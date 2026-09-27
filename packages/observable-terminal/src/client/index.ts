@@ -101,6 +101,10 @@ export interface ObservableTerminalViewer {
   sendInput(data: string): void;
   getSelection(): Promise<string>;
   dragPointer(event: PointerEvent, action: "press" | "motion" | "release", select: boolean): void;
+  /** Send a touch scroll through the terminal's wheel path, including TUI mouse reporting. */
+  scrollTouch(deltaY: number, clientX: number, clientY: number): void;
+  /** Hide the input cursor while reading CLI history without changing the PTY. */
+  setHistoryCursorHidden(hidden: boolean): void;
   paste(text: string): void;
   setTheme(theme: ObservableTerminalTheme): void;
 }
@@ -146,6 +150,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
   let disposed = false;
   let initializing = false;
   let focusRequested = false;
+  let historyCursorHidden = false;
   let theme = options.theme;
 
   const start = (): void => {
@@ -158,6 +163,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
     void initializeTerminalViewer({ ...options, theme: initialTheme }, mount, () => disposed).then((initialized) => {
       if (disposed) { initialized?.dispose(); return; }
       viewer = initialized!;
+      if (historyCursorHidden) viewer.setHistoryCursorHidden(true);
       if (theme && theme !== initialTheme) viewer.setTheme(theme);
       viewer.refresh();
       if (focusRequested && document.hasFocus()) viewer.focus();
@@ -182,6 +188,8 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
     sendInput: (data) => viewer?.sendInput(data),
     getSelection: () => viewer?.getSelection() ?? Promise.resolve(""),
     dragPointer: (event, action, select) => viewer?.dragPointer(event, action, select),
+    scrollTouch: (deltaY, clientX, clientY) => viewer?.scrollTouch(deltaY, clientX, clientY),
+    setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; viewer?.setHistoryCursorHidden(hidden); },
     paste: (text) => viewer?.paste(text),
     setTheme: (value) => { theme = value; viewer?.setTheme(value); },
     dispose: () => { disposed = true; viewer?.dispose(); viewer = undefined; mount.remove(); },
@@ -262,16 +270,23 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         themePending = false;
       }
     };
+    let historyCursorHidden = false;
+    let cursorWasVisible: boolean | undefined;
+    let cursorVisibilityRevision = 0;
+    const hideHistoryCursor = (): void => {
+      if (historyCursorHidden && cursorWasVisible !== undefined) term.write("\x1b[?25l");
+    };
     const writeOutput = (data: string | Uint8Array): void => {
       if (disposed) return;
       if (!awaitingFirstOutput) {
         term.write(data);
+        hideHistoryCursor();
         return;
       }
       awaitingFirstOutput = false;
       // Keep the pane background visible until the first output has been rendered.
       void term.writeAsync(data).then(() => {
-        if (!disposed) term.element.classList.add("observable-terminal-painted");
+        if (!disposed) { hideHistoryCursor(); term.element.classList.add("observable-terminal-painted"); }
       }).catch((error: Error) => {
         reportFailure("paint initial terminal output", error);
       });
@@ -408,6 +423,25 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
             | (event.metaKey ? KeyModifiers.meta : 0),
           timeMs: event.timeStamp,
         });
+      },
+      scrollTouch: (deltaY, clientX, clientY) => {
+        term.element.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX, clientY, cancelable: true }));
+      },
+      setHistoryCursorHidden: (hidden) => {
+        if (historyCursorHidden === hidden) return;
+        historyCursorHidden = hidden;
+        const revision = ++cursorVisibilityRevision;
+        if (hidden) {
+          cursorWasVisible = undefined;
+          void term.readViewport().then(({ cursor }) => {
+            if (revision !== cursorVisibilityRevision) return;
+            cursorWasVisible = cursor.visible;
+            hideHistoryCursor();
+          });
+        } else {
+          if (cursorWasVisible) term.write("\x1b[?25h");
+          cursorWasVisible = undefined;
+        }
       },
       paste: (text) => term.paste(text),
       setTheme: (nextTheme) => { theme = nextTheme; void updateTheme(); },
