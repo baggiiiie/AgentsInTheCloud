@@ -497,10 +497,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function workspaceBootResidentHtml(entry: WorkspaceEntry): string {
     const projectId = isGitProjectInit(entry.init) ? entry.init.projectId : undefined;
-    const deleteButton = buttonHtml({ type: "submit", variant: "danger", content: { kind: "caption", caption: "Delete workspace" } });
-    const deleteAction = `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>`;
     const snapshot = provisioning.snapshot(entry.id);
     const failed = entry.phase.kind === "provisioningPhase" && entry.phase.status === "failed";
+    // Deleting is a recovery decision; offer it only once provisioning has stopped progressing.
+    const stalled = failed || (!!snapshot && snapshot.status !== "running");
+    const deleteButton = buttonHtml({ type: "submit", variant: "danger", content: { kind: "caption", caption: "Delete workspace" } });
+    const deleteAction = stalled ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
     const sourceFailure = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
     const needsSshKey = !!sourceFailure?.error && isSshAuthenticationFailure(sourceFailure.error);
     const recoveryActions = (failed || sourceFailure) && projectId
