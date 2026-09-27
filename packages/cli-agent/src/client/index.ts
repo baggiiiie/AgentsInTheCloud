@@ -178,7 +178,6 @@ export const atelierClientModule: WorkspaceClientModule = {
         const submitKey = composerSubmitKey(event);
         if (!submitKey) return;
         event.preventDefault();
-        if (!this.inputTarget.value.trim() && !this.formTarget.querySelector(".agent-chip")) return;
         if (submitKey === "software-keyboard") this.inputTarget.blur();
         this.formTarget.requestSubmit();
       }
@@ -190,7 +189,13 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!this.connected || !this.viewer) { showError("Terminal disconnected. Reconnect and try again."); return; }
         const form = this.formTarget;
         const data = new FormData(form);
-        if (!String(data.get("text") ?? "").trim() && !data.has("attachment")) return;
+        if (!String(data.get("text") ?? "").trim() && !data.has("attachment")) {
+          status.hidden = true;
+          this.viewer.pressEnter();
+          this.inputTarget.value = "";
+          this.inputChanged();
+          return;
+        }
         const draftText = this.inputTarget.value;
         this.sending = true;
         status.hidden = true;
