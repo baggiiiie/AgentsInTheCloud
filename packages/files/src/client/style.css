@@ -71,7 +71,13 @@
 .files-progress-track { height: 4px; overflow: hidden; border-radius: var(--radius-indicator); background: color-mix(in srgb, var(--text-bright) 14%, transparent); }
 .files-progress-track span { display: block; width: 0; height: 100%; border-radius: inherit; background: var(--accent); transition: width 80ms linear; }
 @media (max-width: 700px) {
-  .file-editor-pane, .files-navigator { grid-template-rows: 52px minmax(0, 1fr); }
+  .file-editor-pane { grid-template-rows: 84px minmax(0, 1fr); }
+  .files-navigator { grid-template-rows: 52px minmax(0, 1fr); }
+  .file-editor-toolbar { flex-direction: column; align-items: stretch; justify-content: center; gap: 2px; }
+  .file-editor-path { flex: none; }
+  .file-editor-toolbar-actions { justify-content: space-between; gap: 4px; overflow-x: auto; }
+  .file-editor-toolbar-actions > * { flex: none; }
+  .file-editor-toolbar-actions > [data-files-pane-expand] { order: -1; }
   .file-editor-status { display: none; }
   .files-workbench { --files-pane-width: 100%; }
   .files-workbench.is-files-pane-open .files-editor-canvas { right: 0; }

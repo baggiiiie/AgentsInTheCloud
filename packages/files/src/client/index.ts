@@ -242,6 +242,7 @@ function createFilesViewController(Controller: WorkspaceClientControllerConstruc
 
     selectedPathValueChanged(): void {
       this.updateSelection();
+      if (this.selectedPathValue) this.collapse();
     }
 
     updateSelection(): void {
