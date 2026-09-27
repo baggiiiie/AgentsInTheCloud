@@ -1,4 +1,5 @@
 export * from "./attachment-drafts.ts";
+export { renderComposerBody, composerAttachmentAttributes } from "./composer.ts";
 export { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { WorkspaceModule } from "@atelier/shared";
 import { handleAttachmentRequest } from "./attachment-routes.ts";

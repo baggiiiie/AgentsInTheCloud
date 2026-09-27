@@ -1,19 +1,46 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalViewportFit, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { isWorkspacePaneVisible, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
       static values = { url: String, workspaceId: String };
-      static targets = ["terminal", "connectionStatus"];
+      static targets = ["terminal", "connectionStatus", "form", "input", "return"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
+      declare readonly formTarget: HTMLFormElement;
+      declare readonly inputTarget: HTMLTextAreaElement;
+      declare readonly returnTarget: HTMLButtonElement;
+      declare readonly hasFormTarget: boolean;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
+      private connected = false;
+      private sending = false;
+      private get draftKey(): string { return `atelier.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
+      private readonly inputChanged = (): void => { localStorage.setItem(this.draftKey, this.inputTarget.value); };
+      private readonly terminalBlur = (event: FocusEvent): void => {
+        if (event.relatedTarget instanceof Node && this.terminalTarget.contains(event.relatedTarget)) return;
+        if (focusLikelyOpensSoftwareKeyboard()) this.showComposer();
+      };
+      private viewportHeight = 0;
+      private keyboardWasOpen = false;
+      private readonly keyboardViewportChanged = (): void => {
+        if (!this.element.classList.contains("cli-raw-mode")) {
+          this.viewportHeight = Math.max(this.viewportHeight, window.visualViewport!.height);
+          return;
+        }
+        const height = window.visualViewport!.height;
+        if (height < this.viewportHeight - 120) this.keyboardWasOpen = true;
+        if (this.keyboardWasOpen && height >= this.viewportHeight - 80) {
+          this.keyboardWasOpen = false;
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          this.showComposer();
+        }
+      };
       private touch?: { id: number; startX: number; startY: number; x: number; y: number; time: number; velocity: number; scrolling: boolean };
       private momentum = 0;
       private viewportFit!: TerminalViewportFit;
@@ -23,6 +50,13 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.viewportFit = new TerminalViewportFit(this.element);
         this.viewportFit.connect();
         window.addEventListener("atelier:workspace-pane-visible", this.activate);
+        this.viewportHeight = window.visualViewport!.height;
+        window.visualViewport!.addEventListener("resize", this.keyboardViewportChanged);
+        if (this.hasFormTarget) {
+          this.inputTarget.value = localStorage.getItem(this.draftKey) ?? "";
+          this.inputTarget.addEventListener("input", this.inputChanged);
+          this.terminalTarget.addEventListener("focusout", this.terminalBlur);
+        }
         this.activate();
       }
       private readonly activate = (): void => {
@@ -50,7 +84,12 @@ export const atelierClientModule: WorkspaceClientModule = {
       disconnect(): void {
         this.viewportFit.disconnect();
         window.removeEventListener("atelier:workspace-pane-visible", this.activate);
+        window.visualViewport!.removeEventListener("resize", this.keyboardViewportChanged);
         this.resize.disconnect();
+        if (this.hasFormTarget) {
+          this.inputTarget.removeEventListener("input", this.inputChanged);
+          this.terminalTarget.removeEventListener("focusout", this.terminalBlur);
+        }
         this.cancelTerminalTouch();
         this.viewer?.dispose();
         this.viewer = undefined;
@@ -99,6 +138,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           || Math.hypot(point.screenX - touch.startX, point.screenY - touch.startY) > 10) return;
         event.preventDefault();
         this.viewer?.setHistoryCursorHidden(false);
+        this.enterRawMode();
         this.viewer?.focus();
         const pointer = new PointerEvent("pointerup", { clientX: point.clientX, clientY: point.clientY });
         this.viewer?.dragPointer(pointer, "press", false);
@@ -120,14 +160,66 @@ export const atelierClientModule: WorkspaceClientModule = {
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
       private setConnected(connected: boolean): void {
         this.connectionStatusTarget.hidden = connected;
-        this.element.setAttribute("data-transcription-composer-unavailable-value", String(!connected));
+        this.connected = connected;
       }
-      dictate(event: CustomEvent<{ text: string }>): void {
-        // Treat recognized text as a paste, never as terminal control keys or Enter.
-        this.resumeInput();
-        this.viewer!.paste(event.detail.text.replace(/[\x00-\x1f\x7f-\x9f]/g, " "));
+      enterRawMode(): void {
+        if (!this.hasFormTarget || !focusLikelyOpensSoftwareKeyboard()) return;
+        this.element.classList.add("cli-raw-mode");
+        this.returnTarget.hidden = false;
       }
-      focus(): void { this.resumeInput(); this.viewer?.focus(); }
+      showComposer(): void {
+        this.element.classList.remove("cli-raw-mode");
+        this.keyboardWasOpen = false;
+        if (this.hasFormTarget) this.returnTarget.hidden = true;
+        this.viewer?.refresh();
+      }
+      inputKeydown(event: KeyboardEvent): void {
+        if (this.element.querySelector(".agent-completion-menu-host:not([hidden])")) return;
+        const submitKey = composerSubmitKey(event);
+        if (!submitKey) return;
+        event.preventDefault();
+        if (!this.inputTarget.value.trim() && !this.formTarget.querySelector(".agent-chip")) return;
+        if (submitKey === "software-keyboard") this.inputTarget.blur();
+        this.formTarget.requestSubmit();
+      }
+      async submit(event: SubmitEvent): Promise<void> {
+        event.preventDefault();
+        if (this.sending) return;
+        const status = this.element.querySelector<HTMLElement>('[data-agent-attachments-target="status"]')!;
+        const showError = (message: string): void => { status.textContent = message; status.hidden = false; };
+        if (!this.connected || !this.viewer) { showError("Terminal disconnected. Reconnect and try again."); return; }
+        const form = this.formTarget;
+        const data = new FormData(form);
+        if (!String(data.get("text") ?? "").trim() && !data.has("attachment")) return;
+        const draftText = this.inputTarget.value;
+        this.sending = true;
+        status.hidden = true;
+        try {
+          const response = await fetch(form.action, { method: "POST", body: data });
+          if (!response.ok) throw new Error(await response.text());
+          const text = await response.text();
+          if (!this.connected) throw new Error("Terminal disconnected. Prompt retained; check the terminal before retrying.");
+          this.viewer.paste(text);
+          // The TUI handles bracketed paste asynchronously; let it finish before
+          // submitting a real Enter key, rather than merging Enter into the paste.
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          if (!this.connected) throw new Error("Terminal disconnected after paste. Check the terminal before retrying.");
+          this.viewer.pressEnter();
+          if (this.inputTarget.value === draftText) {
+            this.inputTarget.value = "";
+            this.inputChanged();
+          }
+          const sentIds = data.getAll("attachment").map(String);
+          if (sentIds.length) {
+            const consumed = await fetch(`${form.action}/consumed`, { method: "POST", body: data });
+            if (!consumed.ok) throw new Error("Prompt sent, but attachments could not be cleared.");
+            for (const chip of form.querySelectorAll(".agent-chip:not(.uploading)")) {
+              if (sentIds.includes(chip.querySelector<HTMLInputElement>('input[name="attachment"]')!.value)) chip.remove();
+            }
+          }
+        } catch (error) { showError(error instanceof Error ? error.message : String(error)); }
+        finally { this.sending = false; }
+      }
       retry(): void {
         this.viewer!.reconnect();
       }

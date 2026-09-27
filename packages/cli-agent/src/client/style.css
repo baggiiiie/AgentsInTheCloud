@@ -2,10 +2,27 @@
 
 .cli-agent-body { position:relative; display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg); color:var(--text-bright); }
 .cli-agent-body .observable-terminal-host { flex:1; min-height:100px; overflow:hidden; touch-action:none; }
+.cli-agent-body .cli-agent-composer {
+  --composer-controls-min-height: calc(3 * var(--composer-control-size) + 2 * var(--composer-control-inset) + 12px);
+  --agent-inline-gutter: 12px;
+  flex:none;
+}
+/* The CLI composer is the terminal pane's bottom edge, like the built-in Agent composer. */
+.cli-agent-body .cli-agent-composer .composer-surface {
+  overflow:visible; border:0; border-top:1px solid var(--line-strong); border-radius:0;
+  background:var(--panel); box-shadow:none;
+}
+.cli-agent-body .cli-agent-composer .composer-surface:focus-within { border-color:var(--line-strong); }
+.cli-agent-body .cli-agent-composer .agent-completion-menu-host:has(> .agent-quick-launches) { bottom:var(--composer-control-inset); }
+.cli-agent-body .cli-agent-composer .composer-input {
+  min-height:max(var(--composer-controls-min-height), calc(1.5em * 4 + 21px));
+  padding-bottom:12px;
+}
 .cli-terminal-status[hidden], .cli-terminal-status:empty { display:none; }
 .cli-terminal-status { padding:12px 20px; display:flex; align-items:center; gap:12px; color:var(--text); }
-.cli-terminal-toolbar { position:absolute; z-index:1; top:6px; right:12px; display:flex; align-items:center; gap:12px; pointer-events:none; }
-.cli-terminal-toolbar [data-transcription-composer-target="button"] { pointer-events:auto; }
-.cli-terminal-dictation-preview { max-width:min(320px, 60cqw); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-muted); font-size:var(--text-body); background:var(--bg); }
-.cli-terminal-dictation-preview:empty { display:none; }
-.cli-terminal-toolbar [data-state="error"] + .transcription-status { top:calc(100% + 6px); bottom:auto; z-index:1; }
+.cli-agent-body [data-cli-terminal-target="return"] { position:absolute; bottom:12px; right:12px; z-index:2; }
+.cli-agent-body [data-cli-terminal-target="return"][hidden] { display:none; }
+@media (max-width:700px) {
+  .cli-agent-body .cli-agent-composer .composer-input { min-height:max(var(--composer-controls-min-height), calc(1.5em * 4 + 30px)); }
+  .cli-agent-body.cli-raw-mode .cli-agent-composer { display:none; }
+}

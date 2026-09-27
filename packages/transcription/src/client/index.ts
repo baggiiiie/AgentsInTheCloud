@@ -21,7 +21,7 @@ export const atelierClientModule: WorkspaceClientModule = {
     hooks.registerCommand({
       id: "transcription.toggle",
       label: "Start or stop transcription",
-      description: "Toggle microphone dictation in the active composer or CLI terminal.",
+      description: "Toggle microphone dictation in the active composer.",
       scope: "agent-conversation",
       binding: "Meta+Alt+Backslash",
       run: () => activeTranscriptionButton()?.click(),

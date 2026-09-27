@@ -194,8 +194,14 @@ async function restartServer(): Promise<void> {
   }
   console.log(`[server] restarting (${why})`);
   stoppingServer = true;
-  server.kill();
-  await server.exited.catch(() => {});
+  const previous = server;
+  previous.kill();
+  const exited = await Promise.race([previous.exited.then(() => true), Bun.sleep(1500).then(() => false)]);
+  if (!exited) {
+    console.log("[server] graceful stop timed out; terminating old server");
+    previous.kill("SIGKILL");
+    await previous.exited;
+  }
   startServer();
   scheduleBrowserReload();
 }

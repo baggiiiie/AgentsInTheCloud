@@ -1,5 +1,6 @@
 .composer-surface { --composer-footer-height: 32px; position: relative; background: var(--panel); border: 1.5px solid var(--line-strong); border-radius: var(--radius-overlay); box-shadow: var(--shadow); overflow: hidden; padding-bottom: var(--composer-footer-height); pointer-events: auto; container-type: inline-size; font: var(--text-body)/var(--leading-standard) var(--font-sans); }
 .composer-surface:focus-within { border-color: var(--accent); }
+.composer-surface:not(:has(> .composer-footer)) { padding-bottom: 0; }
 .agent-attach-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 8px; }
 .agent-attach-row:not(:empty) { padding-top: 8px; }
 .agent-chip {

@@ -153,12 +153,17 @@ export async function deliverAttachmentDraft(workspaceId: string, draftId: strin
 
 async function deliverFileAttachment(workspaceId: string, staged: StagedAttachment): Promise<string> {
   const target = `/tmp/atelier-attachments/${staged.name}`;
+  await copyAttachmentIntoWorkspace(workspaceId, staged, target);
+  return `[Attached file copied into the workspace at ${target}]`;
+}
+
+/** Copy a staged attachment to a caller-owned path in its workspace. */
+export async function copyAttachmentIntoWorkspace(workspaceId: string, staged: StagedAttachment, target: string): Promise<void> {
   const content = await readFile(staged.path);
   const result = await execWorkspaceShell(
     workspaceId,
-    `mkdir -p ${shellQuote(`/tmp/atelier-attachments`)} && base64 -d > ${shellQuote(target)}`,
+    `mkdir -p ${shellQuote(target.slice(0, target.lastIndexOf("/")))} && base64 -d > ${shellQuote(target)}`,
     { stdin: content.toString("base64") },
   );
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `could not copy attachment ${staged.name} into workspace`);
-  return `[Attached file copied into the workspace at ${target}]`;
 }

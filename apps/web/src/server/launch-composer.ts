@@ -1,8 +1,7 @@
-import { renderAttachmentPicker } from "@atelier/prompt/server";
+import { composerAttachmentAttributes, renderComposerBody } from "@atelier/prompt/server";
 import { actionItemHtml } from "@atelier/design-system/action-item";
 import { popupHtml } from "@atelier/design-system/popup";
-import { buttonHtml } from "@atelier/design-system/button";
-import { renderTranscriptionComposerControl, transcriptionComposerController } from "@atelier/transcription/server";
+import { transcriptionComposerController } from "@atelier/transcription/server";
 import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentProvider } from "@atelier/shared";
 
 /** Host-owned launch composer content. */
@@ -37,16 +36,13 @@ export async function renderLaunchProvider(provider: WorkspaceAgentProvider, pro
 export async function launchComposerContent(options: { draftId: string; provider: WorkspaceAgentProvider; providers: readonly WorkspaceAgentProvider[]; context: AgentLaunchFooterContext }): Promise<AgentLaunchPresentation> {
   const { draftId } = options;
   const rowId = domId("agent_draft_attach", draftId);
-  const uploadUrl = `/agent-attachment-drafts/${encodeURIComponent(draftId)}/attachments?row=${rowId}`;
-  const send = buttonHtml({ type: "submit", variant: "primary", content: { kind: "icon-only", label: "Send prompt", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg>' }, attributesHtml: "data-popular-button" });
   return {
-    attributesHtml: `data-controller="composer-focus agent-attachments ${transcriptionComposerController}" data-action="mousedown->composer-focus#preserveInputFocus dragover->agent-attachments#dragOver dragleave->agent-attachments#dragLeave drop->agent-attachments#drop" data-agent-attachments-upload-url-value="${escapeHtml(uploadUrl)}"`,
+    attributesHtml: `data-controller="composer-focus agent-attachments ${transcriptionComposerController}" ${composerAttachmentAttributes(draftId, rowId)}`,
     formAttributesHtml: 'data-action="submit->transcription-composer#submit keydown->submit-shortcut#keydown submit->submit-shortcut#submit turbo:submit-end->launch-composer-dialog#submitted turbo:submit-end->submit-shortcut#submitted"',
-    bodyHtml: `<input type="hidden" name="attachmentDraft" value="${escapeHtml(draftId)}">
-      <div class="agent-attach-row" id="${rowId}" data-agent-attachments-target="row"></div>
-      <div class="composer-input-area"><textarea class="composer-input" name="text" rows="8" enterkeyhint="send" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste"></textarea><div class="composer-input-controls">${renderTranscriptionComposerControl()}${renderAttachmentPicker("icon-only")}</div></div>
-      <div class="composer-actions"><span class="spacer"></span>${send}</div>
-      <p role="status" data-agent-attachments-target="status" hidden></p>`,
+    bodyHtml: renderComposerBody({
+      draft: { id: draftId, rowId },
+      inputHtml: `<textarea class="composer-input" name="text" rows="8" enterkeyhint="send" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste"></textarea>`,
+    }),
     footerHtml: await renderLaunchProvider(options.provider, options.providers, options.context),
     discardUrl: `/agent-attachment-drafts/${encodeURIComponent(draftId)}/discard`,
   };

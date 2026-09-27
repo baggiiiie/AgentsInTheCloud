@@ -14,9 +14,9 @@ interface SlashCommand {
   hotkey?: string;
 }
 
-function slashCommands(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[]): SlashCommand[] {
+function slashCommands(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], applicationCommands: boolean): SlashCommand[] {
   return [
-    { kind: "application-command" as const, trigger: "/tree", description: "Coming soon." },
+    ...(applicationCommands ? [{ kind: "application-command" as const, trigger: "/tree", description: "Coming soon." }] : []),
     ...templates.filter((template) => template.trigger !== "/tree").map((template) => ({
       kind: "prompt-template" as const,
       trigger: template.trigger,
@@ -29,8 +29,8 @@ function slashCommands(templates: readonly PromptTemplate[], skills: readonly Pi
   ];
 }
 
-export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[]): string {
-  const commands = slashCommands(templates, skills);
+export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], applicationCommands = true): string {
+  const commands = slashCommands(templates, skills, applicationCommands);
   const quickLaunches = templates.filter((template) => template.quickLaunch).map((template) => {
     const hotkey = template.hotkey;
     const hotkeyData = hotkey ? ` data-prompt-template-hotkey="${escapeHtml(hotkey)}" data-agent-quick-launch-shortcut="⌘⌥${escapeHtml(hotkey.toUpperCase())}" aria-keyshortcuts="Meta+Alt+${escapeHtml(hotkey.toUpperCase())}"` : "";

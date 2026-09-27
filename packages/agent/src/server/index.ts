@@ -26,6 +26,9 @@ export { handleAgentRequest } from "./routes.ts";
 export { workspaceFileEndpoint } from "./workspace-files.ts";
 export { resolveWorkspacePortProxyBackend } from "./workspace-proxy.ts";
 export { agentConversationKey } from "./render-context.ts";
+export { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
+export { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
+export { expandPromptTemplate } from "./prompt-templates.ts";
 export { agentWorkspaceModule, agentWorkspaceModule as atelierServerModule, workspaceAgentTabProvider } from "./web.ts";
 export {
   createDeleteCurrentWorkspaceTool,

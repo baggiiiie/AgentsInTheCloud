@@ -171,7 +171,8 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
       }
       const send = composerSubmitKey(event) === "shortcut";
       const expand = event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey;
-      if (event.key === "Enter" && input.value.trim() === "/tree") {
+      const treeCommand = input.closest(".composer")?.querySelector('[data-agent-completions-target="catalog"] [data-completion-kind="application-command"][data-command-trigger="/tree"]');
+      if (event.key === "Enter" && input.value.trim() === "/tree" && treeCommand) {
         event.preventDefault();
         event.stopImmediatePropagation();
         actions.setInputValue("");

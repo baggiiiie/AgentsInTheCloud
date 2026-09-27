@@ -137,6 +137,7 @@ export interface ObservableTerminalViewer {
   /** Hide the input cursor while reading CLI history without changing the PTY. */
   setHistoryCursorHidden(hidden: boolean): void;
   paste(text: string): void;
+  pressEnter(): void;
   setTheme(theme: ObservableTerminalTheme): void;
 }
 
@@ -222,6 +223,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
     scrollTouch: (deltaY, clientX, clientY) => viewer?.scrollTouch(deltaY, clientX, clientY),
     setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; viewer?.setHistoryCursorHidden(hidden); },
     paste: (text) => viewer?.paste(text),
+    pressEnter: () => viewer?.pressEnter(),
     setTheme: (value) => { theme = value; viewer?.setTheme(value); },
     dispose: () => { disposed = true; viewer?.dispose(); viewer = undefined; mount.remove(); },
   };
@@ -475,6 +477,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         }
       },
       paste: (text) => term.paste(text),
+      pressEnter: () => term.sendKey({ code: "Enter", text: "\r" }),
       setTheme: (nextTheme) => { theme = nextTheme; void updateTheme(); },
       dispose: () => {
         disposed = true;

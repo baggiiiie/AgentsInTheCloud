@@ -10,6 +10,7 @@
     "@atelier/core": "workspace:*",
     "@atelier/shared": "workspace:*",
     "@atelier/design-system": "workspace:*",
+    "@atelier/transcription": "workspace:*",
     "@atelier/workspace": "workspace:*"
   }
 }

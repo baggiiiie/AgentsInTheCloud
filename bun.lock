@@ -262,6 +262,7 @@
         "@atelier/core": "workspace:*",
         "@atelier/design-system": "workspace:*",
         "@atelier/shared": "workspace:*",
+        "@atelier/transcription": "workspace:*",
         "@atelier/workspace": "workspace:*",
       },
     },

@@ -1,10 +1,13 @@
-import { renderTranscriptionComposerControl } from "@atelier/transcription/server";
+import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, composerAttachmentAttributes } from "@atelier/prompt/server";
+import { transcriptionComposerController } from "@atelier/transcription/server";
 import { buttonHtml } from "@atelier/design-system/button";
 import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
 import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
+import { cliComposerRoutes } from "./composer-routes.ts";
 
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
@@ -24,6 +27,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
       "/cli-agent.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
     },
     initialize(context) { context.registerSocketHandler(cliSocketHandler(adapter.id, sessions)); },
+    routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }],
     agentProvider: {
       id: adapter.id, label: adapter.label, iconHtml: adapter.iconHtml,
       async create({ workspaceId }) {
@@ -36,15 +40,27 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const session = await sessions.ready(workspaceId, conversationId);
           const terminal = await sessions.terminalState(workspaceId, session);
           const url = `/workspaces/${encodeURIComponent(workspaceId)}/${adapter.id}-agents/${encodeURIComponent(conversationId)}`;
-          const canDictate = terminal.exists && !terminal.ended;
-          const transcriptionAttributes = canDictate
-            ? 'data-transcription-composer-terminal-value="true" data-transcription-composer-unavailable-value="true"'
-            : "";
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit" data-controller="cli-terminal${canDictate ? " transcription-composer" : ""}" ${transcriptionAttributes} data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="transcription:segment->cli-terminal#dictate transcription:focus->cli-terminal#focus atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme">
-            ${canDictate ? `<div class="cli-terminal-toolbar"><span class="cli-terminal-dictation-preview" data-transcription-composer-target="preview"></span>${renderTranscriptionComposerControl({ disabled: true })}</div>` : ""}
+          const draftId = agentAttachmentDraftId(workspaceId, `${adapter.id}:${conversationId}`);
+          const rowId = domId("cli_attach", workspaceId, conversationId);
+          const composerUrl = `${url}/composer`;
+          const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="composer-focus agent-attachments agent-completions ${transcriptionComposerController}" ${composerAttachmentAttributes(draftId, rowId)} data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions">
+            <div class="composer-surface">
+              <form id="${domId("cli_composer_form", workspaceId, conversationId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
+                ${renderComposerBody({
+                  draft: { id: draftId, rowId, attachments: await listStagedAttachments(draftId) },
+                  inputHtml: `<textarea class="composer-input" name="text" rows="2" enterkeyhint="send" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
+                })}
+              </form>
+              <div class="agent-completion-menu-host" data-agent-completions-target="menu" hidden></div>
+              <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
+            </div>
+          </div>` : "";
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit" data-controller="cli-terminal" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme">
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             <div class="cli-terminal-status" data-cli-terminal-target="connectionStatus" role="status" hidden>Connection lost. ${retryButton()}</div>
             ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
+            ${composer}
+            ${composer ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10m-5-5 5 5-5 5"/></svg>', label: "Back to composer" }, attributesHtml: 'data-cli-terminal-target="return" data-action="cli-terminal#showComposer" hidden' }) : ""}
           </section>`;
         },
         close: ({ workspaceId, conversationId }) => sessions.close(workspaceId, conversationId),
