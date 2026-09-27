@@ -1,4 +1,4 @@
-import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
+import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalViewportFit, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
 import { isWorkspacePaneVisible, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
@@ -16,9 +16,12 @@ export const atelierClientModule: WorkspaceClientModule = {
       private viewer?: ObservableTerminalViewer;
       private touch?: { id: number; startX: number; startY: number; x: number; y: number; time: number; velocity: number; scrolling: boolean };
       private momentum = 0;
+      private viewportFit!: TerminalViewportFit;
       private resize = new ResizeObserver(() => this.refresh());
 
       connect(): void {
+        this.viewportFit = new TerminalViewportFit(this.element);
+        this.viewportFit.connect();
         window.addEventListener("atelier:workspace-pane-visible", this.activate);
         this.activate();
       }
@@ -44,7 +47,14 @@ export const atelierClientModule: WorkspaceClientModule = {
           },
         });
       }
-      disconnect(): void { window.removeEventListener("atelier:workspace-pane-visible", this.activate); this.resize.disconnect(); this.cancelTerminalTouch(); this.viewer?.dispose(); this.viewer = undefined; }
+      disconnect(): void {
+        this.viewportFit.disconnect();
+        window.removeEventListener("atelier:workspace-pane-visible", this.activate);
+        this.resize.disconnect();
+        this.cancelTerminalTouch();
+        this.viewer?.dispose();
+        this.viewer = undefined;
+      }
       // Gespenst captures touch pointers as terminal mouse drags. Defer mouse input
       // until a completed tap so a swipe cannot click or select in the TUI.
       terminalPointer(event: PointerEvent): void {

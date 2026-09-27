@@ -92,6 +92,37 @@ export class TerminalTouchFocus {
   }
 }
 
+// Fit a focused terminal within the visual viewport when a mobile keyboard
+// pans or shrinks it. Keep the shell unchanged; only the terminal surface fits.
+export class TerminalViewportFit {
+  private readonly viewport = window.visualViewport!;
+  private readonly layoutObserver = new ResizeObserver(() => this.sync());
+
+  constructor(private readonly element: HTMLElement) {}
+
+  readonly sync = (): void => {
+    const bottom = this.viewport.offsetTop + this.viewport.height;
+    const height = Math.max(0, bottom - this.element.getBoundingClientRect().top);
+    this.element.style.setProperty("--terminal-viewport-height", `${height}px`);
+  };
+
+  connect(): void {
+    this.viewport.addEventListener("resize", this.sync);
+    this.viewport.addEventListener("scroll", this.sync);
+    this.element.addEventListener("focusin", this.sync);
+    this.layoutObserver.observe(this.element.parentElement!);
+    this.sync();
+  }
+
+  disconnect(): void {
+    this.viewport.removeEventListener("resize", this.sync);
+    this.viewport.removeEventListener("scroll", this.sync);
+    this.element.removeEventListener("focusin", this.sync);
+    this.layoutObserver.disconnect();
+    this.element.style.removeProperty("--terminal-viewport-height");
+  }
+}
+
 export interface ObservableTerminalViewer {
   dispose(): void;
   focus(): void;

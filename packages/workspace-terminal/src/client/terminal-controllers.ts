@@ -5,6 +5,7 @@ import {
   createObservableTerminalViewer,
   observableWebSocketUrl,
   TerminalTouchFocus,
+  TerminalViewportFit,
   type ObservableTerminalViewer,
 } from "@atelier/observable-terminal/client";
 import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
@@ -59,8 +60,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;
     declare readonly idValue: string;
-    private readonly viewport = window.visualViewport!;
-    private readonly layoutObserver = new ResizeObserver(() => this.syncViewportHeight());
+    private viewportFit!: TerminalViewportFit;
     private readonly touchFocus = new TerminalTouchFocus(() => this.viewer?.focus());
     private pointerDrag?: { id: number; select: boolean };
 
@@ -107,31 +107,18 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
       this.controlTarget.setAttribute("aria-pressed", String(pending));
     }
 
-    readonly syncViewportHeight = (): void => {
-      // Keep the accessory row above the keyboard without resizing the app shell.
-      // offsetTop matters when the browser pans the visual viewport to the input.
-      const bottom = this.viewport.offsetTop + this.viewport.height;
-      const height = Math.max(0, bottom - this.element.getBoundingClientRect().top);
-      this.element.style.setProperty("--terminal-viewport-height", `${height}px`);
-    };
-
     connect(): void {
-      this.viewport.addEventListener("resize", this.syncViewportHeight);
-      this.viewport.addEventListener("scroll", this.syncViewportHeight);
-      this.layoutObserver.observe(this.element.parentElement!);
-      this.syncViewportHeight();
+      this.viewportFit = new TerminalViewportFit(this.element);
+      this.viewportFit.connect();
       if (isWorkspacePaneVisible(this.element)) {
         this.start();
       }
     }
 
     disconnect(): void {
-      this.viewport.removeEventListener("resize", this.syncViewportHeight);
-      this.viewport.removeEventListener("scroll", this.syncViewportHeight);
-      this.layoutObserver.disconnect();
+      this.viewportFit.disconnect();
       this.touchFocus.cancel();
       this.pointerDrag = undefined;
-      this.element.style.removeProperty("--terminal-viewport-height");
       this.stop();
     }
 
