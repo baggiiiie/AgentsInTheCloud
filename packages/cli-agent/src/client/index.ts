@@ -1,14 +1,15 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalTouchFocus, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { isWorkspacePaneVisible, type WorkspaceClientModule } from "@atelier/shared";
+import { isWorkspacePaneVisible, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
-      static values = { url: String };
+      static values = { url: String, workspaceId: String };
       static targets = ["terminal", "connectionStatus"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
+      declare readonly workspaceIdValue: string;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
       declare readonly hasTerminalTarget: boolean;
@@ -31,6 +32,15 @@ export const atelierClientModule: WorkspaceClientModule = {
           theme: atelierObservableTerminalTheme(),
           onConnect: () => this.setConnected(true),
           onDisconnect: () => this.setConnected(false),
+          onFileLink: ({ path, line, column }) => {
+            const anchor = document.createElement("a");
+            anchor.href = `${workspaceFileOpenUrl(this.workspaceIdValue, path, { line, column })}&existing=1`;
+            anchor.dataset.turboStream = "true";
+            anchor.hidden = true;
+            this.element.append(anchor);
+            anchor.click();
+            anchor.remove();
+          },
         });
       }
       disconnect(): void { window.removeEventListener("atelier:workspace-pane-visible", this.activate); this.resize.disconnect(); this.touchFocus.cancel(); this.viewer?.dispose(); this.viewer = undefined; }

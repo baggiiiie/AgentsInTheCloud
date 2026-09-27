@@ -1179,7 +1179,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if ((params = match(/^\/workspaces\/([^/]+)\/file\/open$/))) {
       if (request.method !== "GET") return response("Method not allowed", { status: 405, headers: { allow: "GET" } });
       return await openWorkspaceFile(routeParam(params, 0), parseWorkspaceFileTarget(url.searchParams),
-        (workspaceId, reference) => openWorkspaceModuleWorkView(workspaceId, reference, request));
+        (workspaceId, reference) => openWorkspaceModuleWorkView(workspaceId, reference, request), url.searchParams.get("existing") === "1");
     }
 
     if (url.pathname === "/agent-workspaces" && request.method === "POST") return await createEmptyAgentWorkspaceEndpoint(request);

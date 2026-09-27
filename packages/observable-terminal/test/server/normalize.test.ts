@@ -44,6 +44,7 @@ describe("observable terminal normalization", () => {
       "bind-key", "-n", "S-PPage", "copy-mode -e ; send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-PPage", "send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-NPage", "send-keys -X page-down", ";",
+      "if-shell", "tmux -L 'isolated' show-options -g terminal-features | grep -Fq 'xterm-256color:hyperlinks'", "", "set-option -gas terminal-features ,xterm-256color:hyperlinks", ";",
       "attach-session", "-t", "s",
     ]);
   });

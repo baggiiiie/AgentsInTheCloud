@@ -2,6 +2,7 @@
 
 import type { TerminalTheme } from "@gespenst/core";
 import { encodeObservableTerminalMessage } from "../shared/index.ts";
+import { terminalFileAt, type TerminalFileLink } from "./file-links.ts";
 
 declare const ATELIER_GHOSTTY_WASM_URL: string;
 declare const ATELIER_GHOSTTY_CALLBACKS_WASM_URL: string;
@@ -117,6 +118,8 @@ export interface ObservableTerminalViewerOptions {
   errorMessage?: string;
   transformInput?: (data: string) => string;
   onOutput?: (text: string) => void;
+  /** Opt-in file navigation for agent terminals, not arbitrary shell terminals. */
+  onFileLink?: (link: TerminalFileLink) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
 }
@@ -304,6 +307,63 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       };
     };
     term.on("error", (error) => console.error("Gespenst terminal error", error));
+
+    // Gespenst renders into a canvas, so there are no anchors to click. Read
+    // its authoritative painted cells (including OSC 8 destinations) instead
+    // of trying to parse the incoming PTY byte stream or its escape sequences.
+    if (options.onFileLink) {
+      let rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"] = [];
+      let pointerInside = false;
+      let hoverEvent: PointerEvent | undefined;
+      let pointerStart: { id: number; x: number; y: number } | undefined;
+      const linkAt = (event: PointerEvent) => {
+        const bounds = term.element.getBoundingClientRect();
+        const scale = Math.max(1, globalThis.devicePixelRatio || 1);
+        const column = Math.floor((event.clientX - bounds.left) * scale / term.geometry.cellWidthPx);
+        const row = Math.floor((event.clientY - bounds.top) * scale / term.geometry.cellHeightPx);
+        return rows[row] && column >= 0 && column < term.geometry.cols ? terminalFileAt(rows[row], column) : undefined;
+      };
+      let reading = false;
+      let dirty = false;
+      const updateRows = async () => {
+        dirty = true;
+        if (reading) return;
+        reading = true;
+        try {
+          while (dirty && !disposed) {
+            dirty = false;
+            rows = (await term.readViewport()).viewportRows;
+            term.element.style.cursor = hoverEvent && linkAt(hoverEvent) ? "pointer" : "";
+          }
+        } finally { reading = false; }
+      };
+      term.on("viewportChange", () => { if (pointerInside) void updateRows(); });
+      term.element.addEventListener("pointerenter", () => { pointerInside = true; void updateRows(); });
+      term.element.addEventListener("pointermove", (event) => {
+        hoverEvent = event;
+        term.element.style.cursor = linkAt(event) ? "pointer" : "";
+      });
+      term.element.addEventListener("pointerdown", (event) => {
+        pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        // Do not send mouse input to a TUI when tapping a known link.
+        if (linkAt(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
+      }, { capture: true });
+      term.element.addEventListener("pointerup", (event) => {
+        const start = pointerStart;
+        pointerStart = undefined;
+        if (!start || start.id !== event.pointerId || Math.hypot(start.x - event.clientX, start.y - event.clientY) > 10) return;
+        const link = linkAt(event);
+        if (link) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          options.onFileLink!(link);
+        } else {
+          // A first touch can arrive before the viewport read completes.
+          void updateRows().then(() => { if (!disposed) { const target = linkAt(event); if (target) options.onFileLink!(target); } });
+        }
+      }, { capture: true });
+      term.element.addEventListener("pointerleave", () => { pointerInside = false; hoverEvent = undefined; term.element.style.cursor = ""; pointerStart = undefined; });
+    }
 
     if (options.mode === "interactive") {
       term.on("progress", ({ state, progress }) => {

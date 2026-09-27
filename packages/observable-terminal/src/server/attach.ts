@@ -1,3 +1,4 @@
+import { shellQuote } from "@atelier/core";
 import { observableTerminalEnvironment } from "./constants.ts";
 
 const terminalBridgeSource = String.raw`
@@ -85,6 +86,12 @@ function tmuxAttachArgs(options: HostObservableTerminalAttachOptions): string[] 
   }
   if (options.fixedSize) {
     args.push("set-option", "-t", options.session, "window-size", "manual", ";", "resize-window", "-t", options.session, "-x", String(options.cols), "-y", String(options.rows), ";");
+  }
+  // Tell tmux that the Gespenst client accepts OSC 8. Pi probes this client
+  // feature before emitting file:// hyperlinks; RGB alone is not enough.
+  if (!options.readonly) {
+    const socket = options.socketName ? `-L ${shellQuote(options.socketName)} ` : "";
+    args.push("if-shell", `tmux ${socket}show-options -g terminal-features | grep -Fq 'xterm-256color:hyperlinks'`, "", "set-option -gas terminal-features ,xterm-256color:hyperlinks", ";");
   }
   args.push("attach-session");
   if (options.readonly) args.push("-r");
