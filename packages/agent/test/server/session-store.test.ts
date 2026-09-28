@@ -10,10 +10,10 @@ import {
   listWorkspaceAgentConversations,
   parseWorkspaceAgentFilename,
   replaceWorkspaceAgentSession,
+  publishWorkspaceAgentHistory,
   setWorkspaceAgentConversationTitle,
   sessionShareDir,
   sessionShareKeySlug,
-  sessionTopicSlug,
 } from "../../src/server/session-store.ts";
 
 let dir: string | undefined;
@@ -40,32 +40,44 @@ describe("Workspace Agent conversation store", () => {
   test("parses and ignores filenames", () => {
     expect(parseWorkspaceAgentFilename("Agent 1.jsonl")).toBeUndefined();
     expect(parseWorkspaceAgentFilename("fix-auth-flow--ws1--agent-2--a1b2c3.jsonl", "ws1")).toBeUndefined();
-    expect(parseWorkspaceAgentFilename("fix-auth-flow--ws1--agent-2--53fc77b7-dc19-42d5-b200-2e134ec67529.jsonl", "ws1")).toEqual({
+    expect(parseWorkspaceAgentFilename("builtin--fix-auth-flow--ws1--agent-2--53fc77b7-dc19-42d5-b200-2e134ec67529.jsonl", "ws1")).toEqual({
       conversationId: "53fc77b7-dc19-42d5-b200-2e134ec67529",
       label: "Agent 2",
       number: 2,
     });
-    expect(parseWorkspaceAgentFilename("fix-auth-flow--ws1--agent-2--53fc77b7-dc19-42d5-b200-2e134ec67529.jsonl", "ws2")).toBeUndefined();
+    expect(parseWorkspaceAgentFilename("builtin--fix-auth-flow--ws1--agent-2--53fc77b7-dc19-42d5-b200-2e134ec67529.jsonl", "ws2")).toBeUndefined();
+    expect(parseWorkspaceAgentFilename("fix-auth-flow--ws1--agent-2--53fc77b7-dc19-42d5-b200-2e134ec67529.jsonl", "ws1")?.label).toBe("Agent 2");
   });
 
-  test("projectless Workspace Agent conversations live in the projectless session share", async () => {
+  test("unnamed conversations remain workspace-local; named conversations publish without sidecars", async () => {
     const root = await dataDir();
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1", { topic: "Scratch bug hunt" });
-    expect(agent.label).toBe("Agent 1");
-    expect(agent.conversationId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(agent.path).toStartWith(join(root, "session-shares", "projectless", "scratch-bug-hunt--ws1--agent-1--"));
-    expect(agent.path).toEndWith(".jsonl");
+    const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
+    expect(agent.path).toStartWith(join(root, "workspaces", "ws1", "agent-sessions"));
     expect(await Bun.file(agent.path).exists()).toBe(true);
+    expect(await Bun.file(join(root, "session-shares", "projectless", "builtin--scratch-bug-hunt--ws1--agent-1--" + agent.conversationId + ".jsonl")).exists()).toBe(false);
+    await writeFile(agent.path, '{"type":"message"}\n');
+    const named = await setWorkspaceAgentConversationTitle(agent, "Scratch bug hunt");
+    const published = join(root, "session-shares", "projectless", "builtin--scratch-bug-hunt--ws1--agent-1--" + agent.conversationId + ".jsonl");
+    expect(await Bun.file(published).text()).toBe('{"type":"message"}\n');
+    expect(await Bun.file(published.replace(/\.jsonl$/, ".title")).exists()).toBe(false);
+    await writeFile(agent.path, '{"type":"message"}\n{"type":"update"}\n');
+    await publishWorkspaceAgentHistory(named);
+    expect(await Bun.file(published).text()).toContain("update");
+    expect((await listWorkspaceAgentConversations("ws1"))).toEqual([named]);
+    await rm(join(root, "workspaces", "ws1"), { recursive: true });
+    expect(await Bun.file(published).text()).toContain("update");
   });
 
-  test("Project Workspace Agent conversations live in the Project's session share with topic filenames", async () => {
+  test("project workspaces publish only named conversations into their shared project history", async () => {
     const root = await dataDir();
-    await writeProjectInit("ws1", "repo-1234", "Product Suite");
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1", { topic: "Add OAuth refresh flow!!" });
-    expect(agent.label).toBe("Agent 1");
-    expect(agent.path).toStartWith(join(root, "session-shares", "product-suite", "add-oauth-refresh-flow--ws1--agent-1--"));
-    expect(agent.path).toEndWith(".jsonl");
-    expect(await Bun.file(agent.path).exists()).toBe(true);
+    await writeProjectInit("front", "frontend", "suite");
+    await writeProjectInit("back", "backend", "suite");
+    const front = await ensureDefaultWorkspaceAgentConversation("front");
+    const back = await ensureDefaultWorkspaceAgentConversation("back");
+    await setWorkspaceAgentConversationTitle(front, "Frontend work");
+    await setWorkspaceAgentConversationTitle(back, "Backend work");
+    expect((await Bun.file(join(root, "session-shares", "suite", `builtin--frontend-work--front--agent-1--${front.conversationId}.jsonl`)).exists())).toBe(true);
+    expect((await Bun.file(join(root, "session-shares", "suite", `builtin--backend-work--back--agent-1--${back.conversationId}.jsonl`)).exists())).toBe(true);
   });
 
   test("ignores incomplete persisted project metadata", async () => {
@@ -73,26 +85,16 @@ describe("Workspace Agent conversation store", () => {
     const path = join(root, "workspaces", "ws1", "metadata");
     await mkdir(path, { recursive: true });
     await writeFile(join(path, "init.json"), JSON.stringify({ type: "project.git", sessionShareKey: "unvalidated-share" }));
-
     const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
-
-    expect(agent.path).toStartWith(join(root, "session-shares", "projectless"));
-  });
-
-  test("workspaces with the same session share key share storage while Agent conversations stay Workspace-local", async () => {
-    await dataDir();
-    await writeProjectInit("front", "frontend", "suite");
-    await writeProjectInit("back", "backend", "suite");
-    await ensureDefaultWorkspaceAgentConversation("front", { topic: "frontend work" });
-    await ensureDefaultWorkspaceAgentConversation("back", { topic: "backend work" });
-    expect((await listWorkspaceAgentConversations("front")).map((agent) => agent.path.split("/").at(-1))).toEqual([expect.stringContaining("frontend-work--front--agent-1--")]);
-    expect((await listWorkspaceAgentConversations("back")).map((agent) => agent.path.split("/").at(-1))).toEqual([expect.stringContaining("backend-work--back--agent-1--")]);
+    await setWorkspaceAgentConversationTitle(agent, "Valid history");
+    expect(await Bun.file(join(root, "session-shares", "projectless", `builtin--valid-history--ws1--agent-1--${agent.conversationId}.jsonl`)).exists()).toBe(true);
   });
 
   test("createNextWorkspaceAgentConversation creates lowest unused agent number and list sorts", async () => {
     const root = await dataDir();
     await ensureDefaultWorkspaceAgentConversation("ws1");
     const oldAgentPath = join(root, "session-shares", "projectless", "old-task--ws1--agent-10--268604ac-d16a-4a4a-ab1e-1ed3ca54687d.jsonl");
+    await mkdir(join(root, "session-shares", "projectless"), { recursive: true });
     await writeFile(oldAgentPath, "");
     await writeFile(oldAgentPath.replace(/\.jsonl$/, ".title"), "Old task\n");
     await writeFile(join(root, "session-shares", "projectless", "notes.txt"), "ignored");
@@ -148,7 +150,17 @@ describe("Workspace Agent conversation store", () => {
 
     expect(await listWorkspaceAgentConversations("ws1")).toEqual([first]);
     expect(await Bun.file(second.path.replace(/\.jsonl$/, ".archived.jsonl")).text()).toBe('{"type":"message"}\n');
-    expect(await Bun.file(second.path.replace(/\.jsonl$/, ".archived.title")).text()).toBe("Untitled\n");
+    expect(await Bun.file(second.path.replace(/\.jsonl$/, ".archived.title")).exists()).toBe(false);
+  });
+
+  test("archiving uses the current name even when its caller has an older title", async () => {
+    const root = await dataDir();
+    const original = await ensureDefaultWorkspaceAgentConversation("ws1");
+    await writeFile(original.path, "saved history\n");
+    await setWorkspaceAgentConversationTitle(original, "Named history");
+    await archiveWorkspaceAgentConversation(original);
+    expect(await Bun.file(join(root, "session-shares", "projectless", `builtin--named-history--ws1--agent-1--${original.conversationId}.archived.jsonl`)).text()).toBe("saved history\n");
+    expect(await listWorkspaceAgentConversations("ws1")).toEqual([]);
   });
 
   test("replaces the Agent session behind an existing Agent conversation and archives the old session", async () => {
@@ -166,6 +178,20 @@ describe("Workspace Agent conversation store", () => {
     expect(await listWorkspaceAgentConversations("ws1")).toEqual([replacement]);
   });
 
+  test("replacing a named conversation retains the prior shared snapshot", async () => {
+    const root = await dataDir();
+    const original = await ensureDefaultWorkspaceAgentConversation("ws1");
+    await writeFile(original.path, "first run\n");
+    const named = await setWorkspaceAgentConversationTitle(original, "Named run");
+    const replacement = await replaceWorkspaceAgentSession(original);
+    expect(replacement.title).toBe(named.title);
+    const shared = join(root, "session-shares", "projectless", `builtin--named-run--ws1--agent-1--${named.conversationId}`);
+    expect(await Bun.file(`${shared}.archived.jsonl`).text()).toBe("first run\n");
+    await writeFile(replacement.path, "second run\n");
+    await publishWorkspaceAgentHistory(replacement);
+    expect(await Bun.file(`${shared}.jsonl`).text()).toBe("second run\n");
+  });
+
   test("concurrent list readers never observe the replacement gap used by /new", async () => {
     await dataDir();
     const original = await ensureDefaultWorkspaceAgentConversation("ws1");
@@ -179,8 +205,6 @@ describe("Workspace Agent conversation store", () => {
   });
 
   test("slugs are filesystem friendly", () => {
-    expect(sessionTopicSlug("Add OAuth refresh flow!!")).toBe("add-oauth-refresh-flow");
-    expect(sessionTopicSlug("!!!")).toBe("agent-session");
     expect(sessionShareKeySlug("Product Suite")).toBe("product-suite");
     expect(sessionShareDir("Product Suite", "/tmp/data")).toBe("/tmp/data/session-shares/product-suite");
   });
@@ -205,9 +229,9 @@ describe("host-owned project onboarding permission", () => {
     expect(isProjectOnboardingWorkspace(replacement.workspaceId)).toBe(true);
   });
 
-  test("a topic or transcript cannot opt a normal conversation in", async () => {
+  test("a transcript cannot opt a normal conversation in", async () => {
     await dataDir();
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1", { topic: "project-onboarding" });
+    const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
     await writeFile(agent.path, JSON.stringify({ type: "custom", projectOnboarding: true }));
     await writeFile(agent.path.replace(/\.jsonl$/, ".capabilities.json"), JSON.stringify({ projectOnboarding: [agent.conversationId] }));
     expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(false);

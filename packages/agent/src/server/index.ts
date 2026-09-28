@@ -4,6 +4,7 @@ export {
   ensureDefaultWorkspaceAgentConversation,
   listWorkspaceAgentConversations,
   parseWorkspaceAgentFilename,
+  publishSessionSnapshot,
   sessionShareDir,
   workspaceSessionShareKey,
   sessionShareKeySlug,
@@ -22,6 +23,7 @@ export {
   type WorkspaceAgentRuntime,
 } from "./runtime.ts";
 export { registerAgentEvents } from "./agent-events.ts";
+export { suggestSessionSlug } from "./agent-title-suggestion.ts";
 export { handleAgentRequest } from "./routes.ts";
 export { workspaceFileEndpoint } from "./workspace-files.ts";
 export { resolveWorkspacePortProxyBackend } from "./workspace-proxy.ts";

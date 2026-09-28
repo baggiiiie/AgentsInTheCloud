@@ -10,7 +10,7 @@ export function piLaunchScript(input: WorkspaceAgentInput, imagePaths: string[],
   const model = settings.model ? parseModelRef(settings.model)! : undefined;
   // Pi treats @-prefixed positionals as file attachments even after --.
   const message = prompt.startsWith("@") ? `\n${prompt}` : prompt;
-  const args = ["--approve", "--offline", "--tui-mode", "regular", "--session-dir", "/home/atelier/.local/share/pi/sessions",
+  const args = ["--approve", "--offline", "--tui-mode", "regular", "--session-dir", session ? `/home/atelier/.local/share/pi/sessions/${session.id}` : "/home/atelier/.local/share/pi/sessions",
     ...(session ? ["--extension", piAtelierExtensionPath(session.id)] : []),
     ...(model ? ["--provider", model.provider, "--model", model.id] : []),
     ...(settings.thinkingLevel ? ["--thinking", settings.thinkingLevel] : []),

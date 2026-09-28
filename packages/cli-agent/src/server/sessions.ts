@@ -1,5 +1,7 @@
 import { dirname } from "node:path";
-import { prepareAgentMcp, revokeAgentMcp } from "@atelier/agent/server";
+import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@atelier/agent/server";
+import { parseModelRef } from "@atelier/llm/server";
+import { exportCliHistory } from "./history.ts";
 import { AtelierCoreError, createKeyedOperationQueue, shellQuote } from "@atelier/core";
 import { buildObservableSessionCommand } from "@atelier/observable-terminal/server";
 import { imageMimeByExtension } from "@atelier/prompt/server";
@@ -16,6 +18,7 @@ const sessionSchema = Type.Object({
   kind: Type.Optional(Type.String()), error: Type.Optional(Type.String()),
   firstPresentation: Type.Optional(Type.Boolean()),
   model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()),
+  historySlug: Type.Optional(Type.String()),
 });
 const stateSchema = Type.Object({ sessions: Type.Array(sessionSchema) });
 type CliSession = Static<typeof sessionSchema>;
@@ -110,15 +113,45 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     const [dead, status] = result.stdout.trim().split(":");
     return { exists: true, ended: dead === "1", exitCode: status ? Number(status) : undefined };
   }
-  function close(workspaceId: string, id: string): Promise<void> {
-    return serialize(workspaceId, async () => {
+  async function recordNamingPrompt(workspaceId: string, id: string, text: string): Promise<void> {
+    await serialize(workspaceId, async () => {
+      const session = get(workspaceId, id);
+      if (session.input.text.trim()) return;
+      session.input = { ...session.input, text };
+      store().write(workspaceId, { sessions: list(workspaceId) });
+    });
+  }
+  async function exportHistory(workspaceId: string, id: string): Promise<void> {
+    if (!["pi", "codex", "claude"].includes(adapter.id)) return;
+    await serialize(workspaceId, async () => {
+      const session = list(workspaceId).find((item) => item.id === id);
+      if (!session || session.error) return;
+      if (!session.historySlug) {
+        try {
+          session.historySlug = await suggestSessionSlug(session.input.text, session.model ? parseModelRef(session.model) : undefined);
+        } catch (error) {
+          console.error(`Could not name ${adapter.label} session ${id}`, error);
+          return;
+        }
+        if (!session.historySlug) return;
+        store().write(workspaceId, { sessions: list(workspaceId) });
+      }
+      await exportCliHistory(workspaceId, adapter.id, session.id, session.historySlug);
+    });
+  }
+  async function close(workspaceId: string, id: string): Promise<void> {
+    await exportHistory(workspaceId, id);
+    await serialize(workspaceId, async () => {
       const session = get(workspaceId, id);
       await revokeAgentMcp(workspaceId, id);
       if ((await terminalState(workspaceId, session)).exists) await checkedShell(workspaceId, `tmux kill-session -t ${shellQuote(session.tmuxSession)}`);
       store().write(workspaceId, { sessions: list(workspaceId).filter((session) => session.id !== id) });
     });
   }
-  return { list, get, ready, create, prepareWorkspace, acknowledgeFirstPresentation, terminalState, close };
+  async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
+    for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
+  }
+  return { list, get, ready, create, prepareWorkspace, acknowledgeFirstPresentation, terminalState, recordNamingPrompt, close, exportHistory, exportWorkspaceHistory };
 }
 
 export type CliSessions = ReturnType<typeof createCliSessions>;

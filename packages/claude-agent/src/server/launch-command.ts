@@ -21,6 +21,7 @@ export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: strin
   // Added to whatever MCP servers the user configured; Claude merges both sets.
   const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session.id)] : [];
   const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), ...mcpArgs,
+    ...(session ? ["--session-id", session.id] : []),
     ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["--effort", settings.thinkingLevel] : []), ...(prompt ? ["--", prompt] : [])];
   // The subscription is already connected in Atelier. Preserve other CLI preferences.

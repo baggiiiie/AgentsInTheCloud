@@ -95,4 +95,5 @@ test("loads the session's Atelier extension", async () => {
   const [code, output] = await run(piLaunchScript(empty, [], {}, { id: sessionId, turnSignalCommand: `${home}/turn-signal.sh` }));
   expect(code).toBe(0);
   expect(output.split("\0")).toContain(piAtelierExtensionPath(sessionId));
+  expect(output.split("\0")).toContain(`/home/atelier/.local/share/pi/sessions/${sessionId}`);
 });

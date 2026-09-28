@@ -31,13 +31,12 @@ const automaticallyNameConversation = createAutomaticWorkspaceNamingGate();
 const serializeTitleOperation = createKeyedOperationQueue();
 
 function promptFor(userPrompt: string): string {
-  return `Your job is to come with a slug to describe an agent session. The session was initiated with this user prompt:
+  return `Name the task in this agent session using 2–7 meaningful lowercase words joined by hyphens. Return ONLY the slug: no explanation, reasoning, quotes, or punctuation. If the prompt does not identify a task, return exactly error.
 
+User's task:
 --
 ${userPrompt}
---
-
-respond with the name, or with "error" if for some reason there is not enough to go on to make a name.`;
+--`;
 }
 
 function textFromResponse(response: { content: Array<{ type: string; text?: string }> }): string {
@@ -195,6 +194,20 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
     pendingRenames.add(key);
     void suggest().finally(() => pendingRenames.delete(key));
   }
+}
+
+export async function suggestSessionSlug(userPrompt: string, selectedModel?: ModelRef): Promise<string | undefined> {
+  if (!userPrompt.trim()) return undefined;
+  const modelRef = selectedModel ?? await resolveNewWorkspaceAgentModel();
+  if (!modelRef) return undefined;
+  const runtime = await createPiModelRuntime();
+  const model = runtime.getModels(modelRef.provider).toSorted((a, b) => a.cost.input - b.cost.input)[0];
+  if (!model || !(await runtime.checkAuth(model.provider))) return undefined;
+  const response = await runtime.completeSimple(model, {
+    messages: [{ role: "user", content: promptFor(userPrompt), timestamp: Date.now() }],
+  }, agentTitleRequestOptions);
+  if (response.stopReason === "error") return undefined;
+  return normalizeSlug(textFromResponse(response));
 }
 
 export function maybeNameAgentFromPrompt(agent: WorkspaceAgentConversationInfo, userMessages: string[], options: { events?: AtelierEventBus; agentModel?: ModelRef } = {}): void {

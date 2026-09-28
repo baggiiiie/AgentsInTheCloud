@@ -26,7 +26,17 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
       ...observableTerminalStaticFiles,
       "/cli-agent.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
     },
-    initialize(context) { context.registerSocketHandler(cliSocketHandler(adapter.id, sessions)); },
+    initialize(context) {
+      context.registerSocketHandler(cliSocketHandler(adapter.id, sessions));
+      context.events.on("workspace_agent_turn_finished", ({ workspaceId, conversationId }) => {
+        if (sessions.list(workspaceId).some((session) => session.id === conversationId)) {
+          void sessions.exportHistory(workspaceId, conversationId).catch((error) => console.error(`Could not export ${adapter.label} session ${conversationId}`, error));
+        }
+      });
+      context.events.on("workspace_deleting", async ({ workspaceId }) => {
+        await sessions.exportWorkspaceHistory(workspaceId);
+      });
+    },
     routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }],
     agentProvider: {
       id: adapter.id, label: adapter.label, iconHtml: adapter.iconHtml,

@@ -130,5 +130,6 @@ test("adds the session-local Atelier MCP configuration without disabling the use
   expect(code).toBe(0);
   const args = output.split("\0");
   expect(args[args.indexOf("--mcp-config") + 1]).toBe(claudeMcpConfigPath(sessionId));
+  expect(args[args.indexOf("--session-id") + 1]).toBe(sessionId);
   expect(args).not.toContain("--strict-mcp-config");
 });

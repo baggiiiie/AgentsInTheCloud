@@ -15,8 +15,9 @@ export async function subagentHistoryDirectory(workspaceId: string, dataDir = ge
 
 const historyGuide = `# Finding delegated session history
 
-Root session filenames end in --<workspace-id>--agent-<number>--<root-conversation-id>.jsonl
-(or .archived.jsonl). Some root sessions also contain a custom subagent_history entry
+Built-in root session filenames start with builtin-- and end in
+--<workspace-id>--agent-<number>--<root-conversation-id>.jsonl (or .archived.jsonl).
+Older root filenames have no builtin-- prefix. Some root sessions also contain a custom subagent_history entry
 with the relative directory and rootId below. All paths here are relative to this
 read-only session share; they work inside /atelier/session-share without host access.
 

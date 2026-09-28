@@ -165,7 +165,7 @@ read-only session share. From a workspace:
 
 ```text
 /atelier/session-share/
-  <topic>--<workspace-id>--agent-<number>--<root-id>.jsonl
+  builtin--<topic>--<workspace-id>--agent-<number>--<root-id>.jsonl
   SUBAGENTS.md
   subagents/<workspace-id>/
     state.json
@@ -174,7 +174,7 @@ read-only session share. From a workspace:
 ```
 
 The root's `subagent_history` custom entry supplies the relative directory and root
-ID. Older files without it use the workspace ID and final conversation UUID in their
+ID. Older files without it, including filenames without the `builtin--` prefix, use the workspace ID and final conversation UUID in their
 filename (including `.archived.jsonl`). In `state.json`, select all `agents` with that
 `rootId`; each `id` names a JSONL file and `parentId` links immediate parents. The
 ledger's `messages` provide timestamps and originating tool-call IDs for correlation.

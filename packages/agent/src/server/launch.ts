@@ -64,8 +64,8 @@ export const nativeAgentLaunch: WorkspaceAgentLaunch = {
       },
     };
   },
-  async prepareWorkspace(workspaceId, context) {
-    await ensureDefaultWorkspaceAgentConversation(workspaceId, { topic: context?.agent?.initialPrompt });
+  async prepareWorkspace(workspaceId) {
+    await ensureDefaultWorkspaceAgentConversation(workspaceId);
   },
   async refreshConfiguration(frameId) {
     await reconcileAgentModelPreferences();

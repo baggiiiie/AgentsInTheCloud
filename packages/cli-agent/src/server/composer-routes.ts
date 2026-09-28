@@ -49,6 +49,7 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
       notes.push(`[Attached ${attachment.isImage ? "image" : "file"} available at ${path}]`);
     }
     text = [text, ...notes].filter(Boolean).join("\n\n");
+    await sessions.recordNamingPrompt(workspaceId, conversationId, text);
     return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
   };
 }
