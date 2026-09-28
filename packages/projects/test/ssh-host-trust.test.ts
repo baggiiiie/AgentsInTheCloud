@@ -84,7 +84,11 @@ async function startServer(hostKey: string, authorizedKey: string): Promise<numb
   await run(["sudo", "-n", "mkdir", "-p", "/run/sshd"]);
   daemon = Bun.spawn(["sudo", "-n", sshd, "-D", "-e", "-f", config], { stdin: "ignore", stdout: "ignore", stderr: "pipe" });
   for (let attempt = 0; attempt < 100; attempt++) {
-    if (daemon.exitCode !== null) throw new Error(`sshd exited: ${await new Response(daemon.stderr).text()}`);
+    if (daemon.exitCode !== null) {
+      const stderr = await new Response(daemon.stderr).text();
+      daemon = undefined;
+      throw new Error(`sshd exited: ${stderr}`);
+    }
     const ready = await new Promise<boolean>((resolve) => {
       const connection = createConnection({ host: "127.0.0.1", port });
       connection.once("connect", () => { connection.destroy(); resolve(true); });

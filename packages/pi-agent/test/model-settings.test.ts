@@ -19,7 +19,7 @@ async function scenario(script: string) {
       getConfiguredModels: async () => favorites,
       createPiModelRuntime: async () => {
         runtimeCreations++;
-        return runtime = { getAvailable: async () => favorites.filter(m => m.id !== "unavailable"), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
+        return runtime = { getAvailable: async () => favorites.filter(m => m.id !== "unavailable"), checkAuth: async () => true, getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
       },
       hasConnectedModelProvider: () => true,
       modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high"],

@@ -41,11 +41,14 @@ function codexAccountId(token: string): string {
  */
 export async function maskCodexAccountDiscovery(response: Response, accountId: string): Promise<Response> {
   const payload: unknown = await response.clone().json().catch(() => null);
-  if (!Value.Check(Type.Object({ accounts: Type.Array(Type.Object({ id: Type.String() })) }), payload)) return response;
+  if (!Value.Check(Type.Object({
+    accounts: Type.Array(Type.Object({ id: Type.String() })),
+    account_ordering: Type.Optional(Type.Array(Type.String())),
+    default_account_id: Type.Optional(Type.String()),
+  }), payload)) return response;
   for (const account of payload.accounts) if (account.id === accountId) account.id = codexAccount;
-  const discovery = payload as typeof payload & { account_ordering?: string[]; default_account_id?: string };
-  if (Array.isArray(discovery.account_ordering)) discovery.account_ordering = discovery.account_ordering.map(id => id === accountId ? codexAccount : id);
-  if (discovery.default_account_id === accountId) discovery.default_account_id = codexAccount;
+  if (payload.account_ordering) payload.account_ordering = payload.account_ordering.map(id => id === accountId ? codexAccount : id);
+  if (payload.default_account_id === accountId) payload.default_account_id = codexAccount;
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.delete("content-encoding");

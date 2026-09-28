@@ -14,7 +14,7 @@ async function scenario(script: string) {
     ];
     mock.module("@atelier/llm/server", () => ({ ...llm,
       getConfiguredModels: async () => favorites,
-      createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
+      createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
       modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high", "xhigh"],
     }));
     const { claudeModelSettings: { prepare } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/model-settings.ts"))});

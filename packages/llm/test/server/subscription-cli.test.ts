@@ -33,12 +33,15 @@ test("Codex routing discovery sees its placeholder as the selected account witho
 
 test("workspace proxy translates Codex discovery only on ChatGPT's account endpoint", async () => {
   const token = `header.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "account-123" } })).toString("base64url")}.signature`;
+  // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
   registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: token } }) }) as any);
   const context = await createWorkspaceSecretContext("codex-discovery-test");
+  // SAFETY: The workspace secret context always returns a rewritten Request for matched hosts.
   const request = await context.hooks.onRequest!(new Request("https://chatgpt.com/backend-api/wham/accounts/check", { headers: { authorization: "Bearer atelier-subscription-codex-access", "chatgpt-account-id": "atelier-subscription-codex-account" } })) as Request;
   expect(request.headers.get("authorization")).toBe(`Bearer ${token}`);
   expect(request.headers.get("chatgpt-account-id")).toBe("account-123");
   const upstream = new Response(JSON.stringify({ accounts: [{ id: "account-123" }] }));
+  // SAFETY: The registered codex-accounts-check transform returns a Response for accounts/check.
   const result = await context.hooks.onResponse!(upstream, request) as Response;
   expect((await result.json()).accounts[0].id).toBe("atelier-subscription-codex-account");
   const unrelated = new Response("untouched");

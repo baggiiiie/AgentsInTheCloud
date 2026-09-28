@@ -238,7 +238,9 @@ export async function getProjectConfiguration(projectId: string, file = projects
 export async function listProjects(file = projectsFile()): Promise<ProjectListResult> {
   const store = await readProjectStore(file);
   const projects = [...store.projects].sort((a, b) => a.name.localeCompare(b.name) || (a.branch ?? "").localeCompare(b.branch ?? "") || a.gitUrl.localeCompare(b.gitUrl)).map(projectSummary);
-  return { projects, ...(store.lastProjectlessWorkspaceCreatedAt === undefined ? {} : { lastProjectlessWorkspaceCreatedAt: store.lastProjectlessWorkspaceCreatedAt }) };
+  const result: ProjectListResult = { projects };
+  if (store.lastProjectlessWorkspaceCreatedAt !== undefined) result.lastProjectlessWorkspaceCreatedAt = store.lastProjectlessWorkspaceCreatedAt;
+  return result;
 }
 
 export async function addProject(spec: string, file = projectsFile()): Promise<AddProjectResult> {
