@@ -70,8 +70,12 @@ test("GitHub host keys are trusted without project configuration, including SSH 
 });
 
 async function startServer(hostKey: string, authorizedKey: string): Promise<number> {
-  // Requires OpenSSH server and passwordless sudo to run its privilege-separated daemon.
+  // Requires passwordless sudo to install OpenSSH if needed and run its privilege-separated daemon.
   const sshd = Bun.which("sshd") ?? "/usr/sbin/sshd";
+  if (!(await Bun.file(sshd).exists())) {
+    await run(["sudo", "-n", "apt-get", "update", "-qq"]);
+    await run(["sudo", "-n", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", "-qq", "openssh-server"]);
+  }
   const socket = createServer();
   await new Promise<void>((resolve) => socket.listen(0, "127.0.0.1", resolve));
   // SAFETY: listen completed successfully on an explicit TCP address, not a Unix socket.
@@ -165,4 +169,4 @@ test("real SSH cloning and nested submodules require verified host trust and val
   const wrongLogin = await key("wrong-login");
   await createProjectSshKey(project.id, wrongLogin.privateKey);
   await expect(prepare("wrong-login")).rejects.toThrow("Permission denied");
-}, 30_000);
+}, 180_000);
