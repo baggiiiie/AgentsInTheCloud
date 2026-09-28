@@ -29,10 +29,11 @@ test("exports favorites, labels, capabilities and custom models without credenti
     anthropic: { auth: { apiKey: "sk-ant-oat-real-secret" }, source: "OAuth" },
   });
   const config = await createPiCliConfiguration(runtime, [{ provider: "custom", id: "test-model", label: "My favorite" }, { provider: "anthropic", id: "test-model", label: "Claude" }]);
-  expect(config.enabledModels).toEqual(["custom/test-model", "anthropic/test-model"]);
+  // Anthropic permits Claude subscription tokens only in Claude Code.
+  expect(config.enabledModels).toEqual(["custom/test-model"]);
+  expect(config.auth.anthropic).toBeUndefined();
   expect(config.models.providers.custom!.models[0]!.name).toBe("My favorite");
   expect(config.models.providers.custom!.models[0]!.thinkingLevelMap).toEqual({ minimal: null });
-  expect(config.auth.anthropic!.key).toStartWith("sk-ant-oat-atelier-pi-");
   const serialized = JSON.stringify(config);
   for (const secret of ["custom-secret", "custom-header-secret", "real-account", "real-signature", "sk-ant-oat-real-secret", "refresh"]) expect(serialized).not.toContain(secret);
 
@@ -44,7 +45,7 @@ test("exports favorites, labels, capabilities and custom models without credenti
     const imported = await ModelRuntime.create({ modelsPath: join(directory, "models.json"), authPath: join(directory, "auth.json"), modelsStorePath: join(directory, "cache.json"), allowModelNetwork: false });
     expect(imported.getError()).toBeUndefined();
     const available = await imported.getAvailable();
-    for (const m of models) expect(available.some((item) => item.provider === m.provider && item.id === m.id)).toBe(true);
+    for (const m of models.filter((item) => item.provider !== "anthropic")) expect(available.some((item) => item.provider === m.provider && item.id === m.id)).toBe(true);
     expect((await imported.getAuth(imported.getModel("custom", "test-model")!))!.auth.headers!["x-custom-auth"]).toBe(config.models.providers.custom!.models[0]!.headers!["x-custom-auth"]);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
@@ -74,11 +75,19 @@ test("Codex receives a real access token and account header while the CLI gets o
   expect(request.headers.get("chatgpt-account-id")).toBe("account-two");
 });
 
-test("Anthropic OAuth markers retain the OAuth prefix without sending the placeholder upstream", async () => {
-  const runtime = fixture([model("anthropic", "anthropic-messages", "https://api.anthropic.com")], { anthropic: { auth: { apiKey: "sk-ant-oat-secret" } } });
+test("exports Anthropic API keys but refuses Claude subscription tokens, including for already running Pi tabs", async () => {
+  const anthropic = model("anthropic", "anthropic-messages", "https://api.anthropic.com");
+  const runtime = fixture([anthropic], { anthropic: { auth: { apiKey: "sk-ant-api03-secret" } } });
+  expect(await piCliModelUnavailableReason(runtime, anthropic)).toBeUndefined();
   const config = await createPiCliConfiguration(runtime, []);
-  const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://api.anthropic.com/v1/messages", { headers: { authorization: `Bearer ${config.auth.anthropic!.key}` } }));
-  expect(request.headers.get("authorization")).toBe("Bearer sk-ant-oat-secret");
+  const transform = createPiCliCredentialTransform(async () => runtime);
+  const request = () => new Request("https://api.anthropic.com/v1/messages", { headers: { "x-api-key": config.auth.anthropic!.key } });
+  expect((await transform(request())).headers.get("x-api-key")).toBe("sk-ant-api03-secret");
+
+  runtime.auth.anthropic = { auth: { apiKey: "sk-ant-oat01-secret" } };
+  expect(await piCliModelUnavailableReason(runtime, anthropic)).toContain("Anthropic does not allow you to use our other agents with their subscription");
+  expect((await createPiCliConfiguration(runtime, [])).auth.anthropic).toBeUndefined();
+  await expect(transform(request())).rejects.toThrow("Anthropic does not allow you to use our other agents with their subscription");
 });
 
 test("rejects foreign hosts, changed endpoints, disconnected providers and malformed markers", async () => {

@@ -1,3 +1,4 @@
+import { anthropicSubscriptionNotice, usesAnthropicSubscription } from "./anthropic-subscription.ts";
 import { providerConnections, type ProviderConnection } from "./provider-connections.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef } from "./model-reference.ts";
@@ -8,6 +9,7 @@ import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
 import { dialogHtml } from "@atelier/design-system/dialog";
 import { Icons } from "@atelier/design-system/icons";
+import { warningBannerHtml } from "@atelier/design-system/warning-banner";
 import {
   connectModelProviderApiKey,
   ProviderCatalogueRefreshError,
@@ -94,7 +96,7 @@ function providerAuthAction(provider: ProviderSummary, method: string, surface: 
 }
 function renderConnectionMethods(provider: ProviderSummary, surface: ModelSetupSurface): string {
   return renderConnectionStep(provider, surface, {
-    bodyHtml: `<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="${providerAuthAction(provider, method, surface)}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>`,
+    bodyHtml: `<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="${providerAuthAction(provider, method, surface)}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>${provider.provider === "anthropic" ? warningBannerHtml(anthropicSubscriptionNotice) : ""}`,
   });
 }
 function providerListFrameId(surface: ModelSetupSurface): string { return domId("model_providers", surface); }
@@ -146,7 +148,8 @@ async function providerHasFavorite(provider: string): Promise<boolean> {
 }
 async function renderModelSelection(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
   const frameId = providerFrameId(surface, provider.provider);
-  return setupFrame(surface, `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}
+  const subscriptionNotice = provider.provider === "anthropic" && await usesAnthropicSubscription(await createPiModelRuntime()) ? warningBannerHtml(anthropicSubscriptionNotice) : "";
+  return setupFrame(surface, `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}${subscriptionNotice}
     ${renderFavorites(await getConfiguredModels(), surface, provider.provider)}
     <div class="model-all-models"><p>All models</p><div class="managed-list" data-managed-list-server-filter="true"><form class="managed-list__filter" method="get" action="/settings/models/catalogue" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${frameId}">
       <input type="hidden" name="surface" value="${surface}"><input type="hidden" name="provider" value="${escapeHtml(provider.provider)}">

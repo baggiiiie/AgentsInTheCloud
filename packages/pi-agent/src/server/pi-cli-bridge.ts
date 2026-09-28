@@ -3,7 +3,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { HttpRequestBlockedError } from "@atelier/proxy-egress/server";
-import { modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
+import { anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
 // Every use is checked against the *current* host-side catalogue and authentication.
@@ -11,7 +11,7 @@ const markerSchema = Type.Object({
   provider: Type.String({ minLength: 1 }), model: Type.String({ minLength: 1 }),
   field: Type.Union([Type.Literal("key"), Type.Literal("account"), Type.Literal("header")]),
   header: Type.Optional(Type.String()),
-  style: Type.Union([Type.Literal("plain"), Type.Literal("anthropic"), Type.Literal("codex")]),
+  style: Type.Union([Type.Literal("plain"), Type.Literal("codex")]),
 });
 type Marker = Static<typeof markerSchema>;
 type Runtime = Pick<ModelRuntime, "getAvailable" | "getModel"> & { getAuth(model: Model<Api>): Promise<AuthResult | undefined> };
@@ -23,15 +23,11 @@ function markerToken(marker: Marker): string {
 function placeholder(marker: Marker): string {
   const token = markerToken(marker);
   if (marker.field !== "key") return token;
-  if (marker.style === "anthropic") return `sk-ant-oat-${token}`;
   if (marker.style === "codex") {
     const claims = { "https://api.openai.com/auth": { chatgpt_account_id: markerToken({ ...marker, field: "account", style: "plain" }) } };
     return `${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.${token}`;
   }
   return token;
-}
-function keyMarker(model: Model<Api>, auth: AuthResult): Marker {
-  return { provider: model.provider, model: model.id, field: "key", style: model.api === "openai-codex-responses" ? "codex" : auth.auth.apiKey?.includes("sk-ant-oat") ? "anthropic" : "plain" };
 }
 
 function endpoint(model: Model<Api>, auth: AuthResult): URL {
@@ -48,6 +44,8 @@ function endpoint(model: Model<Api>, auth: AuthResult): URL {
 }
 
 function unsupportedAuth(model: Model<Api>, auth: AuthResult): string | undefined {
+  // Anthropic permits Claude subscription (OAuth) tokens only in Claude Code.
+  if (model.api === "anthropic-messages" && auth.auth.apiKey?.startsWith("sk-ant-oat")) return anthropicSubscriptionUnavailableReason;
   if (!auth.auth.apiKey && !Object.keys(auth.auth.headers ?? {}).length && ["bedrock-converse-stream", "google-vertex"].includes(model.api)) {
     return "Pi's workspace bridge requires an API key or bearer token; host AWS credential chains and Google ADC cannot be copied into a workspace.";
   }
@@ -79,7 +77,7 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
     // Ambient host credentials have no safe file representation. Do not advertise them in Pi.
     if (unsupportedAuth(model, auth)) continue;
     const baseUrl = endpoint(model, auth).href.replace(/\/$/, "");
-    const key = auth.auth.apiKey ? placeholder(keyMarker(model, auth)) : "atelier-pi-no-key";
+    const key = auth.auth.apiKey ? placeholder({ provider: model.provider, model: model.id, field: "key", style: model.api === "openai-codex-responses" ? "codex" : "plain" }) : "atelier-pi-no-key";
     const provider = result.models.providers[model.provider] ??= { apiKey: key, models: [] };
     result.auth[model.provider] = { type: "api_key", key: provider.apiKey };
     const headers = Object.fromEntries(Object.keys(auth.auth.headers ?? {}).map((header) => [header,
@@ -110,6 +108,8 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
           if (!model) throw new HttpRequestBlockedError("Pi model is no longer configured in Atelier");
           const auth = await runtime.getAuth(model);
           if (!auth) throw new HttpRequestBlockedError("Pi provider is no longer connected in Atelier");
+          const unsupported = unsupportedAuth(model, auth);
+          if (unsupported) throw new HttpRequestBlockedError(unsupported);
           return { model, auth };
         })();
         resolutions.set(key, pending);

@@ -1,6 +1,8 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { hasAvailableBuiltinAgentModel } from "@atelier/agent/server";
 import { atelierDataPath, getAtelierRuntimeContext, invalidArguments, type AtelierEventBus } from "@atelier/core";
+import { createPiModelRuntime, usesAnthropicSubscription } from "@atelier/llm/server";
 import type { WorkspaceAgentProvider } from "@atelier/shared";
 import { workspaceModules } from "./workspace-modules.ts";
 
@@ -23,7 +25,10 @@ export async function defaultAgentProvider(): Promise<WorkspaceAgentProvider> {
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
   }
-  return registeredAgentProviders().find((provider) => provider.id === id) ?? agentProvider("builtin");
+  const provider = registeredAgentProviders().find((provider) => provider.id === id) ?? agentProvider("builtin");
+  // Anthropic subscriptions work only in Claude Code; without another usable model, the built-in agent could not start.
+  if (provider.id === "builtin" && !await hasAvailableBuiltinAgentModel() && await usesAnthropicSubscription(await createPiModelRuntime())) return agentProvider("claude");
+  return provider;
 }
 
 export async function rememberAgentProvider(id: string, events?: AtelierEventBus): Promise<void> {

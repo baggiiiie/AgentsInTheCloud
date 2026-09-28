@@ -1,6 +1,11 @@
-import { describe, expect, test } from "bun:test";
-import { selectAvailableConfiguredModel, type AgentModelOptionView } from "../../src/server/model-state.ts";
-import { modelRefValue, parseModelRef } from "@atelier/llm/server";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { configuredModelOptionViews, selectAvailableConfiguredModel, type AgentModelOptionView } from "../../src/server/model-state.ts";
+import { modelRefValue, parseModelRef, setConfiguredModels } from "@atelier/llm/server";
+import { setActiveAgentModel } from "../../src/server/model-preferences.ts";
+import type { Api, Model } from "@earendil-works/pi-ai";
 
 const model = (provider: string, id: string, options: { selected?: boolean; available?: boolean } = {}): AgentModelOptionView => ({
   provider,
@@ -42,5 +47,37 @@ describe("model references", () => {
     for (const value of ["", "model", "::model", "provider::"]) {
       expect(parseModelRef(value)).toBeUndefined();
     }
+  });
+});
+
+describe("Anthropic subscription models", () => {
+  let dataDir: string;
+  beforeEach(async () => {
+    dataDir = await mkdtemp(join(tmpdir(), "atelier-model-state-"));
+    process.env.ATELIER_DATA_DIR = dataDir;
+    await setConfiguredModels([{ provider: "anthropic", id: "claude", label: "Claude" }, { provider: "openai", id: "gpt", label: "GPT" }]);
+    await setActiveAgentModel("anthropic", "claude");
+  });
+  afterEach(async () => {
+    delete process.env.ATELIER_DATA_DIR;
+    await rm(dataDir, { recursive: true, force: true });
+  });
+  const catalogueModel = (provider: string, id: string): Model<Api> => ({ provider, id, name: id, api: "openai-completions", baseUrl: "https://example.test", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1000, maxTokens: 100 });
+  const runtime = (anthropicCredential: "oauth" | "api_key") => ({
+    getAvailable: async (provider?: string) => [provider === "anthropic" ? catalogueModel("anthropic", "claude") : catalogueModel("openai", "gpt")],
+    checkAuth: async () => ({ type: "api_key" as const }),
+    getModel: () => undefined,
+    listCredentials: async () => [{ providerId: "anthropic", type: anthropicCredential }, { providerId: "openai", type: "api_key" as const }],
+  });
+
+  test("are hidden from the built-in agent, which falls back to another provider", async () => {
+    const models = await configuredModelOptionViews(undefined, runtime("oauth"));
+    expect(models.map((model) => model.provider)).toEqual(["openai"]);
+    expect(selectAvailableConfiguredModel(models, { provider: "anthropic", id: "claude" })).toEqual({ provider: "openai", id: "gpt" });
+  });
+
+  test("stay available when Anthropic is connected with an API key", async () => {
+    const models = await configuredModelOptionViews(undefined, runtime("api_key"));
+    expect(models.map((model) => [model.provider, model.available, model.selected])).toEqual([["anthropic", true, true], ["openai", true, false]]);
   });
 });

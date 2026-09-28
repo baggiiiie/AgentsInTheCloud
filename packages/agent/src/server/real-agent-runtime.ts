@@ -1,5 +1,5 @@
-import { isJsonObject } from "@atelier/core";
-import { hasConnectedModelProvider } from "@atelier/llm/server";
+import { AtelierCoreError, isJsonObject } from "@atelier/core";
+import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, usesAnthropicSubscription } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { isFinalAssistantTextEvent } from "./assistant-text-phase.ts";
@@ -207,7 +207,8 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     if (model && !models.some((option) => option.selected)) {
       // Show the current session model for accuracy, but do not offer it as a
       // selectable choice unless it is also in the user's configured models list.
-      models.unshift({ provider: model.provider, id: model.id, name: model.name ?? model.id, selected: true, available: false, unavailableReason: "Model is not configured" });
+      const unavailableReason = model.provider === "anthropic" && await usesAnthropicSubscription(this.session.modelRuntime) ? anthropicSubscriptionUnavailableReason : "Model is not configured";
+      models.unshift({ provider: model.provider, id: model.id, name: model.name ?? model.id, selected: true, available: false, unavailableReason });
     }
     return {
       contextPercent,
@@ -570,6 +571,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     this.followingSetupDefaults = false;
     const model = this.session.modelRuntime.getModel(provider, modelId);
     if (!model) throw new Error(`Model not available: ${provider}/${modelId}`);
+    if (provider === "anthropic" && await usesAnthropicSubscription(this.session.modelRuntime)) throw new AtelierCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
     await this.session.setModel(model);
     this.ctx.model = this.currentModel();
     const remembered = await getModelThinkingLevel(provider, modelId);

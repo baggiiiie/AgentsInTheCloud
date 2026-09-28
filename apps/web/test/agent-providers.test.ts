@@ -56,3 +56,29 @@ test("default-change events observe the already-persisted preference", async () 
   await rememberAgentProvider("codex", events);
   expect(observed).toEqual(["codex"]);
 });
+
+test("defaults to Claude Code when an Anthropic subscription is the only way to run an agent", async () => {
+  const child = Bun.spawn([process.execPath, "-e", `
+    import { expect, mock } from "bun:test";
+    const agent = await import("@atelier/agent/server");
+    const llm = await import("@atelier/llm/server");
+    let builtinHasModel = false;
+    let credentials = [{ providerId: "anthropic", type: "oauth" }];
+    mock.module("@atelier/agent/server", () => ({ ...agent, hasAvailableBuiltinAgentModel: async () => builtinHasModel }));
+    mock.module("@atelier/llm/server", () => ({ ...llm, createPiModelRuntime: async () => ({ listCredentials: async () => credentials }) }));
+    const { defaultAgentProvider, orderedAgentProviders, rememberAgentProvider } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agent-providers.ts"))});
+    expect((await orderedAgentProviders())[0].id).toBe("claude");
+    await rememberAgentProvider("builtin");
+    expect((await defaultAgentProvider()).id).toBe("claude");
+    await rememberAgentProvider("codex");
+    expect((await defaultAgentProvider()).id).toBe("codex");
+    await rememberAgentProvider("builtin");
+    builtinHasModel = true;
+    expect((await defaultAgentProvider()).id).toBe("builtin");
+    builtinHasModel = false;
+    credentials = [{ providerId: "anthropic", type: "api_key" }];
+    expect((await defaultAgentProvider()).id).toBe("builtin");
+  `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
+  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+  expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+});

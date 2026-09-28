@@ -58,6 +58,7 @@ export { projectOnboardingInitialPrompt } from "./project-onboarding.ts";
 
 export { maybeNameWorkspaceFromPrompt } from "./agent-title-suggestion.ts";
 export { nativeAgentLaunch } from "./launch.ts";
+export { hasAvailableBuiltinAgentModel } from "./model-state.ts";
 
 export { prepareAgentMcp, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest } from "./mcp.ts";
 export { markProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
