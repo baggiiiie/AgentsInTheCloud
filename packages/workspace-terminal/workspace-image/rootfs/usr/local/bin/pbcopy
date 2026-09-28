@@ -1,0 +1,5 @@
+#!/bin/sh
+# Send stdin to the browser clipboard using the terminal's OSC 52 protocol.
+printf '\033]52;c;'
+base64 -w 0
+printf '\a'

@@ -79,6 +79,7 @@ function tmuxAttachArgs(options: HostObservableTerminalAttachOptions): string[] 
     // so new and existing sessions work without caller-specific preparation.
     args.push(
       "set-option", "-t", options.session, "mouse", "on", ";",
+      "set-option", "-t", options.session, "set-clipboard", "on", ";",
       "bind-key", "-n", "S-PPage", "copy-mode -e ; send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-PPage", "send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-NPage", "send-keys -X page-down", ";",
@@ -92,6 +93,7 @@ function tmuxAttachArgs(options: HostObservableTerminalAttachOptions): string[] 
   if (!options.readonly) {
     const socket = options.socketName ? `-L ${shellQuote(options.socketName)} ` : "";
     args.push("if-shell", `tmux ${socket}show-options -g terminal-features | grep -Fq 'xterm-256color:hyperlinks'`, "", "set-option -gas terminal-features ,xterm-256color:hyperlinks", ";");
+    args.push("if-shell", `tmux ${socket}show-options -g terminal-features | grep -Fq 'xterm-256color:clipboard'`, "", "set-option -gas terminal-features ,xterm-256color:clipboard", ";");
   }
   args.push("attach-session");
   if (options.readonly) args.push("-r");

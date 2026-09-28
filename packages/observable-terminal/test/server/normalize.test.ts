@@ -41,10 +41,12 @@ describe("observable terminal normalization", () => {
     expect(bridge.args).toEqual([
       "-L", "isolated",
       "set-option", "-t", "s", "mouse", "on", ";",
+      "set-option", "-t", "s", "set-clipboard", "on", ";",
       "bind-key", "-n", "S-PPage", "copy-mode -e ; send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-PPage", "send-keys -X page-up", ";",
       "bind-key", "-T", "copy-mode", "S-NPage", "send-keys -X page-down", ";",
       "if-shell", "tmux -L 'isolated' show-options -g terminal-features | grep -Fq 'xterm-256color:hyperlinks'", "", "set-option -gas terminal-features ,xterm-256color:hyperlinks", ";",
+      "if-shell", "tmux -L 'isolated' show-options -g terminal-features | grep -Fq 'xterm-256color:clipboard'", "", "set-option -gas terminal-features ,xterm-256color:clipboard", ";",
       "attach-session", "-t", "s",
     ]);
   });

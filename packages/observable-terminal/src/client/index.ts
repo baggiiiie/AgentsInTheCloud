@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 
 import type { TerminalTheme } from "@gespenst/core";
+import { copyTextToClipboard } from "@atelier/shared";
 import { encodeObservableTerminalMessage } from "../shared/index.ts";
 import { terminalFileAt, type TerminalFileLink } from "./file-links.ts";
 
@@ -438,6 +439,16 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       window.addEventListener("online", networkRestored);
     }
     term.on("error", (error) => console.error("Gespenst terminal error", error));
+    if (options.mode === "interactive") {
+      term.on("clipboardWrite", ({ location, contents }) => {
+        if (location !== "standard") return;
+        const text = contents.find((content) => content.mime === "text/plain");
+        if (!text) return;
+        // Browser clipboard promises may reject with arbitrary platform errors.
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters
+        void copyTextToClipboard(new TextDecoder().decode(text.data)).catch((error: unknown) => console.error("Could not copy terminal output to clipboard", error));
+      });
+    }
     // Shift+drag forces a selection over a mouse-tracking TUI, but a plain click
     // is then encoded as application input and never reaches Gespenst's
     // selection gesture, so nothing would ever clear the highlight.
