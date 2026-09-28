@@ -448,8 +448,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     // Gespenst renders into a canvas, so there are no anchors to click. Read
     // its authoritative painted cells (including OSC 8 destinations) instead
     // of trying to parse the incoming PTY byte stream or its escape sequences.
-    const fileLinkAt = (rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"], clientX: number, clientY: number) => {
-      const bounds = term.element.getBoundingClientRect();
+    const fileLinkAt = (rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"], clientX: number, clientY: number, bounds = term.element.getBoundingClientRect()) => {
       const scale = Math.max(1, globalThis.devicePixelRatio || 1);
       const column = Math.floor((clientX - bounds.left) * scale / term.geometry.cellWidthPx);
       const row = Math.floor((clientY - bounds.top) * scale / term.geometry.cellHeightPx);
@@ -554,7 +553,11 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       },
       activateFileLinkAt: async (clientX, clientY) => {
         if (!options.onFileLink || disposed) return false;
-        const link = fileLinkAt((await term.readViewport()).viewportRows, clientX, clientY);
+        // A tap can focus the terminal and shift it above the software keyboard
+        // while the viewport read is pending. Resolve the tapped cell against
+        // its position at the time of the tap, not its new position.
+        const bounds = term.element.getBoundingClientRect();
+        const link = fileLinkAt((await term.readViewport()).viewportRows, clientX, clientY, bounds);
         if (!link || disposed) return false;
         options.onFileLink(link);
         return true;

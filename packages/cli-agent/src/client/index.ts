@@ -152,13 +152,22 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!viewer) return;
         const { clientX, clientY } = point;
         // Mobile browsers may cancel or retarget pointerup after a touch. Resolve
-        // the completed tap directly against the painted cells instead.
-        void viewer.activateFileLinkAt(clientX, clientY).then((opened) => {
+        // the completed tap directly against the painted cells instead. Start the
+        // link lookup at the original location, before the terminal shifts.
+        const bounds = this.terminalTarget.getBoundingClientRect();
+        const link = viewer.activateFileLinkAt(clientX, clientY);
+        // Focusing after the asynchronous lookup loses the touch gesture on
+        // mobile Safari, so it cannot open the software keyboard.
+        this.enterRawMode();
+        viewer.focus();
+        void link.then((opened) => {
           if (opened || this.viewer !== viewer) return;
           viewer.setHistoryCursorHidden(false);
-          this.enterRawMode();
-          viewer.focus();
-          const pointer = new PointerEvent("pointerup", { clientX, clientY });
+          const shifted = this.terminalTarget.getBoundingClientRect();
+          const pointer = new PointerEvent("pointerup", {
+            clientX: shifted.left + clientX - bounds.left,
+            clientY: shifted.top + clientY - bounds.top,
+          });
           viewer.dragPointer(pointer, "press", false);
           viewer.dragPointer(pointer, "release", false);
         });
@@ -179,11 +188,16 @@ export const atelierClientModule: WorkspaceClientModule = {
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
       enterRawMode(): void {
         if (!this.hasFormTarget || !focusLikelyOpensSoftwareKeyboard()) return;
+        // The shell follows the visual viewport when the keyboard appears. Keep
+        // the terminal's original geometry and pin its last row to the new bottom
+        // rather than fitting (and resizing the remote tmux) to the smaller pane.
+        this.element.style.setProperty("--cli-terminal-height", `${this.terminalTarget.getBoundingClientRect().height}px`);
         this.element.classList.add("cli-raw-mode");
         this.returnTarget.hidden = false;
       }
       showComposer(): void {
         this.element.classList.remove("cli-raw-mode");
+        this.element.style.removeProperty("--cli-terminal-height");
         this.keyboardWasOpen = false;
         if (this.hasFormTarget) this.returnTarget.hidden = true;
         this.viewer?.refresh();

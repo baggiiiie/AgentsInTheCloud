@@ -26,7 +26,15 @@
 .cli-agent-body [data-cli-terminal-target="return"][hidden] { display:none; }
 @media (max-width:700px) {
   .cli-agent-body .cli-agent-composer .composer-input { min-height:max(var(--composer-controls-min-height), calc(1.5em * 4 + 30px)); }
+}
+@media (max-width:700px), (hover:none) and (pointer:coarse) {
   .cli-agent-body.cli-raw-mode .cli-agent-composer, .cli-agent-body.cli-raw-mode .mobile-composer-opener { display:none; }
   /* Typing goes straight to the terminal while it has focus, so the opener would only cover it. */
   .cli-agent-body:has(> .observable-terminal-host:focus-within) > .mobile-composer-opener { display:none; }
+  /* Clip the top of the original terminal instead of resizing it to the keyboard.
+     The bottom rows (including the agent's input line) stay above the keyboard. */
+  .cli-agent-body.cli-raw-mode { overflow:hidden; }
+  .cli-agent-body.cli-raw-mode > .observable-terminal-host {
+    position:absolute; inset-inline:0; bottom:0; height:var(--cli-terminal-height);
+  }
 }
