@@ -77,8 +77,3 @@
   font-weight: var(--weight-bold);
   letter-spacing: .01em;
 }
-
-.vscode-starting-subtitle {
-  margin-top: 2px;
-  color: var(--text);
-}

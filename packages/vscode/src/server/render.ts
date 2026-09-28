@@ -14,10 +14,7 @@ export function renderVSCodePane(workspaceId: string, title: string): string {
       <div class="vscode-starting-screen" aria-live="polite">
         <div class="vscode-starting-card">
           <span class="status-spinner vscode-starting-spinner" aria-hidden="true"></span>
-          <div>
-            <div class="vscode-starting-title">Starting VS Code</div>
-            <div class="vscode-starting-subtitle">Preparing the editor for this workspace…</div>
-          </div>
+          <div class="vscode-starting-title">Starting VS Code</div>
         </div>
       </div>
     </div>
