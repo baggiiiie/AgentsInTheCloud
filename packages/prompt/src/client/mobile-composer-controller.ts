@@ -6,14 +6,33 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
     declare readonly element: HTMLElement;
     private activeSelection = false;
     private presentedUrl?: string;
+    private readonly viewport = window.visualViewport;
+
+    // The layout viewport stays full-height on mobile Safari when the keyboard
+    // opens. Fit the built-in agent pane to the visible bottom instead of letting
+    // focus pan its composer underneath the keyboard.
+    private readonly fitViewport = (): void => {
+      if (!this.element.classList.contains("agent-pane")) return;
+      const viewport = this.viewport;
+      if (!viewport) return;
+      const bottom = viewport.offsetTop + viewport.height;
+      const top = this.element.getBoundingClientRect().top;
+      this.element.style.setProperty("--mobile-composer-viewport-height", `${Math.min(this.element.parentElement!.clientHeight, Math.max(0, bottom - top))}px`);
+    };
 
     connect(): void {
       window.addEventListener("pagehide", this.acknowledgePresentation);
+      this.viewport?.addEventListener("resize", this.fitViewport);
+      this.viewport?.addEventListener("scroll", this.fitViewport);
+      this.fitViewport();
       if (isWorkspacePaneVisible(this.element)) this.selected();
     }
 
     disconnect(): void {
       window.removeEventListener("pagehide", this.acknowledgePresentation);
+      this.viewport?.removeEventListener("resize", this.fitViewport);
+      this.viewport?.removeEventListener("scroll", this.fitViewport);
+      this.element.style.removeProperty("--mobile-composer-viewport-height");
     }
 
     private readonly acknowledgePresentation = (): void => {
