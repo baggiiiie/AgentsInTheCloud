@@ -37,14 +37,17 @@ async function fixture() {
   const identity = { workspaceId: "workspace-a", agentId: "agent-a" };
   const token = "secret-token";
   let cancelled = false;
-  const endpoint = createAgentMcpServer({
+  let calls = 0;
+  let generation = 0;
+  const createEndpoint = () => createAgentMcpServer({
     authenticate: (candidate) => candidate === token ? identity : undefined,
-    instructions: () => "Use present to show interactive work.",
+    instructions: () => generation ? "Use the updated Atelier tools." : "Use present to show interactive work.",
     tools: () => [
       defineTool({
         name: "present", label: "Present", description: "Present work",
         parameters: Type.Object({ kind: Type.String() }),
         execute: async (_id, args: { kind: string }, _signal, update) => {
+          calls++;
           update?.({ content: [{ type: "text", text: "Opening" }], details: {} });
           return { content: [{ type: "text", text: `Presented ${args.kind}` }], details: {} };
         },
@@ -63,9 +66,14 @@ async function fixture() {
       }),
     ],
   });
+  let endpoint = createEndpoint();
   const server = Bun.serve({ port: 0, fetch: (request) => endpoint.fetch(request) });
   cleanup.push(async () => { await endpoint.revoke({ workspaceId: identity.workspaceId }); server.stop(true); });
-  return { url: new URL("/mcp", server.url).href, token, turnSignalCommand: "/session/turn-signal.sh", cancelled: () => cancelled };
+  return {
+    url: new URL("/mcp", server.url).href, token, turnSignalCommand: "/session/turn-signal.sh", cancelled: () => cancelled,
+    calls: () => calls,
+    restart() { generation++; endpoint = createEndpoint(); },
+  };
 }
 
 test("pi-atelier discovers tools and carries instructions, progress, errors and completion", async () => {
@@ -95,6 +103,30 @@ test("pi-atelier discovers tools and carries instructions, progress, errors and 
   expect(f.executions).toEqual([["sh", [mcp.turnSignalCommand, "started"]], ["sh", [mcp.turnSignalCommand, "finished"]]]);
   await f.emit("session_shutdown");
   await expect(f.tools.get("present")!.execute("call", { kind: "browser" }, undefined, undefined, undefined!)).rejects.toThrow("not connected");
+});
+
+test("pi-atelier reconnects after a host restart without replaying calls on an unknown session", async () => {
+  const mcp = await fixture();
+  const f = fakePi();
+  createPiAtelierExtension(async () => mcp)(f.pi);
+  await f.emit("session_start");
+  mcp.restart();
+
+  const present = f.tools.get("present")!;
+  const results = await Promise.all([
+    present.execute("first", { kind: "browser" }, undefined, undefined, undefined!),
+    present.execute("second", { kind: "desktop" }, undefined, undefined, undefined!),
+  ]);
+  expect(results.map((result) => result.content)).toEqual([
+    [{ type: "text", text: "Presented browser" }],
+    [{ type: "text", text: "Presented desktop" }],
+  ]);
+  expect(mcp.calls()).toBe(2);
+  expect(f.tools.size).toBe(3);
+  expect(await f.emit("before_agent_start", { systemPrompt: "Base" })).toEqual({ systemPrompt: "Base\n\nUse the updated Atelier tools." });
+  expect((await present.execute("third", { kind: "tmux" }, undefined, undefined, undefined!)).content).toEqual([{ type: "text", text: "Presented tmux" }]);
+  expect(mcp.calls()).toBe(3);
+  await f.emit("session_shutdown");
 });
 
 test("pi-atelier fails instead of overriding an existing tool", async () => {

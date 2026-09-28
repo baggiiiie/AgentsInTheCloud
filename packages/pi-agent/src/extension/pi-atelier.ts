@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CallToolResultSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
@@ -25,15 +25,11 @@ type LoadConfig = () => Promise<AtelierMcpConfig>;
 export function createPiAtelierExtension(loadConfig: LoadConfig) {
   return function piAtelierExtension(pi: ExtensionAPI) {
     let connection: { client: Client; instructions?: string; turnSignalCommand: string } | undefined;
+    let config: AtelierMcpConfig;
+    let reconnecting: Promise<void> | undefined;
+    const registered = new Set<string>();
 
-    async function signalTurn(boundary: "started" | "finished"): Promise<void> {
-      if (!connection) throw new Error("Atelier MCP session is not connected");
-      const result = await pi.exec("sh", [connection.turnSignalCommand, boundary]);
-      if (result.code !== 0) throw new Error(result.stderr);
-    }
-
-    pi.on("session_start", async () => {
-      const config = await loadConfig();
+    async function connect(): Promise<void> {
       const nextClient = new Client({ name: "pi-atelier", version: "1.0.0" });
       const transport = new StreamableHTTPClientTransport(new URL(config.url), {
         requestInit: { headers: { Authorization: `Bearer ${config.token}` } },
@@ -45,6 +41,7 @@ export function createPiAtelierExtension(loadConfig: LoadConfig) {
         do {
           const listed = await nextClient.listTools(cursor ? { cursor } : undefined);
           for (const tool of listed.tools) {
+            if (registered.has(tool.name)) continue;
             if (existing.has(tool.name)) throw new Error(`Atelier MCP tool collides with an existing Pi tool: ${tool.name}`);
             existing.add(tool.name);
             pi.registerTool({
@@ -53,9 +50,7 @@ export function createPiAtelierExtension(loadConfig: LoadConfig) {
               description: tool.description ?? tool.title ?? tool.name,
               parameters: Type.Unsafe<McpArguments>(tool.inputSchema),
               async execute(_toolCallId, params, signal, onUpdate) {
-                const active = connection;
-                if (!active) throw new Error("Atelier MCP session is not connected");
-                const result = await active.client.callTool({ name: tool.name, arguments: params }, undefined, {
+                const call = (client: Client) => client.callTool({ name: tool.name, arguments: params }, undefined, {
                   signal,
                   timeout: 3_600_000,
                   onprogress(update) {
@@ -63,26 +58,60 @@ export function createPiAtelierExtension(loadConfig: LoadConfig) {
                     onUpdate?.({ content: [{ type: "text", text }], details: {} });
                   },
                 });
+                const active = connection;
+                if (!active) throw new Error("Atelier MCP session is not connected");
+                let result: Awaited<ReturnType<typeof call>>;
+                try {
+                  result = await call(active.client);
+                } catch (error) {
+                  // A 404 means the old host has no record of this session: it did not dispatch the call.
+                  // Other failures are ambiguous and must not be retried (the tool may have run).
+                  if (!(error instanceof StreamableHTTPError && error.code === 404)) throw error;
+                  if (connection?.client === active.client) await reconnect();
+                  else if (reconnecting) await reconnecting;
+                  if (!connection) throw new Error("Atelier MCP session is not connected");
+                  result = await call(connection.client);
+                }
                 const parsed = CallToolResultSchema.parse(result);
                 const content = toolContent(parsed.content);
                 if (parsed.isError) throw new Error(content.filter((item) => item.type === "text").map((item) => item.text).join("\n") || `Atelier MCP tool failed: ${tool.name}`);
                 return { content, details: {} };
               },
             });
+            registered.add(tool.name);
           }
           cursor = listed.nextCursor;
         } while (cursor);
+        const previous = connection;
         connection = { client: nextClient, instructions: nextClient.getInstructions(), turnSignalCommand: config.turnSignalCommand };
+        await previous?.client.close();
       } catch (error) {
         await nextClient.close();
         throw error;
       }
+    }
+
+    function reconnect(): Promise<void> {
+      if (!reconnecting) reconnecting = connect().finally(() => { reconnecting = undefined; });
+      return reconnecting;
+    }
+
+    async function signalTurn(boundary: "started" | "finished"): Promise<void> {
+      if (!connection) throw new Error("Atelier MCP session is not connected");
+      const result = await pi.exec("sh", [connection.turnSignalCommand, boundary]);
+      if (result.code !== 0) throw new Error(result.stderr);
+    }
+
+    pi.on("session_start", async () => {
+      config = await loadConfig();
+      await connect();
     });
 
     pi.on("before_agent_start", async (event) => connection?.instructions ? { systemPrompt: `${event.systemPrompt}\n\n${connection.instructions}` } : undefined);
     pi.on("agent_start", () => signalTurn("started"));
     pi.on("agent_end", () => signalTurn("finished"));
     pi.on("session_shutdown", async () => {
+      await reconnecting;
       const active = connection;
       connection = undefined;
       await active?.client.close();
