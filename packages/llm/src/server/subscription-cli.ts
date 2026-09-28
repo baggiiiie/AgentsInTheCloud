@@ -6,6 +6,7 @@ import { execWorkspaceCommand, listWorkspaces } from "@atelier/workspace";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { SubscriptionUsageError } from "./subscription-usage.ts";
+import { recordSubscriptionInference } from "./recent-subscription-activity.ts";
 
 const codexToken = "atelier-subscription-codex-access";
 const codexAccount = "atelier-subscription-codex-account";
@@ -17,20 +18,34 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     if (auth?.source !== "OAuth" || !auth.auth.apiKey) throw new Error(`Connect a ${provider} subscription in Atelier to use this CLI.`);
     return auth.auth.apiKey;
   }
+  async function usesConnectedSubscription(request: Request, provider: "anthropic" | "openai-codex"): Promise<boolean> {
+    const auth = await (await getRuntime()).getAuth(provider);
+    return auth?.source === "OAuth" && !!auth.auth.apiKey && request.headers.get("authorization") === `Bearer ${auth.auth.apiKey}`;
+  }
   registerWorkspaceResponseTransform("codex-accounts-check", async (response, request) => {
     if (new URL(request.url).hostname !== "chatgpt.com" || !["/api/codex/accounts/check", "/backend-api/wham/accounts/check"].includes(new URL(request.url).pathname) || !response.ok) return response;
     const accountId = codexAccountId(await subscriptionToken("openai-codex"));
     return maskCodexAccountDiscovery(response, accountId);
   });
+  registerWorkspaceResponseTransform("codex-subscription-activity", async (response, request) => {
+    const url = new URL(request.url);
+    if (url.hostname !== "chatgpt.com" || !/^\/(?:backend-api|api)\/codex\/responses(?:\/|$)/.test(url.pathname) || request.method !== "POST" || !response.ok) return response;
+    if (await usesConnectedSubscription(request, "openai-codex")) recordSubscriptionInference("openai-codex");
+    return response;
+  });
   // Claude Code responses carry the subscription's limits; keeping them spares the
   // usage view from asking Anthropic separately while agents are working.
   registerWorkspaceResponseTransform("anthropic-subscription-usage", async (response, request) => {
-    if (new URL(request.url).hostname !== "api.anthropic.com" || !response.headers.has("anthropic-ratelimit-unified-status")) return response;
-    const auth = await (await getRuntime()).getAuth("anthropic");
+    const url = new URL(request.url);
+    if (url.hostname !== "api.anthropic.com") return response;
+    const inference = url.pathname === "/v1/messages" && request.method === "POST";
+    const hasLimits = response.headers.has("anthropic-ratelimit-unified-status");
+    if (!inference && !hasLimits) return response;
     // Only Atelier's connected subscription, not a login made inside the workspace.
-    if (auth?.source !== "OAuth" || !auth.auth.apiKey || request.headers.get("authorization") !== `Bearer ${auth.auth.apiKey}`) return response;
+    if (!(await usesConnectedSubscription(request, "anthropic"))) return response;
     try {
-      anthropicUsageSource.observe(response.headers);
+      if (hasLimits) anthropicUsageSource.observe(response.headers);
+      if (inference && response.ok) recordSubscriptionInference("anthropic");
     } catch (error) {
       // Usage is a side channel; never fail Claude Code's request over it.
       if (!(error instanceof SubscriptionUsageError)) throw error;

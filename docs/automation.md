@@ -185,10 +185,14 @@ The Usage feature does not record or persist installation-wide token totals.
 The Usage dialog groups provider-reported 0% windows under **Unused limits**
 (collapsed when there are used limits, expanded when all limits are unused)
 and renders reset countdowns such as `3d 12h`. The workspace Usage button traces
-Time and Usage for the selected Agent’s provider, retaining the
-most recent provider when no workspace is visible. It refreshes every minute
-while visible, on focus, and after a dialog refresh. Unsupported, disconnected,
-or unavailable providers have no comparison ring. Both arcs start at twelve
+Time and Usage for the subscription whose active allowance is furthest ahead of pace
+among subscriptions used for successful inference in the 30 minutes ending at the
+last recorded inference. Limits are checked at display time, not frozen at the time
+of that inference. Built-in Agent inference and connected-subscription CLI traffic
+through workspace egress contribute activity; API-key traffic does not. Activity is
+kept in memory and cleared on credential changes. The button refreshes every minute
+while visible, on focus, and after a dialog refresh. No recorded activity or no
+available active limits means no comparison ring. Both arcs start at twelve
 o’clock and run clockwise on the same circle. Their shared portion is neutral;
 Time beyond Usage is green, and Usage beyond Time is red. A dim full-circle
 track preserves the button outline beneath the arcs.
@@ -196,11 +200,8 @@ Among active windows with nonzero usage, the button selects the greatest
 Usage-minus-Time difference; ties prefer higher Usage. When all active windows are
 unused, the main allowance takes precedence over feature-specific allowances.
 Expired/not-started windows and windows with unknown reset timing are excluded.
-`GET /usage/button?provider=openai-codex` returns the server-rendered button frame
+`GET /usage/button` returns the server-rendered button frame
 (or a Turbo Stream with `Accept: text/vnd.turbo-stream.html`).
-
-When no current or browser-remembered provider is available (for example opening
-`/usage` in a fresh tab), the button uses the saved most-recent model provider.
 Each window also includes `timing`: the inferred start (`reset − duration`),
 elapsed-time percentage, and usage-minus-time difference in percentage points.
 `paceDifferenceSeconds` converts that difference to distance along the allowance

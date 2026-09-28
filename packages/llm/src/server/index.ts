@@ -3,6 +3,7 @@ export { modelRefValue, parseModelRef, type ModelRef } from "./model-reference.t
 export { renderModelSetupDialog, handleModelSettingsRequest } from "./settings.ts";
 export { llmWorkspaceModule as atelierServerModule } from "./web.ts";
 export { selectPacingWindow, type PacedUsageWindow } from "./usage-window.ts";
+export { recordSubscriptionInference, providersInLastInferenceWindow, selectSubscriptionLimit } from "./recent-subscription-activity.ts";
 export { connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "./provider-usage.ts";
 
 export { installSubscriptionCli } from "./subscription-cli.ts";

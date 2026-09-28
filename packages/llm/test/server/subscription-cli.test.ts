@@ -2,6 +2,7 @@ import { expect, spyOn, test } from "bun:test";
 import { createWorkspaceSecretContext } from "@atelier/proxy-egress/server";
 import { maskCodexAccountDiscovery, registerSubscriptionCli, subscriptionCliFiles } from "../../src/server/subscription-cli.ts";
 import { anthropicUsageSource } from "../../src/server/anthropic-subscription-usage.ts";
+import { forgetSubscriptionInference, providersInLastInferenceWindow } from "../../src/server/recent-subscription-activity.ts";
 
 test("Codex receives ChatGPT auth, not API-key auth or refresh credentials", () => {
   const file = subscriptionCliFiles().find((file) => file.provider === "openai-codex")!;
@@ -49,6 +50,21 @@ test("workspace proxy translates Codex discovery only on ChatGPT's account endpo
   expect(await context.hooks.onResponse!(unrelated, new Request("https://chatgpt.com/backend-api/wham/usage"))).toBe(unrelated);
 });
 
+test("proxy records only successful Codex inference using Atelier's subscription", async () => {
+  forgetSubscriptionInference("openai-codex");
+  // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
+  registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: "real-token" } }) }) as any);
+  const context = await createWorkspaceSecretContext("codex-inference-test");
+  const request = new Request("https://chatgpt.com/backend-api/codex/responses", { method: "POST", headers: { authorization: "Bearer real-token" } });
+  await context.hooks.onResponse!(new Response("error", { status: 429 }), request);
+  expect(providersInLastInferenceWindow()).toEqual([]);
+  await context.hooks.onResponse!(new Response("ok"), new Request(request.url, { method: "POST", headers: { authorization: "Bearer other-token" } }));
+  expect(providersInLastInferenceWindow()).toEqual([]);
+  await context.hooks.onResponse!(new Response("ok"), request);
+  expect(providersInLastInferenceWindow()).toContain("openai-codex");
+  forgetSubscriptionInference("openai-codex");
+});
+
 test("invalid account discovery remains an upstream response", async () => {
   const response = new Response("not JSON");
   expect(await maskCodexAccountDiscovery(response, "account-123")).toBe(response);
@@ -69,6 +85,7 @@ test("workspace proxy records Claude Code's subscription limits only for Atelier
   // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
   registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: "real-token" } }) }) as any);
   const context = await createWorkspaceSecretContext("anthropic-usage-test");
+  forgetSubscriptionInference("anthropic");
   const observe = spyOn(anthropicUsageSource, "observe");
   const warn = spyOn(console, "warn").mockImplementation(() => {});
   // SAFETY: The workspace secret context always returns a rewritten Request for matched hosts.
@@ -78,8 +95,15 @@ test("workspace proxy records Claude Code's subscription limits only for Atelier
   expect(await context.hooks.onResponse!(upstream, request)).toBe(upstream);
   expect(observe).toHaveBeenCalledTimes(1);
   expect(observe.mock.calls[0]![0]).toBe(upstream.headers);
+  expect(providersInLastInferenceWindow()).toContain("anthropic");
+  forgetSubscriptionInference("anthropic");
   await context.hooks.onResponse!(new Response("", { headers: limits }), new Request("https://api.anthropic.com/v1/messages", { headers: { authorization: "Bearer workspace-login" } }));
   expect(observe).toHaveBeenCalledTimes(1);
+  expect(providersInLastInferenceWindow()).toEqual([]);
+  await context.hooks.onResponse!(new Response("stream"), request);
+  expect(providersInLastInferenceWindow()).toContain("anthropic");
+  expect(observe).toHaveBeenCalledTimes(1);
+  forgetSubscriptionInference("anthropic");
   const malformed = new Response("stream", { headers: { ...limits, "anthropic-ratelimit-unified-5h-utilization": "lots" } });
   expect(await context.hooks.onResponse!(malformed, request)).toBe(malformed);
   expect(warn).toHaveBeenCalledWith("[usage] Anthropic returned unrecognized rate limit headers.");

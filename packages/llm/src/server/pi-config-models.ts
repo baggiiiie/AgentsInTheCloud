@@ -3,6 +3,7 @@ import type { ModelRef } from "./model-reference.ts";
 import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
 import { syncSubscriptionClis } from "./subscription-cli.ts";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
+import { forgetSubscriptionInference } from "./recent-subscription-activity.ts";
 import { defaultProviderModels, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -204,10 +205,15 @@ async function refreshConnectedProviderCatalogue(runtime: ModelRuntime, provider
   }
 }
 
+function forgetSubscriptionState(provider: string): void {
+  if (provider === "anthropic") anthropicUsageSource.forget();
+  if (provider === "anthropic" || provider === "openai-codex") forgetSubscriptionInference(provider);
+}
+
 export async function loginPiOAuthProvider(providerId: string, interaction: AuthInteraction): Promise<void> {
   const runtime = await createPiModelRuntime();
   await runtime.login(providerId, "oauth", interaction);
-  if (providerId === "anthropic") anthropicUsageSource.forget();
+  forgetSubscriptionState(providerId);
   if (providerId === "openai-codex" || providerId === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, providerId, interaction.signal);
 }
@@ -234,14 +240,14 @@ export async function connectModelProviderApiKey(provider: string, key: string, 
     prompt: async (prompt) => prompt.type === "select" ? prompt.options[0]?.id ?? "" : trimmed,
     notify: () => {},
   });
-  if (provider === "anthropic") anthropicUsageSource.forget();
+  forgetSubscriptionState(provider);
   if (provider === "openai-codex" || provider === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, provider);
 }
 export async function disconnectModelProvider(provider: string): Promise<void> {
   const runtime = await createPiModelRuntime();
   await runtime.logout(provider);
-  if (provider === "anthropic") anthropicUsageSource.forget();
+  forgetSubscriptionState(provider);
   if (provider === "openai-codex" || provider === "anthropic") await syncSubscriptionClis(runtime);
   await updateModelSettings((settings) => {
     settings.picker = (settings.picker ?? []).filter((model) => model.provider !== provider);

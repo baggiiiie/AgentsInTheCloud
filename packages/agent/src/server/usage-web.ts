@@ -1,11 +1,10 @@
 import { response } from "@atelier/shared/http";
 import { requestAcceptsJson } from "@atelier/core";
-import { getConfiguredAgentModels } from "./model-preferences.ts";
-import { selectPacingWindow, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@atelier/llm/server";
+import { providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@atelier/llm/server";
 import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { dialogHtml } from "@atelier/design-system/dialog";
 import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, workspaceAgentSelectionEvent, type WorkspaceModuleRouteContext } from "@atelier/shared";
+import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@atelier/shared";
 
 function jsonResponse<Body extends object>(body: Body, status = 200): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -14,7 +13,6 @@ function jsonResponse<Body extends object>(body: Body, status = 200): Response {
 export function renderUsagePaneAction(): string {
   const button = usageButtonHtml();
   const actions = [
-    ...[workspaceAgentSelectionEvent, "atelier:usage-provider:changed", "atelier:workspace-residency-visible", "atelier:workspace-residency-hidden"].map((event) => `${event}@document->usage-button#selectionChanged:capture`),
     "atelier:usage:refreshed@document->usage-button#refresh",
     "visibilitychange@document->usage-button#refresh",
     "focus@window->usage-button#refresh",
@@ -89,18 +87,16 @@ function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: 
   return actionLinkHtml({ href: "/usage", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Usage, label }, perimeterComparison: comparison, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` });
 }
 
-async function renderUsageButton(providerId: string | null): Promise<string> {
-  // Direct Usage/Settings pages have no visible workspace. Use the persisted
-  // most-recent model choice, not an arbitrary connected provider.
-  providerId ??= (await getConfiguredAgentModels()).find((model) => model.active)?.provider ?? null;
-  const provider = supportedUsageProviders.find((provider) => provider.id === providerId);
-  if (!provider) return usageButtonHtml(undefined, providerId ? `Usage — ${providerId}: limits not supported` : "Usage");
-  const overview = await getProviderUsageOverview(provider);
-  const selected = selectPacingWindow(overview.windows);
-  if (!selected || selected.timing.state !== "active") return usageButtonHtml(undefined, `Usage — ${provider.label}: limits unavailable`);
-  const { reported, timing } = selected;
+async function renderUsageButton(): Promise<string> {
+  const activity = providersInLastInferenceWindow();
+  if (!activity.length) return usageButtonHtml(undefined, "Usage — no subscription inference recorded");
+  const overviews = await Promise.all(supportedUsageProviders.filter((provider) => activity.includes(provider.id)).map((provider) => getProviderUsageOverview(provider)));
+  const selected = selectSubscriptionLimit(overviews);
+  if (!selected) return usageButtonHtml(undefined, "Usage — selected subscription limits unavailable");
+  const { provider, window: { reported, timing } } = selected;
+  if (timing.state !== "active") throw new Error("Selected subscription limit must be active");
   const pace = usagePace(timing.paceDifferenceSeconds);
-  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace}`);
+  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace} · Providers from 30 minutes before last inference`);
 }
 
 function providerPlaceholder(provider: UsageProvider, refresh: boolean): string {
@@ -127,7 +123,7 @@ export async function handleUsageRequest(request: Request, url: URL, context: Wo
   const json = requestAcceptsJson(request);
   const refresh = url.searchParams.has("refresh");
   if (url.pathname === "/usage/button") {
-    const button = await renderUsageButton(url.searchParams.get("provider"));
+    const button = await renderUsageButton();
     return request.headers.get("accept")?.includes("text/vnd.turbo-stream.html")
       ? turboStreamResponse(turboStream("update", "usage_button_content", button))
       : response(`<turbo-frame id="usage_button_content">${button}</turbo-frame>`);

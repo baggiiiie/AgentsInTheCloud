@@ -1,5 +1,5 @@
 import { AtelierCoreError, isJsonObject } from "@atelier/core";
-import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, usesAnthropicSubscription } from "@atelier/llm/server";
+import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesAnthropicSubscription } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { isFinalAssistantTextEvent } from "./assistant-text-phase.ts";
@@ -361,6 +361,10 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         }
         if (message?.role === "toolResult") setTimeout(() => this.syncLiveToolResult(message.toolCallId), 0);
         if (message?.role === "assistant") {
+          if (message.stopReason !== "error" && message.stopReason !== "aborted" && message.provider === "openai-codex") {
+            const auth = await this.session.modelRuntime.getAuth("openai-codex");
+            if (auth?.source === "OAuth") recordSubscriptionInference("openai-codex");
+          }
           this.turnTiming?.inferenceEnd(performance.now(), message.usage?.output);
           if (message.stopReason !== "aborted" && message.stopReason !== "error") this.terminalOutcome = "completed";
           if (isFinalAssistantMessage(message.content, message.stopReason)) {
