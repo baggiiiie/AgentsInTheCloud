@@ -34,17 +34,20 @@ const providerUsageSchema = {
   },
 };
 
+const refreshParameter = { name: "refresh", in: "query", required: false, schema: { type: "string" }, description: "When present, ask providers now instead of reusing what Atelier already knows." } satisfies JsonObject;
+
 export const usageOpenApiPaths = {
   "/usage": { get: {
     summary: "Open Usage or inspect all connected, supported providers",
-    description: "HTML opens the Usage dialog in the Atelier shell. JSON includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key. Provider failures are explicit per-provider errors.",
+    parameters: [refreshParameter],
+    description: "HTML opens the Usage dialog in the Atelier shell. JSON includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key; its main limits come from Claude Code responses through the workspace proxy. Atelier asks Anthropic with a one-token message to its cheapest model only on the first read after start or a credential change, after a window resets, and on refresh. Provider failures are explicit per-provider errors.",
     responses: jsonAndHtmlResponse("Usage overview", { type: "object", properties: { providers: { type: "array", items: providerUsageSchema } } }),
   } },
   "/usage/button": { get: { summary: "Usage button perimeter for the selected provider", parameters: [{ name: "provider", in: "query", required: false, schema: { type: "string" } }], responses: htmlSurfaceResponses("Server-rendered button frame. Clockwise Time/Usage comparison ring for the greatest pacing difference among active used windows (the main allowance if all are unused). Ties prefer higher usage. Green is Time beyond Usage; red is Usage beyond Time. Omitted provider uses the saved most-recent model provider. No ring for unknown or unsupported limits.") } },
-  "/usage/overview": { get: { summary: "Refresh the server-rendered Usage overview frame", responses: htmlSurfaceResponses("Usage overview frame") } },
+  "/usage/overview": { get: { summary: "Refresh the server-rendered Usage overview frame", parameters: [refreshParameter], responses: htmlSurfaceResponses("Usage overview frame") } },
   "/usage/providers/{provider}": { get: {
     summary: "Refresh subscription limits for a provider",
-    parameters: [{ name: "provider", in: "path", required: true, schema: { type: "string", enum: supportedUsageProviders.map((provider) => provider.id) } }],
+    parameters: [{ name: "provider", in: "path", required: true, schema: { type: "string", enum: supportedUsageProviders.map((provider) => provider.id) } }, refreshParameter],
     responses: jsonAndHtmlResponse("Provider usage, including any provider error", providerUsageSchema),
   } },
 } satisfies Record<string, JsonObject>;

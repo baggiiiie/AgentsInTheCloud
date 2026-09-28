@@ -22,7 +22,7 @@ export function renderUsagePaneAction(): string {
   return `<span data-controller="usage-button" data-action="${actions}"><template data-usage-button-target="empty">${button}</template><turbo-frame id="usage_button_content">${button}</turbo-frame></span>`;
 }
 const overviewFrameId = "usage_overview";
-const providerPath = (id: string) => `/usage/providers/${encodeURIComponent(id)}`;
+const providerPath = (id: string, refresh: boolean) => `/usage/providers/${encodeURIComponent(id)}${refresh ? "?refresh=1" : ""}`;
 const providerFrameId = (id: string) => `usage_provider_${id}`;
 const number = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 
@@ -103,13 +103,13 @@ async function renderUsageButton(providerId: string | null): Promise<string> {
   return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace}`);
 }
 
-function providerPlaceholder(provider: UsageProvider): string {
-  return `<turbo-frame id="${providerFrameId(provider.id)}" src="${providerPath(provider.id)}"><section class="usage-provider"><h2>${escapeHtml(provider.label)}</h2><p role="status"><span class="status-spinner" aria-hidden="true"></span> Loading…</p></section></turbo-frame>`;
+function providerPlaceholder(provider: UsageProvider, refresh: boolean): string {
+  return `<turbo-frame id="${providerFrameId(provider.id)}" src="${escapeHtml(providerPath(provider.id, refresh))}"><section class="usage-provider"><h2>${escapeHtml(provider.label)}</h2><p role="status"><span class="status-spinner" aria-hidden="true"></span> Loading…</p></section></turbo-frame>`;
 }
 
-async function renderUsageOverview(): Promise<string> {
+async function renderUsageOverview(refresh = false): Promise<string> {
   const providers = await connectedUsageProviders();
-  return `<turbo-frame id="${overviewFrameId}" class="usage-overview">${providers.map(providerPlaceholder).join("") || '<p class="usage-caption">Connect OpenAI Codex or an Anthropic subscription in Settings to see usage.</p>'}</turbo-frame>`;
+  return `<turbo-frame id="${overviewFrameId}" class="usage-overview">${providers.map((provider) => providerPlaceholder(provider, refresh)).join("") || '<p class="usage-caption">Connect OpenAI Codex or an Anthropic subscription in Settings to see usage.</p>'}</turbo-frame>`;
 }
 
 async function renderUsageDialog(): Promise<string> {
@@ -118,13 +118,14 @@ async function renderUsageDialog(): Promise<string> {
     iconHtml: Icons.Usage,
     titleCaption: "Usage",
     bodyHtml: await renderUsageOverview(),
-    footerHtml: actionLinkHtml({ href: "/usage/overview", variant: "secondary", content: { kind: "caption", caption: "Refresh" }, attributesHtml: `data-turbo-frame="${overviewFrameId}"` }),
+    footerHtml: actionLinkHtml({ href: "/usage/overview?refresh=1", variant: "secondary", content: { kind: "caption", caption: "Refresh" }, attributesHtml: `data-turbo-frame="${overviewFrameId}"` }),
   });
 }
 
 export async function handleUsageRequest(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
   if (request.method !== "GET") return undefined;
   const json = requestAcceptsJson(request);
+  const refresh = url.searchParams.has("refresh");
   if (url.pathname === "/usage/button") {
     const button = await renderUsageButton(url.searchParams.get("provider"));
     return request.headers.get("accept")?.includes("text/vnd.turbo-stream.html")
@@ -132,17 +133,17 @@ export async function handleUsageRequest(request: Request, url: URL, context: Wo
       : response(`<turbo-frame id="usage_button_content">${button}</turbo-frame>`);
   }
   if (url.pathname === "/usage") {
-    if (json) return jsonResponse({ providers: await Promise.all((await connectedUsageProviders()).map(getProviderUsageOverview)) });
+    if (json) return jsonResponse({ providers: await Promise.all((await connectedUsageProviders()).map((provider) => getProviderUsageOverview(provider, { refresh }))) });
     const dialog = await renderUsageDialog();
     return request.headers.has("turbo-frame")
       ? response(`<turbo-frame id="${workspaceModuleModalFrameId}">${dialog}</turbo-frame>`)
       : context.renderModalPage(dialog);
   }
-  if (url.pathname === "/usage/overview") return response(await renderUsageOverview());
+  if (url.pathname === "/usage/overview") return response(await renderUsageOverview(refresh));
   const match = url.pathname.match(/^\/usage\/providers\/([^/]+)$/);
   if (!match) return undefined;
   const provider = supportedUsageProviders.find((provider) => provider.id === match[1]);
   if (!provider) return jsonResponse({ error: { code: "unsupported_usage_provider", message: "Subscription usage is not supported for this provider." } }, 404);
-  const overview = await getProviderUsageOverview(provider);
+  const overview = await getProviderUsageOverview(provider, { refresh });
   return json ? jsonResponse(overview) : response(`<turbo-frame id="${providerFrameId(provider.id)}">${renderUsageProvider(overview)}</turbo-frame>`);
 }

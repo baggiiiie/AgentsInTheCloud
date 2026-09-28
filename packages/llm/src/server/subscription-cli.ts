@@ -4,6 +4,8 @@ import { shellQuote } from "@atelier/core";
 import { registerWorkspaceResponseTransform, registerWorkspaceSubscriptionSecrets } from "@atelier/proxy-egress/server";
 import { execWorkspaceCommand, listWorkspaces } from "@atelier/workspace";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
+import { SubscriptionUsageError } from "./subscription-usage.ts";
 
 const codexToken = "atelier-subscription-codex-access";
 const codexAccount = "atelier-subscription-codex-account";
@@ -19,6 +21,22 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     if (new URL(request.url).hostname !== "chatgpt.com" || !["/api/codex/accounts/check", "/backend-api/wham/accounts/check"].includes(new URL(request.url).pathname) || !response.ok) return response;
     const accountId = codexAccountId(await subscriptionToken("openai-codex"));
     return maskCodexAccountDiscovery(response, accountId);
+  });
+  // Claude Code responses carry the subscription's limits; keeping them spares the
+  // usage view from asking Anthropic separately while agents are working.
+  registerWorkspaceResponseTransform("anthropic-subscription-usage", async (response, request) => {
+    if (new URL(request.url).hostname !== "api.anthropic.com" || !response.headers.has("anthropic-ratelimit-unified-status")) return response;
+    const auth = await (await getRuntime()).getAuth("anthropic");
+    // Only Atelier's connected subscription, not a login made inside the workspace.
+    if (auth?.source !== "OAuth" || !auth.auth.apiKey || request.headers.get("authorization") !== `Bearer ${auth.auth.apiKey}`) return response;
+    try {
+      anthropicUsageSource.observe(response.headers);
+    } catch (error) {
+      // Usage is a side channel; never fail Claude Code's request over it.
+      if (!(error instanceof SubscriptionUsageError)) throw error;
+      console.warn(`[usage] ${error.message}`);
+    }
+    return response;
   });
   registerWorkspaceSubscriptionSecrets({
     codexSubscription: { placeholder: codexToken, hosts: ["chatgpt.com"], value: "", resolve: () => subscriptionToken("openai-codex") },

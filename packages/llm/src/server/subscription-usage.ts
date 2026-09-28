@@ -7,4 +7,7 @@ export type SubscriptionUsage = {
 };
 
 /** Expected provider/authentication failures that can be shown in the usage overview. */
-export class SubscriptionUsageError extends Error {}
+export class SubscriptionUsageError extends Error {
+  /** Seconds the provider asked us to wait before asking again, when it said. */
+  constructor(message: string, readonly retryAfterSeconds: number | null = null) { super(message); }
+}

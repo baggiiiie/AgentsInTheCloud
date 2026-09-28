@@ -1,6 +1,7 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { createWorkspaceSecretContext } from "@atelier/proxy-egress/server";
 import { maskCodexAccountDiscovery, registerSubscriptionCli, subscriptionCliFiles } from "../../src/server/subscription-cli.ts";
+import { anthropicUsageSource } from "../../src/server/anthropic-subscription-usage.ts";
 
 test("Codex receives ChatGPT auth, not API-key auth or refresh credentials", () => {
   const file = subscriptionCliFiles().find((file) => file.provider === "openai-codex")!;
@@ -62,4 +63,26 @@ test("Claude Code receives inference-scoped OAuth placeholders", () => {
   expect(auth.refreshToken).toBeNull();
   expect(auth.scopes).toContain("user:inference");
   expect(auth.expiresAt).toBeGreaterThan(Date.now());
+});
+
+test("workspace proxy records Claude Code's subscription limits only for Atelier's credential", async () => {
+  // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
+  registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: "real-token" } }) }) as any);
+  const context = await createWorkspaceSecretContext("anthropic-usage-test");
+  const observe = spyOn(anthropicUsageSource, "observe");
+  const warn = spyOn(console, "warn").mockImplementation(() => {});
+  // SAFETY: The workspace secret context always returns a rewritten Request for matched hosts.
+  const request = await context.hooks.onRequest!(new Request("https://api.anthropic.com/v1/messages", { method: "POST", headers: { authorization: "Bearer atelier-subscription-anthropic-access" } })) as Request;
+  const limits = { "anthropic-ratelimit-unified-status": "allowed", "anthropic-ratelimit-unified-5h-utilization": "0.2" };
+  const upstream = new Response("stream", { headers: limits });
+  expect(await context.hooks.onResponse!(upstream, request)).toBe(upstream);
+  expect(observe).toHaveBeenCalledTimes(1);
+  expect(observe.mock.calls[0]![0]).toBe(upstream.headers);
+  await context.hooks.onResponse!(new Response("", { headers: limits }), new Request("https://api.anthropic.com/v1/messages", { headers: { authorization: "Bearer workspace-login" } }));
+  expect(observe).toHaveBeenCalledTimes(1);
+  const malformed = new Response("stream", { headers: { ...limits, "anthropic-ratelimit-unified-5h-utilization": "lots" } });
+  expect(await context.hooks.onResponse!(malformed, request)).toBe(malformed);
+  expect(warn).toHaveBeenCalledWith("[usage] Anthropic returned unrecognized rate limit headers.");
+  observe.mockRestore();
+  warn.mockRestore();
 });

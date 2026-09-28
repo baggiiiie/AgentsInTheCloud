@@ -1,7 +1,7 @@
 import { createKeyedOperationQueue, type AtelierEventBus } from "@atelier/core";
 import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@atelier/workspace";
 import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
-import { createPiModelRuntime, type ModelRef } from "@atelier/llm/server";
+import { cheapestProviderModel, createPiModelRuntime, type ModelRef } from "@atelier/llm/server";
 import { listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 const pendingRenames = new Set<string>();
@@ -130,8 +130,7 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
         return false;
       }
       const runtime = await createPiModelRuntime();
-      const model = runtime.getModels(titleModelRef.provider)
-        .toSorted((a, b) => a.cost.input - b.cost.input)[0];
+      const model = cheapestProviderModel(runtime, titleModelRef.provider);
       if (!model) {
         logAgentTitleSuggestionError(agent, titleModelRef, "provider has no models available");
         return false;
@@ -201,7 +200,7 @@ export async function suggestSessionSlug(userPrompt: string, selectedModel?: Mod
   const modelRef = selectedModel ?? await resolveNewWorkspaceAgentModel();
   if (!modelRef) return undefined;
   const runtime = await createPiModelRuntime();
-  const model = runtime.getModels(modelRef.provider).toSorted((a, b) => a.cost.input - b.cost.input)[0];
+  const model = cheapestProviderModel(runtime, modelRef.provider);
   if (!model || !(await runtime.checkAuth(model.provider))) return undefined;
   const response = await runtime.completeSimple(model, {
     messages: [{ role: "user", content: promptFor(userPrompt), timestamp: Date.now() }],

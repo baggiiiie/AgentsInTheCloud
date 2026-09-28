@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createAtelierEventBus } from "@atelier/core";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { cheapestProviderModel } from "@atelier/llm/server";
 import type { WorkspaceAgentConversationInfo } from "../../src/server/session-store.ts";
 import { agentTitleRequestOptions, createAutomaticWorkspaceNamingGate, createAgentSessionTitleSetter } from "../../src/server/agent-title-suggestion.ts";
 
@@ -85,7 +86,7 @@ describe("Agent session titles", () => {
 describe("title request options", () => {
   test("leave Anthropic's cheapest model enough answer room without a thinking budget", async () => {
     const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false, refreshOnCreate: false });
-    const model = runtime.getModels("anthropic").toSorted((a, b) => a.cost.input - b.cost.input)[0]!;
+    const model = cheapestProviderModel(runtime, "anthropic")!;
     let request: { max_tokens: number; thinking?: { type: string; budget_tokens?: number } } | undefined;
     const captureRequest: typeof fetch = Object.assign(async (_url: URL | RequestInfo, init?: RequestInit) => {
       request = JSON.parse(String(init?.body));
