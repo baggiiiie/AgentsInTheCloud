@@ -6,6 +6,9 @@
   html.software-keyboard-visible .agent-pane.mobile-composer-open {
     height: var(--mobile-composer-viewport-height, 100%);
   }
+  /* The stats footer would push the composer past the keyboard's top edge. */
+  html.software-keyboard-visible .agent-pane.mobile-composer-open .composer-surface { --composer-footer-height: 0px; }
+  html.software-keyboard-visible .agent-pane.mobile-composer-open .composer-footer { display: none; }
 }
 
 .agent-pane {
