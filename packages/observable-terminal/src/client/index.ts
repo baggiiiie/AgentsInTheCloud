@@ -268,8 +268,16 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     const sendInput = (data: string): void => {
       if (ws?.readyState === WebSocket.OPEN) ws.send(data);
     };
-    const sendSize = ({ cols, rows }: { cols: number; rows: number }): void => {
-      if (ws?.readyState === WebSocket.OPEN) ws.send(encodeObservableTerminalMessage({ type: "resize", cols, rows }));
+    // A hidden host measures 0×0, so Gespenst falls back to 80×24. Keep that
+    // size local: resizing the PTY makes TUIs like Pi redraw their whole history.
+    let ptySize = { cols: term.geometry.cols, rows: term.geometry.rows };
+    const measurePtySize = (): boolean => {
+      const { width, height } = term.element.getBoundingClientRect();
+      if (width && height) ptySize = { cols: term.geometry.cols, rows: term.geometry.rows };
+      return width > 0 && height > 0;
+    };
+    const sendSize = (): void => {
+      if (measurePtySize() && ws?.readyState === WebSocket.OPEN) ws.send(encodeObservableTerminalMessage({ type: "resize", ...ptySize }));
     };
     let awaitingFirstOutput = true;
     let disposed = false;
@@ -365,8 +373,9 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       disconnect();
       if (interactive) {
         status(hasConnected || retryAttempts > 0 ? "reconnecting" : "connecting");
-        websocketUrl.searchParams.set("cols", String(term.geometry.cols));
-        websocketUrl.searchParams.set("rows", String(term.geometry.rows));
+        measurePtySize();
+        websocketUrl.searchParams.set("cols", String(ptySize.cols));
+        websocketUrl.searchParams.set("rows", String(ptySize.rows));
       }
       openedAt = 0;
       const socket = ws = new WebSocket(websocketUrl);
@@ -375,7 +384,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       socket.onopen = () => {
         openedAt = Date.now();
         hasConnected = true;
-        if (interactive) sendSize(term.geometry);
+        if (interactive) sendSize();
         status("connected");
       };
       socket.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
@@ -515,7 +524,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       focus: () => term.focus(),
       refresh: () => {
         term.fit();
-        if (options.mode === "interactive") sendSize(term.geometry);
+        if (options.mode === "interactive") sendSize();
         // Gespenst has no explicit repaint operation. Reapplying the active theme
         // invalidates every row and repaints from its authoritative buffer.
         void updateTheme();

@@ -2,6 +2,8 @@
 
 .cli-agent-body { position:relative; display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg); color:var(--text-bright); }
 .cli-agent-body .observable-terminal-host { flex:1; min-height:100px; overflow:hidden; touch-action:none; }
+/* Overlay the banner: taking rows from the terminal would resize the PTY on every (re)connect. */
+.cli-agent-body > .observable-terminal-connection { position:absolute; top:0; left:0; right:0; z-index:2; }
 .cli-agent-body .cli-agent-composer {
   --composer-controls-min-height: calc(3 * var(--composer-control-size) + 2 * var(--composer-control-inset) + 12px);
   --agent-inline-gutter: 12px;
