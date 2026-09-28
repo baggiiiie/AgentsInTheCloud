@@ -4,6 +4,7 @@ import { transcriptionComposerController } from "@atelier/transcription/server";
 import { buttonHtml } from "@atelier/design-system/button";
 import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml, turboStream, type WorkspaceModule } from "@atelier/shared";
+import type { AtelierEventBus } from "@atelier/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { CliAgentAdapter } from "./adapter.ts";
@@ -19,7 +20,8 @@ function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string
 
 /** One adapter supplies CLI policy; this module owns the complete terminal-agent lifecycle. */
 export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule {
-  const sessions = createCliSessions(adapter);
+  let events: AtelierEventBus;
+  const sessions = createCliSessions(adapter, (workspaceId, conversationId, title) => events.emit("workspace_agent_conversation_title_changed", { workspaceId, conversationId, title }));
   function failureStatus(error: string) { return `Could not start ${escapeHtml(adapter.label)}: ${escapeHtml(error)}`; }
   const turnsChannel = `${adapter.id}-agent-turns`;
   return {
@@ -29,6 +31,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
       "/cli-agent.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
     },
     initialize(context) {
+      events = context.events;
       context.registerSocketHandler(cliSocketHandler(adapter.id, sessions));
       context.events.on("workspace_agent_turn_finished", ({ workspaceId, conversationId }) => {
         if (sessions.list(workspaceId).some((session) => session.id === conversationId)) {

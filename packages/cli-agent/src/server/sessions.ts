@@ -28,7 +28,7 @@ async function checkedShell(workspaceId: string, command: string, stdin?: string
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `Command failed (exit ${result.exitCode})`);
 }
 
-export function createCliSessions(adapter: CliAgentAdapter) {
+export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (workspaceId: string, id: string, title: string) => Promise<void>) {
   let state: ReturnType<typeof createStore> | undefined;
   function createStore() { return createWorkspaceMetadataState(`${adapter.id}-agents.json`, (value) => Value.Parse(stateSchema, value), () => ({ sessions: [] })); }
   function store() { return state ??= createStore(); }
@@ -48,7 +48,7 @@ export function createCliSessions(adapter: CliAgentAdapter) {
   async function launch(workspaceId: string, input: WorkspaceAgentInput, settings: AgentWorkspaceParameters): Promise<string> {
     await adapter.requireSetup();
     const id = crypto.randomUUID();
-    const session: CliSession = { id, title: input.text.trim().split("\n")[0]?.slice(0, 64) || adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel, firstPresentation: !input.text.trim() && !input.images.length && !input.attachmentNotes.length };
+    const session: CliSession = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel, firstPresentation: !input.text.trim() && !input.images.length && !input.attachmentNotes.length };
     // Claim before side effects. Recovery must never submit the initial prompt twice.
     store().write(workspaceId, { sessions: [...list(workspaceId), session] });
     const ready = Promise.withResolvers<void>();
@@ -83,7 +83,32 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       starting.delete(id);
       ready.resolve();
     }
+    if (!session.error && input.text.trim()) void nameFromPrompt(workspaceId, session).catch((error) => console.error(`Could not publish ${adapter.label} session title ${id}`, error));
     return id;
+  }
+
+  async function suggestSlug(session: CliSession): Promise<string | undefined> {
+    try {
+      return await suggestSessionSlug(session.input.text, session.model ? parseModelRef(session.model) : undefined);
+    } catch (error) {
+      console.error(`Could not name ${adapter.label} session ${session.id}`, error);
+      return undefined;
+    }
+  }
+
+  // The launch prompt names the tab; the same slug later names the exported history.
+  async function nameFromPrompt(workspaceId: string, session: CliSession): Promise<void> {
+    const slug = await suggestSlug(session);
+    if (!slug) return;
+    const renamed = await serialize(workspaceId, async () => {
+      const current = list(workspaceId).find((item) => item.id === session.id);
+      if (!current) return false;
+      current.title = slug;
+      current.historySlug ??= slug;
+      store().write(workspaceId, { sessions: list(workspaceId) });
+      return true;
+    });
+    if (renamed) await onTitleChanged(workspaceId, session.id, slug);
   }
 
   function create(workspaceId: string, settings: AgentWorkspaceParameters = {}): Promise<string> {
@@ -127,12 +152,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       const session = list(workspaceId).find((item) => item.id === id);
       if (!session || session.error) return;
       if (!session.historySlug) {
-        try {
-          session.historySlug = await suggestSessionSlug(session.input.text, session.model ? parseModelRef(session.model) : undefined);
-        } catch (error) {
-          console.error(`Could not name ${adapter.label} session ${id}`, error);
-          return;
-        }
+        session.historySlug = await suggestSlug(session);
         if (!session.historySlug) return;
         store().write(workspaceId, { sessions: list(workspaceId) });
       }

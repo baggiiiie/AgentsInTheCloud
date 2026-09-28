@@ -17,6 +17,10 @@ async function scenario(script: string): Promise<void> {
       let preparationError;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
       mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return result; } }));
+      const agentServer = await import("@atelier/agent/server");
+      const slugRequests = [];
+      let suggestedSlug;
+      mock.module("@atelier/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",
@@ -29,6 +33,8 @@ async function scenario(script: string): Promise<void> {
         launchScript: (input, images, settings) => { launches.push({ input, images, settings }); return "printf 'CLI started'"; },
       };
       const module = createCliAgentModule(adapter);
+      const titleEvents = [];
+      module.initialize({ events: { on() {}, emit: async (name, payload) => { titleEvents.push({ name, payload }); } }, registerSocketHandler() {} });
       const provider = module.agentProvider;
       const saved = (workspaceId, providerId = "example") => Bun.file(process.env.ATELIER_DATA_DIR + "/workspaces/" + workspaceId + "/metadata/" + providerId + "-agents.json").json();
       const list = (workspaceId) => provider.tabs.list({ workspaceId });
@@ -52,9 +58,21 @@ test("creation materializes images and passes input and settings to the adapter 
   expect(launches).toEqual([{ input, images: [image], settings }]);
   expect(preparations).toEqual(["initial"]);
   const [session] = (await saved("initial")).sessions;
-  expect(session).toMatchObject({ id: tab.id, title: input.text, input, kind: "example", model: settings.model, thinkingLevel: "custom", tmuxSession: "example-" + tab.id });
+  expect(session).toMatchObject({ id: tab.id, title: "Example CLI", input, kind: "example", model: settings.model, thinkingLevel: "custom", tmuxSession: "example-" + tab.id });
   await list("initial");
   expect(calls).toHaveLength(4);
+`));
+
+test("a launch prompt names the tab with a suggested slug", () => scenario(`
+  suggestedSlug = "inspect-attached-image";
+  const input = { text: "Inspect this image", images: [], attachmentNotes: [] };
+  await provider.launch.prepareWorkspace("named", { agent: { input, model: "any-provider::model" } });
+  const [tab] = await list("named");
+  while (!titleEvents.length) await Bun.sleep(1);
+  expect(slugRequests).toEqual([[input.text, { provider: "any-provider", id: "model" }]]);
+  expect(await list("named")).toEqual([{ id: tab.id, title: suggestedSlug }]);
+  expect((await saved("named")).sessions[0].historySlug).toBe(suggestedSlug);
+  expect(titleEvents).toEqual([{ name: "workspace_agent_conversation_title_changed", payload: { workspaceId: "named", conversationId: tab.id, title: suggestedSlug } }]);
 `));
 
 test("startup failure leaves a durable tab with its actual error", () => scenario(`
