@@ -33,7 +33,7 @@ export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], 
   const commands = slashCommands(templates, skills, applicationCommands);
   const quickLaunches = templates.filter((template) => template.quickLaunch).map((template) => {
     const hotkey = template.hotkey;
-    const hotkeyData = hotkey ? ` data-prompt-template-hotkey="${escapeHtml(hotkey)}" data-agent-quick-launch-shortcut="⌘⌥${escapeHtml(hotkey.toUpperCase())}" aria-keyshortcuts="Meta+Alt+${escapeHtml(hotkey.toUpperCase())}"` : "";
+    const hotkeyData = hotkey ? ` data-prompt-template-hotkey="${escapeHtml(hotkey)}"` : "";
     return buttonHtml({
       type: "button",
       variant: "secondary",

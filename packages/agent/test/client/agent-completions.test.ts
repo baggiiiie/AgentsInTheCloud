@@ -113,8 +113,10 @@ describe("agent prompt completion activation", () => {
       { label: "New Terminal", binding: "Meta+Alt+KeyT" },
     ];
 
-    expect(promptTemplateHotkeyConflict("v", commands)?.label).toBe("Open VS Code");
-    expect(promptTemplateHotkeyConflict("s", commands)).toBeUndefined();
+    expect(promptTemplateHotkeyConflict("v", commands, true)?.label).toBe("Open VS Code");
+    expect(promptTemplateHotkeyConflict("s", commands, true)).toBeUndefined();
+    expect(promptTemplateHotkeyConflict("v", commands, false)).toBeUndefined();
+    expect(promptTemplateHotkeyConflict("v", [{ label: "Paste", binding: "Control+Alt+KeyV" }], false)?.label).toBe("Paste");
   });
 
   test("a selected prompt template replaces a partial trigger before inline expansion", () => {

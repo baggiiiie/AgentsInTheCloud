@@ -1,6 +1,6 @@
 import { setActionItemLabel } from "@atelier/design-system/action-item/client";
 import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { agentCompletionRequest, insertFileCompletion, insertSlashCommand } from "./completion-input.ts";
 import { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 import { handleAgentTreeKeydown, handleAgentTreeMenuEvent, selectAgentTreeOption } from "./session-tree.ts";
@@ -32,9 +32,20 @@ function promptTemplateTriggerForHotkey(html: string, hotkey: string): string | 
 
 type ShortcutCommand = Pick<WorkspaceClientCommand, "label" | "binding">;
 
-export function promptTemplateHotkeyConflict(hotkey: string, commands: readonly ShortcutCommand[]): ShortcutCommand | undefined {
-  const binding = `Meta+Alt+Key${hotkey.toUpperCase()}`;
+// Prompt-template hotkeys are ⌘⌥Letter on Apple platforms and Ctrl+Alt+Letter elsewhere.
+function promptTemplateModifier(apple: boolean): "Meta" | "Control" {
+  return apple ? "Meta" : "Control";
+}
+
+export function promptTemplateHotkeyConflict(hotkey: string, commands: readonly ShortcutCommand[], apple: boolean): ShortcutCommand | undefined {
+  const binding = `${promptTemplateModifier(apple)}+Alt+Key${hotkey.toUpperCase()}`;
   return commands.find((command) => command.binding === binding);
+}
+
+function promptTemplateHotkeyPressed(event: KeyboardEvent): boolean {
+  if (!event.altKey || event.shiftKey) return false;
+  // Windows reports AltGr as Ctrl+Alt; those presses type characters.
+  return isApplePlatform() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey && !event.getModifierState("AltGraph");
 }
 
 function visibleWorkspaceCommands(): ShortcutCommand[] {
@@ -46,23 +57,29 @@ function visibleWorkspaceCommands(): ShortcutCommand[] {
 }
 
 function promptTemplateShortcutConflict(hooks: WorkspaceClientHooks, hotkey: string): ShortcutCommand | undefined {
-  return promptTemplateHotkeyConflict(hotkey, [...hooks.registeredCommands(), ...visibleWorkspaceCommands()]);
+  return promptTemplateHotkeyConflict(hotkey, [...hooks.registeredCommands(), ...visibleWorkspaceCommands()], isApplePlatform());
 }
 
-function markPromptTemplateShortcutConflicts(html: string, hooks: WorkspaceClientHooks): string {
+function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks): string {
   const container = document.createElement("template");
   container.innerHTML = html.trim();
   for (const option of container.content.querySelectorAll<HTMLElement>("[data-prompt-template-hotkey]")) {
     const hotkey = option.dataset.promptTemplateHotkey!;
+    const key = hotkey.toUpperCase();
+    const apple = isApplePlatform();
+    const label = apple ? `⌘⌥${key}` : `Ctrl+Alt+${key}`;
     const conflict = promptTemplateShortcutConflict(hooks, hotkey);
-    if (!conflict) continue;
+    if (!conflict) {
+      option.dataset.agentQuickLaunchShortcut = label;
+      option.setAttribute("aria-keyshortcuts", `${promptTemplateModifier(apple)}+Alt+${key}`);
+      continue;
+    }
     option.removeAttribute("data-prompt-template-hotkey");
-    option.removeAttribute("aria-keyshortcuts");
-    const message = `Shortcut unavailable: ⌘⌥${hotkey.toUpperCase()} is used by ${conflict.label}.`;
+    const message = `Shortcut unavailable: ${label} is used by ${conflict.label}.`;
     option.title = message;
     option.setAttribute("aria-label", `${option.getAttribute("aria-label") ?? option.dataset.commandTrigger}. ${message}`);
     option.classList.add("shortcut-conflict");
-    option.dataset.agentQuickLaunchShortcut = `⌘⌥${hotkey.toUpperCase()} used by ${conflict.label}`;
+    option.dataset.agentQuickLaunchShortcut = `${label} used by ${conflict.label}`;
   }
   return container.innerHTML;
 }
@@ -149,7 +166,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
         : request.params?.kind === "slash-command"
           ? slashCompletionHtml(catalog, request.query, request.params.compactAvailable !== "false")
           : undefined;
-      return html === undefined ? undefined : markPromptTemplateShortcutConflicts(html, hooks);
+      return html === undefined ? undefined : labelPromptTemplateShortcuts(html, hooks);
     },
     select(option, input, url) {
       if (runApplicationCommand(option, input)) return;
@@ -220,7 +237,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
     }
 
     private readonly promptTemplateHotkey = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || event.repeat || event.isComposing || !event.metaKey || !event.altKey || event.ctrlKey || event.shiftKey) return;
+      if (event.defaultPrevented || event.repeat || event.isComposing || !promptTemplateHotkeyPressed(event)) return;
       const match = event.code.match(/^Key([A-Z])$/);
       if (!match || this.element.getClientRects().length === 0 || composerIsTranscribing(this.element)) return;
       const resident = this.element.closest<HTMLElement>(".workspace-detail-resident");
