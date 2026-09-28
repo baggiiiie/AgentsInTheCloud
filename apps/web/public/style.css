@@ -245,7 +245,11 @@ turbo-frame { display: contents; }
 .fixed-shell-projects-pane > .panel > .panel__body { transition: opacity 160ms ease-out, visibility 160ms; }
 .fixed-shell-projects-pane.is-collapsed > .panel > .panel__body { opacity: 0; visibility: hidden; pointer-events: none; }
 .fixed-shell-projects-pane.is-collapsed [data-projects-pane-target="toggle"] svg { transform: rotate(180deg); }
-.fixed-shell-projects-list { padding: 8px; }
+/* Size the rows against the panel, not the scrollbar-reduced scrollport. */
+.fixed-shell-projects-pane > .panel { container-type: inline-size; }
+.fixed-shell-projects-pane > .panel > .panel__body { overflow-x: hidden; }
+.fixed-shell-projects-list { width: 100cqw; padding: 8px 0 8px 8px; }
+.fixed-shell-projects-list .action-item { padding-right: 0; }
 .fixed-shell-projects-empty { position: relative; margin: 0; padding: 16px 56px 16px 8px; color: var(--text-muted); }
 .fixed-shell-projects-empty-arrow { position: absolute; top: 0; right: 10px; pointer-events: none; }
 @media (max-width: 700px), (pointer: coarse) {
