@@ -35,9 +35,10 @@ export const vscodeClientModule: WorkspaceClientModule = {
     }
 
     class VSCodeNavigateController extends Controller {
-      static values = { paneId: String, path: String };
+      static values = { paneId: String, path: String, delivered: Boolean };
       declare readonly paneIdValue: string;
       declare readonly pathValue: string;
+      declare readonly deliveredValue: boolean;
       private observer?: MutationObserver;
 
       connect(): void {
@@ -55,6 +56,10 @@ export const vscodeClientModule: WorkspaceClientModule = {
         const frame = document.getElementById(this.paneIdValue)?.querySelector("iframe");
         if (!frame) return;
         this.observer!.disconnect();
+        // The server already handed the file to the live VS Code windows. A
+        // loaded frame keeps its workbench: reloading it costs a full download.
+        // A frame still loading (perhaps only just activated) takes the file along.
+        if (this.deliveredValue && !frame.closest(".vscode-frame-shell")!.classList.contains("vscode-loading")) return;
         // Navigate the existing frame, rather than removing it, so VS Code can
         // run its normal shutdown/backup handling for unsaved editors.
         frame.setAttribute("data-workspace-app-frame-initial-path-value", this.pathValue);

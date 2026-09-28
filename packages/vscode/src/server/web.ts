@@ -2,7 +2,7 @@ import { Icons } from "@atelier/design-system/icons";
 import type { JsonValue } from "@atelier/core";
 import { turboStreamResponse, type WorkspaceFileTarget, type WorkspaceModuleRouteContext, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@atelier/shared";
 import { renderVSCodePane, vscodeViewKey, renderVSCodeNavigationSignal, vscodeFileNavigationStream } from "./render.ts";
-import { createWorkspaceVSCodeView, deleteWorkspaceVSCodeState, deleteWorkspaceVSCodeView, listWorkspaceVSCodeViews, type WorkspaceVSCodeView } from "./workspace-vscode.ts";
+import { createWorkspaceVSCodeView, deleteWorkspaceVSCodeState, deleteWorkspaceVSCodeView, listWorkspaceVSCodeViews, openFileInConnectedVSCodeWindows, type WorkspaceVSCodeView } from "./workspace-vscode.ts";
 import { vscodeStaticFiles } from "./static.ts";
 import { patchVSCodeWorkspaceAppResponse, resolveVSCodeWorkspaceAppBackend, vscodeAppKey } from "./proxy.ts";
 import { Type, type Static } from "typebox";
@@ -84,6 +84,9 @@ export const vscodeWorkspaceModule: WorkspaceModule = {
 export { createWorkspaceVSCodeView };
 
 export async function openFileInVSCode(workspaceId: string, title: string, target: WorkspaceFileTarget, openWorkView: WorkspaceModuleRouteContext["openWorkView"]): Promise<Response> {
-  const presentation = await openWorkView(workspaceId, { type: "vscode", title });
-  return turboStreamResponse(`${await presentation.text()}${vscodeFileNavigationStream(workspaceId, title, target)}`);
+  const [presentation, delivered] = await Promise.all([
+    openWorkView(workspaceId, { type: "vscode", title }).then((response) => response.text()),
+    openFileInConnectedVSCodeWindows(workspaceId, target),
+  ]);
+  return turboStreamResponse(`${presentation}${vscodeFileNavigationStream(workspaceId, title, target, delivered)}`);
 }

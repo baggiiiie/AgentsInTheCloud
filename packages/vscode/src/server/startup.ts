@@ -57,3 +57,19 @@ export function vscodeStartupScript(workspaceFile: string): string {
     exit 1
   `;
 }
+
+/**
+ * Hands a file to every VS Code window whose extension host answers, the way
+ * `code -r` does in VS Code's own terminal, so open windows need no reload.
+ * Prints "delivered" once any window accepted it. Extension hosts of vanished
+ * pages linger for reconnection and may never answer; don't wait long for them.
+ */
+export function vscodeOpenFileScript(file: string, gotoLine: boolean): string {
+  const args = gotoLine ? `--goto ${shellQuote(file)}` : shellQuote(file);
+  return `
+    for socket in /tmp/vscode-ipc-*.sock; do
+      [ -S "$socket" ] || continue
+      (VSCODE_IPC_HOOK_CLI="$socket" timeout 3 /opt/atelier/vscode-server/bin/remote-cli/code -r ${args} >/dev/null 2>&1 && echo delivered) </dev/null &
+    done | head -n 1
+  `;
+}

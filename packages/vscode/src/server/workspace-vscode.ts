@@ -1,8 +1,10 @@
 import type { JsonValue } from "@atelier/core";
-import { createWorkspaceMetadataState, execWorkspaceShell } from "@atelier/workspace";
+import type { WorkspaceFileTarget } from "@atelier/shared";
+import { createWorkspaceMetadataState, execWorkspaceCommand, execWorkspaceShell } from "@atelier/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { vscodeStartupScript } from "./startup.ts";
+import { vscodeFileLocation } from "./render.ts";
+import { vscodeOpenFileScript, vscodeStartupScript } from "./startup.ts";
 
 const workspaceVSCodeViewSchema = Type.Object({
   title: Type.String({ pattern: "\\S" }),
@@ -53,4 +55,12 @@ export async function ensureWorkspaceVSCodeServer(workspaceId: string): Promise<
   const workspaceFile = `/.atelier/vscode/workspaces/${Buffer.from(workspaceId).toString("base64url")}.code-workspace`;
   const result = await execWorkspaceShell(workspaceId, vscodeStartupScript(workspaceFile), { user: "atelier" });
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `could not start VS Code server for ${workspaceId}`);
+}
+
+/** Returns whether any live VS Code window of the workspace opened the file. */
+export async function openFileInConnectedVSCodeWindows(workspaceId: string, target: WorkspaceFileTarget): Promise<boolean> {
+  const { file, gotoLine } = vscodeFileLocation(target);
+  const result = await execWorkspaceCommand(workspaceId, ["sh", "-c", vscodeOpenFileScript(file, gotoLine)], { user: "atelier" });
+  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `could not open ${file} in VS Code for ${workspaceId}`);
+  return result.stdout.trim() === "delivered";
 }
