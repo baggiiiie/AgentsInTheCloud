@@ -72,7 +72,7 @@ describe("workspace image layer ordering", () => {
     expect(base).not.toContain("      openbox");
     expect(base).not.toContain("      tmux");
     expect(moduleBlock("proxy-egress")).toContain("      socat");
-    expect(moduleBlock("workspace-terminal")).toContain("      tmux");
+    expect(moduleBlock("workspace-terminal")).toContain("tmux-$tmux_version.tar.gz");
     const desktop = moduleBlock("desktop");
     expect(desktop).toContain("      openbox");
     expect(desktop.indexOf("apt-get install")).toBeLessThan(desktop.indexOf("RUN glib-compile-schemas"));
