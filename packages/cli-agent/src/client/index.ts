@@ -152,12 +152,20 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!touch || event.changedTouches.length !== 1 || !point || point.identifier !== touch.id
           || Math.hypot(point.screenX - touch.startX, point.screenY - touch.startY) > 10) return;
         event.preventDefault();
-        this.viewer?.setHistoryCursorHidden(false);
-        this.enterRawMode();
-        this.viewer?.focus();
-        const pointer = new PointerEvent("pointerup", { clientX: point.clientX, clientY: point.clientY });
-        this.viewer?.dragPointer(pointer, "press", false);
-        this.viewer?.dragPointer(pointer, "release", false);
+        const viewer = this.viewer;
+        if (!viewer) return;
+        const { clientX, clientY } = point;
+        // Mobile browsers may cancel or retarget pointerup after a touch. Resolve
+        // the completed tap directly against the painted cells instead.
+        void viewer.activateFileLinkAt(clientX, clientY).then((opened) => {
+          if (opened || this.viewer !== viewer) return;
+          viewer.setHistoryCursorHidden(false);
+          this.enterRawMode();
+          viewer.focus();
+          const pointer = new PointerEvent("pointerup", { clientX, clientY });
+          viewer.dragPointer(pointer, "press", false);
+          viewer.dragPointer(pointer, "release", false);
+        });
       }
       private stopMomentum(): void { cancelAnimationFrame(this.momentum); this.momentum = 0; }
       private glide(velocity: number, x: number, y: number): void {

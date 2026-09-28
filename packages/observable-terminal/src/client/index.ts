@@ -134,6 +134,8 @@ export interface ObservableTerminalViewer {
   dragPointer(event: PointerEvent, action: "press" | "motion" | "release", select: boolean): void;
   /** Send a touch scroll through the terminal's wheel path, including TUI mouse reporting. */
   scrollTouch(deltaY: number, clientX: number, clientY: number): void;
+  /** Resolve a completed touch tap against the painted terminal, before sending TUI input. */
+  activateFileLinkAt(clientX: number, clientY: number): Promise<boolean>;
   /** Hide the input cursor while reading CLI history without changing the PTY. */
   setHistoryCursorHidden(hidden: boolean): void;
   paste(text: string): void;
@@ -240,6 +242,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
     getSelection: () => viewer?.getSelection() ?? Promise.resolve(""),
     dragPointer: (event, action, select) => viewer?.dragPointer(event, action, select),
     scrollTouch: (deltaY, clientX, clientY) => viewer?.scrollTouch(deltaY, clientX, clientY),
+    activateFileLinkAt: (clientX, clientY) => viewer?.activateFileLinkAt(clientX, clientY) ?? Promise.resolve(false),
     setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; viewer?.setHistoryCursorHidden(hidden); },
     paste: (text) => viewer?.paste(text),
     pressEnter: () => viewer?.pressEnter(),
@@ -462,18 +465,19 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     // Gespenst renders into a canvas, so there are no anchors to click. Read
     // its authoritative painted cells (including OSC 8 destinations) instead
     // of trying to parse the incoming PTY byte stream or its escape sequences.
+    const fileLinkAt = (rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"], clientX: number, clientY: number) => {
+      const bounds = term.element.getBoundingClientRect();
+      const scale = Math.max(1, globalThis.devicePixelRatio || 1);
+      const column = Math.floor((clientX - bounds.left) * scale / term.geometry.cellWidthPx);
+      const row = Math.floor((clientY - bounds.top) * scale / term.geometry.cellHeightPx);
+      return rows[row] && column >= 0 && column < term.geometry.cols ? terminalFileAt(rows[row], column) : undefined;
+    };
     if (options.onFileLink) {
       let rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"] = [];
       let pointerInside = false;
       let hoverEvent: PointerEvent | undefined;
       let pointerStart: { id: number; x: number; y: number } | undefined;
-      const linkAt = (event: PointerEvent) => {
-        const bounds = term.element.getBoundingClientRect();
-        const scale = Math.max(1, globalThis.devicePixelRatio || 1);
-        const column = Math.floor((event.clientX - bounds.left) * scale / term.geometry.cellWidthPx);
-        const row = Math.floor((event.clientY - bounds.top) * scale / term.geometry.cellHeightPx);
-        return rows[row] && column >= 0 && column < term.geometry.cols ? terminalFileAt(rows[row], column) : undefined;
-      };
+      const linkAt = (event: PointerEvent) => fileLinkAt(rows, event.clientX, event.clientY);
       let reading = false;
       let dirty = false;
       const updateRows = async () => {
@@ -495,11 +499,13 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         term.element.style.cursor = linkAt(event) ? "pointer" : "";
       });
       term.element.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "touch") return;
         pointerStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
         // Do not send mouse input to a TUI when tapping a known link.
         if (linkAt(event)) { event.preventDefault(); event.stopImmediatePropagation(); }
       }, { capture: true });
       term.element.addEventListener("pointerup", (event) => {
+        if (event.pointerType === "touch") return;
         const start = pointerStart;
         pointerStart = undefined;
         if (!start || start.id !== event.pointerId || Math.hypot(start.x - event.clientX, start.y - event.clientY) > 10) return;
@@ -562,6 +568,13 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       },
       scrollTouch: (deltaY, clientX, clientY) => {
         term.element.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX, clientY, cancelable: true }));
+      },
+      activateFileLinkAt: async (clientX, clientY) => {
+        if (!options.onFileLink || disposed) return false;
+        const link = fileLinkAt((await term.readViewport()).viewportRows, clientX, clientY);
+        if (!link || disposed) return false;
+        options.onFileLink(link);
+        return true;
       },
       setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; updateCursorVisibility(); },
       paste: (text) => term.paste(text),
