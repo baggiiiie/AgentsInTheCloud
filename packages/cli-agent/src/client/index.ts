@@ -1,5 +1,5 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalViewportFit, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
@@ -53,7 +53,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.viewportHeight = window.visualViewport!.height;
         window.visualViewport!.addEventListener("resize", this.keyboardViewportChanged);
         if (this.hasFormTarget) {
-          this.inputTarget.value = localStorage.getItem(this.draftKey) ?? "";
+          setTextInputValue(this.inputTarget, localStorage.getItem(this.draftKey) ?? "");
           this.inputTarget.addEventListener("input", this.inputChanged);
           this.terminalTarget.addEventListener("focusout", this.terminalBlur);
         }
@@ -188,8 +188,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!String(data.get("text") ?? "").trim() && !data.has("attachment")) {
           status.hidden = true;
           this.viewer.pressEnter();
-          this.inputTarget.value = "";
-          this.inputChanged();
+          setTextInputValue(this.inputTarget, "");
           this.element.dispatchEvent(new Event("mobile-composer:sent"));
           return;
         }
@@ -209,8 +208,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.viewer.pressEnter();
           this.element.dispatchEvent(new Event("mobile-composer:sent"));
           if (this.inputTarget.value === draftText) {
-            this.inputTarget.value = "";
-            this.inputChanged();
+            setTextInputValue(this.inputTarget, "");
           }
           const sentIds = data.getAll("attachment").map(String);
           if (sentIds.length) {
