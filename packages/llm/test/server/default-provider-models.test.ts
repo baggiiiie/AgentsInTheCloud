@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defaultProviderModels, getPopularProviderRank } from "../../src/server/hardcoded-provider-knowledge.ts";
+import { defaultProviderModels, getPopularProviderRank, modelDisplayName } from "../../src/server/hardcoded-provider-knowledge.ts";
 
 const model = (id: string, input?: number, name = id) => ({ id, name, cost: input === undefined ? undefined : { input } });
 
@@ -32,5 +32,11 @@ describe("provider setup defaults", () => {
     expect(getPopularProviderRank("openai-codex")).toBe(0);
     expect(getPopularProviderRank("openai")).toBeUndefined();
     expect(getPopularProviderRank("google")).toBeUndefined();
+  });
+  test("drops the Claude brand prefix from model names", () => {
+    expect(modelDisplayName("Claude Opus 5.5")).toBe("Opus 5.5");
+    expect(modelDisplayName("Claude Haiku 4.5 (latest)")).toBe("Haiku 4.5 (latest)");
+    expect(modelDisplayName("Claude 4 Sonnet (proxy)")).toBe("Claude 4 Sonnet (proxy)");
+    expect(modelDisplayName("GPT-6 Astra")).toBe("GPT-6 Astra");
   });
 });

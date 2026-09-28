@@ -39,6 +39,11 @@ export function getProviderApiKeyExample(provider: string): string | undefined {
   return hardcodedProviderKnowledge[provider]?.apiKeyExample;
 }
 
+/** Drops the brand prefix from catalogue names ("Claude Opus 5.5" → "Opus 5.5"); the provider icon already shows it. */
+export function modelDisplayName(name: string): string {
+  return name.replace(/^Claude (?=[A-Z][a-z])/, "");
+}
+
 export function getPopularModelRank(provider: string, id: string): number | undefined {
   const rank = hardcodedPopularModels.findIndex((model) => model.provider === provider && model.id === id);
   return rank < 0 ? undefined : rank;

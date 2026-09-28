@@ -3,7 +3,7 @@ import type { ModelRef } from "./model-reference.ts";
 import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
 import { syncSubscriptionClis } from "./subscription-cli.ts";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
-import { defaultProviderModels } from "./hardcoded-provider-knowledge.ts";
+import { defaultProviderModels, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { atelierDataPath, getAtelierRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
@@ -47,7 +47,7 @@ function configuredModelFromJson(value: JsonValue | undefined): ConfiguredModel 
   if (!isJsonObject(value)) return undefined;
   const reference = modelReferenceFromJsonObject(value);
   if (!reference) return undefined;
-  return { ...reference, label: jsonString(value.label)?.trim() || reference.id };
+  return { ...reference, label: modelDisplayName(jsonString(value.label)?.trim() || reference.id) };
 }
 
 function parseModelSettings(stored: JsonObject): ModelSettings {
@@ -255,7 +255,7 @@ export async function seedProviderFavoriteModels(provider: string): Promise<void
   await updateModelSettings((settings) => {
     const favorites = settings.picker ?? [];
     if (!favorites.some((model) => model.provider === provider)) {
-      settings.picker = [...favorites, ...defaults.map((model) => ({ provider, id: model.id, label: model.name ?? model.id }))];
+      settings.picker = [...favorites, ...defaults.map((model) => ({ provider, id: model.id, label: modelDisplayName(model.name ?? model.id) }))];
     }
   });
 }

@@ -1,6 +1,6 @@
 import { anthropicSubscriptionNotice, usesAnthropicSubscription } from "./anthropic-subscription.ts";
 import { providerConnections, type ProviderConnection } from "./provider-connections.ts";
-import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample } from "./hardcoded-provider-knowledge.ts";
+import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef } from "./model-reference.ts";
 import { actionItemHtml } from "@atelier/design-system/action-item";
 import { actionLinkHtml } from "@atelier/design-system/action-link";
@@ -50,7 +50,7 @@ async function providerCatalogue(provider: string): Promise<ModelCatalogueEntry[
   const favorites = (await getConfiguredModels()).filter((model) => model.provider === provider);
   const favoriteById = new Map(favorites.map((model) => [model.id, model]));
   const models = new Map(runtime.getModels(provider).map((model): [string, ModelCatalogueEntry] => [model.id, {
-    provider, id: model.id, label: favoriteById.get(model.id)?.label ?? model.name ?? model.id, configured: favoriteById.has(model.id),
+    provider, id: model.id, label: favoriteById.get(model.id)?.label ?? modelDisplayName(model.name ?? model.id), configured: favoriteById.has(model.id),
   }]));
   // Keep unavailable favorites visible so they can still be removed.
   for (const model of favorites) {
