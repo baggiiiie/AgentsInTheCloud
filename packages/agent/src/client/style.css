@@ -150,6 +150,11 @@
 }
 .agent-transcript-navigation { align-self: flex-end; display: flex; margin-right: var(--composer-control-inset); pointer-events: auto; }
 .agent-transcript-navigation[hidden] { display: none; }
+.agent-pane-composer .composer-footer { padding-right: var(--composer-control-inset); }
+@media (max-width: 700px) {
+  .agent-transcript-navigation { margin-right: 4px; }
+  .agent-pane-composer .composer-footer { padding-right: 4px; }
+}
 
 .agent-pane .composer-input {
   min-height: max(var(--composer-controls-min-height), calc(1.5em * 4 + 21px));
