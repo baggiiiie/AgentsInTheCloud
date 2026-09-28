@@ -1,4 +1,4 @@
-import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu } from "@atelier/agent/server";
+import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentSessionNameCommand } from "@atelier/agent/server";
 import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@atelier/prompt/server";
 import type { CliSessions } from "./sessions.ts";
 
@@ -34,6 +34,13 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     if (session.error || !terminal.exists || terminal.ended) return new Response("Terminal unavailable", { status: 409 });
     const form = await request.formData();
     if (form.get("attachmentDraft") !== draftId) return new Response("Invalid draft", { status: 422 });
+    const nameResult = await runAgentSessionNameCommand(String(form.get("text") ?? ""), {
+      suggest: () => sessions.suggestTitle(workspaceId, conversationId),
+      setTitle: (title) => sessions.setTitle(workspaceId, conversationId, title),
+    });
+    if (nameResult) return nameResult === "named"
+      ? new Response(null, { status: 204 })
+      : new Response("No prompt available to name this session", { status: 422 });
     const ids = form.getAll("attachment").map(String);
     const attachments = await Promise.all(ids.map(async (id) => {
       const attachment = await findStagedAttachment(draftId, id);

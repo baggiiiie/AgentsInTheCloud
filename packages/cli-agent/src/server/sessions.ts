@@ -96,19 +96,32 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     }
   }
 
-  // The launch prompt names the tab; the same slug later names the exported history.
-  async function nameFromPrompt(workspaceId: string, session: CliSession): Promise<void> {
-    const slug = await suggestSlug(session);
-    if (!slug) return;
-    const renamed = await serialize(workspaceId, async () => {
-      const current = list(workspaceId).find((item) => item.id === session.id);
-      if (!current) return false;
-      current.title = slug;
-      current.historySlug ??= slug;
+  async function applyTitle(workspaceId: string, id: string, title: string, onlyIfUntitled: boolean): Promise<void> {
+    const changed = await serialize(workspaceId, async () => {
+      const session = list(workspaceId).find((item) => item.id === id);
+      if (!session && onlyIfUntitled) return false;
+      const current = session ?? get(workspaceId, id);
+      if (onlyIfUntitled && (current.title !== adapter.label || current.historySlug)) return false;
+      current.title = title;
+      current.historySlug = title;
       store().write(workspaceId, { sessions: list(workspaceId) });
       return true;
     });
-    if (renamed) await onTitleChanged(workspaceId, session.id, slug);
+    if (changed) await onTitleChanged(workspaceId, id, title);
+  }
+
+  // The launch prompt names the tab; the same slug later names the exported history.
+  async function nameFromPrompt(workspaceId: string, session: CliSession): Promise<void> {
+    const slug = await suggestSlug(session);
+    if (slug) await applyTitle(workspaceId, session.id, slug, true);
+  }
+
+  function setTitle(workspaceId: string, id: string, title: string): Promise<void> {
+    return applyTitle(workspaceId, id, title, false);
+  }
+
+  function suggestTitle(workspaceId: string, id: string): Promise<string | undefined> {
+    return suggestSlug(get(workspaceId, id));
   }
 
   function create(workspaceId: string, settings: AgentWorkspaceParameters = {}): Promise<string> {
@@ -171,7 +184,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
     for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
   }
-  return { list, get, ready, create, prepareWorkspace, acknowledgeFirstPresentation, terminalState, recordNamingPrompt, close, exportHistory, exportWorkspaceHistory };
+  return { list, get, ready, create, prepareWorkspace, acknowledgeFirstPresentation, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
 }
 
 export type CliSessions = ReturnType<typeof createCliSessions>;

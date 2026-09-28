@@ -1,9 +1,10 @@
 import { readJsonObject, requestAcceptsJson } from "@atelier/core";
 import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments } from "@atelier/prompt/server";
-import { maybeNameAgentFromPrompt, renameAgentFromContext, setAgentSessionTitle } from "./agent-title-suggestion.ts";
+import { maybeNameAgentFromPrompt, setAgentSessionTitle, suggestSessionSlug } from "./agent-title-suggestion.ts";
 import { turboStreamResponse } from "./html.ts";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
-import { expandPromptTemplate, parseAgentSessionNameCommand, parseCompactCommand } from "./prompt-templates.ts";
+import { expandPromptTemplate, parseCompactCommand } from "./prompt-templates.ts";
+import { runAgentSessionNameCommand } from "./session-name-command.ts";
 import { matchRoute, requireAgentConversation, resolveAgentRuntime, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
 
 export const handleMessageRequest: AgentRouteHandler = async (request, url, options) => {
@@ -35,14 +36,15 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
     await removeInitialPromptDraft(workspaceId, conversationId);
     return json ? Response.json({ agent: { conversationId, state: "idle", compacted: true } }) : turboStreamResponse("");
   }
-  const nameCommand = parseAgentSessionNameCommand(text);
-  if (nameCommand) {
-    if (nameCommand.title) {
-      await setAgentSessionTitle(agent, nameCommand.title, { events: options.events });
-    } else {
+  const nameResult = await runAgentSessionNameCommand(text, {
+    suggest: async () => {
       const runtime = await resolveAgentRuntime(agent, options);
-      renameAgentFromContext(agent, runtime.userMessages(), { events: options.events, agentModel: runtime.currentModel() });
-    }
+      return suggestSessionSlug(runtime.userMessages().join("\n\n"), runtime.currentModel());
+    },
+    setTitle: async (title) => { await setAgentSessionTitle(agent, title, { events: options.events }); },
+  });
+  if (nameResult) {
+    if (nameResult === "no-title") return json ? Response.json({ error: { code: "invalid_arguments", message: "No prompt available to name this session" } }, { status: 422 }) : turboStreamResponse("", { status: 422 });
     await removeInitialPromptDraft(workspaceId, conversationId);
     return json ? Response.json({ agent: { conversationId, state: "idle" } }) : turboStreamResponse("");
   }

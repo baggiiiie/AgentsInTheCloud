@@ -4,7 +4,7 @@ import { renderSlashCommandCatalog } from "./slash-commands.ts";
 
 export async function renderWorkspaceCompletionCatalog(workspaceId: string, mode: "builtin" | "cli" = "builtin"): Promise<string> {
   if (mode === "cli") {
-    const templates = (await listPromptTemplates(workspaceId)).filter((template) => !["/compact", "/name", "/tree"].includes(template.trigger));
+    const templates = (await listPromptTemplates(workspaceId)).filter((template) => !["/compact", "/tree"].includes(template.trigger));
     return renderSlashCommandCatalog(templates, [], false);
   }
   const [templates, { skills }] = await Promise.all([listPromptTemplates(workspaceId), loadWorkspaceSkills(workspaceId)]);

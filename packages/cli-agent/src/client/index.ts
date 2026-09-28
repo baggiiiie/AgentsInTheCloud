@@ -217,6 +217,10 @@ export const atelierClientModule: WorkspaceClientModule = {
         try {
           const response = await fetch(form.action, { method: "POST", body: data });
           if (!response.ok) throw new Error(await response.text());
+          if (response.status === 204) {
+            if (this.inputTarget.value === draftText) setTextInputValue(this.inputTarget, "");
+            return;
+          }
           const text = await response.text();
           if (!this.connected) throw new Error("Terminal disconnected. Prompt retained; check the terminal before retrying.");
           this.viewer.paste(text);

@@ -20,7 +20,8 @@ async function scenario(script: string): Promise<void> {
       const agentServer = await import("@atelier/agent/server");
       const slugRequests = [];
       let suggestedSlug;
-      mock.module("@atelier/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); return suggestedSlug; } }));
+      let slugDelay;
+      mock.module("@atelier/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",
@@ -73,6 +74,52 @@ test("a launch prompt names the tab with a suggested slug", () => scenario(`
   expect(await list("named")).toEqual([{ id: tab.id, title: suggestedSlug }]);
   expect((await saved("named")).sessions[0].historySlug).toBe(suggestedSlug);
   expect(titleEvents).toEqual([{ name: "workspace_agent_conversation_title_changed", payload: { workspaceId: "named", conversationId: tab.id, title: suggestedSlug } }]);
+`));
+
+test("CLI composer /name renames the tab without sending text to the terminal", () => scenario(`
+  const id = await provider.create({ workspaceId: "rename" });
+  const route = module.routes[0].handle;
+  const url = new URL("http://localhost/workspaces/rename/example-agents/" + id + "/composer");
+  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("rename", "example:" + id) }) });
+  const explicit = await route(form("/name manual-title"), url);
+  expect(explicit.status).toBe(204);
+  expect(await list("rename")).toEqual([{ id, title: "manual-title" }]);
+  expect((await saved("rename")).sessions[0].historySlug).toBe("manual-title");
+  expect((await saved("rename")).sessions[0].input.text).toBe("");
+  expect(titleEvents).toEqual([{ name: "workspace_agent_conversation_title_changed", payload: { workspaceId: "rename", conversationId: id, title: "manual-title" } }]);
+  expect((await route(form("/name"), url)).status).toBe(422);
+  expect(await list("rename")).toEqual([{ id, title: "manual-title" }]);
+`));
+
+test("a late automatic title cannot replace a manual CLI /name", () => scenario(`
+  suggestedSlug = "automatic-title";
+  slugDelay = Promise.withResolvers();
+  await provider.launch.prepareWorkspace("race", { agent: { input: { text: "Investigate the timeout", images: [], attachmentNotes: [] } } });
+  const [{ id }] = await list("race");
+  while (!slugRequests.length) await Bun.sleep(1);
+  const url = new URL("http://localhost/workspaces/race/example-agents/" + id + "/composer");
+  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const response = await module.routes[0].handle(new Request(url, { method: "POST", body: new URLSearchParams({ text: "/name manual-title", attachmentDraft: agentAttachmentDraftId("race", "example:" + id) }) }), url);
+  expect(response.status).toBe(204);
+  slugDelay.resolve();
+  await Bun.sleep(20);
+  expect(await list("race")).toEqual([{ id, title: "manual-title" }]);
+  expect((await saved("race")).sessions[0].historySlug).toBe("manual-title");
+  expect(titleEvents).toHaveLength(1);
+`));
+
+test("CLI composer /name uses the saved prompt when no title is supplied", () => scenario(`
+  const id = await provider.create({ workspaceId: "context" });
+  const url = new URL("http://localhost/workspaces/context/example-agents/" + id + "/composer");
+  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("context", "example:" + id) }) });
+  expect((await module.routes[0].handle(form("Investigate the timeout"), url)).status).toBe(200);
+  suggestedSlug = "investigate-timeout";
+  const response = await module.routes[0].handle(form("/name"), url);
+  expect(response.status).toBe(204);
+  expect(slugRequests).toEqual([["Investigate the timeout", undefined]]);
+  expect(await list("context")).toEqual([{ id, title: "investigate-timeout" }]);
 `));
 
 test("startup failure leaves a durable tab with its actual error", () => scenario(`
