@@ -1,5 +1,5 @@
 import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, composerAttachmentAttributes } from "@atelier/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, mobileComposerSelectionActions, composerAttachmentAttributes } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
 import { buttonHtml } from "@atelier/design-system/button";
 import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
@@ -48,6 +48,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               <form id="${domId("cli_composer_form", workspaceId, conversationId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
                 ${renderComposerBody({
                   draft: { id: draftId, rowId, attachments: await listStagedAttachments(draftId) },
+                  mobileCollapsible: true,
                   inputHtml: `<textarea class="composer-input" name="text" rows="2" enterkeyhint="send" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
                 })}
               </form>
@@ -55,10 +56,12 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
             </div>
           </div>` : "";
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit" data-controller="cli-terminal" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme">
+          const firstPresentation = composer && session.firstPresentation;
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit mobile-composer-pane"${firstPresentation ? ` data-mobile-composer-new="true" data-mobile-composer-presented-url="${escapeHtml(composerUrl)}/presented"` : ""} data-controller="cli-terminal mobile-composer" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme ${mobileComposerSelectionActions} mobile-composer:sent->mobile-composer#close">
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             <div class="cli-terminal-status" data-cli-terminal-target="connectionStatus" role="status" hidden>Connection lost. ${retryButton()}</div>
             ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
+            ${composer ? renderOpenComposerButton() : ""}
             ${composer}
             ${composer ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10m-5-5 5 5-5 5"/></svg>', label: "Back to composer" }, attributesHtml: 'data-cli-terminal-target="return" data-action="cli-terminal#showComposer" hidden' }) : ""}
           </section>`;

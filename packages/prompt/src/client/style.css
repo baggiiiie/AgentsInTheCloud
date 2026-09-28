@@ -54,6 +54,21 @@
   .composer-surface { --composer-footer-height: 52px; }
 }
 @media (max-width: 700px) { .composer-input { font-size: 16px; } }
+/* Mobile reading mode keeps the opener over the scrolling transcript, while the
+   expanded composer participates in layout and gives the transcript its own space. */
+.mobile-composer-opener, [data-mobile-composer-close] { display: none; }
+@media (max-width: 700px) {
+  .mobile-composer-pane:not(.mobile-composer-open) > .composer { display: none; }
+  .mobile-composer-pane:not(.mobile-composer-open) > .mobile-composer-opener {
+    display: flex; position: absolute; z-index: 3; bottom: 12px; left: 0; right: 0;
+    justify-content: center; pointer-events: none;
+  }
+  .mobile-composer-opener > button { pointer-events: auto; box-shadow: var(--shadow); }
+  /* Match the workspace bar's 4px outer padding for the four right-side actions. */
+  .mobile-composer-pane .composer-input-controls, .mobile-composer-pane .composer-actions { right: 4px; }
+  .mobile-composer-pane.mobile-composer-open [data-mobile-composer-close] { display: inline-flex; }
+  .mobile-composer-pane.mobile-composer-open > .composer { --composer-controls-min-height: calc(4 * var(--composer-control-size) + 3 * var(--composer-control-inset) + 12px); }
+}
 /* Host launch settings can wrap without hiding provider-specific controls. */
 .launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }
 

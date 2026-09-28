@@ -194,6 +194,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.viewer.pressEnter();
           this.inputTarget.value = "";
           this.inputChanged();
+          this.element.dispatchEvent(new Event("mobile-composer:sent"));
           return;
         }
         const draftText = this.inputTarget.value;
@@ -210,6 +211,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           await new Promise((resolve) => setTimeout(resolve, 100));
           if (!this.connected) throw new Error("Terminal disconnected after paste. Check the terminal before retrying.");
           this.viewer.pressEnter();
+          this.element.dispatchEvent(new Event("mobile-composer:sent"));
           if (this.inputTarget.value === draftText) {
             this.inputTarget.value = "";
             this.inputChanged();

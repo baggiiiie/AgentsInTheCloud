@@ -24,5 +24,5 @@
 .cli-agent-body [data-cli-terminal-target="return"][hidden] { display:none; }
 @media (max-width:700px) {
   .cli-agent-body .cli-agent-composer .composer-input { min-height:max(var(--composer-controls-min-height), calc(1.5em * 4 + 30px)); }
-  .cli-agent-body.cli-raw-mode .cli-agent-composer { display:none; }
+  .cli-agent-body.cli-raw-mode .cli-agent-composer, .cli-agent-body.cli-raw-mode .mobile-composer-opener { display:none; }
 }
