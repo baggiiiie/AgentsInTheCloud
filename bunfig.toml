@@ -5,3 +5,7 @@ exact = true
 # Normal installs must not change bun.lock. Dependency changes require an explicit
 # update/add command with --no-frozen-lockfile and a reviewed package/lockfile diff.
 frozenLockfile = true
+
+[test]
+# Lint alongside every test run, including single files and directories.
+preload = ["./scripts/test-lint-preload.ts"]
