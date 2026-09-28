@@ -1,4 +1,4 @@
-import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalViewportFit, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
+import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
 import { CableTopics, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type CableSubscription, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
@@ -46,12 +46,9 @@ export const atelierClientModule: WorkspaceClientModule = {
       };
       private touch?: { id: number; startX: number; startY: number; x: number; y: number; time: number; velocity: number; scrolling: boolean };
       private momentum = 0;
-      private viewportFit!: TerminalViewportFit;
       private resize = new ResizeObserver(() => this.refresh());
 
       connect(): void {
-        this.viewportFit = new TerminalViewportFit(this.element);
-        this.viewportFit.connect();
         window.addEventListener("atelier:workspace-pane-visible", this.activate);
         this.viewportHeight = window.visualViewport!.height;
         window.visualViewport!.addEventListener("resize", this.keyboardViewportChanged);
@@ -86,7 +83,6 @@ export const atelierClientModule: WorkspaceClientModule = {
         });
       }
       disconnect(): void {
-        this.viewportFit.disconnect();
         window.removeEventListener("atelier:workspace-pane-visible", this.activate);
         window.visualViewport!.removeEventListener("resize", this.keyboardViewportChanged);
         this.resize.disconnect();

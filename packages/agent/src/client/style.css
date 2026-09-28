@@ -2,15 +2,6 @@
 
 .fixed-shell-live-body:has(> .agent-conversation-pane) { padding: 0; overflow: hidden; }
 .agent-conversation-pane { height: 100%; min-height: 0; }
-@media (max-width: 700px) {
-  html.software-keyboard-visible .agent-pane.mobile-composer-open {
-    height: var(--mobile-composer-viewport-height, 100%);
-    transform: translateY(var(--mobile-composer-offset, 0px));
-  }
-  /* The stats footer would push the composer past the keyboard's top edge. */
-  html.software-keyboard-visible .agent-pane.mobile-composer-open .composer-surface { --composer-footer-height: 0px; }
-  html.software-keyboard-visible .agent-pane.mobile-composer-open .composer-footer { display: none; }
-}
 
 .agent-pane {
   --agent-inline-gutter: 2.5rem;

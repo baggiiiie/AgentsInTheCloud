@@ -69,6 +69,48 @@
   .mobile-composer-pane.mobile-composer-open [data-mobile-composer-close] { display: inline-flex; }
   .mobile-composer-pane.mobile-composer-open > .composer { --composer-controls-min-height: calc(4 * var(--composer-control-size) + 3 * var(--composer-control-inset) + 12px); }
 }
+/* The shell owns the visual viewport. Keep the normal vertical controls in
+   both agent kinds, with a bounded, scrollable editor and no typing footer. */
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  html.software-keyboard-visible .mobile-composer-pane {
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  html.software-keyboard-visible .mobile-composer-pane > .agent-transcript,
+  html.software-keyboard-visible .mobile-composer-pane > .observable-terminal-host {
+    flex: 1 1 0px; min-height: 0; padding-block: 0;
+  }
+  html.software-keyboard-visible .mobile-composer-pane > .composer {
+    flex: 0 1 calc(var(--composer-controls-min-height) + 2px); min-height: 0; max-height: 100%;
+  }
+  html.software-keyboard-visible .mobile-composer-pane .composer-surface {
+    --composer-footer-height: 0px;
+    height: 100%; padding-bottom: 0;
+  }
+  html.software-keyboard-visible .mobile-composer-pane .composer-footer { display: none; }
+  html.software-keyboard-visible .mobile-composer-pane .composer-surface > form:not([hidden]) {
+    display: flex; flex-direction: column; height: 100%; min-height: 0;
+  }
+  html.software-keyboard-visible .mobile-composer-pane .agent-attach-row {
+    flex: 0 0 auto; max-height: 60px; overflow-y: auto;
+    padding-right: calc(var(--composer-control-size) + 2 * var(--composer-control-inset));
+  }
+  /* Anchor the stack to the form, not below any attachment chips. */
+  html.software-keyboard-visible .mobile-composer-pane .composer-input-area { position: static; flex: 1; min-height: 0; }
+  html.software-keyboard-visible .mobile-composer-pane .composer-input {
+    min-height: 0; max-height: none;
+    /* The bounded editor replaces desktop autosizing (which sets inline styles). */
+    height: 100% !important; overflow-y: auto !important; font-size: 16px;
+  }
+  /* Empty-editor quick launches occupy the space left of the control stack. */
+  html.software-keyboard-visible .mobile-composer-pane .composer-surface > .agent-completion-menu-host:has(> .agent-quick-launches) {
+    right: calc(var(--composer-control-size) + 2 * var(--composer-control-inset));
+    bottom: var(--composer-control-inset);
+    max-height: calc(100% - 2 * var(--composer-control-inset)); overflow-y: auto;
+  }
+  html.software-keyboard-visible .mobile-composer-pane .composer-surface > form > [role="status"] {
+    flex: 0 0 auto; margin: 0; max-height: 2lh; overflow-y: auto;
+  }
+}
 /* Host launch settings can wrap without hiding provider-specific controls. */
 .launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }
 

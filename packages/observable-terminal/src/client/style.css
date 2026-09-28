@@ -9,7 +9,6 @@
 .observable-terminal-connection[data-state="connecting"] button { display: none; }
 
 @media (hover: none) and (pointer: coarse) {
-  .terminal-viewport-fit:has(.gespenst__input:focus) { max-height: var(--terminal-viewport-height); }
   /* Prevent iOS input zoom without changing the rendered terminal font. */
   .observable-terminal-mount .gespenst__input { font-size: 16px !important; }
 }

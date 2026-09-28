@@ -5,7 +5,6 @@ import {
   createObservableTerminalViewer,
   observableWebSocketUrl,
   TerminalTouchFocus,
-  TerminalViewportFit,
   type ObservableTerminalViewer,
 } from "@atelier/observable-terminal/client";
 import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
@@ -60,7 +59,6 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;
     declare readonly idValue: string;
-    private viewportFit!: TerminalViewportFit;
     private readonly touchFocus = new TerminalTouchFocus(() => this.viewer?.focus());
     private pointerDrag?: { id: number; select: boolean };
 
@@ -105,15 +103,12 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
     }
 
     connect(): void {
-      this.viewportFit = new TerminalViewportFit(this.element);
-      this.viewportFit.connect();
       if (isWorkspacePaneVisible(this.element)) {
         this.start();
       }
     }
 
     disconnect(): void {
-      this.viewportFit.disconnect();
       this.touchFocus.cancel();
       this.pointerDrag = undefined;
       this.stop();

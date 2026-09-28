@@ -380,6 +380,12 @@ html.software-keyboard-visible .fixed-shell-app .fixed-shell-mobile-nav { displa
   /* Each bar owns an intrinsic row: button size, padding, border and safe area
    * participate in layout instead of being duplicated in a pane inset. */
   .fixed-shell-app { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); gap: 0; padding: 0; }
+  /* Fit the root, not individual descendants inside clipped full-height panes.
+   * A fixed origin plus the visual viewport offset also follows Safari's pan. */
+  html.software-keyboard-visible .fixed-shell-app {
+    position: fixed; left: 0; top: var(--keyboard-viewport-top);
+    height: var(--keyboard-viewport-height);
+  }
   /* Resident workspaces own their bar; the overlaid workspace list uses the
    * outer grid's Atelier-bar row independently. */
   .fixed-shell-app-main { grid-area: 1 / 1 / -1 / -1; }

@@ -30,7 +30,10 @@ export function installSoftwareKeyboardTracking(): void {
 
   const viewport = window.visualViewport;
   const viewportHeight = (): number => viewport?.height ?? window.innerHeight;
-  let baselineHeight = viewportHeight();
+  // On iOS a reload or rotation can happen with the keyboard already open.
+  // The layout viewport still supplies the unobscured height in that case.
+  const baselineViewportHeight = (): number => Math.max(document.documentElement.clientHeight, viewportHeight());
+  let baselineHeight = baselineViewportHeight();
 
   const sync = (): void => {
     const currentViewportHeight = viewportHeight();
@@ -46,7 +49,7 @@ export function installSoftwareKeyboardTracking(): void {
   };
 
   const resetBaseline = (): void => {
-    baselineHeight = viewportHeight();
+    baselineHeight = baselineViewportHeight();
     sync();
   };
 
