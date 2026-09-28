@@ -279,10 +279,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return { frameId: launchComposerSettingsFrameId, formId: launchComposerFormId, url: "/launch-composer/settings", query };
   }
 
-  async function renderLaunchComposerFrame(options: { titleCaption: string; action: string }): Promise<string> {
+  async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; projectId?: string }): Promise<string> {
     const draftId = crypto.randomUUID();
     const providers = await orderedAgentProviders();
-    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, provider: providers[0]!, providers });
+    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, provider: providers[0]!, providers, projectId: options.projectId });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
         attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
@@ -306,6 +306,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return await renderLaunchComposerFrame({
       titleCaption: `Create workspace from ${project.name}, and then…`,
       action: `/project-agent-workspaces/${encodeURIComponent(project.id)}`,
+      projectId: project.id,
     });
   }
 

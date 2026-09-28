@@ -70,6 +70,12 @@ function templateRepoPath(key: string): string {
   return join(templateDir(key), "repo");
 }
 
+/** The last cached checkout for this project, if a workspace has populated it. */
+export async function cachedProjectSourcePath(projectId: string): Promise<string> {
+  const { gitUrl, branch } = await getProjectConfiguration(projectId);
+  return templateRepoPath(templateKey(gitUrl, branch));
+}
+
 function workspaceSourceDir(workspaceId: string): string {
   return join(sourceRoot(), "workspaces", workspaceId);
 }

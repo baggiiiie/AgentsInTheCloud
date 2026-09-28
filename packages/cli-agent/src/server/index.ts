@@ -75,7 +75,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const draftId = agentAttachmentDraftId(workspaceId, `${adapter.id}:${conversationId}`);
           const rowId = domId("cli_attach", workspaceId, conversationId);
           const composerUrl = `${url}/composer`;
-          const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="composer-focus agent-completions ${transcriptionComposerController}" data-action="mousedown->composer-focus#preserveInputFocus agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions">
+          const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="composer-focus agent-completions ${transcriptionComposerController}" data-action="mousedown->composer-focus#preserveInputFocus agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-transcription-composer-workspace-id-value="${escapeHtml(workspaceId)}">
             <div class="composer-surface">
               <form id="${domId("cli_composer_form", workspaceId, conversationId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
                 ${renderComposerBody({

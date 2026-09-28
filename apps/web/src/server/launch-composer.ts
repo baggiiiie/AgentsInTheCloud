@@ -33,11 +33,11 @@ export async function renderLaunchProvider(provider: WorkspaceAgentProvider, pro
 }
 
 /** The host owns text and attachments; provider switches replace only the settings footer. */
-export async function launchComposerContent(options: { draftId: string; provider: WorkspaceAgentProvider; providers: readonly WorkspaceAgentProvider[]; context: AgentLaunchFooterContext }): Promise<AgentLaunchPresentation> {
+export async function launchComposerContent(options: { draftId: string; provider: WorkspaceAgentProvider; providers: readonly WorkspaceAgentProvider[]; context: AgentLaunchFooterContext; projectId?: string }): Promise<AgentLaunchPresentation> {
   const { draftId } = options;
   const rowId = domId("agent_draft_attach", draftId);
   return {
-    attributesHtml: `data-controller="composer-focus agent-attachments ${transcriptionComposerController}" ${composerAttachmentAttributes(draftId, rowId)}`,
+    attributesHtml: `data-controller="composer-focus agent-attachments ${transcriptionComposerController}"${options.projectId ? ` data-transcription-composer-project-id-value="${escapeHtml(options.projectId)}"` : ""} ${composerAttachmentAttributes(draftId, rowId)}`,
     formAttributesHtml: 'data-action="submit->transcription-composer#submit keydown->submit-shortcut#keydown submit->submit-shortcut#submit turbo:submit-end->launch-composer-dialog#submitted turbo:submit-end->submit-shortcut#submitted"',
     bodyHtml: renderComposerBody({
       draft: { id: draftId, rowId },

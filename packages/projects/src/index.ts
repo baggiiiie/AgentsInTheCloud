@@ -68,6 +68,7 @@ export {
 
 export {
   prepareWorkspaceSource,
+  cachedProjectSourcePath,
   projectDataDirKey,
   registerProjectWorkspaceInitEvents,
   type PreparedWorkspaceSource,

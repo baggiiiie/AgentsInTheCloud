@@ -1,10 +1,13 @@
 import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
 import type { WorkspaceServerSocketHandler, WorkspaceSocketConnection } from "@atelier/shared";
 import { stat } from "node:fs/promises";
+import { workspaceWorkHostPath } from "@atelier/workspace";
+import { cachedProjectSourcePath } from "@atelier/projects";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import { readTranscriptionModel, transcriptionModel, type TranscriptionModelId } from "./models.ts";
 import { captureProcessStderr, processExitMessage } from "./process-diagnostics.ts";
+import { addTranscriptionContext, readTranscriptionContext } from "./transcription-context.ts";
 import { ensureTranscriptionRuntime } from "./runtime.ts";
 
 const transcriptionPort = 8098;
@@ -95,11 +98,17 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
 
   let browser: WorkspaceSocketConnection | undefined;
   let upstream: WebSocket | undefined;
+  let phrases: string[] = [];
 
   async function connect(): Promise<void> {
     let progressTimer: ReturnType<typeof setInterval> | undefined;
     try {
       const modelId = await readTranscriptionModel();
+      const workspaceId = url.searchParams.get("workspaceId");
+      const projectId = url.searchParams.get("projectId");
+      const source = workspaceId ? workspaceWorkHostPath(workspaceId)
+        : projectId ? await cachedProjectSourcePath(projectId) : undefined;
+      phrases = source ? await readTranscriptionContext(source) : [];
       const model = transcriptionModel(modelId);
       let reportedProgress = -1;
       const reportProgress = async () => {
@@ -140,7 +149,7 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
     },
     message(_socket, message) {
       if (upstream?.readyState !== WebSocket.OPEN) throw new Error("Audio arrived before the transcription server was ready");
-      upstream.send(message instanceof Uint8Array ? new Uint8Array(message).buffer : message);
+      upstream.send(message instanceof Uint8Array ? new Uint8Array(message).buffer : addTranscriptionContext(message, phrases));
     },
     close() {
       upstream?.close();

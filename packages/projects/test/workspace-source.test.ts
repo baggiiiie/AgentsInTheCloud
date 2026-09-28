@@ -5,7 +5,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { clearWorkspaceGitHubToken, createAtelierEventBus, setWorkspaceGitHubToken } from "@atelier/core";
-import { addProject, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, type GitProjectInitInstruction } from "@atelier/projects";
+import { addProject, cachedProjectSourcePath, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, type GitProjectInitInstruction } from "@atelier/projects";
 import type { WorkspaceDockerPlan } from "@atelier/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -92,6 +92,23 @@ describe("workspace source preparation", () => {
 
   test("repository access failures are not reported as missing branches", async () => {
     await expect(prepareWorkspaceSource({ workspaceId: "unavailable", gitUrl: join(dataDir, "missing.git"), branch: "main" })).rejects.toMatchObject({ code: "git_error" });
+  });
+
+  test("provides the cached project checkout for pre-workspace transcription", async () => {
+    const fixture = await createRemote();
+    tempRoots.push(fixture.root);
+    const project = (await addProject(`${fixture.remote}#main`)).project;
+    const contextPath = join(".atelier", "transcription-context");
+    const cachedPath = join(await cachedProjectSourcePath(project.id), contextPath);
+    expect(await Bun.file(cachedPath).exists()).toBe(false);
+
+    await mkdir(join(fixture.seed, ".atelier"));
+    await writeFile(join(fixture.seed, contextPath), "Claude Code\n");
+    await run(["git", "add", contextPath], { cwd: fixture.seed });
+    await run(["git", "commit", "-m", "Add vocabulary"], { cwd: fixture.seed });
+    await run(["git", "push", "origin", "main"], { cwd: fixture.seed });
+    await prepareWorkspaceSource({ workspaceId: "ws-context", gitUrl: fixture.remote, branch: "main" });
+    expect(await Bun.file(cachedPath).text()).toBe("Claude Code\n");
   });
 
   test("creates a standalone COW workspace checkout from a reusable template", async () => {
