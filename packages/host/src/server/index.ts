@@ -10,7 +10,7 @@ import { Icons } from "@atelier/design-system/icons";
 import { requestAcceptsJson } from "@atelier/core";
 import { hostOpenApiPaths } from "./openapi.ts";
 import { tabHtml, tabStripHtml } from "@atelier/design-system/tab-strip";
-import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
+import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { escapeHtml, workspaceModuleModalFrameId, type WorkspaceModule, type WorkspaceModuleRouteContext } from "@atelier/shared";
 import { response } from "@atelier/shared/http";
 import { hostAvailable, hostRequest, hostTerminalSocket } from "./connection.ts";
@@ -59,7 +59,7 @@ function renderTerminals(terminals: HostTerminal[], selected?: string): string {
     closeHtml: closeTerminalForm(t),
   })).join("");
   return `<turbo-frame id="${terminalFrame}"><section class="host-terminals"><header class="host-terminal-heading">${terminals.length ? tabStripHtml({ label: "Host terminals", tabsHtml: tabs }) : ""}<form method="post" action="/host/terminals" data-turbo-frame="${terminalFrame}">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "+ New host terminal" } })}</form></header>
-  ${active ? `<section id="host_terminal_panel" role="tabpanel" aria-labelledby="host_tab_${active.id}"><div class="host-terminal-screen" data-controller="host-terminal" data-host-terminal-url-value="/host/terminals/${active.id}/ws"></div></section>` : `<p class="host-empty">You can use a terminal into your host here. This has full permission to the entire Atelier system. If you run an agent here it has access to everything, including secrets.</p>`}</section></turbo-frame>`;
+  ${active ? `<section id="host_terminal_panel" role="tabpanel" aria-labelledby="host_tab_${active.id}" data-controller="host-terminal" data-host-terminal-url-value="/host/terminals/${active.id}/ws">${renderTerminalConnectionStatus("host-terminal")}<div class="host-terminal-screen observable-terminal-host" data-host-terminal-target="host"></div></section>` : `<p class="host-empty">You can use a terminal into your host here. This has full permission to the entire Atelier system. If you run an agent here it has access to everything, including secrets.</p>`}</section></turbo-frame>`;
 }
 async function handle(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
   if (url.pathname !== "/host" && !url.pathname.startsWith("/host/")) return;

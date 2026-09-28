@@ -77,10 +77,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
           fontFamily: style.getPropertyValue("--font-mono"),
           fontSize: Number.parseFloat(style.getPropertyValue("--text-code")),
           theme: atelierObservableTerminalTheme(),
-          onConnect: () => this.connectionOpened(),
-          onDisconnect: () => this.connectionLost(),
-          disconnectedMessage: "\r\n\x1b[31m[terminal disconnected]\x1b[0m\r\n",
-          errorMessage: "\r\n\x1b[31m[terminal websocket error]\x1b[0m\r\n",
+          connectionStatus: this.connectionStatusTarget,
           transformInput: (data) => {
             if (!this.controlPending) return data;
             this.setControlPending(false);
@@ -122,8 +119,6 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
       this.stop();
     }
 
-    connectionLost(): void { this.connectionStatusTarget.hidden = false; }
-    connectionOpened(): void { this.connectionStatusTarget.hidden = true; }
     retry(): void { this.viewer?.reconnect(); }
 
     startTerminalTouch(event: TouchEvent): void { this.touchFocus.start(event); }

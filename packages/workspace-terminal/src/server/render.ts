@@ -1,4 +1,5 @@
 import { buttonHtml } from "@atelier/design-system/button";
+import { renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml } from "@atelier/shared";
 import { terminalViewKey } from "../shared.ts";
 import type { WorkspaceTerminal } from "./workspace-terminals.ts";
@@ -34,7 +35,7 @@ export function renderTerminalPane(workspaceId: string, terminal: WorkspaceTermi
         touchend->terminal-pane#finishTerminalTouch:!passive">
         <div class="terminal-loading" role="status" aria-label="Loading terminal"><span class="activity-spinner" aria-hidden="true"></span></div>
       </div>
-      <div data-terminal-pane-target="connectionStatus" role="status" hidden>Connection lost. ${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Retry connection" }, attributesHtml: 'data-action="terminal-pane#retry"' })}</div>
+      ${renderTerminalConnectionStatus("terminal-pane")}
       ${renderTerminalAccessoryBar()}
     </div>
   </section>`;

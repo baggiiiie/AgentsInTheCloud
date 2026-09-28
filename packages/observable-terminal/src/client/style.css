@@ -4,6 +4,10 @@
 
 .observable-terminal-mount { width: 100%; height: 100%; min-height: 0; }
 
+.observable-terminal-connection { display: flex; align-items: center; gap: 12px; padding: 8px 12px; color: var(--text); background: var(--panel); border-bottom: 1px solid var(--line); }
+.observable-terminal-connection[hidden], .observable-terminal-connection [hidden] { display: none; }
+.observable-terminal-connection[data-state="connecting"] button { display: none; }
+
 @media (hover: none) and (pointer: coarse) {
   .terminal-viewport-fit:has(.gespenst__input:focus) { max-height: var(--terminal-viewport-height); }
   /* Prevent iOS input zoom without changing the rendered terminal font. */

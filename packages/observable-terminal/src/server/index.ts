@@ -35,3 +35,4 @@ export {
   type HostObservableCommandResult,
 } from "./host-command.ts";
 export { createObservableTerminalSocket, terminalSocketDimensions } from "./socket.ts";
+export { renderTerminalConnectionStatus } from "./status.ts";

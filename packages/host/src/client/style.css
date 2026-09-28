@@ -1,3 +1,5 @@
+@import url("/observable-terminal.css");
+
 .host-instance-url { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); }
 .host-instance-url > span { flex-shrink: 0; }
 .host-instance-url a { overflow-wrap: anywhere; min-width: 0; color: inherit; }

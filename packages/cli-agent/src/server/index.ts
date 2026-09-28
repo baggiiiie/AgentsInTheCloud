@@ -2,7 +2,7 @@ import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, mobileComposerSelectionActions, composerAttachmentAttributes } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
 import { buttonHtml } from "@atelier/design-system/button";
-import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
+import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
 import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
@@ -11,7 +11,6 @@ import { cliComposerRoutes } from "./composer-routes.ts";
 
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
-function retryButton() { return buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Retry connection" }, attributesHtml: 'data-action="cli-terminal#retry"' }); }
 function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string {
   return terminal.ended ? `Session ended${terminal.exitCode ? ` (exit ${terminal.exitCode}). See terminal output for details.` : ""}` : "";
 }
@@ -69,7 +68,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const firstPresentation = composer && session.firstPresentation;
           return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit mobile-composer-pane"${firstPresentation ? ` data-mobile-composer-new="true" data-mobile-composer-presented-url="${escapeHtml(composerUrl)}/presented"` : ""} data-controller="cli-terminal mobile-composer" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme ${mobileComposerSelectionActions} mobile-composer:sent->mobile-composer#close">
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
-            <div class="cli-terminal-status" data-cli-terminal-target="connectionStatus" role="status" hidden>Connection lost. ${retryButton()}</div>
+            ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
             ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
             ${composer ? renderOpenComposerButton() : ""}
             ${composer}

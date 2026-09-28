@@ -229,6 +229,8 @@
       "name": "@atelier/observable-terminal",
       "dependencies": {
         "@atelier/core": "workspace:*",
+        "@atelier/design-system": "workspace:*",
+        "@atelier/shared": "workspace:*",
         "@gespenst/core": "catalog:",
       },
     },

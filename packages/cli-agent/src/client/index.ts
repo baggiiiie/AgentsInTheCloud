@@ -68,8 +68,8 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.viewer = createObservableTerminalViewer({
           host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`),
           theme: atelierObservableTerminalTheme(),
-          onConnect: () => this.setConnected(true),
-          onDisconnect: () => this.setConnected(false),
+          connectionStatus: this.connectionStatusTarget,
+          onConnectionStateChange: (state) => { this.connected = state === "connected"; },
           onFileLink: ({ path, line, column }) => {
             const anchor = document.createElement("a");
             anchor.href = `${workspaceFileOpenUrl(this.workspaceIdValue, path, { line, column })}&existing=1`;
@@ -158,10 +158,6 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.momentum = requestAnimationFrame(frame);
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
-      private setConnected(connected: boolean): void {
-        this.connectionStatusTarget.hidden = connected;
-        this.connected = connected;
-      }
       enterRawMode(): void {
         if (!this.hasFormTarget || !focusLikelyOpensSoftwareKeyboard()) return;
         this.element.classList.add("cli-raw-mode");
