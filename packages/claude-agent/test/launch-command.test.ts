@@ -21,7 +21,7 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true })];
+const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: "custom:atelier" })];
 
 test("reuses home Claude and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
@@ -100,6 +100,13 @@ test("invalid CLI preferences fail visibly rather than being overwritten", async
   expect(error).toContain("SyntaxError");
   expect(output).not.toContain("SHOULD_NOT_START");
   expect(await readFile(`${home}/.claude.json`, "utf8")).toBe("invalid json");
+});
+
+test("installs the Atelier Claude theme so inline code follows the terminal palette", async () => {
+  await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
+  const [code] = await run(claudeLaunchScript(empty, []));
+  expect(code).toBe(0);
+  expect(JSON.parse(await readFile(`${home}/.claude/themes/atelier.json`, "utf8"))).toMatchObject({ base: "dark-ansi" });
 });
 
 for (const preferences of [{}, { autoUpdates: false }, { installMethod: "native", autoUpdates: false, autoUpdatesProtectedForNative: true }]) {

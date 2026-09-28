@@ -14,8 +14,9 @@ const DEFAULT_OBSERVABLE_TERMINAL_THEME = {
   foreground: "#d8dee9",
   cursor: "#d8dee9",
   black: "#3b4252",
-  brightBlack: "#4c566a",
+  brightBlack: "#7b889e",
   brightBlue: "#81a1c1",
+  brightWhite: "#eceff4",
 } as const satisfies ObservableTerminalTheme;
 
 function cssVariable(name: string): string | undefined {
@@ -26,7 +27,11 @@ function themeColor(name: string, fallbackKey: keyof typeof DEFAULT_OBSERVABLE_T
   return cssVariable(name) ?? DEFAULT_OBSERVABLE_TERMINAL_THEME[fallbackKey];
 }
 
-/** Map Atelier's active UI theme onto Gespenst's complete 16-color ANSI palette. */
+/**
+ * Map Atelier's active UI theme onto Gespenst's complete 16-color ANSI palette.
+ * Agent themes (Claude, Codex, Pi) draw with these slots, so the roles are a
+ * contract: bright white emphasizes, bright black recedes, blue is the accent.
+ */
 export function atelierObservableTerminalTheme(): ObservableTerminalTheme {
   const background = themeColor("--bg", "background");
   const foreground = themeColor("--text", "foreground");
@@ -47,14 +52,14 @@ export function atelierObservableTerminalTheme(): ObservableTerminalTheme {
     magenta: violet,
     cyan: accent,
     white: foreground,
-    brightBlack: themeColor("--line-strong", "brightBlack"),
+    brightBlack: themeColor("--text-muted", "brightBlack"),
     brightRed: red,
     brightGreen: green,
     brightYellow: amber,
     brightBlue: accent,
     brightMagenta: violet,
     brightCyan: accent,
-    brightWhite: foreground,
+    brightWhite: themeColor("--text-bright", "brightWhite"),
   };
 }
 

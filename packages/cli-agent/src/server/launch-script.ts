@@ -32,3 +32,12 @@ cd ${shellQuote(workspaceRoot)}
 "$executable" ${args.map(shellQuote).join(" ")}
 `;
 }
+
+/**
+ * Shell lines for `setup` that write a file Atelier owns, such as an agent theme.
+ * Rewritten on every launch so changes ship with Atelier. `path` is a shell expression.
+ */
+export function writeFileScript(path: string, content: string): string {
+  return `mkdir -p "$(dirname ${path})"
+printf '%s' ${shellQuote(content)} > ${path}`;
+}

@@ -1,9 +1,11 @@
 import { parseModelRef } from "@atelier/llm/server";
-import { cliLaunchScript, turnSignalShell, type CliAgentSession, type CliModelSettings, type TurnBoundary } from "@atelier/cli-agent/server";
+import { cliLaunchScript, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings, type TurnBoundary } from "@atelier/cli-agent/server";
 import { claudeMcpConfigPath } from "./mcp.ts";
 import { shellQuote } from "@atelier/core";
 import { workspaceRoot } from "@atelier/workspace";
 import type { WorkspaceAgentInput } from "@atelier/shared";
+import { readThemeSetting } from "@atelier/shared/theme";
+import { claudeAtelierTheme, claudeThemeName } from "./theme.ts";
 
 function turnBoundaryHooks(turnSignalCommand: string) {
   const hook = (boundary: TurnBoundary) => [{ hooks: [{ type: "command", command: turnSignalShell(turnSignalCommand, boundary) }] }];
@@ -16,6 +18,7 @@ export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: strin
   const prompt = [input.text, ...input.attachmentNotes, ...imagePaths.map((path) => `Read the attached image at ${JSON.stringify(path)}.`)].filter(Boolean).join("\n\n");
   const cliSettings = {
     skipDangerousModePermissionPrompt: true,
+    theme: `custom:${claudeThemeName}`,
     hooks: session ? turnBoundaryHooks(session.turnSignalCommand) : undefined,
   };
   // Added to whatever MCP servers the user configured; Claude merges both sets.
@@ -31,7 +34,6 @@ const config = fs.existsSync(path) ? JSON.parse(fs.readFileSync(path, "utf8")) :
 config.installMethod = "local";
 config.autoUpdates = true;
 config.hasCompletedOnboarding = true;
-config.theme ??= "dark";
 config.projects ??= {};
 config.projects[${JSON.stringify(workspaceRoot)}] = { ...config.projects[${JSON.stringify(workspaceRoot)}], hasTrustDialogAccepted: true };
 const temporary = path + ".atelier-" + process.pid;
@@ -45,6 +47,7 @@ fs.renameSync(temporary, path);`;
     setup: `(
   flock 8
   node -e ${shellQuote(configure)}
-) 8> "$HOME/.claude-config-setup.lock"`,
+) 8> "$HOME/.claude-config-setup.lock"
+${writeFileScript(`"$HOME/.claude/themes/${claudeThemeName}.json"`, JSON.stringify(claudeAtelierTheme(readThemeSetting()), null, 2))}`,
   });
 }

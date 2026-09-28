@@ -1,11 +1,4 @@
 import { Application, Controller } from "@hotwired/stimulus";
-class SystemThemeController extends Controller<HTMLElement> {
-  connect() {
-    const theme = localStorage.getItem("atelier.theme");
-    if (theme) this.element.dataset.theme = theme;
-  }
-}
-
 class ProgressController extends Controller<HTMLElement> {
   static values = { events: String, return: Boolean };
   declare eventsValue: string;
@@ -43,5 +36,4 @@ class ProgressController extends Controller<HTMLElement> {
   }
 }
 const application = Application.start();
-application.register("system-theme", SystemThemeController);
 application.register("progress", ProgressController);

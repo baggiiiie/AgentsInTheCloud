@@ -3,6 +3,7 @@ import { buttonHtml } from "../../../packages/design-system/src/button/button-ht
 import { actionItemHtml } from "../../../packages/design-system/src/action-item/action-item-html.ts";
 import { Icons } from "../../../packages/design-system/src/icons/icons-html.ts";
 import { escapeHtml } from "../../../packages/shared/src/html.ts";
+import type { AtelierTheme } from "../../../packages/shared/src/theme.ts";
 
 export const button = (caption: string) =>
   buttonHtml({
@@ -10,8 +11,8 @@ export const button = (caption: string) =>
     variant: "primary",
     content: { kind: "caption", caption },
   });
-export function page(title: string, content: string, assetOrigin = ""): string {
-  return `<!doctype html><html lang="en" data-theme="nord" data-controller="system-theme"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="${escapeHtml(assetOrigin)}/design-system.css"><style>
+export function page(title: string, content: string, assetOrigin = "", theme: AtelierTheme = "nord"): string {
+  return `<!doctype html><html lang="en" data-theme="${theme}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="${escapeHtml(assetOrigin)}/design-system.css"><style>
 body { margin:0; min-height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; padding:24px 16px; font:var(--text-body)/var(--leading-standard) var(--font-sans); background:var(--bg); color:var(--text); }
 main { width:100%; max-width:38rem; margin:auto; }
 pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:20rem; overflow:auto; }

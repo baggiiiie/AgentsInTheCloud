@@ -13,14 +13,10 @@ import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { workspaceModules } from "../workspace-modules.ts";
 import { remove, replace, response, stream, update, wantsStream } from "@atelier/shared/http";
 import { listSettingsContributions, registerSettingsContribution } from "./registry.ts";
+import { renderThemeSettings } from "./theme.ts";
 
 function devSettingsEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
-}
-
-async function renderThemeSettings(): Promise<string> {
-  const themes = [["daylight", "Daylight"], ["cappuccino", "Cappuccino"], ["tokyo-night", "Tokyo Night"], ["midnight", "Midnight"], ["nord", "Nord"]];
-  return `<section class="settings-sec settings-sec-inline settings-sec-theme" id="settings-sec-theme"><h2>Theme</h2><select class="settings-select popup-select" data-controller="theme-select" aria-label="Theme">${themes.map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></section>`;
 }
 
 async function renderGitIdentityForm(error = ""): Promise<string> {

@@ -193,3 +193,22 @@ test("a workspace command refreshes each contributed live resource once", async 
     liveSurfaces: [{ name: "test-resource", async load() { loads++; return []; } }],
   }]);
 });
+
+test("the theme is a server setting pushed to every open page", async () => {
+  await withTestApp([], async ({ app }) => {
+    const pushed: string[] = [];
+    const subscription = await app.subscribeShell((html) => pushed.push(html));
+    const response = await app.fetch(new Request("http://test.local/settings/theme", {
+      method: "POST", headers: { accept: "text/vnd.turbo-stream.html" }, body: new URLSearchParams({ theme: "tokyo-night" }),
+    }));
+    expect(response.status).toBe(200);
+    await Bun.sleep(10);
+    expect(pushed.join("")).toContain('data-atelier-theme-name-value="tokyo-night"');
+    expect(JSON.parse(await readFile(join(process.env.ATELIER_DATA_DIR!, "theme.json"), "utf8"))).toEqual({ theme: "tokyo-night" });
+    const settings = await (await app.fetch(new Request("http://test.local/settings"))).text();
+    expect(settings).toContain('<option value="tokyo-night" selected>');
+    const rejected = await app.fetch(new Request("http://test.local/settings/theme", { method: "POST", body: new URLSearchParams({ theme: "neon" }) }));
+    expect(rejected.status).toBe(400);
+    subscription.unsubscribe();
+  });
+});

@@ -22,7 +22,7 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--approve", "--offline", "--tui-mode", "regular", "--session-dir", "/home/atelier/.local/share/pi/sessions"];
+const baseArgs = ["--approve", "--offline", "--use-theme", "atelier", "--tui-mode", "regular", "--session-dir", "/home/atelier/.local/share/pi/sessions"];
 
 test("passes initial prompt, images, file notes, provider and Pi thinking level literally", async () => {
   await executable(binary(), 'printf "%s\\0" "$@"');
@@ -96,4 +96,16 @@ test("loads the session's Atelier extension", async () => {
   expect(code).toBe(0);
   expect(output.split("\0")).toContain(piAtelierExtensionPath(sessionId));
   expect(output.split("\0")).toContain(`/home/atelier/.local/share/pi/sessions/${sessionId}`);
+});
+
+test("installs an Atelier theme covering every color Pi requires, drawn from the terminal palette", async () => {
+  await executable(binary(), 'printf "%s\\0" "$@"');
+  const [code] = await run(piLaunchScript(empty, []));
+  expect(code).toBe(0);
+  const theme = JSON.parse(await readFile(`${home}/.pi/agent/themes/atelier.json`, "utf8"));
+  const schemaUrl = new URL("modes/interactive/theme/theme-schema.json", import.meta.resolve("@earendil-works/pi-coding-agent"));
+  const colorsSchema = JSON.parse(await readFile(schemaUrl, "utf8")).properties.colors;
+  expect(Object.keys(theme.colors)).toEqual(expect.arrayContaining(colorsSchema.required));
+  expect(Object.keys(colorsSchema.properties)).toEqual(expect.arrayContaining(Object.keys(theme.colors)));
+  for (const color of Object.values(theme.colors)) expect(Number.isInteger(color) && Number(color) < 16).toBe(true);
 });

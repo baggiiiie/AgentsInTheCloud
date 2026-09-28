@@ -59,6 +59,7 @@ import { atelierOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
 import { createProjectRoutes, type ProjectEditorModalOptions } from "./project-routes.ts";
 import { handleSettingsRequest, renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/routes.ts";
+import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
 import { workspaceModules } from "./workspace-modules.ts";
@@ -140,6 +141,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       { target: "global_sidebar_contributions", html: renderGlobalSidebarContributions() },
       { target: "workspace_residents", html: workspaceMounts() },
       { target: emptyWorkspaceOnboardingId, html: emptyWorkspaceOnboardingHtml(pane), action: "replace" as const },
+      { target: themeRegionId, html: themeRegionHtml() },
     ];
   }, regions => regions, reportPresentationError);
 
@@ -1161,7 +1163,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       return value;
     };
 
-    const settingsResponse = await handleSettingsRequest(request, url, { forceDeleteAllWorkspaces: forceDeleteAllWorkspacesFromSettings, renderModelPickerUpdates: () => renderModelPickerUpdates(request) });
+    const settingsResponse = await handleSettingsRequest(request, url, { forceDeleteAllWorkspaces: forceDeleteAllWorkspacesFromSettings, renderModelPickerUpdates: () => renderModelPickerUpdates(request), themeChanged: () => shell.invalidate() });
     if (settingsResponse) return settingsResponse;
 
     const onboardingResponse = await handleOnboardingRequest(request, url);

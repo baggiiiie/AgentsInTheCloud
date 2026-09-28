@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./http": "./src/http.ts"
+    "./http": "./src/http.ts",
+    "./theme": "./src/theme-setting.ts"
   },
   "dependencies": {
     "@atelier/core": "workspace:*",

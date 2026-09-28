@@ -115,5 +115,6 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
 }
 
 export { createCliModelSettings, type CliModelSettings } from "./model-settings.ts";
-export { cliLaunchScript } from "./launch-script.ts";
+export { cliLaunchScript, writeFileScript } from "./launch-script.ts";
 export { turnSignalArgv, turnSignalShell, type TurnBoundary } from "./turn-signal.ts";
+export { syntaxSlot, transcriptSlot } from "./transcript-palette.ts";

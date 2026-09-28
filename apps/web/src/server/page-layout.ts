@@ -1,11 +1,12 @@
 import { atelierName, escapeHtml, type WorkspaceModule } from "@atelier/shared";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { readThemeSetting } from "@atelier/shared/theme";
 import { parseAssetManifest, type AssetManifest } from "./asset-manifest.ts";
+import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 
 export function createPageLayout(options: { devReload?: boolean; workspaceModules: readonly WorkspaceModule[] }): (body: string) => string {
   let cachedAssetManifest: AssetManifest | undefined;
-  const defaultTheme = process.env.ATELIER_HOST_UID ? "cappuccino" : "nord";
 
   function loadAssetManifest(): AssetManifest {
     const manifestUrl = new URL("../../public/assets-manifest.json", import.meta.url);
@@ -39,8 +40,9 @@ export function createPageLayout(options: { devReload?: boolean; workspaceModule
   return (body) => {
     if (options.devReload) cachedAssetManifest = loadAssetManifest();
     const pageId = randomUUID();
+    const theme = readThemeSetting();
     return `<!DOCTYPE html>
-<html lang="en" data-theme="${defaultTheme}" data-atelier-page-id="${escapeHtml(pageId)}">
+<html lang="en" data-theme="${theme}" data-atelier-page-id="${escapeHtml(pageId)}">
 <head>
 <meta charset="utf-8">
 <style>
@@ -54,7 +56,6 @@ ${options.devReload ? `
 @view-transition { navigation: auto; }
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 120ms; }
 ` : ""}</style>
-<script>try { const theme = localStorage.getItem("atelier.theme"); if (theme) document.documentElement.dataset.theme = theme; } catch {}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="turbo-cache-control" content="no-cache">
 <title>${escapeHtml(atelierName)}</title>
@@ -70,7 +71,7 @@ ${options.devReload ? `
 ${moduleStylesHtml()}
 <script type="module" src="${assetPath("/workspace.js")}"></script>
 </head>
-<body id="body" data-controller="cable-shell${options.devReload ? " dev-reload" : ""}"${options.devReload ? ` data-dev-reload-url-value="/__atelier_dev_reload"` : ""}><div id="live-connection-status" role="status" class="live-connection-status"><span class="status-spinner" aria-hidden="true"></span> Reconnecting… Updates are paused.</div>${body}
+<body id="body" data-controller="cable-shell${options.devReload ? " dev-reload" : ""}"${options.devReload ? ` data-dev-reload-url-value="/__atelier_dev_reload"` : ""}><div id="live-connection-status" role="status" class="live-connection-status"><span class="status-spinner" aria-hidden="true"></span> Reconnecting… Updates are paused.</div><div id="${themeRegionId}" hidden>${themeRegionHtml(theme)}</div>${body}
 </body>
 </html>`;
   };

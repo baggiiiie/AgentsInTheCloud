@@ -2,35 +2,16 @@ import type { ToggleChangeEvent } from "@atelier/design-system/toggle/client";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 
-class ThemeSelectController extends Controller<HTMLSelectElement> {
-  private readonly storageKey = "atelier.theme";
+/** Applies the server's theme setting, on page load and when the shell region pushes a change. */
+class AtelierThemeController extends Controller<HTMLElement> {
+  static values = { name: String };
+  declare readonly nameValue: string;
 
-  connect(): void {
-    const theme = this.loadTheme() ?? document.documentElement.dataset.theme ?? "nord";
-    this.element.value = theme;
-    this.apply(theme);
-    this.element.addEventListener("change", this.changed);
-  }
-
-  disconnect(): void {
-    this.element.removeEventListener("change", this.changed);
-  }
-
-  private changed = (): void => {
-    localStorage.setItem(this.storageKey, this.element.value);
-    this.apply(this.element.value);
-  };
-
-  private loadTheme(): string | undefined {
-    try { return localStorage.getItem(this.storageKey) || undefined; } catch { return undefined; }
-  }
-
-  private apply(theme: string): void {
-    document.documentElement.dataset.theme = theme;
-    document.querySelectorAll<HTMLSelectElement>('select[data-controller~="theme-select"]').forEach((select) => {
-      if (select !== this.element) select.value = theme;
-    });
-    document.dispatchEvent(new CustomEvent("atelier:theme-change", { detail: { theme } }));
+  nameValueChanged(): void {
+    const root = document.documentElement;
+    if (root.dataset.theme === this.nameValue) return;
+    root.dataset.theme = this.nameValue;
+    document.dispatchEvent(new CustomEvent("atelier:theme-change", { detail: { theme: this.nameValue } }));
   }
 }
 
@@ -211,7 +192,7 @@ class ServerFilterController extends Controller {
 
 export function registerWorkspaceSettingsControllers(): void {
   registerWorkspaceControllers({
-    "theme-select": ThemeSelectController,
+    "atelier-theme": AtelierThemeController,
     "git-identity": GitIdentityController,
     "settings-autosave": SettingsAutosaveController,
     "project-settings": ProjectSettingsController,

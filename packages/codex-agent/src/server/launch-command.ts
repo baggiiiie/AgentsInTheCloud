@@ -1,6 +1,7 @@
 import { parseModelRef } from "@atelier/llm/server";
-import { cliLaunchScript, turnSignalArgv, turnSignalShell, type CliAgentSession, type CliModelSettings } from "@atelier/cli-agent/server";
+import { cliLaunchScript, turnSignalArgv, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings } from "@atelier/cli-agent/server";
 import { workspaceRoot } from "@atelier/workspace";
+import { codexAtelierTmTheme, codexThemeName } from "./theme.ts";
 import type { WorkspaceAgentInput } from "@atelier/shared";
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
@@ -16,9 +17,10 @@ export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string
       "-c", `notify=${JSON.stringify(turnSignalArgv(session.turnSignalCommand, "finished"))}`,
       "-c", `hooks={UserPromptSubmit=[{hooks=[{type="command",command=${JSON.stringify(turnSignalShell(session.turnSignalCommand, "started"))}}]}]}`,
     ] : []),
-    "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false",
+    "-c", `tui.theme=${JSON.stringify(codexThemeName)}`, "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false",
     "-c", 'cli_auth_credentials_store="file"', ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["-c", `model_reasoning_effort=${JSON.stringify(settings.thinkingLevel)}`] : []),
     ...imagePaths.flatMap((path) => ["--image", path]), ...(prompt ? ["--", prompt] : [])];
-  return cliLaunchScript({ executable: "codex", label: "Codex", npmPackage: "@openai/codex", args });
+  const setup = writeFileScript(`"\${CODEX_HOME:-$HOME/.codex}/themes/${codexThemeName}.tmTheme"`, codexAtelierTmTheme());
+  return cliLaunchScript({ executable: "codex", label: "Codex", npmPackage: "@openai/codex", args, setup });
 }

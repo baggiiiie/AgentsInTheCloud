@@ -544,7 +544,7 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
   .settings-sec-inline { align-items: stretch; flex-direction: column; gap: 8px; }
   .settings-sec-inline :is(form, .settings-select) { width: 100%; }
   .settings-sec-theme { align-items: center; flex-direction: row; }
-  .settings-sec-theme > :is(.settings-select, [data-popup-select-trigger]) { width: auto; max-width: min(190px, 60%); }
+  .settings-sec-theme > form { width: auto; max-width: min(190px, 60%); }
   .settings-field { align-items: stretch; flex-direction: column; gap: 6px; padding: 8px 0; }
   .settings-sec-github .managed-list__content { min-width: 0; }
   .github-connect-controls { align-items: stretch; flex-direction: column; }

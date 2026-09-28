@@ -17,6 +17,7 @@ import { parseArgs } from "node:util";
 import { command, docker, sleep, stopCommands } from "./process.ts";
 import { setSupervisorRoutes } from "./tailscale.ts";
 import { supervisorFragment, page } from "./ui.ts";
+import { readAppTheme } from "./app-theme.ts";
 
 const { values } = parseArgs({
   options: {
@@ -538,6 +539,7 @@ const server = Bun.serve({
         "Atelier System",
         `<section data-controller="progress" data-progress-events-value="${escapeHtml(events)}" data-progress-return-value="${!diagnostic && (local || !!tailnetHost)}"><div data-progress-content>${fragment()}</div></section>`,
         local ? "" : tailnetHost ? `https://${tailnetHost}:8443` : "",
+        await readAppTheme(),
       ),
       { headers: { "content-type": "text/html" } },
     );

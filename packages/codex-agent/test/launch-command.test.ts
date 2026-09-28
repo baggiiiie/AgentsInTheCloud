@@ -20,7 +20,7 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false", "-c", 'cli_auth_credentials_store="file"'];
+const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="atelier"', "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false", "-c", 'cli_auth_credentials_store="file"'];
 
 test("reuses home Codex and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
@@ -86,4 +86,13 @@ test("registers session-local turn boundary notifications", async () => {
   const args = output.split("\0");
   expect(args).toContain(`notify=${JSON.stringify(["sh", command, "finished"])}`);
   expect(args).toContain(`hooks={UserPromptSubmit=[{hooks=[{type="command",command=${JSON.stringify(`sh ${shellQuote(command)} started`)}}]}]}`);
+});
+
+test("installs the Atelier syntax theme in CODEX_HOME with terminal palette colors", async () => {
+  await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
+  const [code] = await run(`CODEX_HOME=${shellQuote(`${home}/session-codex`)}\n${codexLaunchScript(empty, [])}`);
+  expect(code).toBe(0);
+  const theme = await readFile(`${home}/session-codex/themes/atelier.tmTheme`, "utf8");
+  // Inline code uses palette slot 12 (bright blue), Atelier's accent.
+  expect(theme).toContain("<string>markup.inline.raw.string.markdown, markup.raw.inline.markdown</string><key>settings</key><dict><key>foreground</key><string>#0c000000</string>");
 });
