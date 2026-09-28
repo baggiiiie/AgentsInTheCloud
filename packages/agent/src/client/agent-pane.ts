@@ -1,5 +1,5 @@
 import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
@@ -319,6 +319,16 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       button.name = "mode";
       button.value = action;
       button.removeAttribute("form");
+    }
+
+    async sendPrompt(event: CustomEvent<AgentComposerSendPromptDetail>): Promise<void> {
+      const body = new FormData();
+      body.set("text", event.detail.text);
+      body.set("attachmentDraft", String(new FormData(this.formTarget).get("attachmentDraft")));
+      const response = await fetch(this.formTarget.action, { method: "POST", body, headers: { Accept: "text/vnd.turbo-stream.html" } });
+      if (!response.ok) throw new Error(`Could not send ${event.detail.text}: HTTP ${response.status}`);
+      window.Turbo!.renderStreamMessage(await response.text());
+      this.scrollToTranscriptEnd();
     }
 
     submitted(event: TurboSubmitEndEvent): void {

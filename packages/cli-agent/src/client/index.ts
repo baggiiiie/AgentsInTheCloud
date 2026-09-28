@@ -1,5 +1,5 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { CableTopics, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type CableSubscription, type WorkspaceClientModule } from "@atelier/shared";
+import { CableTopics, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type CableSubscription, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
@@ -215,20 +215,10 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.sending = true;
         status.hidden = true;
         try {
-          const response = await fetch(form.action, { method: "POST", body: data });
-          if (!response.ok) throw new Error(await response.text());
-          if (response.status === 204) {
+          if (!await this.deliver(data)) {
             if (this.inputTarget.value === draftText) setTextInputValue(this.inputTarget, "");
             return;
           }
-          const text = await response.text();
-          if (!this.connected) throw new Error("Terminal disconnected. Prompt retained; check the terminal before retrying.");
-          this.viewer.paste(text);
-          // The TUI handles bracketed paste asynchronously; let it finish before
-          // submitting a real Enter key, rather than merging Enter into the paste.
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          if (!this.connected) throw new Error("Terminal disconnected after paste. Check the terminal before retrying.");
-          this.viewer.pressEnter();
           this.element.dispatchEvent(new Event("mobile-composer:sent"));
           if (this.inputTarget.value === draftText) {
             setTextInputValue(this.inputTarget, "");
@@ -243,6 +233,34 @@ export const atelierClientModule: WorkspaceClientModule = {
           }
         } catch (error) { showError(error instanceof Error ? error.message : String(error)); }
         finally { this.sending = false; }
+      }
+      async sendPrompt(event: CustomEvent<AgentComposerSendPromptDetail>): Promise<void> {
+        if (this.sending) return;
+        const status = this.element.querySelector<HTMLElement>('[data-agent-attachments-target="status"]')!;
+        const data = new FormData();
+        data.set("text", event.detail.text);
+        data.set("attachmentDraft", String(new FormData(this.formTarget).get("attachmentDraft")));
+        this.sending = true;
+        status.hidden = true;
+        try { await this.deliver(data); }
+        catch (error) { status.textContent = error instanceof Error ? error.message : String(error); status.hidden = false; }
+        finally { this.sending = false; }
+      }
+      // Returns false when the server handled the prompt itself without terminal input.
+      private async deliver(data: FormData): Promise<boolean> {
+        if (!this.connected || !this.viewer) throw new Error("Terminal disconnected. Reconnect and try again.");
+        const response = await fetch(this.formTarget.action, { method: "POST", body: data });
+        if (!response.ok) throw new Error(await response.text());
+        if (response.status === 204) return false;
+        const text = await response.text();
+        if (!this.connected) throw new Error("Terminal disconnected. Prompt retained; check the terminal before retrying.");
+        this.viewer.paste(text);
+        // The TUI handles bracketed paste asynchronously; let it finish before
+        // submitting a real Enter key, rather than merging Enter into the paste.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (!this.connected) throw new Error("Terminal disconnected after paste. Check the terminal before retrying.");
+        this.viewer.pressEnter();
+        return true;
       }
       retry(): void {
         this.viewer!.reconnect();

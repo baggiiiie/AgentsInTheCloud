@@ -15,6 +15,7 @@ class WorkspaceClientHookRegistry implements WorkspaceClientHooks {
   private readonly workspaceAppFrameRefreshHandlers: Array<(context: { appKey: string; frame: HTMLIFrameElement; load(): void }) => void> = [];
   private readonly paletteProviders = new Map<string, WorkspacePaletteProvider>();
   private readonly commands = new Map<string, WorkspaceClientCommand>();
+  private readonly commandProviders: Array<() => WorkspaceClientCommand[]> = [];
 
   onBecomeVisible(handler: (context: WorkspaceClientSurfaceVisibilityContext) => void): void { this.becomeVisibleHandlers.push(handler); }
   onNoLongerVisible(handler: (context: WorkspaceClientSurfaceVisibilityContext) => void): void { this.noLongerVisibleHandlers.push(handler); }
@@ -23,6 +24,8 @@ class WorkspaceClientHookRegistry implements WorkspaceClientHooks {
   registerPaletteProvider(provider: WorkspacePaletteProvider): void { this.paletteProviders.set(provider.id, provider); }
   registerCommand(command: WorkspaceClientCommand): void { this.commands.set(command.id, command); }
   registeredCommands(): WorkspaceClientCommand[] { return [...this.commands.values()]; }
+  registerCommandProvider(provider: () => WorkspaceClientCommand[]): void { this.commandProviders.push(provider); }
+  providedCommands(): WorkspaceClientCommand[] { return this.commandProviders.flatMap((provider) => provider()); }
 
   becomeVisible(context: WorkspaceClientSurfaceVisibilityContext): void {
     this.becomeVisibleHandlers.forEach((handler) => handler(context));

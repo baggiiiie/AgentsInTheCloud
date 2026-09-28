@@ -1,6 +1,6 @@
 import { setActionItemLabel } from "@atelier/design-system/action-item/client";
 import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { agentComposerSendPromptEvent, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { agentCompletionRequest, insertFileCompletion, insertSlashCommand } from "./completion-input.ts";
 import { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 import { handleAgentTreeKeydown, handleAgentTreeMenuEvent, selectAgentTreeOption } from "./session-tree.ts";
@@ -24,28 +24,16 @@ function runApplicationCommand(option: HTMLElement, input: HTMLInputElement | HT
   return true;
 }
 
-function promptTemplateTriggerForHotkey(html: string, hotkey: string): string | undefined {
-  const container = document.createElement("template");
-  container.innerHTML = html.trim();
-  return container.content.querySelector<HTMLElement>(`[data-prompt-template-hotkey="${hotkey}"]`)?.dataset.commandTrigger;
-}
-
 type ShortcutCommand = Pick<WorkspaceClientCommand, "label" | "binding">;
 
 // Prompt-template hotkeys are ⌘⌥Letter on Apple platforms and Ctrl+Alt+Letter elsewhere.
-function promptTemplateModifier(apple: boolean): "Meta" | "Control" {
-  return apple ? "Meta" : "Control";
+function promptTemplateBinding(hotkey: string, apple: boolean): string {
+  return `${apple ? "Meta" : "Control"}+Alt+Key${hotkey.toUpperCase()}`;
 }
 
 export function promptTemplateHotkeyConflict(hotkey: string, commands: readonly ShortcutCommand[], apple: boolean): ShortcutCommand | undefined {
-  const binding = `${promptTemplateModifier(apple)}+Alt+Key${hotkey.toUpperCase()}`;
+  const binding = promptTemplateBinding(hotkey, apple);
   return commands.find((command) => command.binding === binding);
-}
-
-function promptTemplateHotkeyPressed(event: KeyboardEvent): boolean {
-  if (!event.altKey || event.shiftKey) return false;
-  // Windows reports AltGr as Ctrl+Alt; those presses type characters.
-  return isApplePlatform() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey && !event.getModifierState("AltGraph");
 }
 
 function visibleWorkspaceCommands(): ShortcutCommand[] {
@@ -60,6 +48,33 @@ function promptTemplateShortcutConflict(hooks: WorkspaceClientHooks, hotkey: str
   return promptTemplateHotkeyConflict(hotkey, [...hooks.registeredCommands(), ...visibleWorkspaceCommands()], isApplePlatform());
 }
 
+function activeAgentComposer(): HTMLElement | undefined {
+  return [...document.querySelectorAll<HTMLElement>('[data-workspace-pane-role="agent"].is-active .composer[data-controller~="agent-completions"]')]
+    .find((composer) => composer.closest(".workspace-detail-resident")?.classList.contains("visible") ?? true);
+}
+
+// Hotkeyed prompt templates are workspace shortcuts aimed at the active Agent
+// conversation, independent of focus and of whether its composer is shown.
+export function registerPromptTemplateCommands(hooks: WorkspaceClientHooks): void {
+  hooks.registerCommandProvider(() => {
+    const composer = activeAgentComposer();
+    if (!composer) return [];
+    const templates = composer.querySelectorAll<HTMLElement>('[data-agent-completions-target="catalog"] [role="option"][data-prompt-template-hotkey]');
+    return [...templates].flatMap((template): WorkspaceClientCommand[] => {
+      const hotkey = template.dataset.promptTemplateHotkey!;
+      if (promptTemplateShortcutConflict(hooks, hotkey)) return [];
+      const trigger = template.dataset.commandTrigger!;
+      return [{
+        id: `prompt-template.${trigger.slice(1)}`,
+        label: `Send ${trigger}`,
+        scope: "agent-conversation",
+        binding: promptTemplateBinding(hotkey, isApplePlatform()),
+        run: () => { composer.dispatchEvent(new CustomEvent<AgentComposerSendPromptDetail>(agentComposerSendPromptEvent, { detail: { text: trigger } })); },
+      }];
+    });
+  });
+}
+
 function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks): string {
   const container = document.createElement("template");
   container.innerHTML = html.trim();
@@ -71,7 +86,7 @@ function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks)
     const conflict = promptTemplateShortcutConflict(hooks, hotkey);
     if (!conflict) {
       option.dataset.agentQuickLaunchShortcut = label;
-      option.setAttribute("aria-keyshortcuts", `${promptTemplateModifier(apple)}+Alt+${key}`);
+      option.setAttribute("aria-keyshortcuts", `${apple ? "Meta" : "Control"}+Alt+${key}`);
       continue;
     }
     option.removeAttribute("data-prompt-template-hotkey");
@@ -224,41 +239,15 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
 
     connect(): void {
       super.connect();
-      window.addEventListener("keydown", this.promptTemplateHotkey);
       this.catalogObserver = new MutationObserver(() => this.input());
       this.catalogObserver.observe(this.catalogTarget, { childList: true });
       this.input();
     }
 
     disconnect(): void {
-      window.removeEventListener("keydown", this.promptTemplateHotkey);
       this.catalogObserver?.disconnect();
       super.disconnect();
     }
-
-    private readonly promptTemplateHotkey = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || event.repeat || event.isComposing || !promptTemplateHotkeyPressed(event)) return;
-      const match = event.code.match(/^Key([A-Z])$/);
-      if (!match || this.element.getClientRects().length === 0 || composerIsTranscribing(this.element)) return;
-      const resident = this.element.closest<HTMLElement>(".workspace-detail-resident");
-      if (resident && !resident.classList.contains("visible")) return;
-      const catalog = this.catalogTarget.innerHTML;
-      const hotkey = match[1]!.toLowerCase();
-      if (promptTemplateShortcutConflict(hooks, hotkey)) return;
-      const trigger = promptTemplateTriggerForHotkey(catalog, hotkey);
-      if (!trigger) return;
-
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const initialValue = this.inputTarget.value;
-      void expandedPromptTemplate(this.urlValue, trigger).then((expanded) => {
-        if (this.inputTarget.value !== initialValue || composerIsTranscribing(this.element)) return;
-        setTextInputValue(this.inputTarget, expanded);
-        const form = this.inputTarget.form!;
-        const submitter = form.querySelector<HTMLButtonElement>('button[value="send"], button[value="steer"]');
-        form.requestSubmit(submitter ?? undefined);
-      });
-    };
   };
 }
 

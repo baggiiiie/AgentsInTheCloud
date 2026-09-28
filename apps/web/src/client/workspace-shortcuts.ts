@@ -1,7 +1,7 @@
 import { actionItemElement, actionItemHtml } from "@atelier/design-system/action-item";
 import { dialogHtml } from "@atelier/design-system/dialog";
 import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@atelier/shared";
+import { escapeHtml, isApplePlatform, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@atelier/shared";
 import { Controller } from "@hotwired/stimulus";
 import { submitFormWithFirstButton } from "./form-submission.ts";
 import { clientHooks, type PaletteResult } from "./workspace-client-hooks.ts";
@@ -60,11 +60,15 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
   }
 
   private readonly keydown = (event: KeyboardEvent): void => {
-    if (event.repeat || event.isComposing) return;
-    if (!event.metaKey || !event.altKey || event.ctrlKey) return;
+    if (event.repeat || event.isComposing || !event.altKey) return;
+    const metaAlt = event.metaKey && !event.ctrlKey;
+    // Prompt-template hotkeys use Ctrl+Alt off Apple platforms. Windows reports
+    // AltGr as Ctrl+Alt; those presses type characters.
+    const controlAlt = event.ctrlKey && !event.metaKey && !isApplePlatform() && !event.getModifierState("AltGraph");
+    if (!metaAlt && !controlAlt) return;
 
-    if (event.key === "Meta" || event.key === "Alt") {
-      this.scheduleShortcutOverlay();
+    if (event.key === "Meta" || event.key === "Alt" || event.key === "Control") {
+      if (metaAlt) this.scheduleShortcutOverlay();
       return;
     }
 
@@ -153,6 +157,9 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
           run: () => this.executeVisibleWorkspaceCommand(command.id),
         });
       }
+    }
+    for (const command of clientHooks.providedCommands()) {
+      if (!commands.has(command.id)) commands.set(command.id, command);
     }
     return [...commands.values()];
   }

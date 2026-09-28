@@ -114,7 +114,7 @@ Review the current changes, run the relevant checks, commit them, and prepare to
 
 Set `quick-launch: true` to show a compact command button whenever the Agent pane composer is empty, whether or not it has focus. Selecting it expands the template into the composer for review and editing without submitting it. Atelier focuses the composer when doing so will not open a software keyboard; on software-keyboard devices it leaves the composer unfocused. Quick launches do not appear in the new-workspace launch composer and disappear as soon as the user types or starts transcription.
 
-Set `hotkey` to one letter to expand and immediately send that template with Command-Option-letter (for example, `hotkey: l` uses ⌘⌥L). Atelier supplies the modifiers; other shortcut forms are not accepted. If the template is also a quick launch, its button shows the shortcut. Existing Atelier commands take precedence when a letter conflicts.
+Set `hotkey` to one letter to expand and immediately send that template to the workspace's active Agent conversation with Command-Option-letter, or Ctrl+Alt+letter off Apple platforms (for example, `hotkey: l` uses ⌘⌥L). Atelier supplies the modifiers; other shortcut forms are not accepted. If the template is also a quick launch, its button shows the shortcut. Existing Atelier commands take precedence when a letter conflicts.
 
 Supported placeholders in the body:
 

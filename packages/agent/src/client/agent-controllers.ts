@@ -2,7 +2,7 @@ import { createAgentNotificationsController } from "./notifications-controller.t
 import { createUsageControllers } from "./usage-controllers.ts";
 import type { WorkspaceClientModule } from "@atelier/shared";
 import { createAgentPaneController, registerAgentPaneVisibilityHooks } from "./agent-pane.ts";
-import { createAgentCompletionsController } from "./completions-controller.ts";
+import { createAgentCompletionsController, registerPromptTemplateCommands } from "./completions-controller.ts";
 import { createAgentEditDiffController } from "./edit-diff-controller.ts";
 import { createAgentTurnController } from "./turn-controller.ts";
 import { createAgentElapsedController } from "./elapsed-controller.ts";
@@ -46,5 +46,6 @@ export const agentClientModule: WorkspaceClientModule = {
 
     registerAgentPaneVisibilityHooks(application, hooks);
     registerLaunchComposerCommand(hooks);
+    registerPromptTemplateCommands(hooks);
   },
 };

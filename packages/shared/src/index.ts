@@ -379,6 +379,10 @@ export const phoneLayoutMediaQuery = "(max-width: 700px), (hover: none) and (poi
 
 type ComposerSubmitKey = "shortcut" | "software-keyboard";
 
+/** Asks an Agent conversation's composer to send a prompt without touching its draft. */
+export const agentComposerSendPromptEvent = "agent-composer:send-prompt";
+export interface AgentComposerSendPromptDetail { text: string }
+
 export function composerSubmitKey(
   event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "isComposing">,
   focusOpensSoftwareKeyboard?: boolean,
@@ -452,6 +456,8 @@ export interface WorkspaceClientHooks {
   registerPaletteProvider(provider: WorkspacePaletteProvider): void;
   registerCommand(command: WorkspaceClientCommand): void;
   registeredCommands(): WorkspaceClientCommand[];
+  /** Supplies commands that depend on the current page, evaluated whenever commands are looked up. */
+  registerCommandProvider(provider: () => WorkspaceClientCommand[]): void;
 }
 
 export interface WorkspaceClientModuleContext {
