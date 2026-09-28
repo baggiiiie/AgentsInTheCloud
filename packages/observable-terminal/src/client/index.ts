@@ -452,6 +452,12 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       window.addEventListener("online", networkRestored);
     }
     term.on("error", (error) => console.error("Gespenst terminal error", error));
+    // Shift+drag forces a selection over a mouse-tracking TUI, but a plain click
+    // is then encoded as application input and never reaches Gespenst's
+    // selection gesture, so nothing would ever clear the highlight.
+    term.element.addEventListener("pointerdown", (event) => {
+      if (event.button === 0 && !event.shiftKey) term.clearSelection();
+    }, { capture: true });
 
     // Gespenst renders into a canvas, so there are no anchors to click. Read
     // its authoritative painted cells (including OSC 8 destinations) instead
