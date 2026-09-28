@@ -46,6 +46,8 @@ async function accessFile(workspaceId: string, absolutePath: string): Promise<vo
 
 interface WorkspaceAgentToolOptions {
   events?: AtelierEventBus;
+  /** Only Atelier's own transcript renders atelier-embed: URLs. */
+  embeds?: boolean;
 }
 
 export interface WorkspacePresenterDeps {
@@ -81,6 +83,8 @@ export function registerWorkspacePresenter(kind: string, factory: WorkspacePrese
   };
 }
 
+const presentEmbedHint = " Images, videos, SVGs, and HTML files are already automatically visible to the user when you reference them with an Atelier embed URL in Markdown image syntax, for example: ![](atelier-embed:/work/app/screenshot.png) or ![](atelier-embed:/work/app/demo.html).";
+
 function createPresentTool(workspaceId: string, options: WorkspaceAgentToolOptions): ToolDefinition<any, any> | undefined {
   const presenters = [...registeredWorkspacePresenters.values()].map((factory) => factory(workspaceId, options));
   if (!presenters.length) return undefined;
@@ -91,7 +95,7 @@ function createPresentTool(workspaceId: string, options: WorkspaceAgentToolOptio
   return defineTool({
     name: "present",
     label: "Present",
-    description: "Present one primary interactive surface to the user in Atelier. Use this when the user should look at or interact with while evaluating your work. Atelier will place the chosen surface in the preview area. Calling this again should update or replace the primary presentation rather than adding multiple competing presentations. Do not use this tool for static or inline artifacts. Images, videos, SVGs, and HTML files are already automatically visible to the user when you reference them with an Atelier embed URL in Markdown image syntax, for example: ![](atelier-embed:/work/app/screenshot.png) or ![](atelier-embed:/work/app/demo.html)." + presenters.map((presenter) => `${presenter.kind}: ${presenter.description}`).join(" "),
+    description: "Present one primary interactive surface to the user in Atelier. Use this when the user should look at or interact with while evaluating your work. Atelier will place the chosen surface in the preview area. Calling this again should update or replace the primary presentation rather than adding multiple competing presentations. Do not use this tool for static or inline artifacts." + (options.embeds ? presentEmbedHint : "") + presenters.map((presenter) => `${presenter.kind}: ${presenter.description}`).join(" "),
     // Moonshot requires function parameters to be one top-level object, not a union.
     parameters: Type.Object({
       kind: Type.String({ enum: kinds, description: `Surface to present. One of: ${kinds.join(", ")}.` }),
@@ -162,7 +166,7 @@ export function createWorkspaceAgentTools(workspaceId: string, options: Workspac
     },
   });
   const bash = createTmuxBashTool(workspaceId);
-  return [read, write, edit, bash, ...createAtelierControlTools(workspaceId, options)];
+  return [read, write, edit, bash, ...createAtelierControlTools(workspaceId, { ...options, embeds: true })];
 }
 
 export function createAtelierControlTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): ToolDefinition<any, any>[] {

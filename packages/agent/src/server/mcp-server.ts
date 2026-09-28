@@ -8,7 +8,7 @@ import { authenticateAgentRequest, type AgentMcpIdentity } from "./mcp-credentia
 export interface AgentMcpServerOptions {
   authenticate(token: string): AgentMcpIdentity | undefined;
   tools(identity: AgentMcpIdentity): ToolDefinition<any, any>[];
-  instructions(identity: AgentMcpIdentity): string;
+  instructions(identity: AgentMcpIdentity): string | Promise<string>;
 }
 
 /** Authentication is checked on every HTTP request, independently of MCP session identity. */
@@ -27,7 +27,7 @@ export function createAgentMcpServer(options: AgentMcpServerOptions) {
       if (request.method !== "POST") return new Response("MCP initialization required", { status: 400 });
       // Tool visibility is fixed for the workspace lifetime; build definitions once per session.
       const tools = new Map(options.tools(identity).map((tool) => [tool.name, tool]));
-      const server = new Server({ name: "atelier", version: "1.0.0" }, { capabilities: { tools: {} }, instructions: options.instructions(identity) });
+      const server = new Server({ name: "atelier", version: "1.0.0" }, { capabilities: { tools: {} }, instructions: await options.instructions(identity) });
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => crypto.randomUUID(),
         onsessioninitialized: (id) => { sessions.set(id, { identity, server, transport }); },

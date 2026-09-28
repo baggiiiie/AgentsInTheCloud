@@ -1,5 +1,3 @@
-import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
-import { projectOnboardingInstructions } from "./project-onboarding.ts";
 import { agentDelegation, type AgentSessionAttachment, type AgentDelegationTranscript } from "./delegation.ts";
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -16,7 +14,7 @@ import { compactionKeepRecentTokens } from "./runtime-status.ts";
 import { AgentServiceTierState, modelRuntimeWithServiceTiers, supportsFastMode, type AgentServiceTier } from "./service-tier.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
-import { createAtelierResourceLoader } from "./system-prompt.ts";
+import { createAtelierResourceLoader, prepareAppendedAtelierInstructions } from "./system-prompt.ts";
 import { createWorkspaceAgentTools } from "./tools.ts";
 import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import type { AgentToolDefinitionView } from "./render-transcript.ts";
@@ -69,9 +67,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
     loadWorkspaceSkills(agent.workspaceId),
   ]);
   const preparation = await agentDelegation?.prepare({ agent, events: options.events });
-  const projectOnboarding = isProjectOnboardingWorkspace(agent.workspaceId);
-  const appendSystemPrompt = [...preparation?.prompt ?? [], ...(projectOnboarding ? [projectOnboardingInstructions] : [])];
-  await options.events?.emit("agent_system_prompt_prepare", { workspaceId: agent.workspaceId, conversationId: agent.conversationId, lines: appendSystemPrompt });
+  const appendSystemPrompt = await prepareAppendedAtelierInstructions(options.events, agent.workspaceId, agent.conversationId, preparation?.prompt);
   const sessionSettings = { compaction: { enabled: true, keepRecentTokens: compactionKeepRecentTokens } };
   if (defaultModel) Object.assign(sessionSettings, { defaultProvider: defaultModel.provider, defaultModel: defaultModel.id });
   const sessionManager = SessionManager.open(agent.path, dirname(agent.path), workspaceRoot);

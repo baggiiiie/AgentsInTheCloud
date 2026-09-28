@@ -4,11 +4,13 @@ import {
   type ResourceLoader,
   type Skill,
 } from "@earendil-works/pi-coding-agent";
+import type { AtelierEventBus } from "@atelier/core";
+import { projectOnboardingInstructions } from "./project-onboarding.ts";
+import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
 
-export const atelierSystemPrompt = `You are a coding agent, part of a an online coding management tool called Atelier.
-
-Atelier is running your agent loop, and all your tool calls are executed in the context of a docker container.
-The container is ephemeral, and there's no need to clean it up after you are done. It's an ubuntu os. You are
+/** Atelier guidance for every agent, whether Atelier runs its loop or it connects through MCP. */
+export const sharedAtelierInstructions = `You are running inside of an online coding tool called Atelier.
+Your execution environment is an ephemeral container. There's no need to clean it up after you are done. It's an ubuntu os. You are
 allowed to use "sudo apt install" to install anything you need.
 
 The user you are serving will be reading your responses in the atelier web application.
@@ -25,8 +27,12 @@ You also have access to a chrome browser that runs inside your workspace. use "a
 You can present this browser to the user by calling present(kind=desktop). When you do that, the vnc view to the browser will call attention upon itself visually.
 CDP gives you more control to get the browser into the most ideal state for user evaluation of your work. The preview browser only supports navigating to url's.
 
-When you finish an implementation task, do your best to put atelier in a state that lets the user evaluate your implementation taks.
-Most of the time this will be the preview tool with kind=browser, kind=terminal, or kind=desktop
+Whenever you are assigned an implementation task, you should carefully think what your user needs in order to evaluate your work.
+That can be showing proof through screenshots. It can be by spinning up a dev server and pointing the
+preview browser to it. It can be by recording a video. You will optimize for your users evaluation convenience.`;
+
+/** Only Atelier's own transcript renders embed and file URLs. */
+export const atelierSystemPrompt = `${sharedAtelierInstructions}
 
 The Atelier web application makes it easy for the user to inspect files you have created. If you want the user
 to see an image, svg, video, or any other file on your disk inline in the conversation, emit a Markdown image with an Atelier embed URL like this:
@@ -43,12 +49,14 @@ Use html when you want to explain something visual / interactive. It will be sho
 inline to the user and auto-expand vertically to fit the page content. The preview is about 860px wide on desktop and may be narrower on small screens, so keep layouts responsive.
 Use markdown if it's just prose. Mermaid fenced code blocks are supported and rendered inline.
 If you choose html, use \`![](atelier-embed:/absolute/path/to/file.html)\` to point to the HTML file. It can use javascript and css files. They will be displayed in the inline iframe to the user.
-
-Whenever you are assigned an implementation task, you should carefully think what your user needs in order to evaluate your work.
-That can be showing proof through screenshots you show with embed syntax. It can be by spinning up a dev server and pointing the
-preview browser to it. It can be by recording a video. You will optimize for your users evaluation convenience.
-
 `;
+
+/** Lines appended after the base instructions for every agent; plugins contribute through agent_system_prompt_prepare. */
+export async function prepareAppendedAtelierInstructions(events: AtelierEventBus | undefined, workspaceId: string, conversationId: string, lines: string[] = []): Promise<string[]> {
+  const appended = [...lines, ...(isProjectOnboardingWorkspace(workspaceId) ? [projectOnboardingInstructions] : [])];
+  await events?.emit("agent_system_prompt_prepare", { workspaceId, conversationId, lines: appended });
+  return appended;
+}
 
 interface AtelierAgentsFile {
   path: string;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "typebox";
 import {
+  createAtelierControlTools,
   createWorkspaceAgentTools,
   executeDeleteCurrentWorkspace,
   normalizeWorkspacePath,
@@ -18,6 +19,22 @@ describe("workspace agent tools", () => {
     expect(normalizeWorkspacePath("../foo.ts")).toBe("/foo.ts");
     expect(normalizeWorkspacePath("/etc/passwd")).toBe("/etc/passwd");
     expect(normalizeWorkspacePath("/workspace/work/x")).toBe("/workspace/work/x");
+  });
+
+  test("only the built-in agent's present tool teaches embed URLs", () => {
+    const unregister = registerWorkspacePresenter("test-browser", () => ({
+      kind: "test-browser",
+      description: "Present a test browser.",
+      parameters: { url: Type.String() },
+      execute: async () => ({ content: [{ type: "text" as const, text: "presented" }], details: {} }),
+    }));
+
+    try {
+      expect(createWorkspaceAgentTools("abc").find((tool) => tool.name === "present")?.description).toContain("atelier-embed:");
+      expect(createAtelierControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("atelier-embed:");
+    } finally {
+      unregister();
+    }
   });
 
   test("present tool uses a top-level object schema accepted by Moonshot", () => {
