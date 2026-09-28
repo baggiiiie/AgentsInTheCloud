@@ -169,6 +169,8 @@ export interface ObservableTerminalViewerOptions {
   onFileLink?: (link: TerminalFileLink) => void;
   /** Server-rendered status for an interactive terminal. */
   connectionStatus?: HTMLElement;
+  /** Hide the cursor while keyboard focus is elsewhere, without changing the PTY. */
+  hideUnfocusedCursor?: boolean;
   onConnectionStateChange?: (state: TerminalConnectionState) => void;
 }
 
@@ -323,22 +325,48 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       }
     };
     let historyCursorHidden = false;
+    let focused = false;
+    let cursorHidden = false;
+    // The application's own cursor visibility, restored when Atelier stops hiding it.
     let cursorWasVisible: boolean | undefined;
     let cursorVisibilityRevision = 0;
-    const hideHistoryCursor = (): void => {
-      if (historyCursorHidden && cursorWasVisible !== undefined) term.write("\x1b[?25l");
+    const hideCursor = (): void => {
+      if (cursorHidden && cursorWasVisible !== undefined) term.write("\x1b[?25l");
     };
+    const updateCursorVisibility = (): void => {
+      const hidden = historyCursorHidden || (options.hideUnfocusedCursor === true && !focused);
+      if (cursorHidden === hidden) return;
+      cursorHidden = hidden;
+      const revision = ++cursorVisibilityRevision;
+      if (hidden) {
+        cursorWasVisible = undefined;
+        void term.readViewport().then(({ cursor }) => {
+          if (revision !== cursorVisibilityRevision || cursorWasVisible !== undefined) return;
+          cursorWasVisible = cursor.visible;
+          hideCursor();
+        });
+      } else {
+        if (cursorWasVisible) term.write("\x1b[?25h");
+        cursorWasVisible = undefined;
+      }
+    };
+    if (options.hideUnfocusedCursor) {
+      term.element.addEventListener("focusin", () => { focused = true; updateCursorVisibility(); });
+      term.element.addEventListener("focusout", () => { focused = false; updateCursorVisibility(); });
+      updateCursorVisibility();
+    }
     const writeOutput = (data: string | Uint8Array): void => {
       if (disposed) return;
+      if (cursorHidden) cursorWasVisible = lastCursorVisibility(data) ?? cursorWasVisible;
       if (!awaitingFirstOutput) {
         term.write(data);
-        hideHistoryCursor();
+        hideCursor();
         return;
       }
       awaitingFirstOutput = false;
       // Keep the pane background visible until the first output has been rendered.
       void term.writeAsync(data).then(() => {
-        if (!disposed) { hideHistoryCursor(); term.element.classList.add("observable-terminal-painted"); }
+        if (!disposed) { hideCursor(); term.element.classList.add("observable-terminal-painted"); }
       }).catch((error: Error) => {
         reportFailure("paint initial terminal output", error);
       });
@@ -529,22 +557,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       scrollTouch: (deltaY, clientX, clientY) => {
         term.element.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX, clientY, cancelable: true }));
       },
-      setHistoryCursorHidden: (hidden) => {
-        if (historyCursorHidden === hidden) return;
-        historyCursorHidden = hidden;
-        const revision = ++cursorVisibilityRevision;
-        if (hidden) {
-          cursorWasVisible = undefined;
-          void term.readViewport().then(({ cursor }) => {
-            if (revision !== cursorVisibilityRevision) return;
-            cursorWasVisible = cursor.visible;
-            hideHistoryCursor();
-          });
-        } else {
-          if (cursorWasVisible) term.write("\x1b[?25h");
-          cursorWasVisible = undefined;
-        }
-      },
+      setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; updateCursorVisibility(); },
       paste: (text) => term.paste(text),
       pressEnter: () => term.sendKey({ code: "Enter", text: "\r" }),
       setTheme: (nextTheme) => { theme = nextTheme; void updateTheme(); },
@@ -565,4 +578,14 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     term.dispose();
     throw error;
   }
+}
+
+const latin1 = new TextDecoder("latin1");
+/** The final DECTCEM (show/hide cursor) state an output chunk sets, if any. */
+function lastCursorVisibility(data: string | Uint8Array): boolean | undefined {
+  const text = data instanceof Uint8Array ? latin1.decode(data) : data;
+  const shown = text.lastIndexOf("\x1b[?25h");
+  const hidden = text.lastIndexOf("\x1b[?25l");
+  if (shown === hidden) return undefined;
+  return shown > hidden;
 }

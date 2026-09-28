@@ -1,15 +1,17 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalViewportFit, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
+import { CableTopics, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type CableSubscription, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
-      static values = { url: String, workspaceId: String };
-      static targets = ["terminal", "connectionStatus", "form", "input", "return"];
+      static values = { url: String, workspaceId: String, conversationId: String, turnsChannel: String };
+      static targets = ["terminal", "connectionStatus", "form", "input", "return", "turnFinished"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
+      declare readonly conversationIdValue: string;
+      declare readonly turnsChannelValue: string;
       declare readonly formTarget: HTMLFormElement;
       declare readonly inputTarget: HTMLTextAreaElement;
       declare readonly returnTarget: HTMLButtonElement;
@@ -18,6 +20,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly connectionStatusTarget: HTMLElement;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
+      private turns?: CableSubscription;
       private connected = false;
       private sending = false;
       private get draftKey(): string { return `atelier.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
@@ -65,8 +68,9 @@ export const atelierClientModule: WorkspaceClientModule = {
       private start(): void {
         if (!this.hasTerminalTarget || this.viewer) return;
         this.resize.observe(this.terminalTarget);
+        if (this.hasFormTarget) this.turns = window.AtelierCable!.subscribe(CableTopics.module(this.turnsChannelValue, this.workspaceIdValue, { conversationId: this.conversationIdValue }));
         this.viewer = createObservableTerminalViewer({
-          host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`),
+          host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`), hideUnfocusedCursor: true,
           theme: atelierObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
           onConnectionStateChange: (state) => { this.connected = state === "connected"; },
@@ -91,8 +95,19 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.terminalTarget.removeEventListener("focusout", this.terminalBlur);
         }
         this.cancelTerminalTouch();
+        this.turns?.unsubscribe();
+        this.turns = undefined;
         this.viewer?.dispose();
         this.viewer = undefined;
+      }
+      turnFinishedTargetConnected(marker: HTMLElement): void {
+        marker.remove();
+        // Desktop only: focusing would open the software keyboard on touch devices.
+        // Never take focus from another pane or control outside this agent.
+        if (focusLikelyOpensSoftwareKeyboard() || !isWorkspacePaneVisible(this.element)) return;
+        const active = document.activeElement;
+        if (active && active !== document.body && !this.element.contains(active)) return;
+        this.inputTarget.focus();
       }
       // Gespenst captures touch pointers as terminal mouse drags. Defer mouse input
       // until a completed tap so a swipe cannot click or select in the TUI.

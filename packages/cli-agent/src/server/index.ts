@@ -3,7 +3,9 @@ import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, rend
 import { transcriptionComposerController } from "@atelier/transcription/server";
 import { buttonHtml } from "@atelier/design-system/button";
 import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
-import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
+import { domId, escapeHtml, turboStream, type WorkspaceModule } from "@atelier/shared";
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
@@ -19,6 +21,7 @@ function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string
 export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule {
   const sessions = createCliSessions(adapter);
   function failureStatus(error: string) { return `Could not start ${escapeHtml(adapter.label)}: ${escapeHtml(error)}`; }
+  const turnsChannel = `${adapter.id}-agent-turns`;
   return {
     id: `${adapter.id}-agent`,
     staticFiles: {
@@ -36,6 +39,23 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
         await sessions.exportWorkspaceHistory(workspaceId);
       });
     },
+    cableChannels: [{
+      name: turnsChannel,
+      subscribe(identifier, listener, events) {
+        if (identifier.channel !== "module" || identifier.name !== turnsChannel) throw new Error(`Invalid ${adapter.label} turns channel`);
+        const { workspaceId } = identifier;
+        const { conversationId } = Value.Parse(Type.Object({ conversationId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), identifier.params);
+        if (!sessions.list(workspaceId).some((session) => session.id === conversationId)) throw new Error(`${adapter.label} session not found`);
+        // Each finished turn appends a one-off marker; the pane focuses its composer when it connects.
+        const stop = events.on("workspace_agent_turn_finished", (event) => {
+          if (event.workspaceId === workspaceId && event.conversationId === conversationId) {
+            listener(turboStream("append", domId("cli_agent", workspaceId, conversationId), '<span data-cli-terminal-target="turnFinished" hidden></span>'));
+          }
+        });
+        listener("");
+        return { unsubscribe() { stop(); } };
+      },
+    }],
     routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }],
     agentProvider: {
       id: adapter.id, label: adapter.label, iconHtml: adapter.iconHtml,
@@ -66,7 +86,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
             </div>
           </div>` : "";
           const firstPresentation = composer && session.firstPresentation;
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit mobile-composer-pane"${firstPresentation ? ` data-mobile-composer-new="true" data-mobile-composer-presented-url="${escapeHtml(composerUrl)}/presented"` : ""} data-controller="cli-terminal mobile-composer" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme ${mobileComposerSelectionActions} mobile-composer:sent->mobile-composer#close">
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body terminal-viewport-fit mobile-composer-pane"${firstPresentation ? ` data-mobile-composer-new="true" data-mobile-composer-presented-url="${escapeHtml(composerUrl)}/presented"` : ""} data-controller="cli-terminal mobile-composer" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-cli-terminal-conversation-id-value="${escapeHtml(conversationId)}" data-cli-terminal-turns-channel-value="${escapeHtml(turnsChannel)}" data-action="atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:theme-change@document->cli-terminal#theme ${mobileComposerSelectionActions} mobile-composer:sent->mobile-composer#close">
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
             ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
