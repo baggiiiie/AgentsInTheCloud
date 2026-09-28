@@ -7,23 +7,35 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
     private activeSelection = false;
     private presentedUrl?: string;
     private readonly viewport = window.visualViewport;
+    private composerResizeObserver?: ResizeObserver;
+    private fitFrame = 0;
 
     // The layout viewport stays full-height on mobile Safari when the keyboard
-    // opens. Fit the built-in agent pane to the visible bottom instead of letting
-    // focus pan its composer underneath the keyboard.
+    // opens. Fit the pane to the visible bottom, then account for the composer
+    // itself being taller than that space (as a manual upward pan would).
     private readonly fitViewport = (): void => {
-      if (!this.element.classList.contains("agent-pane")) return;
-      const viewport = this.viewport;
-      if (!viewport) return;
-      const bottom = viewport.offsetTop + viewport.height;
-      const top = this.element.getBoundingClientRect().top;
-      this.element.style.setProperty("--mobile-composer-viewport-height", `${Math.min(this.element.parentElement!.clientHeight, Math.max(0, bottom - top))}px`);
+      if (!this.element.classList.contains("agent-pane") || !this.viewport) return;
+      cancelAnimationFrame(this.fitFrame);
+      this.fitFrame = requestAnimationFrame(() => {
+        const parent = this.element.parentElement!;
+        const bottom = this.viewport!.offsetTop + this.viewport!.height;
+        const height = Math.min(parent.clientHeight, Math.max(0, bottom - parent.getBoundingClientRect().top));
+        this.element.style.setProperty("--mobile-composer-viewport-height", `${height}px`);
+        const keyboardOpen = document.documentElement.classList.contains("software-keyboard-visible") && this.element.classList.contains("mobile-composer-open");
+        const composerHeight = this.element.querySelector<HTMLElement>(".agent-pane-composer")?.offsetHeight ?? 0;
+        this.element.style.setProperty("--mobile-composer-offset", `${keyboardOpen ? -Math.max(0, composerHeight - height) : 0}px`);
+      });
     };
 
     connect(): void {
       window.addEventListener("pagehide", this.acknowledgePresentation);
       this.viewport?.addEventListener("resize", this.fitViewport);
       this.viewport?.addEventListener("scroll", this.fitViewport);
+      const composer = this.element.querySelector<HTMLElement>(".agent-pane-composer");
+      if (composer) {
+        this.composerResizeObserver = new ResizeObserver(this.fitViewport);
+        this.composerResizeObserver.observe(composer);
+      }
       this.fitViewport();
       if (isWorkspacePaneVisible(this.element)) this.selected();
     }
@@ -32,7 +44,10 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
       window.removeEventListener("pagehide", this.acknowledgePresentation);
       this.viewport?.removeEventListener("resize", this.fitViewport);
       this.viewport?.removeEventListener("scroll", this.fitViewport);
+      this.composerResizeObserver?.disconnect();
+      cancelAnimationFrame(this.fitFrame);
       this.element.style.removeProperty("--mobile-composer-viewport-height");
+      this.element.style.removeProperty("--mobile-composer-offset");
     }
 
     private readonly acknowledgePresentation = (): void => {
@@ -57,6 +72,7 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
         && !this.element.querySelector('[data-agent-pane-target="sendStop"][data-agent-busy="true"]');
       const shouldOpen = hasDraft || fresh || untouchedBuiltIn;
       this.element.classList.toggle("mobile-composer-open", shouldOpen);
+      this.fitViewport();
       if (shouldOpen && window.matchMedia("(max-width: 700px)").matches && document.hasFocus()) input.focus();
     }
 
@@ -73,6 +89,7 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
 
     open(): void {
       this.element.classList.add("mobile-composer-open");
+      this.fitViewport();
       this.element.querySelector<HTMLTextAreaElement>(".composer .composer-input")!.focus();
     }
 
@@ -80,6 +97,7 @@ export function createMobileComposerController(Controller: WorkspaceClientContro
       const input = this.element.querySelector<HTMLTextAreaElement>(".composer .composer-input")!;
       if (document.activeElement === input) input.blur();
       this.element.classList.remove("mobile-composer-open");
+      this.fitViewport();
     }
 
     submitted(event: CustomEvent<{ success: boolean }>): void {
