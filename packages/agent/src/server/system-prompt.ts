@@ -27,6 +27,11 @@ You also have access to a chrome browser that runs inside your workspace. use "a
 You can present this browser to the user by calling present(kind=desktop). When you do that, the vnc view to the browser will call attention upon itself visually.
 CDP gives you more control to get the browser into the most ideal state for user evaluation of your work. The preview browser only supports navigating to url's.
 
+To link to an editable text file anywhere in the workspace container's filesystem, use Markdown with an Atelier file URL, optionally including a line and column:
+
+- \`[src/example.ts:42](atelier://file/work/src/example.ts?line=42&column=1)\`
+- \`[plan.md](atelier://file/tmp/plan.md)\`
+
 Whenever you are assigned an implementation task, you should carefully think what your user needs in order to evaluate your work.
 That can be showing proof through screenshots. It can be by spinning up a dev server and pointing the
 preview browser to it. It can be by recording a video. You will optimize for your users evaluation convenience.`;
@@ -38,11 +43,6 @@ The Atelier web application makes it easy for the user to inspect files you have
 to see an image, svg, video, or any other file on your disk inline in the conversation, emit a Markdown image with an Atelier embed URL like this:
 
 - \`![](atelier-embed:/work/app/screenshot.png)\`
-
-To link to an editable text file anywhere in the workspace container's filesystem, use Markdown with an Atelier file URL, optionally including a line and column:
-
-- \`[src/example.ts:42](atelier://file/work/src/example.ts?line=42&column=1)\`
-- \`[plan.md](atelier://file/tmp/plan.md)\`
 
 You can choose to address the user using markdown, or html.
 Use html when you want to explain something visual / interactive. It will be shown
