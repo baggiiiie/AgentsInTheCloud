@@ -39,6 +39,20 @@ test("one context supports local reuse, missing-image rebuild and publication id
   } finally { await context.dispose(); }
 });
 
+// Claude Code is already a background workspace tab in Atelier. Keep its work in the
+// foreground so a completed turn leaves a result the user can actually inspect.
+test("new shared homes default Claude background tasks off through editable user settings", async () => {
+  const context = await prepareDefaultWorkspaceImage();
+  try {
+    const dockerfile = await Bun.file(context.dockerfile).text();
+    expect(dockerfile).toContain('COPY "files/base/rootfs/opt/atelier/home-defaults/.claude/settings.json" "/opt/atelier/home-defaults/.claude/settings.json"');
+    expect(dockerfile).toContain('RUN chmod "0600" "/opt/atelier/home-defaults/.claude/settings.json"');
+    expect(JSON.parse(await Bun.file(context.dockerfile.replace(/Dockerfile$/, "files/base/rootfs/opt/atelier/home-defaults/.claude/settings.json")).text())).toEqual({
+      env: { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1" },
+    });
+  } finally { await context.dispose(); }
+});
+
 test("every default image build checks home against the original base skeleton", async () => {
   const context = await prepareDefaultWorkspaceImage();
   try {

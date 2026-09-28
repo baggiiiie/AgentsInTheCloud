@@ -63,6 +63,12 @@
   ],
   "files": [
     {
+      "from": "rootfs/opt/atelier/home-defaults/.claude/settings.json",
+      "to": "/opt/atelier/home-defaults/.claude/settings.json",
+      "mode": "0600",
+      "afterRun": true
+    },
+    {
       "from": "rootfs/usr/local/bin/chromium",
       "to": "/usr/local/bin/chromium",
       "mode": "0755",
