@@ -25,4 +25,6 @@
 @media (max-width:700px) {
   .cli-agent-body .cli-agent-composer .composer-input { min-height:max(var(--composer-controls-min-height), calc(1.5em * 4 + 30px)); }
   .cli-agent-body.cli-raw-mode .cli-agent-composer, .cli-agent-body.cli-raw-mode .mobile-composer-opener { display:none; }
+  /* Typing goes straight to the terminal while it has focus, so the opener would only cover it. */
+  .cli-agent-body:has(> .observable-terminal-host:focus-within) > .mobile-composer-opener { display:none; }
 }
