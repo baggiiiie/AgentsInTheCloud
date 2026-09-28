@@ -1,7 +1,6 @@
-import { workspaceAgentSelectionEvent } from "@atelier/shared";
 /// <reference lib="dom" />
 
-import { phoneLayoutMediaQuery, type WorkspaceClientApplication, type WorkspaceClientControllerConstructor, type WorkspaceClientSurfaceVisibilityContext } from "@atelier/shared";
+import { focusLikelyOpensSoftwareKeyboard, phoneLayoutMediaQuery, workspaceAgentSelectionEvent, type WorkspaceClientApplication, type WorkspaceClientControllerConstructor, type WorkspaceClientSurfaceVisibilityContext } from "@atelier/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { prepareLiveSurface, selectLiveSurface } from "./live-surface.ts";
@@ -189,6 +188,15 @@ export function createWorkspacePresentationController(
 
     selectedAgentId(): string | undefined {
       return this.state.activeAgentId;
+    }
+
+    focusSelectedAgent(): void {
+      if (!document.hasFocus() || focusLikelyOpensSoftwareKeyboard()) return;
+      const pane = this.visiblePanes().find(item => item.dataset.workspacePaneRole === "agent");
+      if (!pane) return;
+      const cli = pane.querySelector<HTMLElement>("[data-controller~='cli-terminal']");
+      if (cli) cli.dispatchEvent(new Event("atelier:workspace-agent-focus"));
+      else pane.querySelector<HTMLTextAreaElement>(".agent-pane .composer-input")?.focus({ preventScroll: true });
     }
 
     selectWorkView(event: Event): void {

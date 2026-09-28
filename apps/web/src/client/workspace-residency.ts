@@ -70,7 +70,12 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     const presentation = resident.querySelector<HTMLElement>("[data-controller~='workspace-presentation']");
     presentation?.dispatchEvent(new CustomEvent("atelier:workspace-residency-visible", { detail: { selectedFromList: this.selectedFromList } }));
     this.selectedFromList = false;
-    if (presentation) await controllerForElement<{ prepareIntendedSurfaces(): Promise<void> }>(presentation, "workspace-presentation")?.prepareIntendedSurfaces();
+    if (presentation) {
+      const controller = controllerForElement<{ prepareIntendedSurfaces(): Promise<void>; focusSelectedAgent(): void }>(presentation, "workspace-presentation");
+      await controller?.prepareIntendedSurfaces();
+      if (selection !== this.selection) return;
+      controller?.focusSelectedAgent();
+    }
     this.changed();
     this.reportVisibility();
 

@@ -265,6 +265,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       retry(): void {
         this.viewer!.reconnect();
       }
+      focus(): void { this.viewer?.focus(); }
       refresh(): void { this.viewer?.refresh(); }
       theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
     });
