@@ -1,11 +1,10 @@
 interface TranscriptGeometry {
   viewport: number;
-  contentHeight: number;
   contentStart: number;
   contentEnd: number;
   bottomPadding: number;
-  room: number;
   threshold: number;
+  followThreshold: number;
   latestTop: number;
 }
 
@@ -30,12 +29,15 @@ export class TranscriptNavigation {
   private selectionAwaitingSnapshot = false;
   private touch?: { x: number; y: number };
   private readonly resizeObserver: ResizeObserver;
+  private readonly composerOpener: HTMLElement | null;
 
   constructor(private readonly transcript: HTMLElement, private readonly content: HTMLElement, private readonly latestButton: HTMLElement, composer: HTMLElement) {
+    this.composerOpener = transcript.parentElement!.querySelector<HTMLElement>(".mobile-composer-opener > button");
     this.resizeObserver = new ResizeObserver(this.layoutChanged);
     this.resizeObserver.observe(transcript);
     this.resizeObserver.observe(composer);
     this.resizeObserver.observe(content);
+    if (this.composerOpener) this.resizeObserver.observe(this.composerOpener);
     transcript.addEventListener("scroll", this.scrolled);
     transcript.addEventListener("wheel", this.wheel, { capture: true, passive: true });
     transcript.addEventListener("touchstart", this.touchStarted, { passive: true });
@@ -116,22 +118,26 @@ export class TranscriptNavigation {
     const contentBounds = this.content.getBoundingClientRect();
     const contentStart = contentBounds.top - this.transcript.getBoundingClientRect().top + this.transcript.scrollTop;
     const bottomPadding = Number.parseFloat(getComputedStyle(this.transcript).paddingBottom);
-    const room = this.streaming ? Math.min(160, viewport * 0.25) : bottomPadding;
+    const openerBounds = this.composerOpener?.getBoundingClientRect();
+    // In mobile reading mode the opener overlays the transcript. Follow just
+    // above it, without changing the transcript's scrollable reading area.
+    const openerRoom = openerBounds?.height
+      ? Math.max(0, this.transcript.getBoundingClientRect().bottom - openerBounds.top + 8)
+      : 0;
+    const room = openerRoom || (this.streaming ? Math.min(160, viewport * 0.25) : bottomPadding);
     const contentEnd = contentStart + contentBounds.height;
-    return { viewport, contentHeight: contentBounds.height, contentStart, contentEnd, bottomPadding, room,
-      threshold: Math.min(32, room * 0.25), latestTop: Math.max(0, contentEnd - viewport + room) };
+    const threshold = Math.min(32, room * 0.25);
+    return { viewport, contentStart, contentEnd, bottomPadding,
+      threshold, followThreshold: openerRoom ? room - 4 : threshold,
+      latestTop: Math.max(0, contentEnd - viewport + room) };
   }
 
   private reserve(geometry: TranscriptGeometry): void {
-    // Reserve only streaming headroom and space actually needed by the viewport
-    // or a reconciled glide. Never retain a historical content-height maximum.
-    // When idle/paused, excess space drains as soon as the reader scrolls back;
-    // keeping the current viewport avoids clamping it during a contraction.
-    const { viewport, contentStart, contentHeight, bottomPadding, room } = geometry;
-    const protectedTop = Math.max(this.transcript.scrollTop, this.motionFrame ? this.motionTarget : 0);
-    const floor = Math.ceil(Math.max(0,
-      protectedTop + viewport - contentStart - bottomPadding,
-      this.streaming && this.following ? contentHeight + room : 0));
+    // Reserve enough to reach the visible content's follow destination, not
+    // the current scrollTop: using scrollTop here lets scrolling into the
+    // reserve grow the reserve again, with no effective end to the transcript.
+    const { viewport, contentStart, bottomPadding, latestTop } = geometry;
+    const floor = Math.ceil(Math.max(0, latestTop + viewport - contentStart - bottomPadding));
     if (floor === this.floor) return;
     this.floor = floor;
     this.transcript.style.setProperty("--agent-follow-floor", `${floor}px`);
@@ -199,10 +205,11 @@ export class TranscriptNavigation {
         this.transcript.scrollTop = geometry.latestTop;
       } else if (this.following) {
         // Follow visible content, not scrollHeight (which includes our reserve).
-        // Hysteresis lets several new lines use the room before another scroll.
+        // Keep the opener's 8px clearance as new content arrives; elsewhere
+        // retain the larger streaming hysteresis before another scroll.
         const plannedTop = this.motionFrame ? Math.max(this.transcript.scrollTop, this.motionTarget) : this.transcript.scrollTop;
         const contentAboveViewport = geometry.contentEnd < this.transcript.scrollTop + geometry.threshold;
-        if (this.pendingPosition || contentAboveViewport || geometry.contentEnd > plannedTop + geometry.viewport - geometry.threshold) {
+        if (this.pendingPosition || contentAboveViewport || geometry.contentEnd > plannedTop + geometry.viewport - geometry.followThreshold) {
           this.moveTo(geometry.latestTop, this.pendingPosition === "instant");
           this.pendingPosition = undefined;
         }
