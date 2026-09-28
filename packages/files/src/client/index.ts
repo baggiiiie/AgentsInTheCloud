@@ -258,6 +258,12 @@ function createFilesViewController(Controller: WorkspaceClientControllerConstruc
       // Submit the current filter into its Turbo Frame; never replace the editor.
       this.element.querySelector<HTMLFormElement>(".files-filter")?.requestSubmit();
       this.element.querySelector<HTMLElement>('[data-controller="file-editor"]')?.dispatchEvent(new Event("atelier:file-editor-refresh"));
+      const image = this.element.querySelector<HTMLImageElement>(".file-image-preview img");
+      if (image) {
+        const url = new URL(image.src);
+        url.searchParams.set("refresh", String(Date.now()));
+        image.src = url.href;
+      }
     }
 
     expand(): void {

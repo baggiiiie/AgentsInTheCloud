@@ -1,52 +1,33 @@
 import { afterAll, afterEach, expect, spyOn, test } from "bun:test";
 import * as files from "@atelier/files/server";
-import * as vscode from "@atelier/vscode/server";
 import { createTestApp } from "./support/test-web-app.ts";
 
-const listVSCode = spyOn(vscode, "listWorkspaceVSCodeViews");
-const openVSCode = spyOn(vscode, "openFileInVSCode");
 const openFiles = spyOn(files, "openFileInFiles");
 
-afterEach(() => {
-  listVSCode.mockReset();
-  openVSCode.mockReset();
-  openFiles.mockReset();
-});
-afterAll(() => {
-  listVSCode.mockRestore();
-  openVSCode.mockRestore();
-  openFiles.mockRestore();
-});
+afterEach(() => openFiles.mockReset());
+afterAll(() => openFiles.mockRestore());
 
-test("neutral file links prefer the workspace's existing VS Code", async () => {
-  listVSCode.mockReturnValue([{ title: "VS Code" }]);
-  openVSCode.mockResolvedValue(new Response(null, { status: 204 }));
+test("agent file links open in Files", async () => {
+  openFiles.mockResolvedValue(new Response(null, { status: 204 }));
   const { app } = createTestApp();
   const response = await app.fetch(new Request("http://localhost/workspaces/navigation/file/open?path=src/example.ts&line=42&column=3"));
   expect(response.status).toBe(204);
-  expect(listVSCode).toHaveBeenCalledWith("navigation");
-  expect(openVSCode).toHaveBeenCalledWith("navigation", "VS Code", { path: "/work/src/example.ts", line: 42, column: 3 }, expect.any(Function));
-  expect(openFiles).not.toHaveBeenCalled();
+  expect(openFiles).toHaveBeenCalledWith("navigation", { path: "/work/src/example.ts", line: 42, column: 3 }, expect.any(Function));
 });
 
-test("neutral file links use Files when no VS Code is open", async () => {
-  listVSCode.mockReturnValue([]);
+test("neutral file links use Files for paths outside the workspace too", async () => {
   openFiles.mockResolvedValue(new Response(null, { status: 204 }));
   const { app } = createTestApp();
-  const response = await app.fetch(new Request("http://localhost/workspaces/navigation/file/open?path=/tmp/example.ts&line=2"));
+  const response = await app.fetch(new Request("http://localhost/workspaces/navigation/file/open?path=/tmp/example.png"));
   expect(response.status).toBe(204);
-  expect(openFiles).toHaveBeenCalledWith("navigation", { path: "/tmp/example.ts", line: 2, column: undefined }, expect.any(Function));
-  expect(openVSCode).not.toHaveBeenCalled();
+  expect(openFiles).toHaveBeenCalledWith("navigation", { path: "/tmp/example.png", line: undefined, column: undefined }, expect.any(Function));
 });
 
-test("explicit Files navigation never consults VS Code", async () => {
-  listVSCode.mockReturnValue([{ title: "VS Code" }]);
+test("explicit Files navigation opens in Files", async () => {
   openFiles.mockResolvedValue(new Response(null, { status: 204 }));
   const { app } = createTestApp();
   const response = await app.fetch(new Request("http://localhost/workspaces/navigation/files-view/open?path=/work/example.ts&filesView=workspace"));
   expect(response.ok).toBe(true);
-  expect(listVSCode).not.toHaveBeenCalled();
-  expect(openVSCode).not.toHaveBeenCalled();
 });
 
 test("neutral navigation rejects missing paths and unsupported methods before choosing an editor", async () => {
@@ -56,7 +37,5 @@ test("neutral navigation rejects missing paths and unsupported methods before ch
   const post = await app.fetch(new Request("http://localhost/workspaces/navigation/file/open?path=/work/example.ts", { method: "POST" }));
   expect(post.status).toBe(405);
   expect(post.headers.get("allow")).toBe("GET");
-  expect(listVSCode).not.toHaveBeenCalled();
   expect(openFiles).not.toHaveBeenCalled();
-  expect(openVSCode).not.toHaveBeenCalled();
 });

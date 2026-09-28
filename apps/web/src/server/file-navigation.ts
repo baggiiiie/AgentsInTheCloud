@@ -2,7 +2,6 @@ import { posix } from "node:path";
 import { invalidArguments } from "@atelier/core";
 import { openFileInFiles } from "@atelier/files/server";
 import type { WorkspaceFileTarget, WorkspaceModuleRouteContext } from "@atelier/shared";
-import { listWorkspaceVSCodeViews, openFileInVSCode } from "@atelier/vscode/server";
 import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
 
 export async function openWorkspaceFile(workspaceId: string, target: WorkspaceFileTarget, openWorkView: WorkspaceModuleRouteContext["openWorkView"], requireExisting = false): Promise<Response> {
@@ -15,8 +14,5 @@ export async function openWorkspaceFile(workspaceId: string, target: WorkspaceFi
     if (result.exitCode !== 0) return new Response(null, { status: 204 });
   }
   const resolvedTarget = { ...target, path };
-  const vscode = listWorkspaceVSCodeViews(workspaceId)[0];
-  return vscode
-    ? openFileInVSCode(workspaceId, vscode.title, resolvedTarget, openWorkView)
-    : openFileInFiles(workspaceId, resolvedTarget, openWorkView);
+  return openFileInFiles(workspaceId, resolvedTarget, openWorkView);
 }

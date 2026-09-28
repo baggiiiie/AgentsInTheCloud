@@ -11,6 +11,8 @@
 .file-editor-status.is-saving { color: var(--warning); }
 .file-editor-status.is-saved { color: var(--success); }
 .file-editor-host { position: relative; min-height: 0; overflow: hidden; }
+.file-image-preview { display: grid; min-height: 0; overflow: auto; place-items: center; padding: 24px; background: var(--bg); }
+.file-image-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
 .file-editor-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); }
 .file-editor-loading.is-error { color: var(--danger); }
 .file-editor-loading.is-error .status-spinner { display: none; }

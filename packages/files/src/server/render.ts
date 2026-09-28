@@ -11,6 +11,7 @@ import { workspaceRoot } from "@atelier/workspace";
 import { posix } from "node:path";
 import type { FileEntry } from "./files.ts";
 import { defaultFilesViewId, filesDiskGeneration, filesNavigationRequest, type FilesView } from "./state.ts";
+import { isImageFile } from "./image-file.ts";
 
 function filesTreeFrameId(workspaceId: string, viewId: string): string {
   return domId("workspace", workspaceId, "files", viewId, "tree");
@@ -63,7 +64,7 @@ function directoryToggleUrl(workspaceId: string, viewId: string, path: string, e
   return `/workspaces/${encodeURIComponent(workspaceId)}/files?${query}`;
 }
 
-function selectedFileActions(workspaceId: string, view: FilesView): string {
+function selectedFileActions(workspaceId: string, view: FilesView, text = true): string {
   const path = view.path!;
   const name = posix.basename(path);
   const contentUrl = workspaceProxyUrl(workspaceId, "file", path);
@@ -96,7 +97,7 @@ function selectedFileActions(workspaceId: string, view: FilesView): string {
     orientation: "horizontal",
     semantics: "group",
     label: "Actions for selected file",
-    itemsHtml: `${copyButton}${downloadButton}${deleteForm}`,
+    itemsHtml: `${text ? copyButton : ""}${downloadButton}${deleteForm}`,
   });
 }
 
@@ -226,6 +227,13 @@ function markdownDisplayToggle(): string {
 export function renderFilesEditorFrame(workspaceId: string, view: FilesView): string {
   const frameId = filesEditorFrameId(workspaceId, view.id);
   if (!view.path) return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane files-editor-empty"><header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path">Choose a file</span>${filesPaneToggle("expand")}</header><p>Select a file to view or edit. Drop files into the Files pane to upload, or create them in Terminal and choose Refresh.</p></section></turbo-frame>`;
+  if (isImageFile(view.path)) {
+    const imageUrl = workspaceProxyUrl(workspaceId, "file", view.path);
+    return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane">
+      <header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path" title="${escapeHtml(view.path)}">${escapeHtml(view.path)}</span><span class="file-editor-toolbar-actions">${refreshButton()}${selectedFileActions(workspaceId, view, false)}${filesPaneToggle("expand")}</span></header>
+      <div class="file-image-preview"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(posix.basename(view.path))}"></div>
+    </section></turbo-frame>`;
+  }
   const contentUrl = `/workspaces/${encodeURIComponent(workspaceId)}/files-view/content?${new URLSearchParams({ path: view.path })}`;
   const markdown = /\.(?:md|markdown)$/i.test(view.path);
   const editorId = `${frameId}_${Bun.hash(view.path).toString(16)}`;
