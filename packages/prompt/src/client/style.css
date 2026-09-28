@@ -63,7 +63,7 @@
     display: flex; position: absolute; z-index: 3; bottom: 12px; left: 0; right: 0;
     justify-content: center; pointer-events: none;
   }
-  .mobile-composer-opener > button { pointer-events: auto; box-shadow: var(--shadow); }
+  .mobile-composer-opener > button { --button-background: var(--panel); pointer-events: auto; box-shadow: var(--shadow); }
   /* Match the workspace bar's 4px outer padding for the four right-side actions. */
   .mobile-composer-pane .composer-input-controls, .mobile-composer-pane .composer-actions { right: 4px; }
   .mobile-composer-pane.mobile-composer-open [data-mobile-composer-close] { display: inline-flex; }
