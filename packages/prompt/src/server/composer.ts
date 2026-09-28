@@ -26,10 +26,10 @@ export function renderComposerBody(options: {
 }
 
 export function renderOpenComposerButton(): string {
-  return `<div class="mobile-composer-opener">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Open Composer" }, attributesHtml: 'data-action="mobile-composer#open"' })}</div>`;
+  return `<div class="mobile-composer-opener">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Keyboard, label: "Open composer" }, attributesHtml: 'data-popular-button data-action="mobile-composer#open"' })}</div>`;
 }
 
-export function composerAttachmentAttributes(draftId: string, rowId: string, focus = true): string {
+export function composerAttachmentAttributes(draftId: string, rowId: string, focus = true, actions = ""): string {
   const uploadUrl = `/agent-attachment-drafts/${encodeURIComponent(draftId)}/attachments?row=${encodeURIComponent(rowId)}`;
-  return `data-agent-attachments-upload-url-value="${escapeHtml(uploadUrl)}" data-action="${focus ? "mousedown->composer-focus#preserveInputFocus " : ""}dragover->agent-attachments#dragOver dragleave->agent-attachments#dragLeave drop->agent-attachments#drop"`;
+  return `data-agent-attachments-upload-url-value="${escapeHtml(uploadUrl)}" data-action="${actions} ${focus ? "mousedown->composer-focus#preserveInputFocus " : ""}dragover->agent-attachments#dragOver dragleave->agent-attachments#dragLeave drop->agent-attachments#drop"`;
 }

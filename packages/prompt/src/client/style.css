@@ -54,20 +54,21 @@
   .composer-surface { --composer-footer-height: 52px; }
 }
 @media (max-width: 700px) { .composer-input { font-size: 16px; } }
-/* Mobile reading mode keeps the opener over the scrolling transcript, while the
+/* Reading mode keeps the opener over the scrolling transcript, while the
    expanded composer participates in layout and gives the transcript its own space. */
 .mobile-composer-opener, [data-mobile-composer-close] { display: none; }
+.mobile-composer-pane:not(.mobile-composer-open) > .composer { display: none; }
+.mobile-composer-pane:not(.mobile-composer-open) > .mobile-composer-opener {
+  display: flex; position: absolute; z-index: 3; bottom: 12px; right: 10px;
+  justify-content: flex-end; pointer-events: none;
+}
+.mobile-composer-opener > button { --button-background: var(--panel); pointer-events: auto; }
+.mobile-composer-pane.mobile-composer-open [data-mobile-composer-close] { display: inline-flex; }
+.mobile-composer-pane.mobile-composer-open:not(.agent-pane) > .composer { --composer-controls-min-height: calc(4 * var(--composer-control-size) + 3 * var(--composer-control-inset) + 12px); }
 @media (max-width: 700px) {
-  .mobile-composer-pane:not(.mobile-composer-open) > .composer { display: none; }
-  .mobile-composer-pane:not(.mobile-composer-open) > .mobile-composer-opener {
-    display: flex; position: absolute; z-index: 3; bottom: 12px; left: 0; right: 0;
-    justify-content: center; pointer-events: none;
-  }
-  .mobile-composer-opener > button { --button-background: var(--panel); pointer-events: auto; }
+  .mobile-composer-pane:not(.mobile-composer-open) > .mobile-composer-opener { right: 4px; }
   /* Match the workspace bar's 4px outer padding for the four right-side actions. */
   .mobile-composer-pane .composer-input-controls, .mobile-composer-pane .composer-actions { right: 4px; }
-  .mobile-composer-pane.mobile-composer-open [data-mobile-composer-close] { display: inline-flex; }
-  .mobile-composer-pane.mobile-composer-open > .composer { --composer-controls-min-height: calc(4 * var(--composer-control-size) + 3 * var(--composer-control-inset) + 12px); }
 }
 /* The shell owns the visual viewport. Keep the normal vertical controls in
    both agent kinds, with a bounded, scrollable editor and no typing footer. */

@@ -68,6 +68,9 @@ export function createAgentAttachmentsController(Controller: StimulusControllerC
       if (!dragHasFiles(event)) return;
       event.preventDefault();
       event.stopPropagation();
+      if (!this.element.classList.contains("agent-dropping")) {
+        this.element.dispatchEvent(new CustomEvent("agent-attachments:files", { bubbles: true }));
+      }
       this.element.classList.add("agent-dropping");
     }
 
@@ -83,6 +86,7 @@ export function createAgentAttachmentsController(Controller: StimulusControllerC
       if (!files || files.length === 0) return;
       event.preventDefault();
       event.stopPropagation();
+      this.element.dispatchEvent(new CustomEvent("agent-attachments:files", { bubbles: true }));
       for (const file of Array.from(files)) this.upload(file);
     }
 
