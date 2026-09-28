@@ -61,7 +61,7 @@ test("every default image build checks home against the original base skeleton",
     const check = dockerfile.indexOf("RUN diff -r --no-dereference /opt/atelier/home-defaults /home/atelier");
     expect(snapshot).toBeGreaterThan(0);
     expect(snapshot).toBeLessThan(dockerfile.indexOf("# Module: base"));
-    expect(check).toBeGreaterThan(dockerfile.lastIndexOf("COPY "));
     expect(check).toBeGreaterThan(dockerfile.lastIndexOf("# Module:"));
+    expect(check).toBeLessThan(dockerfile.indexOf("# Files independent of module setup"));
   } finally { await context.dispose(); }
 });

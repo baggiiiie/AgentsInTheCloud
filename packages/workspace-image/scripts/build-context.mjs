@@ -109,6 +109,8 @@ for (const module of modules) {
   appendCopies(module.copyInstructions);
   for (const script of module.runInstructions) dockerfile += `RUN ${dockerEscapeRun(script)}\n\n`;
 }
+// Module installation must not change the original home. Template-only defaults are copied later.
+dockerfile += `RUN diff -r --no-dereference /opt/atelier/home-defaults /home/atelier\n`;
 if (finalCopies.length) dockerfile += "# Files independent of module setup\n";
 appendCopies(finalCopies);
 if (Object.keys(env).length) dockerfile += `ENV ${Object.entries(env).map(([key, value]) => `${key}=${quote(value)}`).join(" \\\n    ")}\n\n`;
@@ -122,7 +124,6 @@ dockerfile += `RUN python3 -c 'import json; p="/etc/docker/daemon.json"; c=json.
 dockerfile += `RUN mkdir -p /.atelier && printf "systemctl start atelier-tmux.service\\n" > /.atelier/init.sh\n`;
 // binfmt registrations belong to the host kernel; workspace shutdown must not unregister them.
 dockerfile += `RUN systemctl mask systemd-binfmt.service\n`;
-dockerfile += `RUN diff -r --no-dereference /opt/atelier/home-defaults /home/atelier\n`;
 dockerfile += `ENTRYPOINT ["/usr/local/bin/atelier-workspace-init"]\nCMD []\nWORKDIR /work\n`;
 await writeFile(join(outDir, "Dockerfile"), dockerfile);
 // Identity covers the Docker build context, including generated instructions,
