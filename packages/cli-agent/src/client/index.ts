@@ -198,7 +198,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           status.hidden = true;
           this.viewer.pressEnter();
           setTextInputValue(this.inputTarget, "");
-          this.element.dispatchEvent(new Event("agent-composer:sent"));
+          this.sent();
           return;
         }
         const draftText = this.inputTarget.value;
@@ -217,7 +217,7 @@ export const atelierClientModule: WorkspaceClientModule = {
               if (sentIds.includes(chip.querySelector<HTMLInputElement>('input[name="attachment"]')!.value)) chip.remove();
             }
           }
-          this.element.dispatchEvent(new Event("agent-composer:sent"));
+          this.sent();
         } catch (error) { showError(error instanceof Error ? error.message : String(error)); }
         finally { this.sending = false; }
       }
@@ -231,10 +231,14 @@ export const atelierClientModule: WorkspaceClientModule = {
         status.hidden = true;
         try {
           await this.deliver(data);
-          this.element.dispatchEvent(new Event("agent-composer:sent"));
+          this.sent();
         }
         catch (error) { status.textContent = error instanceof Error ? error.message : String(error); status.hidden = false; }
         finally { this.sending = false; }
+      }
+      private sent(): void {
+        this.showTerminal();
+        this.element.dispatchEvent(new Event("agent-composer:sent"));
       }
       // Returns false when the server handled the prompt itself without terminal input.
       private async deliver(data: FormData): Promise<boolean> {
