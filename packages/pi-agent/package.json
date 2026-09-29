@@ -6,6 +6,7 @@
     "./server": "./src/server/index.ts"
   },
   "dependencies": {
+    "@atelier/agent": "workspace:*",
     "@atelier/core": "workspace:*",
     "@atelier/llm": "workspace:*",
     "@atelier/shared": "workspace:*",

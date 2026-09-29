@@ -241,6 +241,7 @@
     "packages/pi-agent": {
       "name": "@atelier/pi-agent",
       "dependencies": {
+        "@atelier/agent": "workspace:*",
         "@atelier/cli-agent": "workspace:*",
         "@atelier/core": "workspace:*",
         "@atelier/llm": "workspace:*",
