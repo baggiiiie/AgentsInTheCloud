@@ -221,7 +221,7 @@ async function refreshConnectedProviderCatalogue(runtime: ModelRuntime, provider
 
 function forgetSubscriptionState(provider: string): void {
   if (provider === "anthropic") anthropicUsageSource.forget();
-  if (provider === "anthropic" || provider === "openai-codex") forgetSubscriptionInference(provider);
+  if (provider === "anthropic" || provider === "openai") forgetSubscriptionInference(provider);
 }
 
 export async function loginPiOAuthProvider(providerId: string, interaction: AuthInteraction): Promise<void> {
@@ -229,7 +229,7 @@ export async function loginPiOAuthProvider(providerId: string, interaction: Auth
   const deviceId = await piDeviceId();
   await runtime.login(providerId, "oauth", interaction, { getDeviceId: () => deviceId });
   forgetSubscriptionState(providerId);
-  if (providerId === "openai-codex" || providerId === "anthropic") await syncSubscriptionClis(runtime);
+  if (providerId === "openai" || providerId === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, providerId, interaction.signal);
 }
 
@@ -256,14 +256,14 @@ export async function connectModelProviderApiKey(provider: string, key: string, 
     notify: () => {},
   });
   forgetSubscriptionState(provider);
-  if (provider === "openai-codex" || provider === "anthropic") await syncSubscriptionClis(runtime);
+  if (provider === "openai" || provider === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, provider);
 }
 export async function disconnectModelProvider(provider: string): Promise<void> {
   const runtime = await createPiModelRuntime();
   await runtime.logout(provider);
   forgetSubscriptionState(provider);
-  if (provider === "openai-codex" || provider === "anthropic") await syncSubscriptionClis(runtime);
+  if (provider === "openai" || provider === "anthropic") await syncSubscriptionClis(runtime);
   await updateModelSettings((settings) => {
     settings.picker = (settings.picker ?? []).filter((model) => model.provider !== provider);
   });

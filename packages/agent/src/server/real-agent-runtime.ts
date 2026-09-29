@@ -361,9 +361,9 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         }
         if (message?.role === "toolResult") setTimeout(() => this.syncLiveToolResult(message.toolCallId), 0);
         if (message?.role === "assistant") {
-          if (message.stopReason !== "error" && message.stopReason !== "aborted" && message.provider === "openai-codex") {
-            const auth = await this.session.modelRuntime.getAuth("openai-codex");
-            if (auth?.source === "OAuth") recordSubscriptionInference("openai-codex");
+          if (message.stopReason !== "error" && message.stopReason !== "aborted" && message.provider === "openai") {
+            const auth = await this.session.modelRuntime.getAuth("openai");
+            if (auth?.source === "OAuth") recordSubscriptionInference("openai");
           }
           this.turnTiming?.inferenceEnd(performance.now(), message.usage?.output);
           if (message.stopReason !== "aborted" && message.stopReason !== "error") this.terminalOutcome = "completed";

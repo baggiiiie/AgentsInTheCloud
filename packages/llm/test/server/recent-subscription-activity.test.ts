@@ -12,15 +12,15 @@ function window(usedPercent: number, elapsedPercent: number) {
 test("always uses the 30 minutes before the last inference", () => {
   const at = now.getTime();
   forgetSubscriptionInference("anthropic");
-  forgetSubscriptionInference("openai-codex");
+  forgetSubscriptionInference("openai");
   expect(providersInLastInferenceWindow()).toEqual([]);
   recordSubscriptionInference("anthropic", at - 50 * 60_000);
-  recordSubscriptionInference("openai-codex", at - 25 * 60_000);
-  expect(providersInLastInferenceWindow()).toEqual(["anthropic", "openai-codex"]);
-  recordSubscriptionInference("openai-codex", at);
-  expect(providersInLastInferenceWindow()).toEqual(["openai-codex"]);
+  recordSubscriptionInference("openai", at - 25 * 60_000);
+  expect(providersInLastInferenceWindow()).toEqual(["anthropic", "openai"]);
+  recordSubscriptionInference("openai", at);
+  expect(providersInLastInferenceWindow()).toEqual(["openai"]);
   forgetSubscriptionInference("anthropic");
-  forgetSubscriptionInference("openai-codex");
+  forgetSubscriptionInference("openai");
 });
 
 test("selects the subscription furthest ahead of pace, not the highest raw usage", () => {

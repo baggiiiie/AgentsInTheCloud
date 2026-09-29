@@ -18,19 +18,21 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     if (auth?.source !== "OAuth" || !auth.auth.apiKey) throw new Error(`Connect a ${provider} subscription in Atelier to use this CLI.`);
     return auth.auth.apiKey;
   }
-  async function usesConnectedSubscription(request: Request, provider: "anthropic" | "openai-codex"): Promise<boolean> {
+  async function usesConnectedSubscription(request: Request, provider: "anthropic" | "openai"): Promise<boolean> {
     const auth = await (await getRuntime()).getAuth(provider);
     return auth?.source === "OAuth" && !!auth.auth.apiKey && request.headers.get("authorization") === `Bearer ${auth.auth.apiKey}`;
   }
   registerWorkspaceResponseTransform("codex-accounts-check", async (response, request) => {
     if (new URL(request.url).hostname !== "chatgpt.com" || !["/api/codex/accounts/check", "/backend-api/wham/accounts/check"].includes(new URL(request.url).pathname) || !response.ok) return response;
-    const accountId = codexAccountId(await subscriptionToken("openai-codex"));
+    const accountId = codexAccountId(await subscriptionToken("openai"));
     return maskCodexAccountDiscovery(response, accountId);
   });
   registerWorkspaceResponseTransform("codex-subscription-activity", async (response, request) => {
     const url = new URL(request.url);
-    if (url.hostname !== "chatgpt.com" || !/^\/(?:backend-api|api)\/codex\/responses(?:\/|$)/.test(url.pathname) || request.method !== "POST" || !response.ok) return response;
-    if (await usesConnectedSubscription(request, "openai-codex")) recordSubscriptionInference("openai-codex");
+    const inference = (url.hostname === "chatgpt.com" && /^\/(?:backend-api|api)\/codex\/responses(?:\/|$)/.test(url.pathname))
+      || (url.hostname === "api.openai.com" && url.pathname === "/v1/responses");
+    if (!inference || request.method !== "POST" || !response.ok) return response;
+    if (await usesConnectedSubscription(request, "openai")) recordSubscriptionInference("openai");
     return response;
   });
   // Claude Code responses carry the subscription's limits; keeping them spares the
@@ -54,9 +56,9 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     return response;
   });
   registerWorkspaceSubscriptionSecrets({
-    codexSubscription: { placeholder: codexToken, hosts: ["chatgpt.com"], value: "", resolve: () => subscriptionToken("openai-codex") },
-    codexAccount: { placeholder: codexAccount, hosts: ["chatgpt.com"], value: "", resolve: async () => {
-      const token = await subscriptionToken("openai-codex");
+    codexSubscription: { placeholder: codexToken, hosts: ["chatgpt.com", "api.openai.com"], value: "", resolve: () => subscriptionToken("openai") },
+    codexAccount: { placeholder: codexAccount, hosts: ["chatgpt.com", "api.openai.com"], value: "", resolve: async () => {
+      const token = await subscriptionToken("openai");
       return codexAccountId(token);
     } },
     anthropicSubscription: { placeholder: anthropicToken, hosts: ["api.anthropic.com"], value: "", resolve: () => subscriptionToken("anthropic") },
@@ -96,7 +98,7 @@ export function subscriptionCliFiles(): Array<{ provider: string; path: string; 
     "https://api.openai.com/auth": { chatgpt_account_id: codexAccount },
   })).toString("base64url"), "atelier"].join(".");
   return [
-    { provider: "openai-codex", path: ".codex/auth.json", marker: codexToken, content: JSON.stringify({
+    { provider: "openai", path: ".codex/auth.json", marker: codexToken, content: JSON.stringify({
       auth_mode: "chatgpt", OPENAI_API_KEY: null,
       tokens: { id_token: idToken, access_token: codexToken, refresh_token: "", account_id: codexAccount },
       last_refresh: "2099-01-01T00:00:00Z",

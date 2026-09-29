@@ -5,7 +5,7 @@ import { anthropicUsageSource } from "../../src/server/anthropic-subscription-us
 import { forgetSubscriptionInference, providersInLastInferenceWindow } from "../../src/server/recent-subscription-activity.ts";
 
 test("Codex receives ChatGPT auth, not API-key auth or refresh credentials", () => {
-  const file = subscriptionCliFiles().find((file) => file.provider === "openai-codex")!;
+  const file = subscriptionCliFiles().find((file) => file.provider === "openai")!;
   const auth = JSON.parse(file.content);
   expect(auth.auth_mode).toBe("chatgpt");
   expect(auth.OPENAI_API_KEY).toBeNull();
@@ -24,7 +24,7 @@ test("Codex routing discovery sees its placeholder as the selected account witho
     { id: "other-account" },
   ], account_ordering: ["other-account", "account-123"], default_account_id: "account-123" }), { headers: { "content-length": "200", "content-type": "application/json" } });
   const translated = await maskCodexAccountDiscovery(response, "account-123");
-  const selected = JSON.parse(subscriptionCliFiles().find(file => file.provider === "openai-codex")!.content).tokens.account_id;
+  const selected = JSON.parse(subscriptionCliFiles().find(file => file.provider === "openai")!.content).tokens.account_id;
   expect(await translated.json()).toEqual({ accounts: [
     { id: selected, workspace_backend_origin: "https://chatgpt.com", account_routing_override: "NO_CONSTRAINT" },
     { id: "other-account" },
@@ -51,7 +51,7 @@ test("workspace proxy translates Codex discovery only on ChatGPT's account endpo
 });
 
 test("proxy records only successful Codex inference using Atelier's subscription", async () => {
-  forgetSubscriptionInference("openai-codex");
+  forgetSubscriptionInference("openai");
   // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
   registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: "real-token" } }) }) as any);
   const context = await createWorkspaceSecretContext("codex-inference-test");
@@ -61,8 +61,8 @@ test("proxy records only successful Codex inference using Atelier's subscription
   await context.hooks.onResponse!(new Response("ok"), new Request(request.url, { method: "POST", headers: { authorization: "Bearer other-token" } }));
   expect(providersInLastInferenceWindow()).toEqual([]);
   await context.hooks.onResponse!(new Response("ok"), request);
-  expect(providersInLastInferenceWindow()).toContain("openai-codex");
-  forgetSubscriptionInference("openai-codex");
+  expect(providersInLastInferenceWindow()).toContain("openai");
+  forgetSubscriptionInference("openai");
 });
 
 test("invalid account discovery remains an upstream response", async () => {
@@ -109,4 +109,27 @@ test("workspace proxy records Claude Code's subscription limits only for Atelier
   expect(warn).toHaveBeenCalledWith("[usage] Anthropic returned unrecognized rate limit headers.");
   observe.mockRestore();
   warn.mockRestore();
+});
+
+test("OpenAI subscription placeholders resolve only on ChatGPT and the OpenAI API", async () => {
+  const token = `header.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "account-123" } })).toString("base64url")}.signature`;
+  // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
+  registerSubscriptionCli(async () => ({ getAuth: async (provider: string) => {
+    expect(provider).toBe("openai");
+    return { source: "OAuth", auth: { apiKey: token } };
+  } }) as any);
+  const context = await createWorkspaceSecretContext("openai-hosts-test");
+  for (const host of ["chatgpt.com", "api.openai.com"]) {
+    // SAFETY: The workspace secret context returns a rewritten Request for these matched hosts.
+    const request = await context.hooks.onRequest!(new Request(`https://${host}/v1/responses`, { headers: { authorization: "Bearer atelier-subscription-codex-access", "chatgpt-account-id": "atelier-subscription-codex-account" } })) as Request;
+    expect(request.headers.get("authorization")).toBe(`Bearer ${token}`);
+    expect(request.headers.get("chatgpt-account-id")).toBe("account-123");
+  }
+  for (const host of ["auth.openai.com", "other.openai.com", "api.openai.com.example.com"]) {
+    await expect(context.hooks.onRequest!(new Request(`https://${host}/`, { headers: { authorization: "Bearer atelier-subscription-codex-access" } }))).rejects.toThrow("not allowed for host");
+  }
+  forgetSubscriptionInference("openai");
+  await context.hooks.onResponse!(new Response("ok"), new Request("https://api.openai.com/v1/responses", { method: "POST", headers: { authorization: `Bearer ${token}` } }));
+  expect(providersInLastInferenceWindow()).toContain("openai");
+  forgetSubscriptionInference("openai");
 });

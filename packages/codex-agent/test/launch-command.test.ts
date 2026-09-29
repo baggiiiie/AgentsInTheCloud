@@ -20,7 +20,7 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="atelier"', "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false", "-c", 'cli_auth_credentials_store="file"'];
+const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="atelier"', "-c", "notice.hide_full_access_warning=true", "-c", 'cli_auth_credentials_store="file"'];
 
 test("reuses home Codex and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
@@ -73,7 +73,7 @@ test("Codex startup failure retains its exit code and diagnostics", async () => 
 
 test("passes the chosen Codex model and thinking level to the CLI", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
-  const [code, output] = await run(codexLaunchScript(empty, [], { model: "openai-codex::gpt-5.4", thinkingLevel: "high" }));
+  const [code, output] = await run(codexLaunchScript(empty, [], { model: "openai::gpt-5.4", thinkingLevel: "high" }));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--model", "gpt-5.4", "-c", 'model_reasoning_effort="high"']);
 });

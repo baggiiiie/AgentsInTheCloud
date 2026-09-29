@@ -7,7 +7,7 @@ import type { WorkspaceAgentInput } from "@atelier/shared";
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
 export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession): string {
   const prompt = [input.text, ...input.attachmentNotes].filter(Boolean).join("\n\n");
-  // Invocation-local overrides avoid trust/update prompts without changing shared config.
+  // Invocation-local overrides avoid trust prompts without changing shared config.
   // Codex splits dotted keys literally, so encode project paths in a TOML table value.
   // Config overrides also keep current Codex on its embedded server rather than a shared daemon.
   const args = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", workspaceRoot,
@@ -17,7 +17,7 @@ export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string
       "-c", `notify=${JSON.stringify(turnSignalArgv(session.turnSignalCommand, "finished"))}`,
       "-c", `hooks={UserPromptSubmit=[{hooks=[{type="command",command=${JSON.stringify(turnSignalShell(session.turnSignalCommand, "started"))}}]}]}`,
     ] : []),
-    "-c", `tui.theme=${JSON.stringify(codexThemeName)}`, "-c", "notice.hide_full_access_warning=true", "-c", "check_for_update_on_startup=false",
+    "-c", `tui.theme=${JSON.stringify(codexThemeName)}`, "-c", "notice.hide_full_access_warning=true",
     "-c", 'cli_auth_credentials_store="file"', ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["-c", `model_reasoning_effort=${JSON.stringify(settings.thinkingLevel)}`] : []),
     ...imagePaths.flatMap((path) => ["--image", path]), ...(prompt ? ["--", prompt] : [])];

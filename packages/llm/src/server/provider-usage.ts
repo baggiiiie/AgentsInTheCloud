@@ -7,12 +7,12 @@ import { cheapestProviderModel, createPiModelRuntime } from "./pi-config-models.
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 // Only providers with implemented subscription adapters appear in the overview.
-export const supportedUsageProviders = [{ id: "openai-codex", label: "OpenAI Codex" }, { id: "anthropic", label: "Anthropic" }] as const;
+export const supportedUsageProviders = [{ id: "openai", label: "OpenAI Codex" }, { id: "anthropic", label: "Anthropic" }] as const;
 export type UsageProvider = typeof supportedUsageProviders[number];
 type UsageRequest = { runtime: ModelRuntime; refresh: boolean };
 const subscriptionAdapters = {
   // Codex reports usage cheaply on every request, so it is always current.
-  "openai-codex": (token) => fetchCodexSubscriptionUsage(token),
+  "openai": (token) => fetchCodexSubscriptionUsage(token),
   anthropic: (token, { runtime, refresh }) => {
     const model = cheapestProviderModel(runtime, "anthropic");
     if (!model) throw new Error("Anthropic has no models to check subscription usage with.");
