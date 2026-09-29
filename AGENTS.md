@@ -2,6 +2,8 @@
 
 Do not write UI tests. Follow the [UI testing policy](docs/ui-testing-policy.md).
 
+To run remote iOS simulators for web/PWA work, start with `bun tools/ios-sim/cli.ts --help`.
+
 - Do not add documentation files unless explicitly requested.
 - When working on the web app, prefer server-rendered HTML over client-rendered UI.
 - Prefer Turbo Frames and Turbo Streams for webpage/server interactions whenever possible.
