@@ -17,6 +17,8 @@ To run remote iOS simulators for web/PWA work, start with `bun tools/ios-sim/cli
 - Run `bun run generate:workspace-modules` before raw TypeScript checks; otherwise missing ignored generated modules cause cascading unrelated server errors.
 - When presenting the user with the results after an implementation request, if atelier itself is the most natural place to showcase your change to the user, run atelier, show it in the preview browser, and use api's you can find in our openapi description to bring the inner atelier to a state/situation where
 - your work can immediately be evaluated, without the user having to do more manual preparation steps.
+- It’s okay to incur modest inference costs to stage and verify a real Agent session when presenting work.
+- Atelier running inside Atelier automatically receives the outer Atelier’s model-provider credentials; don’t assume it needs separate setup.
 - When controlling or staging an Atelier instance programmatically, follow [docs/automation.md](docs/automation.md).
 - Whenever modifying the user interface, use elements from the [Atelier design system catalogue](packages/design-system/README.md) whenever possible.
 

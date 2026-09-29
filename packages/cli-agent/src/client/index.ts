@@ -6,7 +6,7 @@ export const atelierClientModule: WorkspaceClientModule = {
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
       static values = { url: String, workspaceId: String };
-      static targets = ["terminal", "connectionStatus", "form", "input", "transcript"];
+      static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptEnd"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
@@ -16,6 +16,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
       declare readonly transcriptTarget: HTMLElement & { src: string };
+      declare readonly transcriptEndTarget: HTMLButtonElement;
       declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
@@ -154,8 +155,25 @@ export const atelierClientModule: WorkspaceClientModule = {
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
       showTranscript(): void {
         if (!this.hasTranscriptTarget) return;
+        this.transcriptEndTarget.hidden = true;
         this.element.classList.add("cli-transcript-mode");
         this.transcriptTarget.src = `${this.transcriptTarget.dataset.url}?opened=${Date.now()}`;
+      }
+      private transcriptEndTop(): number {
+        const transcript = this.transcriptTarget;
+        const content = transcript.querySelector<HTMLElement>(".agent-transcript-content");
+        if (!content) return 0;
+        return Math.max(0, transcript.scrollTop + content.getBoundingClientRect().bottom - transcript.getBoundingClientRect().top - transcript.clientHeight + 24);
+      }
+      transcriptLoaded(event: Event): void {
+        if (event.target !== this.transcriptTarget) return;
+        requestAnimationFrame(() => { this.transcriptTarget.scrollTop = this.transcriptEndTop(); this.transcriptScrolled(); });
+      }
+      transcriptScrolled(): void {
+        this.transcriptEndTarget.hidden = this.transcriptEndTop() - this.transcriptTarget.scrollTop <= 32;
+      }
+      scrollToTranscriptEnd(): void {
+        this.transcriptTarget.scrollTo({ top: this.transcriptEndTop(), behavior: "smooth" });
       }
       showTerminal(): void {
         this.element.classList.remove("cli-transcript-mode");
