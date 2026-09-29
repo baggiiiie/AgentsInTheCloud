@@ -58,7 +58,8 @@ printf '%s\\n' "$keys" | curl --noproxy '*' --fail --silent --show-error --max-t
   --data-urlencode "host=$host" --data-urlencode "port=$port" --data-urlencode 'keys@-' http://localhost/ssh/host-keys
 `;
     await writeFile(join(directory, "known-hosts-command"), command, { mode: 0o755 });
-    await writeFile(join(directory, "ssh_config"), `Host *\n    KnownHostsCommand /run/atelier-ssh-agent/known-hosts-command %h %p\n    UserKnownHostsFile /run/atelier-ssh-agent/known_hosts /run/atelier-ssh-agent/workspace_known_hosts ~/.ssh/known_hosts\n    StrictHostKeyChecking yes\n`);
+    // Loopback is the workspace's own container, not a server the user can verify, so keep default OpenSSH behavior there.
+    await writeFile(join(directory, "ssh_config"), `Host * !localhost !127.* !::1\n    KnownHostsCommand /run/atelier-ssh-agent/known-hosts-command %h %p\n    UserKnownHostsFile /run/atelier-ssh-agent/known_hosts /run/atelier-ssh-agent/workspace_known_hosts ~/.ssh/known_hosts\n    StrictHostKeyChecking yes\n`);
     plan.containerFiles.push({ source: join(directory, "ssh_config"), target: "/etc/ssh/ssh_config.d/atelier.conf" });
     plan.initScripts.push("chown root:root /etc/ssh/ssh_config.d/atelier.conf; chmod 644 /etc/ssh/ssh_config.d/atelier.conf");
     plan.mounts.push({ type: "bind", source: dockerHostAtelierDataPath(getAtelierRuntimeContext(), "ssh-agents", workspaceId), target: containerAgentDir, readonly: true });
