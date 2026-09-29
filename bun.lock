@@ -408,6 +408,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "@earendil-works/pi-ai@0.99.1": "patches/@earendil-works%2Fpi-ai@0.99.1.patch",
+  },
   "catalog": {
     "@earendil-works/pi-ai": "^0.99.1",
     "@earendil-works/pi-coding-agent": "^0.99.1",

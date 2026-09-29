@@ -410,14 +410,21 @@ function oauthPromptForm(flow: PendingOAuthFlow): string {
   return `<form id="${oauthRedirectFormId(flow)}" class="settings-oauth-card" method="post" action="/settings/providers/${encodeURIComponent(flow.provider)}/oauth/${encodeURIComponent(flow.id)}/prompt" data-turbo="true"><label for="${inputId}">${escapeHtml(prompt.message)}</label><input id="${inputId}" class="settings-input text-field" type="${prompt.type === "secret" ? "password" : "text"}" name="value" data-1p-ignore placeholder="${escapeHtml(prompt.placeholder ?? "")}"${prompt.type === "manual_code" || prompt.type === "secret" ? " required" : ""}></form>`;
 }
 
+/** Providers either redirect to a localhost page that won't load here, or show a code to copy on their own page. */
+function oauthRedirectsToLocalhost(flow: PendingOAuthFlow): boolean {
+  const redirect = flow.authUrl ? new URL(flow.authUrl).searchParams.get("redirect_uri") : null;
+  return !redirect || ["localhost", "127.0.0.1"].includes(new URL(redirect).hostname);
+}
+
 function oauthBrowserRedirectBody(flow: PendingOAuthFlow): string {
   const prompt = flow.prompt;
   const promptForm = oauthPromptForm(flow);
+  const localhost = oauthRedirectsToLocalhost(flow);
   return `<div class="settings-oauth-card">
-    <p>After signing in, copy the localhost URL here—even if that page won’t load.</p>
+    <p>${localhost ? "After signing in, copy the localhost URL here—even if that page won’t load." : "After signing in, copy the code shown on the page and paste it here."}</p>
     ${oauthAuthenticationAction(flow, flow.authUrl ?? "#")}
     ${promptForm}
-    ${!prompt && flow.redirectSubmitted ? oauthStatus("pending", `Waiting for ${flow.label}`, "Confirming the pasted redirect URL.") : ""}
+    ${!prompt && flow.redirectSubmitted ? oauthStatus("pending", `Waiting for ${flow.label}`, localhost ? "Confirming the pasted redirect URL." : "Confirming the pasted code.") : ""}
   </div>`;
 }
 
@@ -434,7 +441,7 @@ function renderOAuthConnectionStep(flow: PendingOAuthFlow): string {
   const submitUrlButton = buttonHtml({
     type: "submit",
     variant: "primary",
-    content: { kind: "caption", caption: flow.authUrl ? "Submit URL" : "Continue" },
+    content: { kind: "caption", caption: flow.authUrl ? oauthRedirectsToLocalhost(flow) ? "Submit URL" : "Submit code" : "Continue" },
     attributesHtml: `form="${oauthRedirectFormId(flow)}"`,
   });
   const body = flow.status === "complete"
