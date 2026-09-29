@@ -133,6 +133,12 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     }
   }
   private readonly changed = (): void => {
+    const selected = this.residentTargets.find(resident => resident.dataset.workspaceId === this.intended);
+    // Approval ends selection; container teardown can continue in the background.
+    if (this.intended && selected?.querySelector('[data-deletion-status="deleting"]')) {
+      this.unselectWorkspace(this.intended);
+      return;
+    }
     this.maintainResidents();
     this.updateRows();
   };
