@@ -99,3 +99,5 @@ export { createCliModelSettings, type CliModelSettings } from "./model-settings.
 export { cliLaunchScript, writeFileScript } from "./launch-script.ts";
 export { turnSignalArgv, turnSignalShell, type TurnBoundary } from "./turn-signal.ts";
 export { syntaxSlot, transcriptSlot } from "./transcript-palette.ts";
+export { nativeJsonlFiles } from "./history.ts";
+export { nativeJsonlRows, nativeJsonlText, nativeImageTypes, nativeImageResponse } from "./native-transcript.ts";

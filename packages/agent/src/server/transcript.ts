@@ -160,7 +160,7 @@ export function finalAssistantText(parts: ReadonlyArray<AssistantContentPart>): 
 }
 
 /** Run markers keep steering in one block; older unmarked history retains its user boundaries. */
-export function buildTranscript(records: TranscriptRecord[]): TranscriptItem[] {
+export function buildTranscript(records: TranscriptRecord[], options: { openEnded?: boolean } = {}): TranscriptItem[] {
   const items: TranscriptItem[] = [];
   const tools = new Map<string, ToolView>();
   const runStarts = new Set(records.filter((record) => record.kind === "runStart").map((record) => record.turnEntryId));
@@ -295,7 +295,7 @@ export function buildTranscript(records: TranscriptRecord[]): TranscriptItem[] {
       tone: record.tone,
     });
   }
-  stopWorking(lastTimestamp);
+  if (!options.openEnded) stopWorking(lastTimestamp);
   return items;
 }
 

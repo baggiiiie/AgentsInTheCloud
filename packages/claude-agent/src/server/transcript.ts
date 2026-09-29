@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { nativeJsonlRows, nativeJsonlText, nativeImageTypes, nativeImageResponse } from "@atelier/cli-agent/server";
 import { join } from "node:path";
 import { getAtelierRuntimeContext } from "@atelier/core";
 import type { TranscriptRecord } from "@atelier/agent/server";
@@ -25,7 +25,6 @@ const rowSchema = Type.Object({
   timestamp: Type.Optional(Type.String()), isSidechain: Type.Optional(Type.Boolean()), isMeta: Type.Optional(Type.Boolean()),
   subtype: Type.Optional(Type.String()), message: Type.Optional(messageSchema),
 });
-type ClaudeRow = Static<typeof rowSchema>;
 type ClaudeBlock = Static<typeof blockSchema>;
 
 function timestamp(value?: string): number {
@@ -45,8 +44,8 @@ function toolCall(block: ClaudeBlock): ProjectedToolCall {
 }
 function imageSources(blocks: ClaudeBlock[]): Array<Static<typeof imageSourceSchema>> {
   return blocks.flatMap((block) => {
-    if (block.type === "image" && block.source && allowedImageTypes.has(block.source.media_type)) return [block.source];
-    if (block.type === "tool_result" && Array.isArray(block.content)) return block.content.flatMap((part) => part.type === "image" && part.source && allowedImageTypes.has(part.source.media_type) ? [part.source] : []);
+    if (block.type === "image" && block.source && nativeImageTypes.has(block.source.media_type)) return [block.source];
+    if (block.type === "tool_result" && Array.isArray(block.content)) return block.content.flatMap((part) => part.type === "image" && part.source && nativeImageTypes.has(part.source.media_type) ? [part.source] : []);
     return [];
   });
 }
@@ -55,24 +54,9 @@ function resultText(value: ClaudeBlock["content"]): string {
   return value.filter((block) => block.type === "text").map((block) => block.text ?? "").filter(Boolean).join("\n");
 }
 
-function* parsedRows(jsonl: string): Generator<ClaudeRow> {
-  const lines = jsonl.split("\n");
-  for (const [index, line] of lines.entries()) {
-    if (!line.trim()) continue;
-    let parsed: unknown;
-    try { parsed = JSON.parse(line); }
-    catch (error) {
-      // A live CLI may be partway through writing its final JSONL record.
-      if (index === lines.length - 1) break;
-      throw error;
-    }
-    if (Value.Check(rowSchema, parsed)) yield parsed;
-  }
-}
-
 /** Claude Code's native JSONL is untrusted, append-only input; never turn it into a Pi session. */
 export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
-  const rows = Array.from(parsedRows(jsonl));
+  const rows = Array.from(nativeJsonlRows(jsonl, rowSchema));
   // Claude can rewind and fork. Display the ancestry of the last mainline message,
   // not abandoned alternatives or independent subagent conversations.
   const byId = new Map(rows.flatMap((row) => row.uuid ? [[row.uuid, row] as const] : []));
@@ -117,30 +101,22 @@ export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
   return records;
 }
 
-const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 function nativeSessionPath(sessionId: string): string {
   return join(getAtelierRuntimeContext().atelierDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
 }
-async function nativeSessionText(sessionId: string): Promise<string | undefined> {
-  return readFile(nativeSessionPath(sessionId), "utf8").catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
-}
 export async function loadClaudeTranscript(_workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
-  const text = await nativeSessionText(sessionId);
+  const text = await nativeJsonlText(nativeSessionPath(sessionId));
   return text === undefined ? undefined : claudeTranscriptRecords(text);
 }
 
 export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
-  const text = await nativeSessionText(sessionId);
+  const text = await nativeJsonlText(nativeSessionPath(sessionId));
   if (text === undefined) return new Response("Not found", { status: 404 });
-  for (const row of parsedRows(text)) {
+  for (const row of nativeJsonlRows(text, rowSchema)) {
     if (row.uuid !== entryId || !row.message || !Array.isArray(row.message.content)) continue;
     const source = imageSources(row.message.content)[contentIndex];
     if (!source) break;
-    const data = Buffer.from(source.data, "base64");
-    return new Response(data, { headers: { "Content-Type": source.media_type, "Content-Length": String(data.byteLength), "Cache-Control": "private, no-store", "Content-Security-Policy": "default-src 'none'; sandbox", "X-Content-Type-Options": "nosniff" } });
+    return nativeImageResponse(source.data, source.media_type);
   }
   return new Response("Not found", { status: 404 });
 }

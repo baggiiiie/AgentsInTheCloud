@@ -4,7 +4,7 @@ import { getAtelierRuntimeContext } from "@atelier/core";
 import { publishSessionSnapshot, sessionShareDir, workspaceSessionShareKey } from "@atelier/agent/server";
 import { workspaceRoot } from "@atelier/workspace";
 
-async function jsonlFiles(directory: string): Promise<string[]> {
+export async function nativeJsonlFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
     throw error;
@@ -12,7 +12,7 @@ async function jsonlFiles(directory: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of entries) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await jsonlFiles(path));
+    if (entry.isDirectory()) files.push(...await nativeJsonlFiles(path));
     else if (entry.isFile() && entry.name.endsWith(".jsonl")) files.push(path);
   }
   return files;
@@ -24,8 +24,8 @@ export async function exportCliHistory(workspaceId: string, provider: string, ta
   const workspaceShare = join(dataDir, "workspaces", workspaceId, "home-local", ".local", "share");
   let sources: string[];
   switch (provider) {
-    case "pi": sources = await jsonlFiles(join(workspaceShare, "pi", "sessions", tabId)); break;
-    case "codex": sources = await jsonlFiles(join(workspaceShare, "atelier-agents", tabId, "codex", "sessions")); break;
+    case "pi": sources = await nativeJsonlFiles(join(workspaceShare, "pi", "sessions", tabId)); break;
+    case "codex": sources = await nativeJsonlFiles(join(workspaceShare, "atelier-agents", tabId, "codex", "sessions")); break;
     case "claude": {
       const path = join(dataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${tabId}.jsonl`);
       sources = await Bun.file(path).exists() ? [path] : [];

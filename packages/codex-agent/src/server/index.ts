@@ -5,6 +5,7 @@ import { providerBrandIconHtml } from "@atelier/shared";
 import { requireCodexSubscription } from "./auth.ts";
 import { codexLaunchScript } from "./launch-command.ts";
 import { codexModelSettings } from "./model-settings.ts";
+import { loadCodexTranscript, loadCodexTranscriptImage } from "./transcript.ts";
 
 export const atelierServerModule = createCliAgentModule({
   id: "codex", label: "Codex", iconHtml: providerBrandIconHtml("openai"),
@@ -13,4 +14,6 @@ export const atelierServerModule = createCliAgentModule({
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
   prepareSession: prepareCodexMcp,
   launchScript: codexLaunchScript,
+  loadTranscript: loadCodexTranscript,
+  loadTranscriptImage: loadCodexTranscriptImage,
 });

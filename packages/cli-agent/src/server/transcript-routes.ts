@@ -23,19 +23,21 @@ export function cliTranscriptRoutes(adapter: CliAgentAdapter, sessions: CliSessi
     if (!match || match[2] !== adapter.id || request.method !== "GET" || !adapter.loadTranscript) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
     const conversationId = decodeURIComponent(match[3]!);
-    await sessions.ready(workspaceId, conversationId);
+    const session = await sessions.ready(workspaceId, conversationId);
     const ctx = context(workspaceId, conversationId, adapter.id);
     if (match[4] === "session-images") {
       if (!adapter.loadTranscriptImage || match[6] === undefined) return new Response("Not found", { status: 404 });
       return adapter.loadTranscriptImage(workspaceId, conversationId, decodeURIComponent(match[5]!), Number(match[6]));
     }
     const records = await adapter.loadTranscript(workspaceId, conversationId);
+    const terminal = await sessions.terminalState(workspaceId, session);
+    const openEnded = terminal.exists && !terminal.ended;
     if (match[4] === "transcript-items") {
       const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
-      const html = records && renderReadOnlyTranscriptDetail(ctx, records, decodeURIComponent(match[5]!), count);
+      const html = records && renderReadOnlyTranscriptDetail(ctx, records, decodeURIComponent(match[5]!), count, openEnded);
       return new Response(html ?? "Not found", { status: html ? 200 : 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
     }
-    const content = records?.length ? renderReadOnlyTranscript(ctx, records) : `<div class="cli-transcript-empty">No ${escapeHtml(adapter.label)} transcript is available yet. Return to the terminal and try again after a message.</div>`;
+    const content = records?.length ? renderReadOnlyTranscript(ctx, records, openEnded) : `<div class="cli-transcript-empty">No ${escapeHtml(adapter.label)} transcript is available yet. Return to the terminal and try again after a message.</div>`;
     return new Response(`<turbo-frame id="${escapeHtml(ids.transcript(ctx))}"><div class="agent-transcript-content">${content}</div></turbo-frame>`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
   };
 }

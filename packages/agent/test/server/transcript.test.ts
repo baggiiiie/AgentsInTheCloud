@@ -21,6 +21,18 @@ describe("transcript", () => {
     expect(text?.type === "text" && text.final).toBe(true);
   });
 
+  test("keeps the last turn open when reading an active CLI transcript", () => {
+    const records: TranscriptRecord[] = [
+      { kind: "user", id: "u", text: "Run this", images: [], timestamp: 1000 },
+      { kind: "assistant", id: "a", parts: [{ type: "toolCall", callId: "c", name: "bash", args: { command: "sleep 10" } }], stopReason: "toolUse", timestamp: 2000 },
+    ];
+    expect(buildTranscript(records)[1]).toMatchObject({ type: "working", stoppedAt: 2000 });
+    expect(buildTranscript(records, { openEnded: true })[1]).toMatchObject({ type: "working", startedAt: 1000 });
+    expect(buildTranscript(records, { openEnded: true })[1]).not.toHaveProperty("stoppedAt");
+    const finished = [...records, { kind: "assistant" as const, id: "done", parts: [{ type: "text" as const, text: "Done" }], stopReason: "stop" as const, timestamp: 3000 }];
+    expect(buildTranscript(finished, { openEnded: true })[1]).toMatchObject({ type: "working", completedAt: 3000 });
+  });
+
   test("only first rendered part carries an assistant rewind boundary", () => {
     const items = buildTranscript([{ kind: "assistant", id: "a", parts: [{ type: "thinking", text: "one" }, { type: "text", text: "two" }], stopReason: "stop", timestamp: 1 }]);
     expect(items[0]?.rewindEntryId).toBe("a");
