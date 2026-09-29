@@ -371,12 +371,12 @@ function oauthStatus(kind: "pending" | "done", title: string, detail: string): s
   return `<ul class="status-list"><li class="status-list__item" ${kind === "done" ? 'role="checkbox" aria-checked="true"' : 'aria-busy="true"'}><span class="status-list__marker">${kind === "done" ? "✓" : ""}</span><span>${escapeHtml(title)} — ${escapeHtml(detail)}</span></li></ul>`;
 }
 
-function oauthAuthenticationAction(flow: PendingOAuthFlow, url: string, hidden = false): string {
+function oauthAuthenticationAction(flow: PendingOAuthFlow, url: string, hidden = false, caption?: string): string {
   const authenticationName = flow.provider === "openai-codex" ? "OpenAI" : flow.label;
   return actionLinkHtml({
     href: url,
     variant: "primary",
-    content: { kind: "caption", caption: `Open ${authenticationName} sign-in page` },
+    content: { kind: "caption", caption: caption ?? `Open ${authenticationName} sign-in page` },
     attributesHtml: `target="_blank" rel="noreferrer"${hidden ? ' data-oauth-device-auth hidden data-action="oauth-flow#showWaitingStatus"' : ""}`,
   });
 }
@@ -403,11 +403,14 @@ function oauthRedirectFormId(flow: PendingOAuthFlow): string {
   return domId("oauth_redirect_form", flow.id);
 }
 
-function oauthPromptForm(flow: PendingOAuthFlow): string {
+/** `copyCodeHint` replaces the visible label: the field then only carries the hint as its placeholder. */
+function oauthPromptForm(flow: PendingOAuthFlow, copyCodeHint?: string): string {
   if (!flow.prompt) return "";
   const prompt = flow.prompt.input;
   const inputId = domId("oauth_prompt", flow.id);
-  return `<form id="${oauthRedirectFormId(flow)}" class="settings-oauth-card" method="post" action="/settings/providers/${encodeURIComponent(flow.provider)}/oauth/${encodeURIComponent(flow.id)}/prompt" data-turbo="true"><label for="${inputId}">${escapeHtml(prompt.message)}</label><input id="${inputId}" class="settings-input text-field" type="${prompt.type === "secret" ? "password" : "text"}" name="value" data-1p-ignore placeholder="${escapeHtml(prompt.placeholder ?? "")}"${prompt.type === "manual_code" || prompt.type === "secret" ? " required" : ""}></form>`;
+  const label = copyCodeHint ? "" : `<label for="${inputId}">${escapeHtml(prompt.message)}</label>`;
+  const placeholder = copyCodeHint ?? prompt.placeholder ?? "";
+  return `<form id="${oauthRedirectFormId(flow)}" class="settings-oauth-card" method="post" action="/settings/providers/${encodeURIComponent(flow.provider)}/oauth/${encodeURIComponent(flow.id)}/prompt" data-turbo="true">${label}<input id="${inputId}" class="settings-input text-field" type="${prompt.type === "secret" ? "password" : "text"}" name="value" data-1p-ignore placeholder="${escapeHtml(placeholder)}"${copyCodeHint ? ` aria-label="${escapeHtml(copyCodeHint)}"` : ""}${prompt.type === "manual_code" || prompt.type === "secret" ? " required" : ""}></form>`;
 }
 
 /** Providers either redirect to a localhost page that won't load here, or show a code to copy on their own page. */
@@ -418,11 +421,11 @@ function oauthRedirectsToLocalhost(flow: PendingOAuthFlow): boolean {
 
 function oauthBrowserRedirectBody(flow: PendingOAuthFlow): string {
   const prompt = flow.prompt;
-  const promptForm = oauthPromptForm(flow);
   const localhost = oauthRedirectsToLocalhost(flow);
+  const promptForm = localhost ? oauthPromptForm(flow) : oauthPromptForm(flow, `Paste the code from the ${flow.label} page here`);
   return `<div class="settings-oauth-card">
-    <p>${localhost ? "After signing in, copy the localhost URL here—even if that page won’t load." : "After signing in, copy the code shown on the page and paste it here."}</p>
-    ${oauthAuthenticationAction(flow, flow.authUrl ?? "#")}
+    ${localhost ? "<p>After signing in, copy the localhost URL here—even if that page won’t load.</p>" : ""}
+    ${oauthAuthenticationAction(flow, flow.authUrl ?? "#", false, localhost ? undefined : `Open ${flow.label} page to get the code`)}
     ${promptForm}
     ${!prompt && flow.redirectSubmitted ? oauthStatus("pending", `Waiting for ${flow.label}`, localhost ? "Confirming the pasted redirect URL." : "Confirming the pasted code.") : ""}
   </div>`;
