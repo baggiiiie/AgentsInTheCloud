@@ -91,11 +91,13 @@
     "packages/claude-agent": {
       "name": "@atelier/claude-agent",
       "dependencies": {
+        "@atelier/agent": "workspace:*",
         "@atelier/cli-agent": "workspace:*",
         "@atelier/core": "workspace:*",
         "@atelier/llm": "workspace:*",
         "@atelier/shared": "workspace:*",
         "@atelier/workspace": "workspace:*",
+        "typebox": "^1.0.57",
       },
     },
     "packages/cli-agent": {

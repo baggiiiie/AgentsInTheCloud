@@ -5,6 +5,7 @@ import { requireClaudeSubscription } from "./auth.ts";
 import { claudeLaunchScript } from "./launch-command.ts";
 import { claudeModelSettings } from "./model-settings.ts";
 import { prepareClaudeMcp } from "./mcp.ts";
+import { loadClaudeTranscript, loadClaudeTranscriptImage } from "./transcript.ts";
 
 export const atelierServerModule = createCliAgentModule({
   id: "claude", label: "Claude Code", iconHtml: providerBrandIconHtml("anthropic"),
@@ -13,4 +14,6 @@ export const atelierServerModule = createCliAgentModule({
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
   prepareSession: prepareClaudeMcp,
   launchScript: claudeLaunchScript,
+  loadTranscript: loadClaudeTranscript,
+  loadTranscriptImage: loadClaudeTranscriptImage,
 });

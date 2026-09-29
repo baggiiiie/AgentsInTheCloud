@@ -11,6 +11,7 @@ import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
+import { cliTranscriptRoutes, renderCliTranscriptSwitch } from "./transcript-routes.ts";
 
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
@@ -59,7 +60,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
         return { unsubscribe() { stop(); } };
       },
     }],
-    routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }],
+    routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }, { handle: cliTranscriptRoutes(adapter, sessions) }],
     agentProvider: {
       id: adapter.id, label: adapter.label, iconHtml: adapter.iconHtml,
       async create({ workspaceId }) {
@@ -91,8 +92,11 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const firstPresentation = composer && session.firstPresentation;
           return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body mobile-composer-pane"${firstPresentation ? ` data-mobile-composer-new="true" data-mobile-composer-presented-url="${escapeHtml(composerUrl)}/presented"` : ""} data-controller="cli-terminal mobile-composer${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" data-cli-terminal-conversation-id-value="${escapeHtml(conversationId)}" data-cli-terminal-turns-channel-value="${escapeHtml(turnsChannel)}" ${composerAttachmentAttributes(draftId, rowId, false, `atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:workspace-agent-focus->cli-terminal#focus atelier:theme-change@document->cli-terminal#theme ${mobileComposerSelectionActions} mobile-composer:sent->mobile-composer#close agent-attachments:files->cli-terminal#showComposer agent-attachments:files->mobile-composer#reveal`)}>
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
-            ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
-            ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
+            <div class="cli-agent-stage">
+              ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
+              ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
+              ${renderCliTranscriptSwitch(adapter, workspaceId, conversationId)}
+            </div>
             ${composer ? renderOpenComposerButton() : ""}
             ${composer}
             ${composer ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10m-5-5 5 5-5 5"/></svg>', label: "Back to composer" }, attributesHtml: 'data-cli-terminal-target="return" data-action="cli-terminal#showComposer" hidden' }) : ""}

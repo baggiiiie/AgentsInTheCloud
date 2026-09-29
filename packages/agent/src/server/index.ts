@@ -28,6 +28,7 @@ export { handleAgentRequest } from "./routes.ts";
 export { workspaceFileEndpoint } from "./workspace-files.ts";
 export { resolveWorkspacePortProxyBackend } from "./workspace-proxy.ts";
 export { agentConversationKey } from "./render-context.ts";
+export { renderReadOnlyTranscript, renderReadOnlyTranscriptDetail } from "./read-only-transcript.ts";
 export { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
 export { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
 export { expandPromptTemplate } from "./prompt-templates.ts";

@@ -1,0 +1,146 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { getAtelierRuntimeContext } from "@atelier/core";
+import type { TranscriptRecord } from "@atelier/agent/server";
+import { workspaceRoot } from "@atelier/workspace";
+import { Type, type Static } from "typebox";
+import { Value } from "typebox/value";
+
+const imageSourceSchema = Type.Object({ type: Type.Literal("base64"), media_type: Type.String(), data: Type.String() });
+const resultBlockSchema = Type.Object({ type: Type.String(), text: Type.Optional(Type.String()), source: Type.Optional(imageSourceSchema) });
+const editInputSchema = Type.Object({ file_path: Type.String(), old_string: Type.String(), new_string: Type.String(), replace_all: Type.Optional(Type.Boolean()) });
+const blockSchema = Type.Object({
+  type: Type.String(), text: Type.Optional(Type.String()), thinking: Type.Optional(Type.String()),
+  source: Type.Optional(imageSourceSchema),
+  id: Type.Optional(Type.String()), name: Type.Optional(Type.String()), input: Type.Optional(Type.Unknown()),
+  tool_use_id: Type.Optional(Type.String()), is_error: Type.Optional(Type.Boolean()),
+  content: Type.Optional(Type.Union([Type.String(), Type.Array(resultBlockSchema)])),
+});
+const messageSchema = Type.Object({
+  content: Type.Union([Type.String(), Type.Array(blockSchema)]),
+  stop_reason: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+});
+const rowSchema = Type.Object({
+  type: Type.String(), uuid: Type.Optional(Type.String()), parentUuid: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  timestamp: Type.Optional(Type.String()), isSidechain: Type.Optional(Type.Boolean()), isMeta: Type.Optional(Type.Boolean()),
+  subtype: Type.Optional(Type.String()), message: Type.Optional(messageSchema),
+});
+type ClaudeRow = Static<typeof rowSchema>;
+type ClaudeBlock = Static<typeof blockSchema>;
+
+function timestamp(value?: string): number {
+  const parsed = Date.parse(value ?? "");
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+type ProjectedToolCall = { name: string; args: unknown };
+function toolCall(block: ClaudeBlock): ProjectedToolCall {
+  if (block.name === "Bash") return { name: "bash", args: block.input };
+  if (block.name === "Read") return { name: "read", args: block.input };
+  if (block.name === "Write") return { name: "write", args: block.input };
+  if (block.name === "Edit" && Value.Check(editInputSchema, block.input) && block.input.replace_all !== true) {
+    const { old_string, new_string, ...args } = block.input;
+    return { name: "edit", args: { ...args, oldText: old_string, newText: new_string } };
+  }
+  return { name: block.name ?? "", args: block.input };
+}
+function imageSources(blocks: ClaudeBlock[]): Array<Static<typeof imageSourceSchema>> {
+  return blocks.flatMap((block) => {
+    if (block.type === "image" && block.source && allowedImageTypes.has(block.source.media_type)) return [block.source];
+    if (block.type === "tool_result" && Array.isArray(block.content)) return block.content.flatMap((part) => part.type === "image" && part.source && allowedImageTypes.has(part.source.media_type) ? [part.source] : []);
+    return [];
+  });
+}
+function resultText(value: ClaudeBlock["content"]): string {
+  if (!Array.isArray(value)) return value ?? "";
+  return value.filter((block) => block.type === "text").map((block) => block.text ?? "").filter(Boolean).join("\n");
+}
+
+function* parsedRows(jsonl: string): Generator<ClaudeRow> {
+  const lines = jsonl.split("\n");
+  for (const [index, line] of lines.entries()) {
+    if (!line.trim()) continue;
+    let parsed: unknown;
+    try { parsed = JSON.parse(line); }
+    catch (error) {
+      // A live CLI may be partway through writing its final JSONL record.
+      if (index === lines.length - 1) break;
+      throw error;
+    }
+    if (Value.Check(rowSchema, parsed)) yield parsed;
+  }
+}
+
+/** Claude Code's native JSONL is untrusted, append-only input; never turn it into a Pi session. */
+export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
+  const rows = Array.from(parsedRows(jsonl));
+  // Claude can rewind and fork. Display the ancestry of the last mainline message,
+  // not abandoned alternatives or independent subagent conversations.
+  const byId = new Map(rows.flatMap((row) => row.uuid ? [[row.uuid, row] as const] : []));
+  const leaf = rows.findLast((row) => (row.type === "user" || row.type === "assistant") && row.isSidechain !== true && row.uuid);
+  const lineage = new Set<string>();
+  let current = leaf;
+  while (current?.uuid && !lineage.has(current.uuid)) {
+    lineage.add(current.uuid);
+    current = byId.get(current.parentUuid ?? "");
+  }
+  const records: TranscriptRecord[] = [];
+  for (const row of rows) {
+    const id = row.uuid;
+    if (!id || !lineage.has(id)) continue;
+    const message = row.message;
+    const time = timestamp(row.timestamp);
+    if (row.type === "user" && message) {
+      const blocks = Array.isArray(message.content) ? message.content : [];
+      const images: Extract<TranscriptRecord, { kind: "user" }>["images"] = [];
+      let imageIndex = 0;
+      for (const block of blocks) {
+        const refs = imageSources([block]).map((source) => ({ entryId: id, contentIndex: imageIndex++, mimeType: source.media_type }));
+        if (block.type === "image") images.push(...refs);
+        if (block.type === "tool_result" && block.tool_use_id) {
+          records.push({ kind: "toolResult", callId: block.tool_use_id, text: resultText(block.content), images: refs, isError: block.is_error === true, timestamp: time });
+        }
+      }
+      const text = Array.isArray(message.content) ? blocks.filter((block) => block.type === "text").map((block) => block.text ?? "").join("\n") : message.content;
+      if ((text || images.length) && row.isMeta !== true) records.push({ kind: "user", id, text, images, timestamp: time, rewindable: false });
+    } else if (row.type === "assistant" && message) {
+      const content: Extract<TranscriptRecord, { kind: "assistant" }>["parts"] = [];
+      for (const block of Array.isArray(message.content) ? message.content : []) {
+        if (block.type === "thinking") content.push({ type: "thinking", text: block.thinking ?? "" });
+        else if (block.type === "text") content.push({ type: "text", text: block.text ?? "" });
+        else if (block.type === "tool_use" && block.id && block.name) content.push({ type: "toolCall", callId: block.id, ...toolCall(block) });
+      }
+      if (content.length) records.push({ kind: "assistant", id, parts: content, stopReason: message.stop_reason === "end_turn" ? "stop" : "toolUse", timestamp: time });
+    } else if (row.type === "system" && row.subtype === "compact_boundary") {
+      records.push({ kind: "note", id, text: "Context compacted", tone: "system", timestamp: time });
+    }
+  }
+  return records;
+}
+
+const allowedImageTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+function nativeSessionPath(sessionId: string): string {
+  return join(getAtelierRuntimeContext().atelierDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
+}
+async function nativeSessionText(sessionId: string): Promise<string | undefined> {
+  return readFile(nativeSessionPath(sessionId), "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+}
+export async function loadClaudeTranscript(_workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
+  const text = await nativeSessionText(sessionId);
+  return text === undefined ? undefined : claudeTranscriptRecords(text);
+}
+
+export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
+  const text = await nativeSessionText(sessionId);
+  if (text === undefined) return new Response("Not found", { status: 404 });
+  for (const row of parsedRows(text)) {
+    if (row.uuid !== entryId || !row.message || !Array.isArray(row.message.content)) continue;
+    const source = imageSources(row.message.content)[contentIndex];
+    if (!source) break;
+    const data = Buffer.from(source.data, "base64");
+    return new Response(data, { headers: { "Content-Type": source.media_type, "Content-Length": String(data.byteLength), "Cache-Control": "private, no-store", "Content-Security-Policy": "default-src 'none'; sandbox", "X-Content-Type-Options": "nosniff" } });
+  }
+  return new Response("Not found", { status: 404 });
+}

@@ -10,6 +10,8 @@
     "@atelier/llm": "workspace:*",
     "@atelier/shared": "workspace:*",
     "@atelier/workspace": "workspace:*",
-    "@atelier/cli-agent": "workspace:*"
+    "@atelier/cli-agent": "workspace:*",
+    "@atelier/agent": "workspace:*",
+    "typebox": "^1.0.57"
   }
 }

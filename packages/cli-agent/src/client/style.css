@@ -1,9 +1,25 @@
 @import url("/observable-terminal.css");
 
-.cli-agent-body { position:relative; display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg); color:var(--text-bright); }
-.cli-agent-body .observable-terminal-host { flex:1; min-height:100px; overflow:hidden; touch-action:none; }
+.cli-agent-body { --agent-inline-gutter:2.5rem; --agent-inline-gutter:clamp(.75rem, 4cqi, 2.5rem); container-type:inline-size; position:relative; display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg); color:var(--text-bright); }
+.cli-agent-stage { position:relative; flex:1; min-height:0; }
+.cli-agent-body .observable-terminal-host { height:100%; min-height:100px; overflow:hidden; touch-action:none; }
 /* Overlay the banner: taking rows from the terminal would resize the PTY on every (re)connect. */
-.cli-agent-body > .observable-terminal-connection { position:absolute; top:0; left:0; right:0; z-index:2; }
+.cli-agent-stage > .observable-terminal-connection { position:absolute; top:0; left:0; right:0; z-index:2; }
+.cli-agent-body .cli-transcript-view { display:none; position:absolute; inset:0; overflow-y:auto; padding-bottom:128px; }
+.cli-agent-body.cli-transcript-mode .observable-terminal-host { visibility:hidden; pointer-events:none; }
+.cli-agent-body.cli-transcript-mode .cli-transcript-view { display:block; }
+.cli-transcript-switch { position:absolute; z-index:3; right:10px; bottom:12px; }
+.cli-agent-body:not(.mobile-composer-open) .cli-transcript-switch { bottom:74px; }
+@media (max-width:700px), (pointer:coarse) {
+  .cli-agent-body .cli-transcript-view { padding-bottom:172px; }
+  .cli-transcript-switch { right:4px; }
+  .cli-agent-body:not(.mobile-composer-open) .cli-transcript-switch { bottom:92px; }
+}
+.cli-transcript-switch > button { --button-background:var(--panel); }
+.cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:none; }
+.cli-agent-body.cli-transcript-mode .cli-transcript-switch > button[data-action="cli-terminal#showTranscript"] { display:none; }
+.cli-agent-body.cli-transcript-mode .cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:inline-flex; }
+.cli-transcript-empty { padding:24px 0; color:var(--text-muted); }
 .cli-agent-body .cli-agent-composer {
   --composer-controls-min-height: calc(3 * var(--composer-control-size) + 2 * var(--composer-control-inset) + 12px);
   --agent-inline-gutter: 12px;
@@ -30,11 +46,11 @@
 @media (max-width:700px), (hover:none) and (pointer:coarse) {
   .cli-agent-body.cli-raw-mode .cli-agent-composer, .cli-agent-body.cli-raw-mode .mobile-composer-opener { display:none; }
   /* Typing goes straight to the terminal while it has focus, so the opener would only cover it. */
-  .cli-agent-body:has(> .observable-terminal-host:focus-within) > .mobile-composer-opener { display:none; }
+  .cli-agent-body:has(> .cli-agent-stage > .observable-terminal-host:focus-within) > .mobile-composer-opener { display:none; }
   /* Clip the top of the original terminal instead of resizing it to the keyboard.
      The bottom rows (including the agent's input line) stay above the keyboard. */
   .cli-agent-body.cli-raw-mode { overflow:hidden; }
-  .cli-agent-body.cli-raw-mode > .observable-terminal-host {
+  .cli-agent-body.cli-raw-mode .cli-agent-stage > .observable-terminal-host {
     position:absolute; inset-inline:0; bottom:0; height:var(--cli-terminal-height);
   }
 }

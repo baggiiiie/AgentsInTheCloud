@@ -6,7 +6,7 @@ export const atelierClientModule: WorkspaceClientModule = {
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
       static values = { url: String, workspaceId: String, conversationId: String, turnsChannel: String };
-      static targets = ["terminal", "connectionStatus", "form", "input", "return", "turnFinished"];
+      static targets = ["terminal", "connectionStatus", "form", "input", "return", "turnFinished", "transcript"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
@@ -18,6 +18,8 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly hasFormTarget: boolean;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
+      declare readonly transcriptTarget: HTMLElement & { src: string };
+      declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
       private turns?: CableSubscription;
@@ -194,6 +196,15 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.element.style.setProperty("--cli-terminal-height", `${this.terminalTarget.getBoundingClientRect().height}px`);
         this.element.classList.add("cli-raw-mode");
         this.returnTarget.hidden = false;
+      }
+      showTranscript(): void {
+        if (!this.hasTranscriptTarget) return;
+        this.element.classList.add("cli-transcript-mode");
+        this.transcriptTarget.src = `${this.transcriptTarget.dataset.url}?opened=${Date.now()}`;
+      }
+      showTerminal(): void {
+        this.element.classList.remove("cli-transcript-mode");
+        this.viewer?.refresh();
       }
       showComposer(): void {
         this.element.classList.remove("cli-raw-mode");

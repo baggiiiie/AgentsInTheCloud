@@ -11,6 +11,9 @@ export interface AgentRenderContext {
   branchId?: string;
   /** Distinct DOM identities for the collapsed commentary projection. */
   commentary?: boolean;
+  /** Read-only external transcripts use their own detail routes. */
+  transcriptBasePath?: string;
+  readOnly?: boolean;
 }
 
 export function commentaryContext(ctx: AgentRenderContext): AgentRenderContext {
@@ -49,7 +52,7 @@ export const ids = {
 };
 
 export function agentPath(ctx: AgentRenderContext, suffix: string): string {
-  return `/workspaces/${encodeURIComponent(ctx.workspaceId)}/agents/${encodeURIComponent(ctx.conversationId)}${suffix}`;
+  return `${ctx.transcriptBasePath ?? `/workspaces/${encodeURIComponent(ctx.workspaceId)}/agents/${encodeURIComponent(ctx.conversationId)}`}${suffix}`;
 }
 
 export function transcriptItemPath(ctx: AgentRenderContext, key: string, query = ""): string {

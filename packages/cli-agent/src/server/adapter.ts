@@ -1,4 +1,5 @@
 import type { JsonObject } from "@atelier/core";
+import type { TranscriptRecord } from "@atelier/agent/server";
 import type { AgentLaunchFooterContext, AgentWorkspaceParameters, WorkspaceAgentInput } from "@atelier/shared";
 
 /** Identity of the session being launched, so adapters can address their session-local files. */
@@ -25,4 +26,7 @@ export interface CliAgentAdapter {
   prepareSession?(workspaceId: string, session: CliAgentSession, mcp: { url: string; token: string }): Promise<Record<string, string>>;
   /** Bash script with the CLI-specific flags and initial prompt. */
   launchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: AgentWorkspaceParameters, session: CliAgentSession): string;
+  /** Optional native-history adapter. CLI providers without one remain terminal-only. */
+  loadTranscript?(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined>;
+  loadTranscriptImage?(workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response>;
 }
