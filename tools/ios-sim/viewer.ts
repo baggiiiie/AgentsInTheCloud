@@ -1,17 +1,10 @@
 /** The standalone, server-rendered viewer for this workspace's iOS simulators. */
-export interface ViewerSimulator {
-  handle: string;
-  name: string;
-  udid: string;
-  model: string;
-  state: string;
-  lastUrl?: string;
-}
+import type { Sim } from './core';
 
 export type ViewerAction = "home" | "open" | "screenshot" | "type" | "tap" | "swipe" | "model";
 
 export interface ViewerDeps {
-  list(): Promise<ViewerSimulator[]>;
+  list(): Promise<Sim[]>;
   models(): Promise<string[]>;
   stream(sim: string): Promise<Response> | Response;
   action(sim: string, action: ViewerAction, data: Record<string, string>): Promise<Response | void>;
@@ -36,7 +29,7 @@ button,.button{border:1px solid #5b6475;background:#303948;color:#f4f5f8;padding
 @media(max-width:600px){header{padding:18px 16px}main{padding:16px}.screen-wrap{padding:10px}.screen{max-height:64vh}}
 `;
 
-function deviceHtml(device: ViewerSimulator, models: string[]): string {
+function deviceHtml(device: Sim, models: string[]): string {
   const handle = encodeURIComponent(device.handle);
   const action = `/viewer/action/${handle}`;
   const options = models.map((model) => `<option value="${escapeHtml(model)}"${model === device.model ? " selected" : ""}>${escapeHtml(model)}</option>`).join("");
@@ -56,7 +49,7 @@ function deviceHtml(device: ViewerSimulator, models: string[]): string {
   </article>`;
 }
 
-function page(devices: ViewerSimulator[], models: string[], error?: string): string {
+function page(devices: Sim[], models: string[], error?: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>iOS Simulators</title><style>${stylesheet}</style><script src="/viewer/gestures.js" defer></script></head><body>
 <header><h1>iOS Simulators</h1><p>Live screens from this workspace's simulators</p></header><main>
 ${error ? `<div role="alert" class="error">${escapeHtml(error)}</div>` : ""}
@@ -74,13 +67,14 @@ for (const form of document.querySelectorAll('[data-confirm-model]')) {
 for (const img of document.querySelectorAll('[data-gesture-sim]')) {
   let start;
   const point = event => {
+    // Send screen fractions; the server resolves current native point dimensions.
     const rect = img.getBoundingClientRect();
-    return {x: Math.round((event.clientX - rect.left) / rect.width * img.naturalWidth * 2),
-            y: Math.round((event.clientY - rect.top) / rect.height * img.naturalHeight * 2)};
+    return {x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+            y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))};
   };
   img.addEventListener('pointerdown', event => {
     if (event.button !== 0 || !img.naturalWidth) return;
-    start = {id: event.pointerId, ...point(event)};
+    start = {id: event.pointerId, clientX: event.clientX, clientY: event.clientY, ...point(event)};
     img.setPointerCapture(event.pointerId);
     event.preventDefault();
   });
@@ -90,7 +84,7 @@ for (const img of document.querySelectorAll('[data-gesture-sim]')) {
     const from = start;
     start = undefined;
     const to = point(event);
-    const swipe = Math.hypot(to.x - from.x, to.y - from.y) >= 15;
+    const swipe = Math.hypot(event.clientX - from.clientX, event.clientY - from.clientY) >= 15;
     const body = new URLSearchParams(swipe ? {x1: String(from.x), y1: String(from.y), x2: String(to.x), y2: String(to.y)} : {x: String(to.x), y: String(to.y)});
     try {
       const response = await fetch('/viewer/action/' + encodeURIComponent(img.dataset.gestureSim) + '/' + (swipe ? 'swipe' : 'tap'), {method: 'POST', body});

@@ -1,10 +1,8 @@
+import { quote } from './core';
+
 // Native simulator interactions. The caller owns the SSH connection and ensures
 // that the UDID belongs to this workspace before passing it here.
 export type NativeRemote = (command: string) => Promise<string>;
-
-function quote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
 
 function number(value: number): string {
   if (!Number.isFinite(value)) throw new Error(`Invalid coordinate: ${value}`);
@@ -65,6 +63,12 @@ function screenSize(tree: string): { width: number; height: number } {
   const root = (JSON.parse(tree) as Element[])[0];
   if (!root?.frame) throw new Error(`No screen frame in accessibility tree: ${tree}`);
   return root.frame;
+}
+
+// AXe gestures use native screen points, not screenshot/stream pixels. Query at
+// gesture time so model changes and rotation do not leave stale geometry.
+export async function screenDimensions(remote: NativeRemote, udid: string): Promise<{ width: number; height: number }> {
+  return screenSize(await describe(remote, udid));
 }
 
 async function waitForLabel(remote: NativeRemote, udid: string, label: string): Promise<string> {

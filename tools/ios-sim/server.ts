@@ -166,8 +166,18 @@ const server = Bun.serve({port:4100,hostname:'0.0.0.0',idleTimeout:255,async fet
         else if(action==='open') await open(s,data.url);
         else if(action==='screenshot') return new Response(await native.screenshot(remote,s.udid),{headers:{'content-type':'image/png'}});
         else if(action==='type') await native.typeText(remote,s.udid,data.text);
-        else if(action==='tap') await native.tap(remote,s.udid,Number(data.x),Number(data.y));
-        else if(action==='swipe') await native.swipe(remote,s.udid,Number(data.x1),Number(data.y1),Number(data.x2),Number(data.y2));
+        else if(action==='tap' || action==='swipe') {
+          const {width,height}=await native.screenDimensions(remote,s.udid);
+          const coordinate=(key:string,size:number)=>{
+            const fraction=Number(data[key]);
+            if(data[key] === undefined || data[key].trim() === '' || !Number.isFinite(fraction) || fraction<0 || fraction>1)
+              throw Error(`Invalid normalized coordinate: ${key}`);
+            return fraction*size;
+          };
+          if(action==='tap') await native.tap(remote,s.udid,coordinate('x',width),coordinate('y',height));
+          else await native.swipe(remote,s.udid,coordinate('x1',width),coordinate('y1',height),coordinate('x2',width),coordinate('y2',height));
+          return new Response(null,{status:204});
+        }
         else if(action==='model') await run('model',[handle,data.model]);
       })
     });
