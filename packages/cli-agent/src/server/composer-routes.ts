@@ -4,7 +4,7 @@ import type { CliSessions } from "./sessions.ts";
 
 export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
   return async (request: Request, url: URL): Promise<Response | undefined> => {
-    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/composer(?:\/(completions(?:\/prompt-template-expand)?|consumed|presented))?$/);
+    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/composer(?:\/(completions(?:\/prompt-template-expand)?|consumed))?$/);
     if (!match || match[2] !== providerId) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
     const conversationId = decodeURIComponent(match[3]!);
@@ -17,10 +17,6 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     if (request.method === "POST" && operation === "completions/prompt-template-expand") {
       const form = await request.formData();
       return new Response(await expandPromptTemplate(workspaceId, String(form.get("text") ?? "")), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
-    }
-    if (request.method === "POST" && operation === "presented") {
-      sessions.acknowledgeFirstPresentation(workspaceId, conversationId);
-      return new Response(null, { status: 204 });
     }
     const draftId = agentAttachmentDraftId(workspaceId, `${providerId}:${conversationId}`);
     if (request.method === "POST" && operation === "consumed") {

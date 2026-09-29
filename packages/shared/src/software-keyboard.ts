@@ -16,7 +16,7 @@ export function softwareKeyboardVisible(
   return focusOpensSoftwareKeyboard && textEntryFocused && baselineHeight - viewportHeight >= minimumOcclusion;
 }
 
-function isTextEntry(element: Element | null): boolean {
+export function isTextEntry(element: Element | null): boolean {
   if (element instanceof HTMLTextAreaElement) return true;
   if (element instanceof HTMLInputElement) return !["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes(element.type);
   return element instanceof HTMLElement && element.isContentEditable;

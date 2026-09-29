@@ -1,7 +1,7 @@
 import { activityButtonHtml } from "@atelier/design-system/activity-button";
 import { buttonHtml } from "@atelier/design-system/button";
 import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@atelier/llm/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, mobileComposerSelectionActions, composerAttachmentAttributes, type StagedAttachment } from "@atelier/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
 import { domId, escapeHtml } from "./html.ts";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
@@ -40,16 +40,16 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
   return `<section id="${domId("agent_pane", ctx.workspaceId, agent.conversationId)}" data-turbo-permanent class="agent-conversation-pane" data-agent-conversation-source="${escapeHtml(key)}">
-    <div class="agent-pane mobile-composer-pane mobile-composer-open" id="${ids.pane(ctx)}"
-      data-controller="agent-pane agent-attachments mobile-composer"
-      data-action="${mobileComposerSelectionActions}"
+    <div class="agent-pane agent-composer-pane agent-composer-open" id="${ids.pane(ctx)}"
+      data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
       data-agent-pane-conversation-id-value="${escapeHtml(ctx.conversationId)}"
-      ${composerAttachmentAttributes(draftId, attachRowId, false)}>
+      ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}>
       <div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>
       <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
         <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
       </div>
+      ${renderOpenComposerButton()}
       ${renderAgentPaneComposer({
         ctx,
         action: agentPath(ctx, "/messages"),
@@ -88,12 +88,13 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
   const { ctx, draftId, stats } = options;
   const formId = `agent_pane_composer_${draftId}`;
   const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy)}</span>`;
-  return `<div class="composer agent-pane-composer" data-controller="composer-focus agent-model-setup agent-completions ${transcriptionComposerController}" data-action="mousedown->composer-focus#preserveInputFocus agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
+  return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
     <div class="agent-pane-composer-overlays">${renderTranscriptEndNavigation()}</div>
     <div class="composer-surface">
       <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-end->agent-pane#submitted click->agent-pane#focusInput">
         ${renderComposerBody({
           draft: { id: draftId, rowId: ids.attachRow(ctx), attachments: options.attachments },
+          collapsible: true,
           inputHtml: renderAgentPanePromptInput(ctx, options.initialText ?? ""),
           sendHtml: renderComposerActions(actions),
         })}

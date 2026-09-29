@@ -1,5 +1,5 @@
 import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
@@ -75,9 +75,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.element.dataset.agentPresentationReady = "false";
       if (this.cableSubscription) this.setReconnecting(true);
     };
-    private relinquishSoftwareKeyboardFocus(): void {
-      if (focusLikelyOpensSoftwareKeyboard() && document.activeElement === this.inputTarget) this.inputTarget.blur();
-    }
     private readonly submitting = (): void => {
       const submittedText = this.inputTarget.value;
       const submittedRevision = this.composerRevision;
@@ -91,7 +88,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
         });
       }
       this.scrollToTranscriptEnd();
-      this.relinquishSoftwareKeyboardFocus();
     };
     connect(): void {
       this.navigation = new TranscriptNavigation(this.transcriptTarget, this.transcriptContentTarget, this.transcriptEndTarget, this.element.querySelector<HTMLElement>(".composer")!);
@@ -245,9 +241,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       if (submitKey === "shortcut" || softwareKeyboardSubmit) {
         event.preventDefault();
         if (this.inputTarget.value.trim() || this.formTarget.querySelector(".agent-chip")) {
-          // Let Turbo capture the keyboard-closed focus state. Following no longer
-          // depends on whether this blur occurs before or after submission.
-          if (softwareKeyboardSubmit) this.relinquishSoftwareKeyboardFocus();
           const submitter = this.formTarget.querySelector<HTMLButtonElement>('button[value="send"], button[value="steer"]');
           this.formTarget.requestSubmit(submitter ?? undefined);
         }

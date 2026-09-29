@@ -9,6 +9,7 @@ test("each adapter exposes its own interactive terminal protocol", async () => {
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
       const workspace = await import("@atelier/workspace");
+      const { createAtelierEventBus } = await import("@atelier/core");
       const observable = await import("@atelier/observable-terminal/server");
       const writes = [], sizes = [], attachments = [];
       let callbacks, closed = 0;
@@ -25,7 +26,7 @@ test("each adapter exposes its own interactive terminal protocol", async () => {
           launchScript: () => "true",
         });
         let handler;
-        module.initialize({ registerSocketHandler: (value) => { handler = value; } });
+        module.initialize({ events: createAtelierEventBus(), registerSocketHandler: (value) => { handler = value; } });
         const id = await module.agentProvider.create({ workspaceId: "socket" });
         expect(await handler(new URL("http://localhost/workspaces/socket/unrelated-agents/" + id + "/ws"))).toBeUndefined();
         const route = "http://localhost/workspaces/socket/" + providerId + "-agents/";

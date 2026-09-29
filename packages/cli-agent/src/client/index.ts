@@ -1,20 +1,17 @@
 import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { CableTopics, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type CableSubscription, type WorkspaceClientModule } from "@atelier/shared";
+import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller }) {
     application.register("cli-terminal", class extends Controller {
-      static values = { url: String, workspaceId: String, conversationId: String, turnsChannel: String };
-      static targets = ["terminal", "connectionStatus", "form", "input", "return", "turnFinished", "transcript"];
+      static values = { url: String, workspaceId: String };
+      static targets = ["terminal", "connectionStatus", "form", "input", "transcript"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
-      declare readonly conversationIdValue: string;
-      declare readonly turnsChannelValue: string;
       declare readonly formTarget: HTMLFormElement;
       declare readonly inputTarget: HTMLTextAreaElement;
-      declare readonly returnTarget: HTMLButtonElement;
       declare readonly hasFormTarget: boolean;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
@@ -22,42 +19,22 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
-      private turns?: CableSubscription;
       private connected = false;
       private sending = false;
       private get draftKey(): string { return `atelier.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
       private readonly inputChanged = (): void => { localStorage.setItem(this.draftKey, this.inputTarget.value); };
-      private readonly terminalBlur = (event: FocusEvent): void => {
-        if (event.relatedTarget instanceof Node && this.terminalTarget.contains(event.relatedTarget)) return;
-        if (focusLikelyOpensSoftwareKeyboard()) this.showComposer();
-      };
-      private viewportHeight = 0;
-      private keyboardWasOpen = false;
-      private readonly keyboardViewportChanged = (): void => {
-        if (!this.element.classList.contains("cli-raw-mode")) {
-          this.viewportHeight = Math.max(this.viewportHeight, window.visualViewport!.height);
-          return;
-        }
-        const height = window.visualViewport!.height;
-        if (height < this.viewportHeight - 120) this.keyboardWasOpen = true;
-        if (this.keyboardWasOpen && height >= this.viewportHeight - 80) {
-          this.keyboardWasOpen = false;
-          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-          this.showComposer();
-        }
-      };
       private touch?: { id: number; startX: number; startY: number; x: number; y: number; time: number; velocity: number; scrolling: boolean };
       private momentum = 0;
+      private terminalHeight = 0;
+      private paneWidth = 0;
+      private keyboardOccluded = false;
       private resize = new ResizeObserver(() => this.refresh());
 
       connect(): void {
         window.addEventListener("atelier:workspace-pane-visible", this.activate);
-        this.viewportHeight = window.visualViewport!.height;
-        window.visualViewport!.addEventListener("resize", this.keyboardViewportChanged);
         if (this.hasFormTarget) {
           setTextInputValue(this.inputTarget, localStorage.getItem(this.draftKey) ?? "");
           this.inputTarget.addEventListener("input", this.inputChanged);
-          this.terminalTarget.addEventListener("focusout", this.terminalBlur);
         }
         this.activate();
       }
@@ -66,8 +43,9 @@ export const atelierClientModule: WorkspaceClientModule = {
       };
       private start(): void {
         if (!this.hasTerminalTarget || this.viewer) return;
-        this.resize.observe(this.terminalTarget);
-        if (this.hasFormTarget) this.turns = window.AtelierCable!.subscribe(CableTopics.module(this.turnsChannelValue, this.workspaceIdValue, { conversationId: this.conversationIdValue }));
+        this.resize.observe(this.element);
+        this.resize.observe(this.terminalTarget.parentElement!);
+        this.refresh();
         this.viewer = createObservableTerminalViewer({
           host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`), hideUnfocusedCursor: true,
           theme: atelierObservableTerminalTheme(),
@@ -86,26 +64,13 @@ export const atelierClientModule: WorkspaceClientModule = {
       }
       disconnect(): void {
         window.removeEventListener("atelier:workspace-pane-visible", this.activate);
-        window.visualViewport!.removeEventListener("resize", this.keyboardViewportChanged);
         this.resize.disconnect();
         if (this.hasFormTarget) {
           this.inputTarget.removeEventListener("input", this.inputChanged);
-          this.terminalTarget.removeEventListener("focusout", this.terminalBlur);
         }
         this.cancelTerminalTouch();
-        this.turns?.unsubscribe();
-        this.turns = undefined;
         this.viewer?.dispose();
         this.viewer = undefined;
-      }
-      turnFinishedTargetConnected(marker: HTMLElement): void {
-        marker.remove();
-        // Desktop only: focusing would open the software keyboard on touch devices.
-        // Never take focus from another pane or control outside this agent.
-        if (focusLikelyOpensSoftwareKeyboard() || !isWorkspacePaneVisible(this.element)) return;
-        const active = document.activeElement;
-        if (active && active !== document.body && !this.element.contains(active)) return;
-        this.inputTarget.focus();
       }
       // Gespenst captures touch pointers as terminal mouse drags. Defer mouse input
       // until a completed tap so a swipe cannot click or select in the TUI.
@@ -160,7 +125,6 @@ export const atelierClientModule: WorkspaceClientModule = {
         const link = viewer.activateFileLinkAt(clientX, clientY);
         // Focusing after the asynchronous lookup loses the touch gesture on
         // mobile Safari, so it cannot open the software keyboard.
-        this.enterRawMode();
         viewer.focus();
         void link.then((opened) => {
           if (opened || this.viewer !== viewer) return;
@@ -188,15 +152,6 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.momentum = requestAnimationFrame(frame);
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
-      enterRawMode(): void {
-        if (!this.hasFormTarget || !focusLikelyOpensSoftwareKeyboard()) return;
-        // The shell follows the visual viewport when the keyboard appears. Keep
-        // the terminal's original geometry and pin its last row to the new bottom
-        // rather than fitting (and resizing the remote tmux) to the smaller pane.
-        this.element.style.setProperty("--cli-terminal-height", `${this.terminalTarget.getBoundingClientRect().height}px`);
-        this.element.classList.add("cli-raw-mode");
-        this.returnTarget.hidden = false;
-      }
       showTranscript(): void {
         if (!this.hasTranscriptTarget) return;
         this.element.classList.add("cli-transcript-mode");
@@ -206,19 +161,11 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.element.classList.remove("cli-transcript-mode");
         this.viewer?.refresh();
       }
-      showComposer(): void {
-        this.element.classList.remove("cli-raw-mode");
-        this.element.style.removeProperty("--cli-terminal-height");
-        this.keyboardWasOpen = false;
-        if (this.hasFormTarget) this.returnTarget.hidden = true;
-        this.viewer?.refresh();
-      }
       inputKeydown(event: KeyboardEvent): void {
         if (this.element.querySelector(".agent-completion-menu-host:not([hidden])")) return;
         const submitKey = composerSubmitKey(event);
         if (!submitKey) return;
         event.preventDefault();
-        if (submitKey === "software-keyboard") this.inputTarget.blur();
         this.formTarget.requestSubmit();
       }
       async submit(event: SubmitEvent): Promise<void> {
@@ -233,29 +180,26 @@ export const atelierClientModule: WorkspaceClientModule = {
           status.hidden = true;
           this.viewer.pressEnter();
           setTextInputValue(this.inputTarget, "");
-          this.element.dispatchEvent(new Event("mobile-composer:sent"));
+          this.element.dispatchEvent(new Event("agent-composer:sent"));
           return;
         }
         const draftText = this.inputTarget.value;
         this.sending = true;
         status.hidden = true;
         try {
-          if (!await this.deliver(data)) {
-            if (this.inputTarget.value === draftText) setTextInputValue(this.inputTarget, "");
-            return;
-          }
-          this.element.dispatchEvent(new Event("mobile-composer:sent"));
+          const delivered = await this.deliver(data);
           if (this.inputTarget.value === draftText) {
             setTextInputValue(this.inputTarget, "");
           }
           const sentIds = data.getAll("attachment").map(String);
-          if (sentIds.length) {
+          if (delivered && sentIds.length) {
             const consumed = await fetch(`${form.action}/consumed`, { method: "POST", body: data });
             if (!consumed.ok) throw new Error("Prompt sent, but attachments could not be cleared.");
             for (const chip of form.querySelectorAll(".agent-chip:not(.uploading)")) {
               if (sentIds.includes(chip.querySelector<HTMLInputElement>('input[name="attachment"]')!.value)) chip.remove();
             }
           }
+          this.element.dispatchEvent(new Event("agent-composer:sent"));
         } catch (error) { showError(error instanceof Error ? error.message : String(error)); }
         finally { this.sending = false; }
       }
@@ -267,7 +211,10 @@ export const atelierClientModule: WorkspaceClientModule = {
         data.set("attachmentDraft", String(new FormData(this.formTarget).get("attachmentDraft")));
         this.sending = true;
         status.hidden = true;
-        try { await this.deliver(data); }
+        try {
+          await this.deliver(data);
+          this.element.dispatchEvent(new Event("agent-composer:sent"));
+        }
         catch (error) { status.textContent = error instanceof Error ? error.message : String(error); status.hidden = false; }
         finally { this.sending = false; }
       }
@@ -290,8 +237,27 @@ export const atelierClientModule: WorkspaceClientModule = {
       retry(): void {
         this.viewer!.reconnect();
       }
-      focus(): void { this.viewer?.focus(); }
-      refresh(): void { this.viewer?.refresh(); }
+      focus(): void { this.start(); this.viewer?.focus(); }
+      refresh(): void {
+        if (!this.hasTerminalTarget || !isWorkspacePaneVisible(this.element)) return;
+        const viewport = window.visualViewport!;
+        const width = this.element.clientWidth;
+        // Text focus can belong to a hardware keyboard. Only an actually
+        // occluded layout viewport freezes geometry; keep that state through
+        // blur until the software keyboard's closing animation has finished.
+        this.keyboardOccluded = focusLikelyOpensSoftwareKeyboard()
+          && viewport.height < document.documentElement.clientHeight - 1
+          && (isTextEntry(document.activeElement) || this.keyboardOccluded);
+        // Retain the actual unobscured geometry, not pane height plus keyboard
+        // occlusion: shell chrome also disappears while the keyboard is open.
+        if (!this.terminalHeight || width !== this.paneWidth || !this.keyboardOccluded) {
+          const stage = this.terminalTarget.parentElement!;
+          this.terminalHeight = this.element.clientHeight - stage.offsetTop;
+          this.paneWidth = width;
+        }
+        this.element.style.setProperty("--cli-terminal-height", `${this.terminalHeight}px`);
+        this.viewer?.refresh();
+      }
       theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
     });
   },

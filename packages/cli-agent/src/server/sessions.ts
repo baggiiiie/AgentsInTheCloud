@@ -16,7 +16,6 @@ const sessionSchema = Type.Object({
   id: Type.String(), title: Type.String(), tmuxSession: Type.String(), input: inputSchema,
   // Older Codex tabs have no kind. Reading them must never execute their saved prompts.
   kind: Type.Optional(Type.String()), error: Type.Optional(Type.String()),
-  firstPresentation: Type.Optional(Type.Boolean()),
   model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()),
   historySlug: Type.Optional(Type.String()),
 });
@@ -48,7 +47,7 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
   async function launch(workspaceId: string, input: WorkspaceAgentInput, settings: AgentWorkspaceParameters): Promise<string> {
     await adapter.requireSetup();
     const id = crypto.randomUUID();
-    const session: CliSession = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel, firstPresentation: !input.text.trim() && !input.images.length && !input.attachmentNotes.length };
+    const session: CliSession = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel };
     // Claim before side effects. Recovery must never submit the initial prompt twice.
     store().write(workspaceId, { sessions: [...list(workspaceId), session] });
     const ready = Promise.withResolvers<void>();
@@ -137,12 +136,6 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     await starting.get(id);
     return get(workspaceId, id);
   }
-  function acknowledgeFirstPresentation(workspaceId: string, id: string): void {
-    const session = get(workspaceId, id);
-    if (!session.firstPresentation) return;
-    session.firstPresentation = false;
-    store().write(workspaceId, { sessions: list(workspaceId) });
-  }
   async function terminalState(workspaceId: string, session: CliSession): Promise<{ starting?: boolean; exists: boolean; ended: boolean; exitCode?: number }> {
     if (starting.has(session.id)) return { starting: true, exists: false, ended: false };
     const result = await execWorkspaceShell(workspaceId, `tmux list-panes -t ${shellQuote(session.tmuxSession)} -F '#{pane_dead}:#{pane_dead_status}'`);
@@ -184,7 +177,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
     for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
   }
-  return { list, get, ready, create, prepareWorkspace, acknowledgeFirstPresentation, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
+  return { list, get, ready, create, prepareWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
 }
 
 export type CliSessions = ReturnType<typeof createCliSessions>;

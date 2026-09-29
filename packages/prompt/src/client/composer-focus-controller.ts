@@ -1,14 +1,15 @@
 import { focusLikelyOpensSoftwareKeyboard, type WorkspaceClientControllerConstructor } from "@atelier/shared";
 
-/** Keep a tap's target in place until its native click has activated it. */
+/** Preserve editor focus on submit and keep touch controls in place until click. */
 export function createComposerFocusController(Controller: WorkspaceClientControllerConstructor) {
   return class ComposerFocusController extends Controller {
     preserveInputFocus(event: MouseEvent): void {
-      if (!focusLikelyOpensSoftwareKeyboard()) return;
       if (event.button !== 0 || !(event.target instanceof Element)) return;
       const control = event.target.closest("button, a[href]");
+      if (!focusLikelyOpensSoftwareKeyboard() && !(control instanceof HTMLButtonElement && control.type === "submit")) return;
+      if (!control?.closest(".composer, .agent-composer-opener")) return;
       const input = document.activeElement;
-      if (!control || !this.element.contains(control) || !(input instanceof HTMLTextAreaElement) || !this.element.contains(input)) return;
+      if (!this.element.contains(control) || !(input instanceof HTMLTextAreaElement) || !this.element.contains(input)) return;
 
       // On iOS, moving focus before click dismisses the keyboard and can move
       // the composer out from under the tap. Cancel only mousedown's focus

@@ -32,7 +32,7 @@ export class TranscriptNavigation {
   private readonly composerOpener: HTMLElement | null;
 
   constructor(private readonly transcript: HTMLElement, private readonly content: HTMLElement, private readonly latestButton: HTMLElement, composer: HTMLElement) {
-    this.composerOpener = transcript.parentElement!.querySelector<HTMLElement>(".mobile-composer-opener > button");
+    this.composerOpener = transcript.parentElement!.querySelector<HTMLElement>(".agent-composer-opener > button");
     this.resizeObserver = new ResizeObserver(this.layoutChanged);
     this.resizeObserver.observe(transcript);
     this.resizeObserver.observe(composer);

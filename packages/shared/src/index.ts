@@ -488,7 +488,7 @@ export {
   setTextInputValue
 } from "./text-input.ts";
 
-export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking } from "./software-keyboard.ts";
+export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking, isTextEntry } from "./software-keyboard.ts";
 export { isApplePlatform } from "./platform.ts";
 
 export type { CableChannelAdapter, CableChannelSubscription } from "./cable.ts";

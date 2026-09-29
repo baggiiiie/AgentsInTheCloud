@@ -194,9 +194,9 @@ export function createWorkspacePresentationController(
       if (!document.hasFocus() || focusLikelyOpensSoftwareKeyboard()) return;
       const pane = this.visiblePanes().find(item => item.dataset.workspacePaneRole === "agent");
       if (!pane) return;
-      const cli = pane.querySelector<HTMLElement>("[data-controller~='cli-terminal']");
-      if (cli) cli.dispatchEvent(new Event("atelier:workspace-agent-focus"));
-      else pane.querySelector<HTMLTextAreaElement>(".agent-pane .composer-input")?.focus({ preventScroll: true });
+      const composer = pane.querySelector<HTMLTextAreaElement>(".agent-composer-open .composer-input");
+      if (composer) composer.focus({ preventScroll: true });
+      else pane.querySelector<HTMLElement>("[data-controller~='cli-terminal']")?.dispatchEvent(new Event("atelier:workspace-agent-focus"));
     }
 
     selectWorkView(event: Event): void {
