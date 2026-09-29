@@ -28,7 +28,9 @@ export {
 export {
   createProjectSshKey,
   deleteProjectSshKey,
+  deriveProjectSshPublicKey,
   listProjectSshKeys,
+  renameProjectSshKey,
   revealProjectSshKeys,
 } from "./ssh-keys.ts";
 

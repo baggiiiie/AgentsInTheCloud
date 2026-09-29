@@ -81,6 +81,13 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
         get: { summary: "Inspect project configuration", parameters: [projectId], responses: jsonResponse("Project configuration", { $ref: "#/components/schemas/ProjectConfigurationEnvelope" }) },
         post: { summary: "Update a project", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["name", "gitUrl"], properties: { name: { type: "string" }, gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Project updated", { $ref: "#/components/schemas/ProjectEnvelope" }) },
       },
+      "/projects/{projectId}/ssh-keys/{keyId}/public-key": {
+        get: {
+          summary: "Derive the public key from a stored project private key",
+          parameters: [projectId, { name: "keyId", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "OpenSSH public key", content: { "text/plain": { schema: { type: "string" } } } } },
+        },
+      },
       "/projects/{projectId}/ssh-known-hosts": {
         get: { summary: "Read explicitly trusted SSH server keys", parameters: [projectId], responses: jsonResponse("Trusted host keys", sshKnownHostsSchema) },
         post: { summary: "Save operator-verified known_hosts entries for future workspace preparation", parameters: [projectId], requestBody: jsonBody(sshKnownHostsSchema), responses: jsonResponse("Trusted host keys saved", sshKnownHostsSchema) },

@@ -57,7 +57,7 @@ const storedProjectSshKeySchema = Type.Object({
   id: Type.String(),
   projectId: Type.String(),
   keyType: Type.String(),
-  fingerprint: Type.String(),
+  name: Type.Optional(Type.String()),
   createdAt: Type.String(),
   encryptedPrivateKey: Type.String(),
 });
@@ -143,7 +143,13 @@ export function parseProjectSpec(spec: string): { gitUrl: string; branch: string
 
 export async function readProjectStore(file: string): Promise<ProjectStore> {
   try {
-    return Value.Parse(projectStoreSchema, JSON.parse(await readFile(file, "utf8")));
+    const store = Value.Parse(projectStoreSchema, JSON.parse(await readFile(file, "utf8")));
+    // Older records may contain derived SSH metadata; keep only the encrypted key and its label.
+    for (const project of store.projects) for (const key of project.sshKeys ?? []) {
+      Reflect.deleteProperty(key, "publicKey");
+      Reflect.deleteProperty(key, "fingerprint");
+    }
+    return store;
   } catch (error) {
     const code = error instanceof Error && "code" in error ? error.code : undefined;
     if (code === "ENOENT") return { projects: [] };

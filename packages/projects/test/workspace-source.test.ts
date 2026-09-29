@@ -184,7 +184,8 @@ describe("workspace source preparation", () => {
     const keyPath = join(dataDir, "live-key");
     await run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", keyPath]);
     const key = await createProjectSshKey(project.id, await Bun.file(keyPath).text());
-    expect((await listed(environment)).output).toContain(key.fingerprint);
+    const fingerprint = (await run(["ssh-keygen", "-lf", `${keyPath}.pub`])).stdout.split(/\s+/)[1]!;
+    expect((await listed(environment)).output).toContain(fingerprint);
     expect((await listed(other)).status).toBe(1);
     await deleteProjectSshKey(project.id, key.id);
     expect((await listed(environment)).status).toBe(1);

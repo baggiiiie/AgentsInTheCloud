@@ -13,11 +13,11 @@ import {
   addProject, createProjectEnvironmentVariable,
   createProjectSecret,
   createProjectSshKey,
-  deleteProject, deleteProjectEnvironmentVariable, deleteProjectSecret, deleteProjectSshKey,
+  deleteProject, deleteProjectEnvironmentVariable, deleteProjectSecret, deleteProjectSshKey, deriveProjectSshPublicKey,
   formatProjectSpec, getProjectConfiguration,
   getProjectSshKnownHosts,
   listProjectEnvironmentVariables, listProjectSecrets,
-  listProjectSshKeys, listProjects, parseProjectSpec,
+  listProjectSshKeys, listProjects, parseProjectSpec, renameProjectSshKey,
   projectSecretRoutingRevision, projectSecretValueInputSchema,
   secretNeedsValue,
   setProjectDockerfile, setProjectPreloadImages,
@@ -203,14 +203,24 @@ export function createProjectRoutes(deps: {
     const configuredKeys = keys.map((key) => {
       const removeButton = destructiveConfirmationHtml({
         id: domId("remove_ssh_key", project.id, key.id),
-        trigger: { type: "button", variant: "danger", content: { kind: "caption", caption: "Remove SSH key" } },
+        trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Remove SSH key" } },
         confirmCaption: "Remove SSH key",
         cancelCaption: "Cancel",
       });
-      return `<form class="project-ssh-key-configured" method="post" action="${projectPath}/ssh-keys/${encodeURIComponent(key.id)}/delete" data-turbo="true"><span title="${escapeHtml(`${key.keyType} ${key.fingerprint}`)}"><code>${escapeHtml(key.keyType)}</code> <code>${escapeHtml(key.fingerprint)}</code></span>${removeButton}</form>`;
+      const keyPath = `${projectPath}/ssh-keys/${encodeURIComponent(key.id)}`;
+      const copyButton = transientFeedbackHtml({
+        element: { tag: "button", attributesHtml: `type="button" aria-label="Copy public key" data-action="click->ssh-public-key-copy#copy"` },
+        initialContent: { kind: "text", text: "Copy" },
+        feedbackContent: { kind: "text", text: "Copied" },
+        state: "initial",
+      });
+      return `<div class="project-ssh-key-configured"><div class="project-ssh-key-heading"><form method="post" action="${keyPath}" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving"><label><span>Name</span><input class="text-field" name="name" aria-label="SSH key name" placeholder="Name this key" value="${escapeHtml(key.name ?? "")}" autocomplete="off"></label></form><form method="post" action="${keyPath}/delete" data-turbo="true">${removeButton}</form></div><div class="project-ssh-key-public" data-controller="ssh-public-key-copy" data-ssh-public-key-copy-url-value="${keyPath}/public-key"><span>Public key</span><code>${escapeHtml(key.keyType)} …</code>${copyButton}<span class="project-ssh-key-copy-error" data-ssh-public-key-copy-target="error" role="status" hidden>Could not copy key</span></div></div>`;
     }).join("");
-    return `<div class="project-ssh-key-fields" id="${domId("project_ssh_key_fields", project.id)}"><p>Keys stay encrypted outside workspaces.</p>${configuredKeys}<form class="project-ssh-key-form" method="post" action="${projectPath}/ssh-keys" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving submit->settings-autosave#submit">
-      <label><span>Add a new private key</span><textarea class="textarea" name="privateKey" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA…\n-----END OPENSSH PRIVATE KEY-----" autocomplete="off" required></textarea></label>
+    return `<div class="project-ssh-key-fields" id="${domId("project_ssh_key_fields", project.id)}"><div class="project-ssh-key-list">${configuredKeys}</div><form class="project-ssh-key-form" method="post" action="${projectPath}/ssh-keys" data-turbo="true">
+      <h4>Add a key</h4>
+      <input class="text-field" name="name" aria-label="New SSH key name" placeholder="Name (optional)" autocomplete="off">
+      <textarea class="textarea" name="privateKey" aria-label="Private key" placeholder="Paste private key" autocomplete="off" spellcheck="false" required></textarea>
+      <div class="project-ssh-key-form-footer"><span>Encrypted outside workspaces</span>${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Add key" } })}</div>
     </form></div>`;
   }
 
@@ -223,7 +233,7 @@ export function createProjectRoutes(deps: {
 
   function projectSshKeyEditor(project: ProjectSummary, keys: ProjectSshKeySummary[], knownHosts: string, section?: ProjectSettingsSection): string {
     return `<section class="project-configuration-list project-ssh-key" id="${domId("project_ssh_key", project.id)}"${revealSection(section, "ssh-keys")}>
-      ${projectConfigurationDisclosure("Configure SSH private keys", projectSshKeyFields(project, keys), section === "ssh-keys")}
+      ${projectConfigurationDisclosure("SSH keys", projectSshKeyFields(project, keys), section === "ssh-keys")}
       ${projectConfigurationDisclosure("Trusted SSH servers", projectSshHostTrustFields(project.id, knownHosts))}
     </section>`;
   }
@@ -379,7 +389,7 @@ export function createProjectRoutes(deps: {
     return projectSettingsResponse(request, { project }, async () => "");
   }
 
-  type ProjectSettingsResult = { knownHosts: string } | { project: ProjectSummary } | { secret: ProjectSecretSummary; deleted?: true } | { environmentVariable: ProjectEnvironmentVariable; deleted?: true };
+  type ProjectSettingsResult = { knownHosts: string } | { project: ProjectSummary } | { secret: ProjectSecretSummary; deleted?: true } | { environmentVariable: ProjectEnvironmentVariable; deleted?: true } | { key: ProjectSshKeySummary };
 
   /** Every settings mutation refreshes workspace warnings, including JSON callers. */
   async function projectSettingsResponse(request: Request, result: ProjectSettingsResult, renderFields: () => Promise<string> = async () => ""): Promise<Response> {
@@ -528,8 +538,14 @@ export function createProjectRoutes(deps: {
 
   async function createProjectSshKeyFromForm(projectId: string, request: Request): Promise<Response> {
     const formData = await request.formData();
-    await createProjectSshKey(projectId, String(formData.get("privateKey") ?? ""));
+    await createProjectSshKey(projectId, String(formData.get("privateKey") ?? ""), undefined, undefined, String(formData.get("name") ?? ""));
     return turboStreamResponse(await renderProjectSshKeyStreams(projectId));
+  }
+
+  async function renameProjectSshKeyEndpoint(projectId: string, keyId: string, request: Request): Promise<Response> {
+    const name = requestAcceptsJson(request) ? jsonString(await readJsonObject(request), "name") : String((await request.formData()).get("name") ?? "");
+    const key = await renameProjectSshKey(projectId, keyId, name);
+    return projectSettingsResponse(request, { key }, () => renderProjectSshKeyStreams(projectId));
   }
 
   async function deleteProjectSshKeyFromForm(projectId: string, keyId: string): Promise<Response> {
@@ -611,6 +627,8 @@ export function createProjectRoutes(deps: {
       if (request.method === "POST") return updateProjectSshKnownHostsEndpoint(projectId, request);
     }
     if ((params = match(/^\/projects\/([^/]+)\/ssh-keys$/)) && request.method === "POST") return await createProjectSshKeyFromForm(params[0]!, request);
+    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/public-key$/)) && request.method === "GET") return new Response(await deriveProjectSshPublicKey(params[0]!, params[1]!), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)$/)) && request.method === "POST") return await renameProjectSshKeyEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSshKeyFromForm(params[0]!, params[1]!);
     if ((params = match(/^\/projects\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEndpoint(params[0]!, request);
     if ((params = match(/^\/project-agent-workspaces\/([^/]+)$/)) && request.method === "POST") return await createProjectAgentWorkspaceEndpoint(params[0]!, request);

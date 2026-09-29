@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProject, deleteProjectEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createProjectSshKey, listProjectEnvironmentVariables, listProjectSecrets, listProjectSshKeys, listProjects, parseProjectSpec, revealProjectSecrets, revealProjectSshKeys, setGitIdentity, updateProject, updateProjectEnvironmentVariable, updateProjectSecret } from "@atelier/projects";
+import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProject, deleteProjectEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createProjectSshKey, deriveProjectSshPublicKey, listProjectEnvironmentVariables, listProjectSecrets, listProjectSshKeys, listProjects, parseProjectSpec, revealProjectSecrets, revealProjectSshKeys, renameProjectSshKey, setGitIdentity, updateProject, updateProjectEnvironmentVariable, updateProjectSecret } from "@atelier/projects";
 
 describe("projects", () => {
   test("parseProjectSpec supports an optional #branch suffix", () => {
@@ -126,6 +126,23 @@ describe("projects", () => {
     const second = await createProjectSshKey(project.id, privateKey, file, keyFile);
 
     expect(await listProjectSshKeys(project.id, file)).toEqual([first, second]);
+    const publicKey = await deriveProjectSshPublicKey(project.id, first.id, file, keyFile);
+    expect(publicKey).toMatch(/^ssh-ed25519 /);
+    expect(await deriveProjectSshPublicKey(project.id, second.id, file, keyFile)).toBe(publicKey);
+    expect(await renameProjectSshKey(project.id, first.id, "  GitHub deploy key  ", file)).toEqual({ ...first, name: "GitHub deploy key" });
+    expect((await listProjectSshKeys(project.id, file))[0]?.name).toBe("GitHub deploy key");
+    const oldStore = JSON.parse(await readFile(file, "utf8"));
+    delete oldStore.projects[0].sshKeys[1].name;
+    oldStore.projects[0].sshKeys[1].publicKey = publicKey;
+    oldStore.projects[0].sshKeys[1].fingerprint = "SHA256:legacy";
+    await writeFile(file, JSON.stringify(oldStore));
+    expect(await deriveProjectSshPublicKey(project.id, second.id, file, keyFile)).toBe(publicKey);
+    expect((await listProjectSshKeys(project.id, file))[1]).not.toHaveProperty("publicKey");
+    expect((await listProjectSshKeys(project.id, file))[1]).not.toHaveProperty("fingerprint");
+    expect((await listProjectSshKeys(project.id, file))[1]?.name).toBeUndefined();
+    await renameProjectSshKey(project.id, second.id, "Legacy key", file);
+    expect(await readFile(file, "utf8")).not.toContain('"publicKey"');
+    expect(await readFile(file, "utf8")).not.toContain('"fingerprint"');
     expect(await readFile(file, "utf8")).not.toContain("OPENSSH PRIVATE KEY");
     expect(await revealProjectSshKeys(project.id, file, keyFile)).toEqual([privateKey, privateKey]);
     expect((await listProjects(file)).projects[0]).toEqual({ ...project, configurationFingerprint: expect.any(String) });

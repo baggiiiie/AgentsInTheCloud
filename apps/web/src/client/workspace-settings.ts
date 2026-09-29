@@ -1,4 +1,6 @@
 import type { ToggleChangeEvent } from "@atelier/design-system/toggle/client";
+import { showTransientFeedback } from "@atelier/design-system/transient-feedback/client";
+import { copyTextToClipboard } from "@atelier/shared";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 
@@ -190,11 +192,37 @@ class ServerFilterController extends Controller {
   }
 }
 
+class SshPublicKeyCopyController extends Controller<HTMLElement> {
+  static values = { url: String };
+  static targets = ["error"];
+  declare readonly urlValue: string;
+  declare readonly errorTarget: HTMLElement;
+
+  async copy(event: Event): Promise<void> {
+    // SAFETY: The action is bound only to the server-rendered copy button.
+    const button = event.currentTarget as HTMLButtonElement;
+    button.disabled = true;
+    this.errorTarget.hidden = true;
+    try {
+      const response = await fetch(this.urlValue);
+      if (!response.ok) throw new Error(`Could not derive public key: HTTP ${response.status}`);
+      await copyTextToClipboard(await response.text());
+      showTransientFeedback(button);
+    } catch (error) {
+      this.errorTarget.hidden = false;
+      throw error;
+    } finally {
+      button.disabled = false;
+    }
+  }
+}
+
 export function registerWorkspaceSettingsControllers(): void {
   registerWorkspaceControllers({
     "atelier-theme": AtelierThemeController,
     "git-identity": GitIdentityController,
     "settings-autosave": SettingsAutosaveController,
+    "ssh-public-key-copy": SshPublicKeyCopyController,
     "project-settings": ProjectSettingsController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,

@@ -158,12 +158,22 @@ a { color: inherit; text-decoration: none; }
 .project-configuration-disclosure > summary { list-style: none; }
 .project-configuration-disclosure > summary::-webkit-details-marker { display: none; }
 .project-configuration-disclosure > :is(.project-configuration-grid, .project-secrets-list, .project-ssh-key-fields) { padding: 8px; }
-.project-ssh-key-fields { display: grid; gap: 8px; }
-.project-ssh-key-form label { display: grid; gap: 4px; }
-.project-ssh-key-form .textarea { min-height: 88px; background: var(--bg); font-family: var(--font-mono); line-height: var(--leading-standard); }
-.project-ssh-key-configured { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.project-ssh-key-configured > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-ssh-key-configured code { font-family: var(--font-mono); }
+.project-ssh-key-fields { display: grid; gap: 16px; }
+.project-ssh-key-list { display: grid; gap: 8px; }
+.project-ssh-key-configured { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-surface); }
+.project-ssh-key-heading { display: flex; align-items: end; gap: 12px; }
+.project-ssh-key-heading > form:first-child { flex: 1; min-width: 0; }
+.project-ssh-key-heading label { display: grid; gap: 4px; }
+.project-ssh-key-heading label > span, .project-ssh-key-public > span { color: var(--text-muted); font-size: var(--text-small); }
+.project-ssh-key-public { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.project-ssh-key-public > span { flex: 0 0 72px; }
+.project-ssh-key-public code { flex: 1; min-width: 0; font-size: var(--text-small); }
+.project-ssh-key-copy-error:not([hidden]) { color: var(--danger); font-size: var(--text-small); }
+.project-ssh-key-form { display: grid; gap: 8px; }
+.project-ssh-key-form h4 { margin: 0; font-size: var(--text-body); }
+.project-ssh-key-form .textarea { min-height: 80px; background: var(--bg); font-family: var(--font-mono); line-height: var(--leading-standard); }
+.project-ssh-key-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-ssh-key-form-footer > span { color: var(--text-muted); font-size: var(--text-small); }
 .project-edit-danger-zone { margin-top: 24px; }
 .project-instance-url { display: flex; align-items: center; gap: 8px; }
 .project-instance-url a { min-width: 0; overflow-wrap: anywhere; }
