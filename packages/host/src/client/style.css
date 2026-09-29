@@ -36,7 +36,7 @@
 .host-terminals { display: grid; gap: 10px; min-width: 0; }
 .host-terminal-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .host-terminal-heading > .tab-strip { flex: 0 1 auto; }
-.host-terminal-screen { height: clamp(260px, 36dvh, 480px); min-width: 0; overflow: hidden; position: relative; font: var(--text-code)/var(--leading-standard) var(--font-mono); }
+.host-terminal-screen.observable-terminal-host { height: clamp(260px, 36dvh, 480px); min-width: 0; overflow: hidden; position: relative; font: var(--text-code)/var(--leading-standard) var(--font-mono); }
 .host-error { display: flex; align-items: start; gap: 8px; color: var(--danger); }
 .host-error p { flex: 1; }
 .host-empty { margin: 0; padding: 8px 0 16px; color: var(--text); line-height: var(--leading-copy); }
