@@ -162,7 +162,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.viewer?.refresh();
       }
       inputKeydown(event: KeyboardEvent): void {
-        if (this.element.querySelector(".agent-completion-menu-host:not([hidden])")) return;
+        if (this.element.querySelector<HTMLElement>(".agent-completion-menu-host:not([hidden])")?.checkVisibility()) return;
         const submitKey = composerSubmitKey(event);
         if (!submitKey) return;
         event.preventDefault();

@@ -68,7 +68,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
             </div>
           </div>` : "";
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${composerAttachmentAttributes(draftId, rowId, `atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:workspace-agent-focus->cli-terminal#focus atelier:theme-change@document->cli-terminal#theme ${agentComposerActions} agent-composer:sent->agent-composer#sent`)}>
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${composerAttachmentAttributes(draftId, rowId, `atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:workspace-agent-focus->cli-terminal#focus atelier:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             <div class="cli-agent-stage">
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}

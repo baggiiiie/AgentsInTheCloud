@@ -231,7 +231,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     }
 
     inputKeydown(event: KeyboardEvent): void {
-      const completionMenuOpen = Boolean(this.element.querySelector(".agent-completion-menu-host:not([hidden])"));
+      const completionMenuOpen = Boolean(this.element.querySelector<HTMLElement>(".agent-completion-menu-host:not([hidden])")?.checkVisibility());
       if (!completionMenuOpen && this.promptHistory.keydown(event, this.inputTarget, () => this.userPrompts())) return;
 
       // Enter inserts a newline when typing with a hardware keyboard. A software
@@ -338,6 +338,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
           if (consumed.has(input.value)) input.closest(".agent-chip")!.remove();
         });
       }
+      this.element.dispatchEvent(new Event("agent-composer:sent"));
     }
   };
 }

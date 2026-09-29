@@ -5,7 +5,7 @@ import { escapeHtml } from "@atelier/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
 
-export const agentComposerActions = "atelier:workspace-pane-visible@document->agent-composer#selected atelier:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal";
+export const agentComposerActions = "atelier:workspace-pane-visible@document->agent-composer#selected atelier:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sent->agent-composer#sent";
 
 const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg>';
 

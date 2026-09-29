@@ -1,4 +1,4 @@
-import { focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, phoneLayoutMediaQuery, type WorkspaceClientControllerConstructor } from "@atelier/shared";
 
 /** Composer visibility is independent of input focus and the software keyboard. */
 export function createAgentComposerController(Controller: WorkspaceClientControllerConstructor) {
@@ -68,6 +68,7 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
     }
 
     sent(): void {
+      if (this.element.classList.contains("agent-pane") && !window.matchMedia(phoneLayoutMediaQuery).matches) return;
       this.close();
       if (!focusLikelyOpensSoftwareKeyboard() && isWorkspacePaneVisible(this.element) && document.hasFocus()) {
         this.element.dispatchEvent(new Event("atelier:workspace-agent-focus"));
