@@ -3,7 +3,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { HttpRequestBlockedError } from "@atelier/proxy-egress/server";
-import { anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
+import { availableProviderModels, anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
 // Every use is checked against the *current* host-side catalogue and authentication.
@@ -15,7 +15,7 @@ const markerSchema = Type.Object({
   style: Type.Union([Type.Literal("plain"), Type.Literal("codex"), Type.Literal("sk")]),
 });
 type Marker = Static<typeof markerSchema>;
-type Runtime = Pick<ModelRuntime, "getAvailable" | "getModel"> & { getAuth(model: Model<Api>): Promise<AuthResult | undefined> };
+type Runtime = Pick<ModelRuntime, "getAvailable" | "getModel" | "checkAuth"> & { getAuth(model: Model<Api>): Promise<AuthResult | undefined> };
 const markerPattern = /atelier-pi-([A-Za-z0-9_-]+)-end/g;
 
 function markerToken(marker: Marker): string {
@@ -71,7 +71,7 @@ export interface PiCliConfiguration {
 /** Export resolved model configuration, never raw models.json (which may contain secrets or commands). */
 export async function createPiCliConfiguration(runtime: Runtime, favorites: ConfiguredModel[]): Promise<PiCliConfiguration> {
   const result: PiCliConfiguration = { auth: {}, models: { providers: {} }, enabledModels: [] };
-  const available = await runtime.getAvailable();
+  const available = await availableProviderModels(runtime);
   const favoriteLabels = new Map(favorites.map((model) => [modelRefValue(model), model.label]));
   for (const model of available) {
     const auth = await runtime.getAuth(model);
@@ -97,7 +97,7 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
 /** Resolve current endpoints on each CONNECT, including OAuth endpoint overrides. */
 export async function piCliCredentialHosts(runtime: Runtime): Promise<string[]> {
   const hosts = new Set<string>();
-  for (const model of await runtime.getAvailable()) {
+  for (const model of await availableProviderModels(runtime)) {
     const auth = await runtime.getAuth(model);
     if (!auth) throw new Error(`Provider disconnected while resolving Pi endpoints: ${model.provider}`);
     if (!unsupportedAuth(model, auth)) hosts.add(endpoint(model, auth).hostname);
@@ -137,7 +137,7 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
         catch { throw new HttpRequestBlockedError("Invalid Pi credential placeholder"); }
         const { model, auth } = await resolve({ provider: marker.provider, id: marker.model });
         // Provider API keys are shared by its models, including providers with multiple API endpoints.
-        const candidates = marker.field === "header" ? [model] : await runtime.getAvailable(marker.provider);
+        const candidates = marker.field === "header" ? [model] : await availableProviderModels(runtime, marker.provider);
         const allowed = candidates.some((candidate) => endpoint(candidate, auth).origin === url.origin);
         if (!allowed) throw new HttpRequestBlockedError(`Pi credentials are not allowed for ${url.origin}`);
         let replacement: string | null | undefined;

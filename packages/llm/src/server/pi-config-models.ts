@@ -1,3 +1,4 @@
+import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { providerAvailability } from "./provider-availability.ts";
 import type { ModelRef } from "./model-reference.ts";
 import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
@@ -270,7 +271,7 @@ export async function disconnectModelProvider(provider: string): Promise<void> {
 
 export async function seedProviderFavoriteModels(provider: string): Promise<void> {
   const runtime = await createPiModelRuntime();
-  const available = await runtime.getAvailable(provider);
+  const available = await availableProviderModels(runtime, provider);
   const defaults = defaultProviderModels(provider, available);
   await updateModelSettings((settings) => {
     const favorites = settings.picker ?? [];

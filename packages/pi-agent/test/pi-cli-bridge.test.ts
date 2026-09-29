@@ -17,6 +17,7 @@ function fixture(models: Model<Api>[], auth: Record<string, AuthResult>) {
   return {
     models, auth,
     getAvailable: async (provider?: string) => models.filter((m) => (!provider || m.provider === provider) && auth[m.provider]),
+    checkAuth: async (provider: string) => auth[provider] ? { type: auth[provider]!.source === "OAuth" ? "oauth" as const : "api_key" as const } : undefined,
     getModel: (provider: string, id: string) => models.find((m) => m.provider === provider && m.id === id),
     getAuth: async (ref: Model<Api>) => auth[ref.provider],
   };

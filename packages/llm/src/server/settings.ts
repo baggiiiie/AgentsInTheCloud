@@ -1,3 +1,4 @@
+import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { anthropicSubscriptionNotice, usesAnthropicSubscription } from "./anthropic-subscription.ts";
 import { providerConnections, type ProviderConnection } from "./provider-connections.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
@@ -49,7 +50,7 @@ async function providerCatalogue(provider: string): Promise<ModelCatalogueEntry[
   const runtime = await createPiModelRuntime();
   const favorites = (await getConfiguredModels()).filter((model) => model.provider === provider);
   const favoriteById = new Map(favorites.map((model) => [model.id, model]));
-  const models = new Map(runtime.getModels(provider).map((model): [string, ModelCatalogueEntry] => [model.id, {
+  const models = new Map((await availableProviderModels(runtime, provider)).map((model): [string, ModelCatalogueEntry] => [model.id, {
     provider, id: model.id, label: favoriteById.get(model.id)?.label ?? modelDisplayName(model.name ?? model.id), configured: favoriteById.has(model.id),
   }]));
   // Keep unavailable favorites visible so they can still be removed.
@@ -143,7 +144,7 @@ function continueButton(provider: string, working: boolean): string {
   return `<span class="${domId("model_setup_continue", provider)}">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Continue" }, disabled: !working })}</span>`;
 }
 async function providerHasFavorite(provider: string): Promise<boolean> {
-  const available = new Set((await (await createPiModelRuntime()).getAvailable(provider)).map((model) => model.id));
+  const available = new Set((await availableProviderModels(await createPiModelRuntime(), provider)).map((model) => model.id));
   return (await getConfiguredModels()).some((model) => model.provider === provider && available.has(model.id));
 }
 async function renderModelSelection(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
