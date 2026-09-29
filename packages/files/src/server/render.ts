@@ -75,7 +75,7 @@ function selectedFileActions(workspaceId: string, view: FilesView, text = true):
     attributesHtml: 'data-file-editor-target="copyButton"',
   });
   const downloadButton = actionLinkHtml({
-    href: contentUrl,
+    href: `${contentUrl}?download=1`,
     variant: "secondary",
     content: {
       kind: "icon-only",

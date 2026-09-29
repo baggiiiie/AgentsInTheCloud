@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { workspaceContainerName } from "@atelier/workspace";
 import { extensionOf, imageMimeByExtension } from "@atelier/prompt/server";
 
@@ -48,6 +49,9 @@ export async function workspaceFileEndpoint(workspaceId: string, path: string, r
   const command = range ? `tail -c +${range.start + 1} ${quoted} | head -c ${range.end - range.start + 1}` : `cat ${quoted}`;
   const proc = Bun.spawn(["docker", "exec", container, "sh", "-c", command], { stdout: "pipe", stderr: "ignore" });
   const headers = new Headers({ "content-type": mimeByExtension[extensionOf(path)] ?? "application/octet-stream", "accept-ranges": "bytes" });
+  if (new URL(request.url).searchParams.has("download")) {
+    headers.set("content-disposition", `attachment; filename*=UTF-8''${encodeURIComponent(posix.basename(path))}`);
+  }
   if (range) {
     headers.set("content-range", `bytes ${range.start}-${range.end}/${size}`);
     headers.set("content-length", String(range.end - range.start + 1));
