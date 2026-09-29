@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAtelierEventBus } from "@atelier/core";
 import { createNextWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
-import { createWorkspaceAgentTabProvider, workspaceAgentTabProvider } from "../../src/server/web.ts";
+import { agentWorkspaceModule, createWorkspaceAgentTabProvider, workspaceAgentTabProvider } from "../../src/server/web.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
 import { agentAttachmentDraftId, findStagedAttachment, stageAttachment } from "@atelier/prompt/server";
 import { readInitialPromptDraft, stageInitialPrompt } from "../../src/server/initial-prompt-draft.ts";
+import { publishWorkspaceAgentBusy } from "../../src/server/workspace-agent-busy.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -28,6 +29,42 @@ afterEach(async () => {
   delete process.env.ATELIER_DATA_DIR;
   if (dir) await rm(dir, { recursive: true, force: true });
   dir = undefined;
+});
+
+test("a delegated agent finishing while its parent works does not request workspace attention", async () => {
+  await dataDir();
+  const root = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+  const childId = crypto.randomUUID();
+  const events = createAtelierEventBus();
+  const surfaceRequests: string[] = [];
+  const workspaceRequests: string[] = [];
+  const busyAgents = new Set<string>();
+  // SAFETY: The event handler under test only uses these context members.
+  agentWorkspaceModule.initialize!({
+    events,
+    registry: {
+      requestSurfaceAttention(_workspaceId: string, key: string) { surfaceRequests.push(key); },
+      requestAttention(workspaceId: string) { workspaceRequests.push(workspaceId); },
+      setAgentBusy(_workspaceId: string, key: string, busy: boolean) {
+        if (busy) busyAgents.add(key);
+        else busyAgents.delete(key);
+      },
+    },
+    invalidateWorkspace() {},
+    registerSocketHandler() {},
+    registerWorkspaceAppResolver() {},
+    onWorkspaceRemoved() {},
+  } as any);
+
+  // The delegated conversation is not a top-level workspace Agent tab.
+  publishWorkspaceAgentBusy({ workspaceId: "workspace-1", agentKey: `agent:${root.conversationId}`, busy: true });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", conversationId: childId });
+  expect(surfaceRequests).toEqual([`agent:${childId}`]);
+  expect(workspaceRequests).toEqual([]);
+  expect(busyAgents.has(`agent:${root.conversationId}`)).toBe(true);
+
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", conversationId: root.conversationId });
+  expect(workspaceRequests).toEqual(["workspace-1"]);
 });
 
 describe("Workspace Agent-tab provider", () => {

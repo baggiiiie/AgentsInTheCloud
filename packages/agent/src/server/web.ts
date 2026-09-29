@@ -193,7 +193,9 @@ export const agentWorkspaceModule: WorkspaceModule = {
       const agent = (await listWorkspaceAgentConversations(workspaceId)).find((item) => item.conversationId === conversationId);
       if (agent) await publishWorkspaceAgentHistory(agent);
       context.registry.requestSurfaceAttention(workspaceId, agentConversationKey(conversationId));
-      context.registry.requestAttention(workspaceId);
+      // Delegated conversations finish independently of the root's turn. Their
+      // completion belongs to the Agent surface, not workspace-level attention.
+      if (agent) context.registry.requestAttention(workspaceId);
       context.invalidateWorkspace(workspaceId);
       await refreshWorkspaceCompletionCatalogs(workspaceId);
     });
