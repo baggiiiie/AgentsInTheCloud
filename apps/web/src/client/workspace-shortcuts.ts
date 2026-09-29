@@ -159,7 +159,15 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
       }
     }
     for (const command of clientHooks.providedCommands()) {
-      if (!commands.has(command.id)) commands.set(command.id, command);
+      if (commands.has(command.id)) continue;
+      // Contextual commands own their binding while their view is available.
+      // Keep displaced commands in the palette, but not in shortcut dispatch.
+      if (command.binding) {
+        for (const [id, existing] of commands) {
+          if (existing.binding === command.binding) commands.set(id, { ...existing, binding: undefined });
+        }
+      }
+      commands.set(command.id, command);
     }
     return [...commands.values()];
   }

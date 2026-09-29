@@ -3,7 +3,18 @@ import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpens
 
 export const atelierClientModule: WorkspaceClientModule = {
   id: "cli-agent",
-  install({ application, Controller }) {
+  install({ application, Controller, hooks }) {
+    const terminals = new Set<{ element: HTMLElement; hasTranscriptTarget: boolean; toggleMode(): void }>();
+    hooks.registerCommandProvider(() => {
+      const terminal = [...terminals].find((controller) => controller.hasTranscriptTarget && isWorkspacePaneVisible(controller.element));
+      return terminal ? [{
+        id: "cli-agent.toggle-mode",
+        label: "Switch terminal / transcript",
+        scope: "agent-conversation",
+        binding: "Meta+Alt+KeyP",
+        run: () => terminal.toggleMode(),
+      }] : [];
+    });
     application.register("cli-terminal", class extends Controller {
       static values = { url: String, workspaceId: String };
       static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptEnd"];
@@ -32,6 +43,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       private resize = new ResizeObserver(() => this.refresh());
 
       connect(): void {
+        terminals.add(this);
         window.addEventListener("atelier:workspace-pane-visible", this.activate);
         if (this.hasFormTarget) {
           setTextInputValue(this.inputTarget, localStorage.getItem(this.draftKey) ?? "");
@@ -64,6 +76,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         });
       }
       disconnect(): void {
+        terminals.delete(this);
         window.removeEventListener("atelier:workspace-pane-visible", this.activate);
         this.resize.disconnect();
         if (this.hasFormTarget) {
@@ -153,6 +166,14 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.momentum = requestAnimationFrame(frame);
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
+      toggleMode(): void {
+        if (this.element.classList.contains("cli-transcript-mode")) {
+          this.showTerminal();
+          this.focus();
+        } else {
+          this.element.querySelector<HTMLAnchorElement>('a[data-action="cli-terminal#showTranscript"]')!.click();
+        }
+      }
       showTranscript(): void {
         if (!this.hasTranscriptTarget) return;
         this.transcriptEndTarget.hidden = true;
