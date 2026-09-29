@@ -58,7 +58,7 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
 
     open(): void {
       this.element.classList.add("agent-composer-open");
-      this.input!.focus({ preventScroll: true });
+      if (!focusLikelyOpensSoftwareKeyboard()) this.input!.focus({ preventScroll: true });
     }
 
     close(): void {
