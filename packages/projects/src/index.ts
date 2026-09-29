@@ -82,4 +82,6 @@ export { projectWorkspaceSettingsSchema, type ProjectWorkspaceSettings } from ".
 export { readProjectWorkspaceSettings, writeProjectWorkspaceSettings, projectWorkspaceInitWithSettings, validateProjectWorkspaceSettings } from "./workspace-settings.ts";
 
 export { getProjectSshKnownHosts, setProjectSshKnownHosts } from "./ssh-host-trust.ts";
+export { sshHostTrustFailure, unknownSshHost, scanSshHost, trustScannedSshHost } from "./ssh-trust-recovery.ts";
+export { onWorkspaceSshTrustChanged, workspaceSshTrustRequests, requestWorkspaceSshTrust, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, type WorkspaceSshTrustRequest } from "./ssh-trust-broker.ts";
 export { isSshAuthenticationFailure } from "./git-access-failure.ts";

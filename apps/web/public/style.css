@@ -104,7 +104,12 @@ a { color: inherit; text-decoration: none; }
 .repo-diff.muted em { color: var(--text-muted); }
 
 .side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 80px; }
-.workspace-boot { height: 100%; min-height: 0; overflow: clip; }
+.workspace-boot { position: relative; height: 100%; min-height: 0; overflow: clip; }
+.workspace-ssh-trust-overlay { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter: blur(3px); }
+.workspace-ssh-trust-overlay > .panel { width: min(620px, 100%); max-height: min(680px, 100%); box-shadow: 0 16px 48px color-mix(in srgb, var(--text) 20%, transparent); }
+.workspace-ssh-trust-overlay .panel__body p + p { margin-top: 12px; }
+.workspace-ssh-trust-overlay code { overflow-wrap: anywhere; }
+.workspace-ssh-trust-overlay .text-field { display: block; margin-top: 8px; width: 100%; }
 .workspace-boot .main, .workspace-boot .body { height: 100%; }
 .workspace-boot .body { display: flex; flex-direction: column; gap: 24px; padding-top: 0; overflow: hidden; }
 .workspace-boot-progress { min-height: 0; flex: 1; overflow: auto; padding-top: 64px; }

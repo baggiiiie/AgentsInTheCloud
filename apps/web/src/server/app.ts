@@ -17,10 +17,11 @@ import {
 import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { buttonHtml } from "@atelier/design-system/button";
 import { dialogHtml } from "@atelier/design-system/dialog";
+import { panelHtml } from "@atelier/design-system/panel";
 import { Icons } from "@atelier/design-system/icons";
 import { warningBannerHtml } from "@atelier/design-system/warning-banner";
 import { parseModelRef } from "@atelier/llm/server";
-import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, type ProjectConfiguration, type ProjectSummary } from "@atelier/projects";
+import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, type ProjectConfiguration, type ProjectSummary } from "@atelier/projects";
 import { validDraftId } from "@atelier/prompt/server";
 import {
   domId,
@@ -192,6 +193,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   deps.events?.on("workspace_agent_view_invalidated", invalidatePresentation);
   deps.events?.on("workspace_agent_conversation_title_changed", invalidatePresentation);
 
+  onWorkspaceSshTrustChanged(invalidateWorkspace);
+  const hostTrustPanels = new Map<string, Awaited<ReturnType<typeof scanSshHost>>>();
+  deps.events?.on("workspace_deleted", ({ workspaceId }) => { cancelWorkspaceSshTrust(workspaceId); hostTrustPanels.delete(workspaceId); });
   const provisioningPrompts = new Map<string, string>();
   const provisioning = createWorkspaceProvisioning({ events: deps.events, onChange: (workspaceId) => {
     invalidatePresentation();
@@ -441,7 +445,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       commands,
       workPresentationIntent,
       warningsHtml: workspaceWarningsHtml(entry.id, warningState),
-      overlayHtml: attachments.flatMap((attachment) => attachment.overlayHtml ?? []),
+      overlayHtml: [...attachments.flatMap((attachment) => attachment.overlayHtml ?? []), ...workspaceSshTrustRequests(workspaceId).slice(-1).map(request => sshTrustPanel(workspaceId, request.records, request.host, request.port, request.changed, `/workspaces/${encodeURIComponent(workspaceId)}/ssh-trust/${encodeURIComponent(request.id)}`))],
     };
     return { presentation, commandContributions, storedWorkViews, warningState };
   }
@@ -507,17 +511,23 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const deleteButton = buttonHtml({ type: "submit", variant: "danger", content: { kind: "caption", caption: "Delete workspace" } });
     const deleteAction = stalled ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
     const sourceFailure = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
+    const sourceError = `${sourceFailure?.output ?? ""}\n${sourceFailure?.error ?? ""}`;
     const needsSshKey = !!sourceFailure?.error && isSshAuthenticationFailure(sourceFailure.error);
+    const hostFailure = sourceFailure && sshHostTrustFailure(sourceError);
+    const missingHost = hostFailure && !hostFailure.changed ? hostFailure : undefined;
+    const changedHost = hostFailure?.changed ?? sourceError.includes("REMOTE HOST IDENTIFICATION HAS CHANGED");
     const recoveryActions = (failed || sourceFailure) && projectId
-      ? actionLinkHtml({ href: `/projects/${encodeURIComponent(projectId)}/settings?section=${needsSshKey ? "ssh-keys" : "repository"}`, variant: "primary", content: { kind: "caption", caption: needsSshKey ? "Add project SSH key" : "Open Project settings" }, attributesHtml: 'data-turbo-stream="true"' })
+      ? actionLinkHtml({ href: hostFailure ? `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust` : `/projects/${encodeURIComponent(projectId)}/settings?section=${needsSshKey || changedHost ? "ssh-keys" : "repository"}`, variant: "primary", content: { kind: "caption", caption: hostFailure ? changedHost ? "Investigate changed SSH identity" : "Review SSH server identity" : needsSshKey ? "Add project SSH key" : "Open Project settings" }, attributesHtml: 'data-turbo-stream="true"' })
       : "";
     const recovery = sourceFailure ? {
       stepId: sourceFailure.id,
-      description: needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this project, then retry." : undefined,
+      description: missingHost ? `Atelier does not yet trust ${missingHost.host}. Verify its fingerprint before trusting it and retrying.` : changedHost ? "The server's identity changed. Do not retry until your administrator verifies the new key. Update Trusted SSH servers in Project settings only after verification." : needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this project, then retry." : undefined,
       actionsHtml: recoveryActions,
     } : undefined;
     const inner = `${renderWorkspaceProvisioning(entry.id, snapshot, { failed, error: entry.phase.error, recovery })}${sourceFailure ? "" : recoveryActions}${deleteAction}`;
-    return `<div class="workspace-boot"><div class="main"><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${renderWorkspaceLaunchPrompt(provisioningPrompts.get(entry.id))}</div></div>${renderMobileWorkspaceBar()}</div>`;
+    const trustPanel = hostTrustPanels.get(entry.id);
+    const overlay = trustPanel ? sshTrustPanel(entry.id, trustPanel.records, trustPanel.host, trustPanel.port, changedHost, `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust`) : "";
+    return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${renderWorkspaceLaunchPrompt(provisioningPrompts.get(entry.id))}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
   }
 
   const emptyWorkspaceOnboardingId = "workspace_empty_onboarding";
@@ -829,6 +839,50 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function deleteCurrentWorkspaceFromAgent(id: string, force: boolean): Promise<DeleteCurrentWorkspaceResult> {
     return deletion.request(id, { force });
+  }
+
+  function sshTrustPanel(workspaceId: string, records: { line: string; fingerprint: string }[], host: string, port: number, changed: boolean, action: string): string {
+    const server = port === 22 ? host : `${host}:${port}`;
+    const keys = records.map(({ line, fingerprint }) => `<p><label><input type="checkbox" name="key" value="${escapeHtml(line)}" checked> <strong>${escapeHtml(line.split(" ")[1] ?? "SSH key")}</strong> <code>${escapeHtml(fingerprint)}</code></label></p>`).join("");
+    const warning = changed
+      ? `<p><strong>Warning: this server's identity has changed.</strong> This can mean a server migration, but it can also mean someone is intercepting your connection. Do not approve this until you have confirmed the new fingerprint with your administrator through a separate, trusted channel.</p>`
+      : `<p>Atelier received these public keys from <strong>${escapeHtml(server)}</strong>. A network scan does not prove this is the real server. Compare the fingerprints with a trusted source or your administrator before continuing.</p>`;
+    const formId = domId("ssh_trust_form", workspaceId);
+    const body = `${warning}<form id="${formId}" method="post" action="${escapeHtml(action)}" data-turbo="true">${keys}${changed ? `<p><label>Type <strong>${escapeHtml(server)}</strong> to confirm: <input class="text-field" name="confirmation" autocomplete="off" required></label></p>` : ""}</form>`;
+    const footer = `<form method="post" action="${escapeHtml(action)}/reject" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Do not trust" } })}</form>${buttonHtml({ type: "submit", variant: changed ? "danger" : "primary", content: { kind: "caption", caption: changed ? "Trust changed identity" : "Trust verified keys" }, attributesHtml: `form="${formId}"` })}`;
+    return `<div class="workspace-ssh-trust-overlay" role="presentation" data-controller="workspace-ssh-trust">${panelHtml({ element: { tag: "section", attributesHtml: `role="dialog" aria-label="${escapeHtml(changed ? `SSH identity changed: ${server}` : `Trust SSH server ${server}?`)}"` }, headerHtml: `<h2 class="panel__title">${escapeHtml(changed ? `SSH identity changed: ${server}` : `Trust SSH server ${server}?`)}</h2>`, bodyHtml: body, bodyLayout: "padded", bodyOverflow: "scroll", footerHtml: footer })}</div>`;
+  }
+
+  async function workspaceSshTrustEndpoint(id: string, request: Request, reject = false): Promise<Response> {
+    const entry = requireWorkspace(id);
+    const snapshot = provisioning.snapshot(id);
+    const source = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
+    const address = source && sshHostTrustFailure(`${source.output ?? ""}\n${source.error ?? ""}`);
+    if (!isGitProjectInit(entry.init) || !address || snapshot?.waiting?.stepId !== "workspace.source" || !snapshot.waiting.retryable) {
+      throw new AtelierCoreError("workspace_not_ready", "This workspace is not waiting for SSH server trust");
+    }
+    if (request.method === "POST") {
+      if (!reject) {
+        const candidate = await scanSshHost(address.host, address.port);
+        const form = await request.formData();
+        if (address.changed && form.get("confirmation") !== (address.port === 22 ? address.host : `${address.host}:${address.port}`)) throw invalidArguments("Confirm the changed server identity before trusting it");
+        await trustScannedSshHost(entry.init.projectId, candidate, form.getAll("key").map(String));
+        provisioning.resume(id, "retry");
+      }
+      hostTrustPanels.delete(id);
+    } else hostTrustPanels.set(id, await scanSshHost(address.host, address.port));
+    invalidateWorkspace(id);
+    return wantsTurboStream(request) ? turboStreamResponse(turboReplaceStream(workspaceResidentId(id), workspaceBootResidentHtml(entry))) : workspacePage(id, request);
+  }
+
+  async function workspaceRuntimeSshTrustEndpoint(id: string, trustId: string, request: Request, reject = false): Promise<Response> {
+    requireWorkspace(id);
+    const pending = workspaceSshTrustRequests(id).find(item => item.id === trustId);
+    if (!pending) throw new AtelierCoreError("workspace_not_ready", "The SSH trust request has expired");
+    const form = reject ? undefined : await request.formData();
+    if (pending.changed && !reject && form?.get("confirmation") !== (pending.port === 22 ? pending.host : `${pending.host}:${pending.port}`)) throw invalidArguments("Confirm the changed server identity before trusting it");
+    await decideWorkspaceSshTrust(id, trustId, reject ? [] : form!.getAll("key").map(String));
+    return turboStreamResponse("");
   }
 
   function continueWorkspaceProvisioningEndpoint(id: string, request: Request): Response {
@@ -1221,6 +1275,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if ((params = match(/^\/workspaces\/([^/]+)\/park$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], true, request);
     if ((params = match(/^\/workspaces\/([^/]+)\/unpark$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], false, request);
     if ((params = match(/^\/workspaces\/([^/]+)\/warnings\/([^/]+)\/dismiss$/)) && request.method === "POST") return dismissWorkspaceWarning(params[0], params[1], request);
+    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)\/reject$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request, true);
+    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request);
+    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/reject$/)) && request.method === "POST") return workspaceSshTrustEndpoint(params[0]!, request, true);
+    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust$/))) {
+      if (request.method === "GET" || request.method === "POST") return await workspaceSshTrustEndpoint(params[0]!, request);
+    }
     if ((params = match(/^\/workspaces\/([^/]+)\/provisioning\/continue$/)) && request.method === "POST") return continueWorkspaceProvisioningEndpoint(params[0], request);
     if ((params = match(/^\/workspaces\/([^/]+)\/delete\/cancel$/)) && request.method === "POST") return await cancelWorkspaceDeletionEndpoint(params[0], request);
     if ((params = match(/^\/workspaces\/([^/]+)\/delete\/confirm$/)) && request.method === "POST") return await confirmWorkspaceDeletionEndpoint(params[0], request);

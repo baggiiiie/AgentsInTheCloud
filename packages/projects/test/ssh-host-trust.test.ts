@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, createConnection, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addProject, createProjectSshKey, deleteProjectSshKey, projectWorkspaceInit, registerProjectWorkspaceInitEvents, setProjectSshKnownHosts, getProjectSshKnownHosts } from "@atelier/projects";
 import { prepareWorkspaceSshTrust, workspaceGitSshCommand } from "../src/ssh-host-trust.ts";
+import { unknownSshHost, sshHostTrustFailure, scanSshHost, trustScannedSshHost } from "../src/ssh-trust-recovery.ts";
+import { requestWorkspaceSshTrust, workspaceSshTrustRequests, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged } from "../src/ssh-trust-broker.ts";
 import { createAtelierEventBus } from "@atelier/core";
 import type { WorkspaceDockerPlan } from "@atelier/workspace";
 import { stopProjectSshAgents, registerProjectSshAgentWorkspaceEvents } from "../src/ssh-agent.ts";
@@ -48,6 +50,53 @@ test("host trust validates every record, persists explicitly, and can be cleared
   await expect(setProjectSshKnownHosts(project.id, host.privateKey)).rejects.toThrow("known_hosts");
   expect(await getProjectSshKnownHosts(project.id)).toBe(trusted);
   expect(await setProjectSshKnownHosts(project.id, "")).toBe("");
+});
+
+test("unknown SSH hosts are identified without offering changed identities as new trust", () => {
+  expect(unknownSshHost("No ED25519 host key is known for [127.0.0.1]:2222 and you have requested strict checking.\nHost key verification failed.")).toEqual({ host: "127.0.0.1", port: 2222 });
+  expect(unknownSshHost("No ED25519 host key is known for git.example.com and you have requested strict checking.\nHost key verification failed.")).toEqual({ host: "git.example.com", port: 22 });
+  expect(unknownSshHost("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!\nHost key verification failed.")).toBeUndefined();
+  expect(sshHostTrustFailure("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!\nHost key for [example.test]:2222 has changed and you have requested strict checking.\nHost key verification failed.")).toEqual({ host: "example.test", port: 2222, changed: true });
+  expect(unknownSshHost("Permission denied (publickey).")).toBeUndefined();
+});
+
+test("workspace SSH trust requests await a decision and persist per-workspace, including changed identities", async () => {
+  const id = "workspace-trust";
+  const directory = join(root, "data", "ssh-agents", id);
+  await prepareWorkspaceSshTrust(directory);
+  const first = await key("first-host");
+  const second = await key("second-host");
+  const line = (publicKey: string) => `example.test ${publicKey.split(" ").slice(0, 2).join(" ")}`;
+  const firstLine = line(first.publicKey);
+  const firstPending = Promise.withResolvers<void>();
+  const unsubscribeFirst = onWorkspaceSshTrustChanged(() => firstPending.resolve());
+  const asking = requestWorkspaceSshTrust(id, "example.test", 22, firstLine);
+  await firstPending.promise;
+  unsubscribeFirst();
+  const pending = workspaceSshTrustRequests(id);
+  expect(pending).toHaveLength(1);
+  expect(pending[0]?.changed).toBe(false);
+  await decideWorkspaceSshTrust(id, pending[0]!.id, [firstLine]);
+  expect(await asking).toContain(firstLine);
+  expect(await requestWorkspaceSshTrust(id, "example.test", 22, firstLine)).toContain(firstLine);
+  const otherLine = `other.test ${first.publicKey.split(" ").slice(0, 2).join(" ")}`;
+  const otherPending = Promise.withResolvers<void>();
+  const unsubscribeOther = onWorkspaceSshTrustChanged(() => otherPending.resolve());
+  const other = requestWorkspaceSshTrust(id, "other.test", 22, otherLine);
+  await otherPending.promise;
+  unsubscribeOther();
+  await decideWorkspaceSshTrust(id, workspaceSshTrustRequests(id)[0]!.id, [otherLine]);
+  await other;
+  const secondLine = line(second.publicKey);
+  const nextPending = Promise.withResolvers<void>();
+  const unsubscribeNext = onWorkspaceSshTrustChanged(() => nextPending.resolve());
+  const changed = requestWorkspaceSshTrust(id, "example.test", 22, secondLine);
+  await nextPending.promise;
+  unsubscribeNext();
+  expect(workspaceSshTrustRequests(id)[0]?.changed).toBe(true);
+  await decideWorkspaceSshTrust(id, workspaceSshTrustRequests(id)[0]!.id, [secondLine]);
+  expect(await changed).toContain(secondLine);
+  expect(await readFile(join(directory, "workspace_known_hosts"), "utf8")).toBe(`${otherLine}\n${secondLine}\n`);
 });
 
 test("GitHub host keys are trusted without project configuration, including SSH over port 443", async () => {
@@ -143,9 +192,17 @@ test("real SSH cloning and nested submodules require verified host trust and val
     return source;
   };
   await expect(prepare("missing-trust")).rejects.toThrow("Trusted SSH servers");
+  const missingOutput = await readFile(join(root, "data", "workspaces", "missing-trust", (await readdir(join(root, "data", "workspaces", "missing-trust"))).find(name => name.startsWith("project-provision-"))!), "utf8");
+  expect(unknownSshHost(missingOutput)).toEqual({ host: "127.0.0.1", port });
+  const candidate = await scanSshHost("127.0.0.1", port);
+  expect(candidate.records.some(record => record.line.includes(host.publicKey.split(" ")[1]!))).toBe(true);
+  expect(candidate.records[0]?.fingerprint).toStartWith("SHA256:");
+  await expect(trustScannedSshHost(project.id, candidate, ["unverified key"])).rejects.toThrow("changed");
+  expect(await getProjectSshKnownHosts(project.id)).toBe("");
   expect(await Bun.file(join(root, "data", "ssh-agents", "missing-trust", "agent.sock")).exists()).toBe(false);
   await expect(prepare("missing-submodule-trust", parent.remote)).rejects.toThrow("Trusted SSH servers");
-  await setProjectSshKnownHosts(project.id, `[127.0.0.1]:${port} ${host.publicKey}`);
+  await trustScannedSshHost(project.id, candidate, candidate.records.map(record => record.line));
+  expect(await getProjectSshKnownHosts(project.id)).toContain(host.publicKey.split(" ")[1]!);
   const source = await prepare("trusted");
   expect(await readFile(join(source.workHostPath, "child", "child", "file.txt"), "utf8")).toBe("leaf");
   const agentDirectory = join(root, "data", "ssh-agents", "trusted");
@@ -164,6 +221,8 @@ test("real SSH cloning and nested submodules require verified host trust and val
   const changedHost = await key("changed-server");
   await setProjectSshKnownHosts(project.id, `[127.0.0.1]:${port} ${changedHost.publicKey}`);
   await expect(prepare("changed-host")).rejects.toThrow("Host key verification failed");
+  await trustScannedSshHost(project.id, await scanSshHost("127.0.0.1", port), candidate.records.map(record => record.line));
+  expect(await readFile((await prepare("changed-host-recovered")).workHostPath + "/child/child/file.txt", "utf8")).toBe("leaf");
   await setProjectSshKnownHosts(project.id, `[127.0.0.1]:${port} ${host.publicKey}`);
   await deleteProjectSshKey(project.id, storedKey.id);
   const wrongLogin = await key("wrong-login");

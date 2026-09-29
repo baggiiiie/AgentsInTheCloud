@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { invalidArguments, runCommand, shellQuote } from "@atelier/core";
 import { gitHubKnownHosts } from "./github-host-keys.ts";
 import { findProjectRecord, projectsFile, readProjectStore, updateProjectStore } from "./project.ts";
@@ -46,5 +46,5 @@ export async function prepareWorkspaceSshTrust(directory: string, projectId?: st
 
 export function workspaceGitSshCommand(knownHostsPath: string): string {
   // Retain normal host-managed trust in addition to the explicit project trust file.
-  return `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ${shellQuote(`UserKnownHostsFile=${knownHostsPath} ~/.ssh/known_hosts`)}`;
+  return `ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ${shellQuote(`UserKnownHostsFile=${knownHostsPath} ${join(dirname(knownHostsPath), "workspace_known_hosts")} ~/.ssh/known_hosts`)}`;
 }

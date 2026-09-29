@@ -3,6 +3,7 @@ import { createAtelierEventBus, getAtelierRuntimeContext } from "@atelier/core";
 import { designSystemCatalogueHtml } from "@atelier/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@atelier/observable-terminal/server";
 import { deliverAttachmentDraft, removeAttachmentDraft, validDraftId } from "@atelier/prompt/server";
+import { requestWorkspaceSshTrust } from "@atelier/projects";
 import {
   createFileOriginIdentityStore,
   createWorkspaceIngress,
@@ -393,7 +394,22 @@ const workspaceIngress = createWorkspaceIngress({
   originIdentityStore: createFileOriginIdentityStore(),
 });
 
-const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runtimeContext.atelierDataDir, "workspace-sockets"), handleAgentMcpRequest);
+const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runtimeContext.atelierDataDir, "workspace-sockets"), async (request, workspaceId) => {
+  if (new URL(request.url).pathname === "/ssh/host-keys" && request.method === "POST") {
+    const form = await request.formData();
+    const host = form.get("host");
+    const port = form.get("port");
+    const keys = form.get("keys");
+    if (!Value.Check(Type.String(), host) || !Value.Check(Type.String(), port) || !Value.Check(Type.String(), keys)) return new Response("Invalid SSH host keys", { status: 400 });
+    try {
+      return new Response(await requestWorkspaceSshTrust(workspaceId, host, Number(port), keys), { headers: { "content-type": "text/plain; charset=utf-8" } });
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "invalid_arguments") return new Response(error.message, { status: 400 });
+      throw error;
+    }
+  }
+  return handleAgentMcpRequest(request, workspaceId);
+});
 atelierEvents.on("workspace_plan_prepare", ({ workspaceId }) => ingressSockets.ensure(workspaceId));
 atelierEvents.on("workspace_deleted", ({ workspaceId }) => ingressSockets.remove(workspaceId));
 

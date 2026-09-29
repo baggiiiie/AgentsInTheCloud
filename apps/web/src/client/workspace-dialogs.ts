@@ -7,6 +7,20 @@ import { Value } from "typebox/value";
 import { submitFormWithFirstButton } from "./form-submission.ts";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 
+class WorkspaceSshTrustController extends Controller<HTMLElement> {
+  private focusFrame?: number;
+
+  connect(): void {
+    this.focusFrame = requestAnimationFrame(() => {
+      if (isWorkspacePaneVisible(this.element)) this.element.querySelector<HTMLElement>('input[name="key"], button')?.focus();
+    });
+  }
+
+  disconnect(): void {
+    if (this.focusFrame !== undefined) cancelAnimationFrame(this.focusFrame);
+  }
+}
+
 class SubmitShortcutController extends Controller {
   private submitting = false;
 
@@ -152,6 +166,7 @@ const ProjectGithubSearchController = createHtmlAutocompleteController(Controlle
 export function registerWorkspaceDialogControllers(): void {
   registerWorkspaceControllers({
     "submit-shortcut": SubmitShortcutController,
+    "workspace-ssh-trust": WorkspaceSshTrustController,
     "launch-composer-dialog": LaunchComposerDialogController,
     "project-github-search": ProjectGithubSearchController,
     "auto-scroll": AutoScrollController,
