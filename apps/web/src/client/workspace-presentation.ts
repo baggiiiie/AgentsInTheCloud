@@ -357,9 +357,14 @@ export function createWorkspacePresentationController(
 
     private selectPhoneDestinationOnWorkspaceEntry(): void {
       if (!this.isPhone) return;
-      const attention = [...this.element.querySelectorAll<HTMLElement>("[data-work-view-key][data-attention-sequence]")]
+      const oldestAttention = (selector: string) => [...this.element.querySelectorAll<HTMLElement>(selector)]
         .sort((a, b) => Number(a.dataset.attentionSequence) - Number(b.dataset.attentionSequence))[0];
-      if (attention) this.selectWorkViewState(attention.dataset.workViewKey!, attention.dataset.workViewKind === "contextual");
+      const agentAttention = oldestAttention("[data-agent-attention-id][data-attention-sequence]");
+      const workAttention = oldestAttention("[data-work-view-key][data-attention-sequence]");
+      if (agentAttention) {
+        this.state.activeAgentId = agentAttention.dataset.agentAttentionId!;
+        this.state.phoneDestination = "agents";
+      } else if (workAttention) this.selectWorkViewState(workAttention.dataset.workViewKey!, workAttention.dataset.workViewKind === "contextual");
       else this.state.phoneDestination = "agents";
     }
 
