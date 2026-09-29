@@ -1,122 +1,30 @@
 import { readFile } from "node:fs/promises";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { CallToolResultSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
 const configSchema = Type.Object({ url: Type.String(), token: Type.String(), turnSignalCommand: Type.String() });
 type AtelierMcpConfig = Static<typeof configSchema>;
-type JsonValue = string | number | boolean | null | JsonValue[] | { [name: string]: JsonValue };
-type McpArguments = { [name: string]: JsonValue };
-type PiContent = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 
-function toolContent(content: CallToolResult["content"]): PiContent[] {
-  return content.map((item) => {
-    if (item.type === "text") return { type: "text", text: item.text };
-    if (item.type === "image") return { type: "image", data: item.data, mimeType: item.mimeType };
-    throw new Error(`Atelier MCP returned unsupported ${item.type} content`);
+/** Pi owns MCP discovery, execution, and instructions; we only wire up the session. */
+export function registerPiAtelier(pi: ExtensionAPI, config: AtelierMcpConfig): void {
+  pi.registerMcpServer("atelier", {
+    url: config.url,
+    headers: { Authorization: `Bearer ${config.token}` },
+    exposure: "codemode",
+    timeout: 3_600,
   });
+
+  async function signalTurn(boundary: "started" | "finished"): Promise<void> {
+    const result = await pi.exec("sh", [config.turnSignalCommand, boundary]);
+    if (result.code !== 0) throw new Error(result.stderr);
+  }
+
+  pi.on("agent_start", () => signalTurn("started"));
+  pi.on("agent_end", () => signalTurn("finished"));
 }
 
-type LoadConfig = () => Promise<AtelierMcpConfig>;
-
-export function createPiAtelierExtension(loadConfig: LoadConfig) {
-  return function piAtelierExtension(pi: ExtensionAPI) {
-    let connection: { client: Client; instructions?: string; turnSignalCommand: string } | undefined;
-    let config: AtelierMcpConfig;
-    let reconnecting: Promise<void> | undefined;
-    const registered = new Set<string>();
-
-    async function connect(): Promise<void> {
-      const nextClient = new Client({ name: "pi-atelier", version: "1.0.0" });
-      const transport = new StreamableHTTPClientTransport(new URL(config.url), {
-        requestInit: { headers: { Authorization: `Bearer ${config.token}` } },
-      });
-      try {
-        await nextClient.connect(transport);
-        const existing = new Set(pi.getAllTools().map((tool) => tool.name));
-        let cursor: string | undefined;
-        do {
-          const listed = await nextClient.listTools(cursor ? { cursor } : undefined);
-          for (const tool of listed.tools) {
-            if (registered.has(tool.name)) continue;
-            if (existing.has(tool.name)) throw new Error(`Atelier MCP tool collides with an existing Pi tool: ${tool.name}`);
-            existing.add(tool.name);
-            pi.registerTool({
-              name: tool.name,
-              label: tool.title ?? tool.name,
-              description: tool.description ?? tool.title ?? tool.name,
-              parameters: Type.Unsafe<McpArguments>(tool.inputSchema),
-              async execute(_toolCallId, params, signal, onUpdate) {
-                const call = (client: Client) => client.callTool({ name: tool.name, arguments: params }, undefined, {
-                  signal,
-                  timeout: 3_600_000,
-                  onprogress(update) {
-                    const text = update.message ?? `Progress: ${update.progress}`;
-                    onUpdate?.({ content: [{ type: "text", text }], details: {} });
-                  },
-                });
-                const active = connection;
-                if (!active) throw new Error("Atelier MCP session is not connected");
-                let result: Awaited<ReturnType<typeof call>>;
-                try {
-                  result = await call(active.client);
-                } catch (error) {
-                  // A 404 means the old host has no record of this session: it did not dispatch the call.
-                  // Other failures are ambiguous and must not be retried (the tool may have run).
-                  if (!(error instanceof StreamableHTTPError && error.code === 404)) throw error;
-                  if (connection?.client === active.client) await reconnect();
-                  else if (reconnecting) await reconnecting;
-                  if (!connection) throw new Error("Atelier MCP session is not connected");
-                  result = await call(connection.client);
-                }
-                const parsed = CallToolResultSchema.parse(result);
-                const content = toolContent(parsed.content);
-                if (parsed.isError) throw new Error(content.filter((item) => item.type === "text").map((item) => item.text).join("\n") || `Atelier MCP tool failed: ${tool.name}`);
-                return { content, details: {} };
-              },
-            });
-            registered.add(tool.name);
-          }
-          cursor = listed.nextCursor;
-        } while (cursor);
-        const previous = connection;
-        connection = { client: nextClient, instructions: nextClient.getInstructions(), turnSignalCommand: config.turnSignalCommand };
-        await previous?.client.close();
-      } catch (error) {
-        await nextClient.close();
-        throw error;
-      }
-    }
-
-    function reconnect(): Promise<void> {
-      if (!reconnecting) reconnecting = connect().finally(() => { reconnecting = undefined; });
-      return reconnecting;
-    }
-
-    async function signalTurn(boundary: "started" | "finished"): Promise<void> {
-      if (!connection) throw new Error("Atelier MCP session is not connected");
-      const result = await pi.exec("sh", [connection.turnSignalCommand, boundary]);
-      if (result.code !== 0) throw new Error(result.stderr);
-    }
-
-    pi.on("session_start", async () => {
-      config = await loadConfig();
-      await connect();
-    });
-
-    pi.on("before_agent_start", async (event) => connection?.instructions ? { systemPrompt: `${event.systemPrompt}\n\n${connection.instructions}` } : undefined);
-    pi.on("agent_start", () => signalTurn("started"));
-    pi.on("agent_end", () => signalTurn("finished"));
-    pi.on("session_shutdown", async () => {
-      await reconnecting;
-      const active = connection;
-      connection = undefined;
-      await active?.client.close();
-    });
-  };
+export default async function piAtelierExtension(pi: ExtensionAPI): Promise<void> {
+  const config = Value.Parse(configSchema, JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8")));
+  registerPiAtelier(pi, config);
 }
-
-export default createPiAtelierExtension(async () => Value.Parse(configSchema, JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8"))));

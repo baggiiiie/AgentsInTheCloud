@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
-test("prepares a bundled session-private MCP extension without putting its credential in the command", async () => {
+test("prepares bundled session-private native MCP registration without putting its credential in the command", async () => {
   const source = join(import.meta.dir, "../src/server/mcp.ts");
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
@@ -18,7 +18,7 @@ test("prepares a bundled session-private MCP extension without putting its crede
     expect(command).not.toContain(mcp.token);
     const count = Number(command.match(/count=(\\d+)/)[1]);
     const input = Buffer.from(options.stdin);
-    expect(input.subarray(0, count).toString()).toContain("pi-atelier");
+    expect(input.subarray(0, count).toString()).toContain("registerMcpServer");
     expect(JSON.parse(input.subarray(count).toString())).toEqual({ ...mcp, turnSignalCommand: "/session/signal.sh" });
   `], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);

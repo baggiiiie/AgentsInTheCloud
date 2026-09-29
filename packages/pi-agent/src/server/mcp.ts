@@ -26,7 +26,7 @@ function buildExtension(): Promise<string> {
   })();
 }
 
-/** Install the required Atelier MCP bridge and its session-scoped credential. */
+/** Install native MCP registration and turn notifications with a session-private credential. */
 export async function preparePiMcp(workspaceId: string, session: CliAgentSession, mcp: { url: string; token: string }): Promise<Record<string, string>> {
   const directory = piAtelierDirectory(session.id);
   const extension = await buildExtension();
