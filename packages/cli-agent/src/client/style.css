@@ -15,11 +15,11 @@
   .cli-transcript-switch { right:4px; }
   .cli-agent-body:not(.agent-composer-open) .cli-transcript-switch { bottom:92px; }
 }
-.cli-transcript-switch > button { --button-background:var(--panel); }
+.cli-transcript-switch > :is(button, a) { --button-background:var(--panel); }
 .cli-transcript-switch > button[hidden] { display:none; }
 .cli-agent-body:not(.cli-transcript-mode) .cli-transcript-switch > button[data-cli-terminal-target="transcriptEnd"] { display:none; }
 .cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:none; }
-.cli-agent-body.cli-transcript-mode .cli-transcript-switch > button[data-action="cli-terminal#showTranscript"] { display:none; }
+.cli-agent-body.cli-transcript-mode .cli-transcript-switch > a[data-action~="cli-terminal#showTranscript"] { display:none; }
 .cli-agent-body.cli-transcript-mode .cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:inline-flex; }
 .cli-transcript-empty { padding:24px 0; color:var(--text-muted); }
 .cli-agent-body .cli-agent-composer {

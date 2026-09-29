@@ -15,7 +15,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly hasFormTarget: boolean;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
-      declare readonly transcriptTarget: HTMLElement & { src: string };
+      declare readonly transcriptTarget: HTMLElement;
       declare readonly transcriptEndTarget: HTMLButtonElement;
       declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
@@ -157,7 +157,8 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!this.hasTranscriptTarget) return;
         this.transcriptEndTarget.hidden = true;
         this.element.classList.add("cli-transcript-mode");
-        this.transcriptTarget.src = `${this.transcriptTarget.dataset.url}?opened=${Date.now()}`;
+        // Never show the previous snapshot while Turbo loads the fresh one into the frame.
+        this.transcriptTarget.replaceChildren();
       }
       private transcriptEndTop(): number {
         const transcript = this.transcriptTarget;
