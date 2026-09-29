@@ -1010,11 +1010,11 @@ export const entries: CatalogueEntry[] = [
     title: "Status & progress lists",
     when: "Compact status markers and multi-step summaries. Pair color with visible text.",
     contract:
-      "status-dot with success, warning, danger or running; decorative dots use aria-hidden. status-list has __item and __marker; use status-list--compact for dense progress histories. aria-busy for running, data-status=failed for failure, aria-checked=true only with checkbox role. Reduced motion disables spinning.",
+      "status-dot with success, warning, danger or running; add static to running for a non-animated snapshot marker. Decorative dots use aria-hidden. status-list has __item and __marker; use status-list--compact for dense progress histories. aria-busy for running, data-status=failed for failure, aria-checked=true only with checkbox role. Reduced motion disables spinning.",
     sources: ["status/status.css"],
     examples: [
       {
-        title: "Success · warning · danger · running",
+        title: "Success · warning · danger · running · snapshot",
         render: () =>
           '<div class="form-section">' +
           ["success", "warning", "danger", "running"]
@@ -1023,6 +1023,7 @@ export const entries: CatalogueEntry[] = [
                 `<span><span class="status-dot ${state}" aria-hidden="true"></span> ${state}</span>`,
             )
             .join("") +
+          '<span><span class="status-dot running static" aria-hidden="true"></span> In progress at snapshot</span>' +
           '<ul class="status-list"><li class="status-list__item" role="checkbox" aria-checked="true"><span class="status-list__marker">✓</span>Complete</li><li class="status-list__item" aria-busy="true"><span class="status-list__marker"></span>Running</li><li class="status-list__item" data-status="failed"><span class="status-list__marker">!</span>Failed</li></ul></div>',
       },
     ],

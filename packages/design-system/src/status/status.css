@@ -35,6 +35,8 @@
   background: transparent;
   animation: activity-spinner-spin 750ms linear infinite;
 }
+/* Snapshot activity retains its in-progress shape without implying live work. */
+.status-dot.running.static { animation: none; }
 .status-dot:is(circle) { fill: currentColor; stroke: none; }
 
 /* A concise result summary whose marker follows semantic completion state. */

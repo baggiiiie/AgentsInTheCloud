@@ -100,9 +100,9 @@ export function renderWorkingSummary(ctx: AgentRenderContext, section: WorkingTr
   const steeringCount = section.items.filter((item) => item.type === "user" && item.steering).length;
   const endedAt = section.completedAt ?? section.stoppedAt;
   const active = endedAt === undefined;
-  const duration = formatDuration(active ? 0 : section.timing?.elapsedMs ?? (endedAt! - section.startedAt));
-  const activityLabel = active && ctx.readOnly ? "In progress at snapshot" : `${active ? "Working for" : section.completedAt !== undefined ? "Worked for" : "Stopped after"} ${duration}`;
-  const status = active ? '<i class="status-dot running action-item__status" aria-label="In progress"></i>' : "";
+  const duration = formatDuration(active ? ctx.readOnly ? Date.now() - section.startedAt : 0 : section.timing?.elapsedMs ?? (endedAt! - section.startedAt));
+  const activityLabel = `${active ? "Working for" : section.completedAt !== undefined ? "Worked for" : "Stopped after"} ${duration}`;
+  const status = active ? `<i class="status-dot running${ctx.readOnly ? " static" : ""} action-item__status" aria-label="In progress"></i>` : "";
   return transcriptActionItemHtml({ kind: "text", text: activityLabel,
     attributesHtml: active && !ctx.readOnly ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working for "` : undefined,
     textAttributesHtml: active && !ctx.readOnly ? 'data-agent-elapsed-target="time"' : undefined,

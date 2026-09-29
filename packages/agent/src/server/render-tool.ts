@@ -22,9 +22,9 @@ const diffOperationSchema = Type.Object({
   newText: Type.String(),
 });
 
-export function statusHtml(status: ToolView["status"]): string {
+export function statusHtml(status: ToolView["status"], readOnly = false): string {
   const state = status === "streaming" || status === "running" ? "running" : status === "error" ? "danger" : "success";
-  return `<span class="status-dot ${state}" aria-label="${state === "running" ? "In progress" : state === "danger" ? "Failed" : "Complete"}"></span>`;
+  return `<span class="status-dot ${state}${state === "running" && readOnly ? " static" : ""}" aria-label="${state === "running" ? "In progress" : state === "danger" ? "Failed" : "Complete"}"></span>`;
 }
 
 function tokenSummary(tool: ToolView, direction: "up" | "down"): string {
@@ -72,10 +72,11 @@ function toolSummaryText(tool: ToolView): string {
   return [tool.name || "tool", toolSummaryHtml(tool)].filter(Boolean).join(" · ");
 }
 
-function toolSummaryMetadataHtml(tool: ToolView): string {
+function toolSummaryMetadataHtml(tool: ToolView, readOnly = false): string {
   if (!isBashTool(tool.name) || tool.status !== "running" || tool.startedAt === undefined) return "";
   const timeout = tool.timeoutSeconds ?? numberArg(toolArgs(tool), "timeout") ?? 600;
-  return `<span class="agent-tool-elapsed agent-duration-slot" data-controller="agent-elapsed" data-agent-elapsed-since-value="${tool.startedAt}" data-agent-elapsed-max-value="${timeout}"><span data-agent-elapsed-target="time">${formatDuration(Date.now() - tool.startedAt)} / ${formatDuration(timeout * 1000)}</span></span>`;
+  const attributes = readOnly ? "" : ` data-controller="agent-elapsed" data-agent-elapsed-since-value="${tool.startedAt}" data-agent-elapsed-max-value="${timeout}"`;
+  return `<span class="agent-tool-elapsed agent-duration-slot"${attributes}><span${readOnly ? "" : ' data-agent-elapsed-target="time"'}>${formatDuration(Date.now() - tool.startedAt)} / ${formatDuration(timeout * 1000)}</span></span>`;
 }
 
 export interface ToolPresentation {
@@ -101,9 +102,9 @@ export function renderToolCard(ctx: AgentRenderContext, key: string, original: T
   const tool = toolForRender(original);
   const label = { kind: "text" as const, text: toolSummaryText(tool) };
   const labelOptions = {
-    leadingHtml: `<span id="${ids.itemSummaryStatus(ctx, key)}" class="agent-tool-status">${statusHtml(tool.status)}</span>`,
+    leadingHtml: `<span id="${ids.itemSummaryStatus(ctx, key)}" class="agent-tool-status">${statusHtml(tool.status, ctx.readOnly)}</span>`,
     labelId: ids.itemSummaryContent(ctx, key),
-    trailingHtml: `<span id="${ids.itemSummaryMetadata(ctx, key)}">${toolSummaryMetadataHtml(tool)}</span>`,
+    trailingHtml: `<span id="${ids.itemSummaryMetadata(ctx, key)}">${toolSummaryMetadataHtml(tool, ctx.readOnly)}</span>`,
   };
   const active = tool.status === "streaming" || tool.status === "running";
   if (!toolPresentation(tool).showsDetail) {
