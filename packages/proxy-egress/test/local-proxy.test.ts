@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { startWorkspaceEgressProxy } from "../src/egress/egress-proxy.ts";
 import { ensureMitmCa, ensureLeafCertificate } from "../src/egress/mitm-ca.ts";
 import { createHttpHooks } from "../src/secrets/placeholder-hooks.ts";
-import type { WorkspaceSecretContext } from "../src/secrets/workspace-secrets.ts";
+import { registerWorkspaceRequestTransform, type WorkspaceSecretContext } from "../src/secrets/workspace-secrets.ts";
 
 const cleanup: (() => void | Promise<void>)[] = [];
 afterEach(async () => { for (const dispose of cleanup.reverse()) await dispose(); cleanup.length = 0; });
@@ -209,6 +209,29 @@ test("workspace socket controls HTTP and HTTPS identity, policy and reconnection
   await requestOnTls(freshTls);
   expect(received.at(-1)?.key).toBe("new-secret");
   freshTls.destroy();
+  contexts.set("beta", { workspaceId: "beta", env: {}, hooks: withoutSecrets.httpHooks, secrets: [] });
+  // A credential bridge must select TLS interception without ordinary secrets.
+  let bridgeHosts = ["127.0.0.1"];
+  registerWorkspaceRequestTransform("test-tls-bridge", async (request) => request, async () => bridgeHosts);
+  cleanup.push(() => { registerWorkspaceRequestTransform("test-tls-bridge", async (request) => request); });
+  const bridgeHooks = createHttpHooks({
+    allowedInternalHosts: ["127.0.0.1"],
+    onRequest: async (request) => {
+      request.headers.set("x-api-key", "bridge-secret");
+      return request;
+    },
+  });
+  contexts.set("beta", { workspaceId: "beta", env: {}, hooks: bridgeHooks.httpHooks, secrets: [] });
+  const bridgeTls = await connectTls();
+  await requestOnTls(bridgeTls);
+  expect(received.at(-1)?.key).toBe("bridge-secret");
+  bridgeTls.destroy();
+  // Endpoint changes apply to the next CONNECT without rebuilding the context.
+  bridgeHosts = [];
+  const opaqueTls = await connectTls();
+  await requestOnTls(opaqueTls);
+  expect(received.at(-1)?.key).toBe("ATELIER_TEST_PLACEHOLDER");
+  opaqueTls.destroy();
   contexts.set("beta", { workspaceId: "beta", env: {}, hooks: withoutSecrets.httpHooks, secrets: [] });
   // Zig also needs the alternate path when there are no secrets: a normal
   // upstream HTTPS server would reject its plaintext after CONNECT too.

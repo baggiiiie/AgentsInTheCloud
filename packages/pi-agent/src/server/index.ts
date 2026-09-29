@@ -3,7 +3,7 @@ import { createPiModelRuntime } from "@atelier/llm/server";
 import { registerWorkspaceRequestTransform } from "@atelier/proxy-egress/server";
 import { providerBrandIconHtml, type WorkspaceModule } from "@atelier/shared";
 import { installPiCliConfiguration } from "./pi-cli.ts";
-import { createPiCliCredentialTransform } from "./pi-cli-bridge.ts";
+import { createPiCliCredentialTransform, piCliCredentialHosts } from "./pi-cli-bridge.ts";
 import { requirePiModels } from "./auth.ts";
 import { piLaunchScript } from "./launch-command.ts";
 import { preparePiMcp } from "./mcp.ts";
@@ -25,6 +25,6 @@ export const atelierServerModule: WorkspaceModule = {
   ...cliModule,
   initialize(context) {
     cliModule.initialize!(context);
-    registerWorkspaceRequestTransform("pi-cli", createPiCliCredentialTransform(createPiModelRuntime));
+    registerWorkspaceRequestTransform("pi-cli", createPiCliCredentialTransform(createPiModelRuntime), async () => piCliCredentialHosts(await createPiModelRuntime()));
   },
 };

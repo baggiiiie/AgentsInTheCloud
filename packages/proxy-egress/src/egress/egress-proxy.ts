@@ -11,7 +11,7 @@ import tls from "node:tls";
 import { atelierDataPath, dockerHostAtelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
 import { HttpRequestBlockedError } from "../secrets/errors.ts";
 import { matchHostname } from "../secrets/patterns.ts";
-import { createWorkspaceSecretContext, forgetWorkspaceSecretContext, getWorkspaceSecretContext, type WorkspaceSecretContext } from "../secrets/workspace-secrets.ts";
+import { workspaceRequestTransformMatchesHost, createWorkspaceSecretContext, forgetWorkspaceSecretContext, getWorkspaceSecretContext, type WorkspaceSecretContext } from "../secrets/workspace-secrets.ts";
 import type { AtelierEventBus } from "@atelier/core";
 import { isHopByHopHeader, stripHopByHopHeaders } from "@atelier/shared";
 import { workspaceLocalProxyInitScript, workspaceLocalProxyUrl } from "./local-proxy.ts";
@@ -189,7 +189,8 @@ async function handleConnect(ca: MitmCa, context: ProxyContext, req: IncomingMes
 
 async function shouldMitmConnectTarget(context: ProxyContext, hostname: string): Promise<boolean> {
   const secrets = await context.secrets();
-  return secrets.secrets.some((secret) => secret.hosts.some((host) => matchHostname(hostname, host)));
+  return secrets.secrets.some((secret) => secret.hosts.some((host) => matchHostname(hostname, host)))
+    || await workspaceRequestTransformMatchesHost(hostname);
 }
 
 async function tunnelConnect(connect: ConnectUpstream, hostname: string, port: number, socket: Duplex, head: Buffer): Promise<void> {

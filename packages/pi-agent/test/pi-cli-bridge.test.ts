@@ -8,7 +8,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { stream as streamOpenAIResponses } from "@earendil-works/pi-ai/api/openai-responses";
 import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
-import { createPiCliConfiguration, createPiCliCredentialTransform, piCliModelUnavailableReason } from "../src/server/pi-cli-bridge.ts";
+import { createPiCliConfiguration, createPiCliCredentialTransform, piCliCredentialHosts, piCliModelUnavailableReason } from "../src/server/pi-cli-bridge.ts";
 
 function model(provider: string, api: Api = "openai-completions", baseUrl = `https://${provider}.example/v1`): Model<Api> {
   return { provider, id: "test-model", name: "Test model", api, baseUrl, reasoning: true, input: ["text", "image"], cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 }, contextWindow: 10000, maxTokens: 1000, thinkingLevelMap: { minimal: null } };
@@ -171,4 +171,19 @@ test("refuses host-only credential chains, but supports Bedrock bearer tokens an
 test("rejects embedded URL credentials instead of copying them into the workspace", async () => {
   const runtime = fixture([model("custom", "openai-completions", "https://user:secret@custom.example/v1")], { custom: { auth: { apiKey: "secret" } } });
   await expect(createPiCliConfiguration(runtime, [])).rejects.toThrow("without embedded credentials");
+});
+
+test("credential bridge intercepts current model hosts and authentication endpoint overrides", async () => {
+  const runtime = fixture([
+    model("openai", "openai-responses", "https://api.openai.com/v1"),
+    model("custom"),
+    model("anthropic", "anthropic-messages", "https://api.anthropic.com"),
+  ], {
+    openai: { auth: { apiKey: "access-token", baseUrl: "https://chatgpt.com/backend-api" } },
+    custom: { auth: { apiKey: "secret" } },
+    anthropic: { auth: { apiKey: "sk-ant-oat-secret" } },
+  });
+  expect(await piCliCredentialHosts(runtime)).toEqual(["chatgpt.com", "custom.example"]);
+  runtime.auth.openai = { auth: { apiKey: "sk-secret" } };
+  expect(await piCliCredentialHosts(runtime)).toEqual(["api.openai.com", "custom.example"]);
 });

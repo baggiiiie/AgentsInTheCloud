@@ -1,6 +1,7 @@
 import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@atelier/core";
 import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts } from "@atelier/projects";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@atelier/workspace";
+import { matchHostname } from "./patterns.ts";
 import { isWorkspaceDestinationAllowed } from "./workspace-destinations.ts";
 import { createHttpHooks, type RequestTransformHttpHooks, type SecretDefinition } from "./placeholder-hooks.ts";
 
@@ -14,13 +15,21 @@ export type WorkspaceSecretContext = {
 };
 
 const subscriptionSecrets: Record<string, SecretDefinition> = {};
-const requestTransforms = new Map<string, (request: Request) => Promise<Request>>();
+const requestTransforms = new Map<string, { transform: (request: Request) => Promise<Request>; hosts: () => Promise<string[]> }>();
 const responseTransforms = new Map<string, (response: Response, request: Request) => Promise<Response>>();
 
 /** Host-owned credential bridges run before ordinary secret substitution. */
-export function registerWorkspaceRequestTransform(id: string, transform: (request: Request) => Promise<Request>): void {
-  requestTransforms.set(id, transform);
+export function registerWorkspaceRequestTransform(id: string, transform: (request: Request) => Promise<Request>, hosts: () => Promise<string[]> = async () => []): void {
+  requestTransforms.set(id, { transform, hosts });
   invalidateContexts();
+}
+
+/** HTTPS must be decrypted before host-owned request bridges can see placeholders. */
+export async function workspaceRequestTransformMatchesHost(hostname: string): Promise<boolean> {
+  for (const { hosts } of requestTransforms.values()) {
+    if ((await hosts()).some((host) => matchHostname(hostname, host))) return true;
+  }
+  return false;
 }
 
 export function registerWorkspaceResponseTransform(id: string, transform: (response: Response, request: Request) => Promise<Response>): void {
@@ -100,7 +109,7 @@ function buildContext(workspaceId: string, secrets: Record<string, SecretDefinit
     replaceSecretsInQuery: false,
     secrets,
     onRequest: async (request) => {
-      for (const transform of requestTransforms.values()) request = await transform(request);
+      for (const { transform } of requestTransforms.values()) request = await transform(request);
       return request;
     },
     onResponse: async (response, request) => {

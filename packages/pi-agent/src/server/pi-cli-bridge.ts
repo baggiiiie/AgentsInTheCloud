@@ -94,6 +94,17 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
   return result;
 }
 
+/** Resolve current endpoints on each CONNECT, including OAuth endpoint overrides. */
+export async function piCliCredentialHosts(runtime: Runtime): Promise<string[]> {
+  const hosts = new Set<string>();
+  for (const model of await runtime.getAvailable()) {
+    const auth = await runtime.getAuth(model);
+    if (!auth) throw new Error(`Provider disconnected while resolving Pi endpoints: ${model.provider}`);
+    if (!unsupportedAuth(model, auth)) hosts.add(endpoint(model, auth).hostname);
+  }
+  return [...hosts];
+}
+
 /** Resolve only markers addressed to a currently configured endpoint. OAuth refresh stays in ModelRuntime. */
 export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime>): (request: Request) => Promise<Request> {
   return async (request) => {
