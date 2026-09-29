@@ -181,8 +181,11 @@ export const atelierClientModule: WorkspaceClientModule = {
       }
       inputKeydown(event: KeyboardEvent): void {
         if (this.element.querySelector<HTMLElement>(".agent-completion-menu-host:not([hidden])")?.checkVisibility()) return;
-        const submitKey = composerSubmitKey(event);
-        if (!submitKey) return;
+        // iOS may report Shift on the blue Send key when auto-capitalization is
+        // armed after a period. That is not a hardware Shift+Enter newline.
+        const shiftedSoftSend = event.key === "Enter" && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && !event.isComposing
+          && document.documentElement.classList.contains("software-keyboard-visible");
+        if (!composerSubmitKey(event) && !shiftedSoftSend) return;
         event.preventDefault();
         this.formTarget.requestSubmit();
       }
