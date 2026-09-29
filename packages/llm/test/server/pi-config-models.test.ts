@@ -28,7 +28,7 @@ describe("custom Pi model configuration", () => {
       providers: {
         "openai-codex": {
           models: [
-            { id: "gpt-5.4", name: "Stale custom copy" },
+            { id: "gpt-5.5", name: "Stale custom copy" },
             { id: "future-model", name: "Future model" },
           ],
         },
@@ -38,7 +38,7 @@ describe("custom Pi model configuration", () => {
     const result = await setCustomModelsJson(source);
     const effective = JSON.parse(await readFile(join(dataDir, "pi-config", "models.json"), "utf8"));
 
-    expect(result.skippedOfficialModels).toEqual([{ provider: "openai-codex", id: "gpt-5.4" }]);
+    expect(result.skippedOfficialModels).toEqual([{ provider: "openai-codex", id: "gpt-5.5" }]);
     expect(effective.providers["openai-codex"].models).toEqual([{ id: "future-model", name: "Future model" }]);
     expect(JSON.parse(await getCustomModelsJson()).providers["openai-codex"].models).toHaveLength(2);
   });

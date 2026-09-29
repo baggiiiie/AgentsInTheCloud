@@ -1,5 +1,6 @@
 import { isJsonObject, type JsonObject } from "@atelier/core";
 import { stream as streamAnthropic } from "@earendil-works/pi-ai/api/anthropic-messages";
+import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
 import { describe, expect, test } from "bun:test";
 import { agentPath, messageEnvelope, modelMessage, parseForkTurns, codexStatus } from "../../src/server/subagent-protocol.ts";
 import { SubagentModelInput } from "../../src/server/subagent-model-input.ts";
@@ -144,7 +145,7 @@ test("Anthropic's real request serializer receives user-message envelopes withou
     id: "claude-sonnet-4-20250514", name: "Claude", provider: "anthropic", api: "anthropic-messages",
     baseUrl: "https://api.anthropic.com", reasoning: false, input: ["text"],
     contextWindow: 200000, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  }, { messages: [mapped] }, {
+  }, normalizeContext({ messages: [mapped] }), {
     apiKey: "serializer-inspection-only", cacheRetention: "none",
     onPayload(payload) {
       if (!isJsonObject(payload)) throw new Error("Expected an Anthropic request object");
