@@ -117,7 +117,9 @@ function usageSource(accountUsage: () => Response = () => new Response(null, { s
 
 test("asks Anthropic on the first read after start, then stays quiet however long it idles", async () => {
   const { read, calls, advance } = usageSource();
-  expect((await read()).windows[0]!.usedPercent).toBe(26);
+  const usage = await read();
+  expect(usage.windows[0]!.usedPercent).toBe(26);
+  expect(usage.checkedAt).toBe(checkedAt.toISOString());
   expect(calls.toSorted()).toEqual(["/api/oauth/usage Bearer secret", "/v1/messages Bearer secret"]);
   advance(40 * 60_000);
   await read();

@@ -140,7 +140,8 @@ export function createAnthropicUsageSource(fetcher: Fetcher = fetch, now: () => 
 
   const probe = singleFlight(async (token: string, model: string) => {
     const started = generation;
-    const usage = await probeAnthropicSubscriptionUsage(token, model, fetcher);
+    const result = await probeAnthropicSubscriptionUsage(token, model, fetcher);
+    const usage = { ...result, checkedAt: new Date(now()).toISOString() };
     if (generation === started) record(usage);
     return usage;
   });
