@@ -4,6 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import type { Api, AuthResult, Model } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
+import { Value } from "typebox/value";
+import { stream as streamOpenAIResponses } from "@earendil-works/pi-ai/api/openai-responses";
+import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
 import { createPiCliConfiguration, createPiCliCredentialTransform, piCliModelUnavailableReason } from "../src/server/pi-cli-bridge.ts";
 
 function model(provider: string, api: Api = "openai-completions", baseUrl = `https://${provider}.example/v1`): Model<Api> {
@@ -73,6 +77,30 @@ test("Codex receives a real access token and account header while the CLI gets o
   const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://chatgpt.com/backend-api/codex/responses", { headers: { authorization: `Bearer ${key}`, "chatgpt-account-id": claims["https://api.openai.com/auth"].chatgpt_account_id } }));
   expect(request.headers.get("authorization")).toBe(`Bearer ${jwt("account-two")}`);
   expect(request.headers.get("chatgpt-account-id")).toBe("account-two");
+});
+
+test("OpenAI placeholders keep the shape Pi uses to tell API keys from Sign in with ChatGPT", async () => {
+  const openai = { ...model("openai", "openai-responses", "https://api.openai.com/v1"), maxTokens: 4000 };
+  // Pi omits request fields that Sign in with ChatGPT rejects, based on whether the key starts with `sk-`.
+  async function cliRequestOmitsMaxOutputTokens(key: string): Promise<boolean> {
+    let omitted: boolean | undefined;
+    await streamOpenAIResponses({ ...openai, api: "openai-responses" }, normalizeContext({ messages: [{ role: "user", content: "hi", timestamp: 0 }] }), {
+      apiKey: key, maxTokens: 2000,
+      onPayload(body) {
+        omitted = Value.Parse(Type.Object({ max_output_tokens: Type.Optional(Type.Number()) }), body).max_output_tokens === undefined;
+        throw new Error("Stop after serialization; no network request");
+      },
+    }).result();
+    return omitted!;
+  }
+  for (const [secret, subscription] of [["sk-proj-real-secret", false], ["chatgpt-access-token", true]] as const) {
+    const runtime = fixture([openai], { openai: { auth: { apiKey: secret } } });
+    const key = (await createPiCliConfiguration(runtime, [])).auth.openai!.key;
+    expect(key).not.toContain(secret);
+    expect(await cliRequestOmitsMaxOutputTokens(key)).toBe(subscription);
+    const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://api.openai.com/v1/responses", { headers: { authorization: `Bearer ${key}` } }));
+    expect(request.headers.get("authorization")).toBe(`Bearer ${secret}`);
+  }
 });
 
 test("exports Anthropic API keys but refuses Claude subscription tokens, including for already running Pi tabs", async () => {

@@ -34,7 +34,7 @@ async function providerSummaries(): Promise<ProviderSummary[]> {
   const connections = await providerConnections(runtime);
   return runtime.getProviders().map((provider): ProviderSummary => ({
     provider: provider.id,
-    label: provider.id === "openai-codex" ? "ChatGPT / Codex" : provider.id === "openai" ? "OpenAI API" : provider.name ?? provider.id,
+    label: provider.id === "openai-codex" ? "ChatGPT / Codex" : provider.id === "openai" ? "OpenAI" : provider.name ?? provider.id,
     connection: connections.get(provider.id)!,
     methods: [provider.auth.oauth && "oauth", provider.auth.apiKey?.login && "api_key"].filter((method): method is string => Boolean(method)),
   })).sort((a, b) => (getPopularProviderRank(a.provider) ?? Number.MAX_SAFE_INTEGER) - (getPopularProviderRank(b.provider) ?? Number.MAX_SAFE_INTEGER) || a.label.localeCompare(b.label));

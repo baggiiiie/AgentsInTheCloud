@@ -11,7 +11,8 @@ const markerSchema = Type.Object({
   provider: Type.String({ minLength: 1 }), model: Type.String({ minLength: 1 }),
   field: Type.Union([Type.Literal("key"), Type.Literal("account"), Type.Literal("header")]),
   header: Type.Optional(Type.String()),
-  style: Type.Union([Type.Literal("plain"), Type.Literal("codex")]),
+  // "sk" keeps the real key's `sk-` prefix: Pi classifies OpenAI credentials by it (API key or Sign in with ChatGPT).
+  style: Type.Union([Type.Literal("plain"), Type.Literal("codex"), Type.Literal("sk")]),
 });
 type Marker = Static<typeof markerSchema>;
 type Runtime = Pick<ModelRuntime, "getAvailable" | "getModel"> & { getAuth(model: Model<Api>): Promise<AuthResult | undefined> };
@@ -27,6 +28,7 @@ function placeholder(marker: Marker): string {
     const claims = { "https://api.openai.com/auth": { chatgpt_account_id: markerToken({ ...marker, field: "account", style: "plain" }) } };
     return `${Buffer.from('{"alg":"none"}').toString("base64url")}.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.${token}`;
   }
+  if (marker.style === "sk") return `sk-${token}`;
   return token;
 }
 
@@ -77,7 +79,8 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
     // Ambient host credentials have no safe file representation. Do not advertise them in Pi.
     if (unsupportedAuth(model, auth)) continue;
     const baseUrl = endpoint(model, auth).href.replace(/\/$/, "");
-    const key = auth.auth.apiKey ? placeholder({ provider: model.provider, model: model.id, field: "key", style: model.api === "openai-codex-responses" ? "codex" : "plain" }) : "atelier-pi-no-key";
+    const style = model.api === "openai-codex-responses" ? "codex" : auth.auth.apiKey?.startsWith("sk-") ? "sk" : "plain";
+    const key = auth.auth.apiKey ? placeholder({ provider: model.provider, model: model.id, field: "key", style }) : "atelier-pi-no-key";
     const provider = result.models.providers[model.provider] ??= { apiKey: key, models: [] };
     result.auth[model.provider] = { type: "api_key", key: provider.apiKey };
     const headers = Object.fromEntries(Object.keys(auth.auth.headers ?? {}).map((header) => [header,

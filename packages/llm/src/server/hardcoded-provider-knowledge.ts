@@ -12,15 +12,17 @@ interface ProviderKnowledgeRegistry {
 }
 
 const hardcodedPopularModels: readonly (ProviderModelReference & { provider: string })[] = [
-  { provider: "openai-codex", id: "gpt-6-astra" },
-  { provider: "openai-codex", id: "gpt-5.6-terra" },
-  { provider: "openai-codex", id: "gpt-5.6-luna" },
+  { provider: "openai", id: "gpt-6-astra" },
+  { provider: "openai", id: "gpt-5.6-terra" },
+  { provider: "openai", id: "gpt-5.6-luna" },
   { provider: "anthropic", id: "claude-opus-5" },
   { provider: "anthropic", id: "claude-fable-5" },
   { provider: "anthropic", id: "claude-opus-4-8" },
   { provider: "github-copilot", id: "gpt-6-astra" },
-  { provider: "openai", id: "gpt-5.6-sol" },
   { provider: "xai", id: "grok-4.6" },
+  { provider: "openai-codex", id: "gpt-6-astra" },
+  { provider: "openai-codex", id: "gpt-5.6-terra" },
+  { provider: "openai-codex", id: "gpt-5.6-luna" },
 ];
 
 const hardcodedProviderKnowledge: ProviderKnowledgeRegistry = {
@@ -50,7 +52,8 @@ export function getPopularModelRank(provider: string, id: string): number | unde
 }
 
 export function getPopularProviderRank(provider: string): number | undefined {
-  if (provider === "openai") return undefined;
+  // Sign in with ChatGPT on OpenAI supersedes the Codex provider, which keeps its curated defaults.
+  if (provider === "openai-codex") return undefined;
   const rank = hardcodedPopularModels.findIndex((model) => model.provider === provider);
   return rank < 0 ? undefined : rank;
 }

@@ -26,6 +26,19 @@ function piConfigDir(): string { return atelierDataPath(getAtelierRuntimeContext
 function piModelsJsonPath(): string { return join(piConfigDir(), "models.json"); }
 function piCustomModelsJsonPath(): string { return join(piConfigDir(), "custom-models.json"); }
 function piAuthJsonPath(): string { return join(piConfigDir(), "auth.json"); }
+function piDeviceIdPath(): string { return join(piConfigDir(), "device-id"); }
+
+/** Sign in with ChatGPT identifies each installation by a stable UUID. */
+async function piDeviceId(): Promise<string> {
+  const path = piDeviceIdPath();
+  await mkdir(dirname(path), { recursive: true });
+  try {
+    await writeFile(path, crypto.randomUUID(), { flag: "wx" });
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+  }
+  return (await readFile(path, "utf8")).trim();
+}
 
 async function writeJsonFile(path: string, value: JsonObject): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -212,7 +225,8 @@ function forgetSubscriptionState(provider: string): void {
 
 export async function loginPiOAuthProvider(providerId: string, interaction: AuthInteraction): Promise<void> {
   const runtime = await createPiModelRuntime();
-  await runtime.login(providerId, "oauth", interaction);
+  const deviceId = await piDeviceId();
+  await runtime.login(providerId, "oauth", interaction, { getDeviceId: () => deviceId });
   forgetSubscriptionState(providerId);
   if (providerId === "openai-codex" || providerId === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, providerId, interaction.signal);

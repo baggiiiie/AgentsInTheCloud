@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getCustomModelsJson, setCustomModelsJson } from "../../src/server/pi-config-models.ts";
+import { getCustomModelsJson, loginPiOAuthProvider, setCustomModelsJson } from "../../src/server/pi-config-models.ts";
 let dataDir: string;
 beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "atelier-llm-models-"));
@@ -42,5 +42,20 @@ describe("custom Pi model configuration", () => {
     expect(effective.providers["openai-codex"].models).toEqual([{ id: "future-model", name: "Future model" }]);
     expect(JSON.parse(await getCustomModelsJson()).providers["openai-codex"].models).toHaveLength(2);
   });
-});
 
+  test("Sign in with ChatGPT identifies this installation by one stable device ID", async () => {
+    async function agentHostId(): Promise<string | null> {
+      const abort = new AbortController();
+      let authUrl: string | undefined;
+      await expect(loginPiOAuthProvider("openai", {
+        signal: abort.signal,
+        notify: (event) => { if (event.type === "auth_url") { authUrl = event.url; abort.abort(); } },
+        prompt: (prompt) => new Promise((_resolve, reject) => prompt.signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true })),
+      })).rejects.toThrow();
+      return new URL(authUrl!).searchParams.get("ext_agent_host_id");
+    }
+    const first = await agentHostId();
+    expect(first).toMatch(/^urn:uuid:[0-9a-f-]{36}$/);
+    expect(await agentHostId()).toBe(first);
+  });
+});
