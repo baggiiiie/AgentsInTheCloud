@@ -8,6 +8,8 @@
   height: 100%; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto;
   background: var(--bg); position: relative; container-type: inline-size;
 }
+.agent-transcript-region { position: relative; display: flex; min-height: 0; }
+.agent-transcript-region > .agent-transcript { flex: 1; min-width: 0; }
 .agent-transcript {
   min-height: 0; overflow-y: auto; scroll-behavior: auto;
   padding-block: 1.875rem;
@@ -123,16 +125,21 @@
 
 .agent-tool-ansi, .agent-tool-code, .agent-tool-term { background: color-mix(in srgb, var(--bg) 45%, #000 14%); color: var(--text-bright); }
 
-.agent-pane-composer-overlays {
-  position: absolute; z-index: 20; left: 0; right: 0; bottom: calc(100% + 4px);
-  display: flex; flex-direction: column; align-items: stretch; gap: 4px; pointer-events: none;
+.agent-transcript-navigation {
+  position: absolute; z-index: 20; right: 10px; bottom: 4px; display: flex;
 }
-.agent-transcript-navigation { align-self: flex-end; display: flex; margin-right: var(--composer-control-inset); pointer-events: auto; }
+/* Keep transcript navigation above the composer opener in reading mode. */
+.agent-pane:not(.agent-composer-open) .agent-transcript-navigation { bottom: var(--agent-composer-opener-clearance); }
 .agent-transcript-navigation[hidden] { display: none; }
 .agent-pane-composer .composer-footer { padding-right: var(--composer-control-inset); }
 @media (max-width: 700px) {
-  .agent-transcript-navigation { margin-right: 4px; }
+  .agent-transcript-navigation { right: 4px; }
   .agent-pane-composer .composer-footer { padding-right: 4px; }
+}
+
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  html.software-keyboard-visible .agent-transcript-region { flex: 1 1 0px; }
+  html.software-keyboard-visible .agent-pane .agent-transcript { padding-block: 0; }
 }
 
 @media (max-width: 700px) {

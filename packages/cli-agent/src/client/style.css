@@ -9,11 +9,10 @@
 .cli-agent-body.cli-transcript-mode .observable-terminal-host { visibility:hidden; pointer-events:none; }
 .cli-agent-body.cli-transcript-mode .cli-transcript-view { display:block; }
 .cli-transcript-switch { position:absolute; z-index:3; right:10px; bottom:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.cli-agent-body:not(.agent-composer-open) .cli-transcript-switch { bottom:74px; }
+.cli-agent-body:not(.agent-composer-open) .cli-transcript-switch { bottom:var(--agent-composer-opener-clearance); }
 @media (max-width:700px), (pointer:coarse) {
   .cli-agent-body .cli-transcript-view { padding-bottom:172px; }
   .cli-transcript-switch { right:4px; }
-  .cli-agent-body:not(.agent-composer-open) .cli-transcript-switch { bottom:92px; }
 }
 .cli-transcript-switch > :is(button, a) { --button-background:var(--panel); }
 .cli-transcript-switch > button[hidden] { display:none; }

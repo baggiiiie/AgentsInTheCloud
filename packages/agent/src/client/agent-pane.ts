@@ -90,7 +90,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.scrollToTranscriptEnd();
     };
     connect(): void {
-      this.navigation = new TranscriptNavigation(this.transcriptTarget, this.transcriptContentTarget, this.transcriptEndTarget, this.element.querySelector<HTMLElement>(".composer")!);
+      this.navigation = new TranscriptNavigation(this.transcriptTarget, this.transcriptContentTarget, this.transcriptEndTarget);
       this.navigation.setStreaming(this.sendStopTarget.dataset.agentBusy === "true");
       this.element.dataset.agentConnectionActive = "false";
       this.element.addEventListener("agent:turn-reveal", this.turnRevealed);

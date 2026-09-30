@@ -47,8 +47,11 @@
 .launch-composer .composer-input { min-height: var(--composer-input-max-height); overflow-y: auto; }
 .composer-input-controls { position: absolute; top: var(--composer-control-inset); right: var(--composer-control-inset); display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .composer-input-controls [data-transcription-composer-target="button"] { position: relative; top: auto; right: auto; }
+/* Transcript controls share the space reserved above the composer opener. */
+.agent-composer-pane { --agent-composer-opener-clearance: 74px; }
 @media (max-width: 700px), (pointer: coarse) {
   .composer { --composer-control-size: 62.5px; }
+  .agent-composer-pane { --agent-composer-opener-clearance: 92px; }
   .composer-surface { --composer-footer-height: 52px; }
 }
 @media (max-width: 700px) { .composer-input { font-size: 16px; } }
@@ -82,9 +85,6 @@
 @media (max-width: 700px), (hover: none) and (pointer: coarse) {
   html.software-keyboard-visible .agent-composer-pane {
     display: flex; flex-direction: column; min-height: 0;
-  }
-  html.software-keyboard-visible .agent-composer-pane > .agent-transcript {
-    flex: 1 1 0px; min-height: 0; padding-block: 0;
   }
   html.software-keyboard-visible .agent-composer-pane > .composer {
     flex: 0 1 180px; min-height: 0; max-height: 60%;

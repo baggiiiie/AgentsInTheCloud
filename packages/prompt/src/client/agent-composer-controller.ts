@@ -21,6 +21,10 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       return this.element.querySelector<HTMLTextAreaElement>(".composer .composer-input");
     }
 
+    private get staysOpen(): boolean {
+      return this.element.classList.contains("agent-pane") && !window.matchMedia(phoneLayoutMediaQuery).matches;
+    }
+
     private blurInput(): void {
       const active = document.activeElement;
       if (active instanceof HTMLElement && this.element.contains(active)) active.blur();
@@ -32,12 +36,12 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       this.activeSelection = true;
       const input = this.input;
       if (!input) return; // Ended CLI sessions are read-only.
-      const builtin = this.element.classList.contains("agent-pane");
       const hasDraft = Boolean(input.value.trim() || this.element.querySelector(".agent-chip"));
-      this.element.classList.toggle("agent-composer-open", builtin || hasDraft);
+      const open = this.staysOpen || hasDraft;
+      this.element.classList.toggle("agent-composer-open", open);
       if (focusLikelyOpensSoftwareKeyboard()) this.blurInput();
       else if (document.hasFocus()) {
-        if (builtin || hasDraft) input.focus({ preventScroll: true });
+        if (open) input.focus({ preventScroll: true });
         else this.element.dispatchEvent(new Event("atelier:workspace-agent-focus"));
       }
     }
@@ -68,7 +72,7 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
     }
 
     sent(): void {
-      if (this.element.classList.contains("agent-pane") && !window.matchMedia(phoneLayoutMediaQuery).matches) return;
+      if (this.staysOpen) return;
       this.close();
       if (!focusLikelyOpensSoftwareKeyboard() && isWorkspacePaneVisible(this.element) && document.hasFocus()) {
         this.element.dispatchEvent(new Event("atelier:workspace-agent-focus"));

@@ -19,6 +19,7 @@ export class TranscriptNavigation {
   private pendingPosition: "prompt" | "instant" | "smooth" | undefined;
   private floor = 0;
   private width = 0;
+  private height = 0;
   private readingAnchor?: { element: HTMLElement; offset: number; height: number };
   private streaming = false;
   private motionFrame = 0;
@@ -31,11 +32,10 @@ export class TranscriptNavigation {
   private readonly resizeObserver: ResizeObserver;
   private readonly composerOpener: HTMLElement | null;
 
-  constructor(private readonly transcript: HTMLElement, private readonly content: HTMLElement, private readonly latestButton: HTMLElement, composer: HTMLElement) {
-    this.composerOpener = transcript.parentElement!.querySelector<HTMLElement>(".agent-composer-opener > button");
+  constructor(private readonly transcript: HTMLElement, private readonly content: HTMLElement, private readonly latestButton: HTMLElement) {
+    this.composerOpener = transcript.closest(".agent-composer-pane")!.querySelector<HTMLElement>(".agent-composer-opener > button");
     this.resizeObserver = new ResizeObserver(this.layoutChanged);
     this.resizeObserver.observe(transcript);
-    this.resizeObserver.observe(composer);
     this.resizeObserver.observe(content);
     if (this.composerOpener) this.resizeObserver.observe(this.composerOpener);
     transcript.addEventListener("scroll", this.scrolled);
@@ -175,19 +175,22 @@ export class TranscriptNavigation {
       this.frame = 0;
       if (!this.visible) return;
       const width = this.transcript.clientWidth;
-      const resized = this.width !== 0 && width !== this.width;
-      this.width = width;
       const geometry = this.geometry();
-      if (resized && !this.pendingPosition) {
-        if (this.following) {
-          this.pendingPosition = "instant";
-        } else if (this.readingAnchor && this.content.contains(this.readingAnchor.element)) {
-          const { element, offset, height } = this.readingAnchor;
-          const bounds = element.getBoundingClientRect();
-          // Scale an offset inside a reflowed block; preserve gaps above it.
-          const nextOffset = offset < 0 ? offset * bounds.height / height : offset;
-          this.moveTo(this.transcript.scrollTop + bounds.top - this.transcript.getBoundingClientRect().top - nextOffset, true);
-        }
+      const widthChanged = this.width !== 0 && width !== this.width;
+      const resized = widthChanged || (this.height !== 0 && geometry.viewport !== this.height);
+      this.width = width;
+      this.height = geometry.viewport;
+      if (resized && this.following) {
+        // Composer/keyboard changes resize the viewport immediately. Match that
+        // layout change with a snap, even if a follow glide is already running.
+        this.stopMotion();
+        this.pendingPosition = "instant";
+      } else if (widthChanged && !this.pendingPosition && this.readingAnchor && this.content.contains(this.readingAnchor.element)) {
+        const { element, offset, height } = this.readingAnchor;
+        const bounds = element.getBoundingClientRect();
+        // Scale an offset inside a reflowed block; preserve gaps above it.
+        const nextOffset = offset < 0 ? offset * bounds.height / height : offset;
+        this.moveTo(this.transcript.scrollTop + bounds.top - this.transcript.getBoundingClientRect().top - nextOffset, true);
       }
       this.reconcileMotion(geometry);
       this.reserve(geometry);
