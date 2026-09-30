@@ -75,6 +75,69 @@ describe("workspace source preparation", () => {
     await Promise.all(tempRoots.splice(0).map((path) => rm(path, { recursive: true, force: true })));
   });
 
+  test("prepares unborn default and explicit branches without creating commits", async () => {
+    const root = await mkdtemp(join(tmpdir(), "atelier-empty-source-test-"));
+    tempRoots.push(root);
+    const remote = join(root, "repo.git");
+    await run(["git", "init", "--bare", "-b", "main", remote]);
+
+    for (const branch of [null, "new-project"]) {
+      const project = (await addProject(`${remote}${branch ? `#${branch}` : ""}`)).project;
+      for (const attempt of ["first", "cached"]) {
+        const workspaceId = `empty-${branch}-${attempt}`;
+        const source = await prepareWorkspaceSource({ workspaceId, gitUrl: remote, branch });
+        expect(source.resolvedCommit).toBeNull();
+        expect((await run(["git", "symbolic-ref", "--short", "HEAD"], { cwd: source.worktreePath })).stdout.trim()).toBe(branch ?? "main");
+        expect((await run(["git", "for-each-ref"], { cwd: source.worktreePath })).stdout).toBe("");
+        expect((await run(["git", "status", "--porcelain"], { cwd: source.worktreePath })).stdout).toBe("");
+        expect((await run(["git", "remote", "get-url", "origin"], { cwd: source.worktreePath })).stdout.trim()).toBe(remote);
+        const metadata = await Bun.file(join(source.cleanupPath, "metadata.json")).json();
+        expect(metadata.resolvedCommit).toBeNull();
+        expect(metadata.effectiveBranch).toBe(branch ?? "main");
+
+        const events = createAtelierEventBus();
+        registerProjectWorkspaceInitEvents(events);
+        const init: GitProjectInitInstruction = { type: "project.git", projectId: project.id, name: project.id, gitUrl: remote, branch, sessionShareKey: project.id };
+        const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+        await events.emit("workspace_plan_prepare", { workspaceId, init, workHostPath: source.worktreePath, workContainerPath: "/work", plan });
+        expect(plan.labels["com.atelier.source-commit"]).toBeUndefined();
+        expect(plan.labels["com.atelier.source-template"]).toBe(source.templateKey);
+      }
+    }
+  });
+
+  test("uses the first pushed commit for later workspaces while the original stays unborn", async () => {
+    const root = await mkdtemp(join(tmpdir(), "atelier-empty-source-test-"));
+    tempRoots.push(root);
+    const remote = join(root, "repo.git");
+    await run(["git", "init", "--bare", "-b", "main", remote]);
+    const first = await prepareWorkspaceSource({ workspaceId: "empty-first", gitUrl: remote, branch: null });
+    const original = await prepareWorkspaceSource({ workspaceId: "empty-original", gitUrl: remote, branch: null });
+    await run(["git", "config", "user.name", "Test"], { cwd: first.worktreePath });
+    await run(["git", "config", "user.email", "test@example.com"], { cwd: first.worktreePath });
+    await writeFile(join(first.worktreePath, "README.md"), "New project\n");
+    await run(["git", "add", "README.md"], { cwd: first.worktreePath });
+    await run(["git", "commit", "-m", "Initial commit"], { cwd: first.worktreePath });
+    await run(["git", "push", "-u", "origin", "main"], { cwd: first.worktreePath });
+
+    const next = await prepareWorkspaceSource({ workspaceId: "with-first-commit", gitUrl: remote, branch: null });
+    expect(next.resolvedCommit).toBe((await run(["git", "rev-parse", "HEAD"], { cwd: first.worktreePath })).stdout.trim());
+    expect(await Bun.file(join(next.worktreePath, "README.md")).text()).toBe("New project\n");
+    expect((await run(["git", "ls-files"], { cwd: original.worktreePath })).stdout).toBe("");
+    expect(original.resolvedCommit).toBeNull();
+  });
+
+  test("discards cached history when the remote becomes empty", async () => {
+    const fixture = await createRemote();
+    tempRoots.push(fixture.root);
+    const first = await prepareWorkspaceSource({ workspaceId: "before-empty", gitUrl: fixture.remote, branch: "main" });
+    await run(["git", "--git-dir", fixture.remote, "update-ref", "-d", "refs/heads/main"]);
+    const next = await prepareWorkspaceSource({ workspaceId: "after-empty", gitUrl: fixture.remote, branch: "main" });
+    expect(next.resolvedCommit).toBeNull();
+    expect((await run(["git", "ls-files"], { cwd: next.worktreePath })).stdout).toBe("");
+    expect(await Bun.file(join(first.worktreePath, "file.txt")).text()).toBe("one\n");
+  });
+
   test("missing branches report a recoverable error on initial and cached preparation", async () => {
     const fixture = await createRemote();
     tempRoots.push(fixture.root);

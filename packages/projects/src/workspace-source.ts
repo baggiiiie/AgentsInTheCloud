@@ -29,7 +29,7 @@ export interface PreparedWorkspaceSource {
   cleanupPath: string;
   gitUrl: string;
   branch: string | null;
-  resolvedCommit: string;
+  resolvedCommit: string | null;
   templateKey: string;
 }
 
@@ -44,7 +44,7 @@ const workspaceSourceMetadataSchema = Type.Object({
   branch: Type.Union([Type.String(), Type.Null()]),
   effectiveBranch: Type.Union([Type.String(), Type.Null()]),
   templateKey: Type.String(),
-  resolvedCommit: Type.String(),
+  resolvedCommit: Type.Union([Type.String(), Type.Null()]),
   createdAt: Type.String(),
 });
 type WorkspaceSourceMetadata = Static<typeof workspaceSourceMetadataSchema>;
@@ -120,7 +120,7 @@ async function pathExists(path: string): Promise<boolean> {
   return await stat(path).then(() => true, () => false);
 }
 
-async function ensureTemplate(gitUrl: string, branch: string | null, key: string, options: { workspaceId: string; events?: AtelierEventBus; logPath: string; sshEnv: Record<string, string> }): Promise<{ repoPath: string; resolvedCommit: string; effectiveBranch: string | null }> {
+async function ensureTemplate(gitUrl: string, branch: string | null, key: string, options: { workspaceId: string; events?: AtelierEventBus; logPath: string; sshEnv: Record<string, string> }): Promise<{ repoPath: string; resolvedCommit: string | null; effectiveBranch: string | null }> {
   const dir = templateDir(key);
   const repoPath = templateRepoPath(key);
   const tmpPath = join(dir, `repo.tmp-${process.pid}-${Date.now()}`);
@@ -147,7 +147,9 @@ resolved_commit_file=${shellQuote(resolvedCommitPath)}
 git_cmd() { git -c credential.helper="$credential_helper" "$@"; }
 trap 'rm -rf "$tmp_path"' EXIT
 
-if [ ! -d "$repo_path/.git" ]; then
+# Inspect the remote, not the cached checkout: local branches may retain old commits.
+remote_refs="$(git_cmd ls-remote --refs "$git_url")"
+if [ -z "$remote_refs" ] || [ ! -d "$repo_path/.git" ]; then
   rm -rf "$tmp_path"
   git_cmd clone "$git_url" "$tmp_path"
   rm -rf "$repo_path"
@@ -155,34 +157,48 @@ if [ ! -d "$repo_path/.git" ]; then
 fi
 
 git_cmd -C "$repo_path" remote set-url origin "$git_url"
-git_cmd -C "$repo_path" fetch --prune --force --tags origin
-
-if [ -n "$branch" ]; then
-  effective_branch="$branch"
-  reset_ref="refs/remotes/origin/$branch"
-  git_cmd -C "$repo_path" show-ref --verify --quiet "$reset_ref" || {
-    status=$?
-    if [ "$status" -eq 1 ]; then exit ${branchNotFoundExitCode}; fi
-    exit "$status"
-  }
-  git_cmd -C "$repo_path" checkout -B "$effective_branch" "$reset_ref"
-else
-  git_cmd -C "$repo_path" remote set-head origin -a
-  remote_head="$(git_cmd -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD)"
-  case "$remote_head" in origin/*) ;; *) echo "could not resolve origin default branch for $git_url" >&2; exit 2 ;; esac
-  effective_branch="\${remote_head#origin/}"
-  reset_ref="$remote_head"
-  git_cmd -C "$repo_path" checkout -B "$effective_branch" "$reset_ref"
-fi
-
-git_cmd -C "$repo_path" reset --hard "$reset_ref"
-git_cmd -C "$repo_path" clean -ffdx
 git_cmd lfs version
 git_cmd -C "$repo_path" lfs install --local
-git_cmd -C "$repo_path" lfs pull origin "$effective_branch"
-git_cmd -C "$repo_path" submodule sync --recursive
-git_cmd -C "$repo_path" submodule update --init --recursive --checkout --force
-git_cmd -C "$repo_path" submodule foreach --quiet --recursive 'git clean -ffdx && git lfs install --local && git lfs pull'
+
+if [ -z "$remote_refs" ]; then
+  # Clone preserves the advertised unborn default branch when Git provides it.
+  # An explicit branch is also valid here: there are no remote branches to miss.
+  if [ -n "$branch" ]; then
+    git_cmd check-ref-format --branch "$branch"
+    git_cmd -C "$repo_path" symbolic-ref HEAD "refs/heads/$branch"
+  fi
+  effective_branch="$(git_cmd -C "$repo_path" symbolic-ref --short HEAD)"
+  : > "$resolved_commit_file"
+else
+  git_cmd -C "$repo_path" fetch --prune --force --tags origin
+
+  if [ -n "$branch" ]; then
+    effective_branch="$branch"
+    reset_ref="refs/remotes/origin/$branch"
+    git_cmd -C "$repo_path" show-ref --verify --quiet "$reset_ref" || {
+      status=$?
+      if [ "$status" -eq 1 ]; then exit ${branchNotFoundExitCode}; fi
+      exit "$status"
+    }
+    git_cmd -C "$repo_path" checkout -B "$effective_branch" "$reset_ref"
+  else
+    git_cmd -C "$repo_path" remote set-head origin -a
+    remote_head="$(git_cmd -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD)"
+    case "$remote_head" in origin/*) ;; *) echo "could not resolve origin default branch for $git_url" >&2; exit 2 ;; esac
+    effective_branch="\${remote_head#origin/}"
+    reset_ref="$remote_head"
+    git_cmd -C "$repo_path" checkout -B "$effective_branch" "$reset_ref"
+  fi
+
+  git_cmd -C "$repo_path" reset --hard "$reset_ref"
+  git_cmd -C "$repo_path" clean -ffdx
+  git_cmd -C "$repo_path" lfs pull origin "$effective_branch"
+  git_cmd -C "$repo_path" submodule sync --recursive
+  git_cmd -C "$repo_path" submodule update --init --recursive --checkout --force
+  git_cmd -C "$repo_path" submodule foreach --quiet --recursive 'git clean -ffdx && git lfs install --local && git lfs pull'
+
+  git_cmd -C "$repo_path" rev-parse HEAD > "$resolved_commit_file"
+fi
 
 status="$(git_cmd -C "$repo_path" status --porcelain=v1)"
 if [ -n "$status" ]; then
@@ -191,7 +207,6 @@ if [ -n "$status" ]; then
   exit 3
 fi
 
-git_cmd -C "$repo_path" rev-parse HEAD > "$resolved_commit_file"
 printf '%s\n' "$effective_branch" > "$effective_branch_file"
 `;
 
@@ -217,7 +232,7 @@ printf '%s\n' "$effective_branch" > "$effective_branch_file"
   }
 
   const effectiveBranch = (await readFile(effectiveBranchPath, "utf8")).trim() || null;
-  const resolvedCommit = (await readFile(resolvedCommitPath, "utf8")).trim();
+  const resolvedCommit = (await readFile(resolvedCommitPath, "utf8")).trim() || null;
   await rm(effectiveBranchPath, { force: true });
   await rm(resolvedCommitPath, { force: true });
 
@@ -386,7 +401,7 @@ export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): voi
     const metadataPath = join(workspaceSourceDir(workspaceId), "metadata.json");
     if (!existsSync(metadataPath)) return;
     const metadata = Value.Parse(workspaceSourceMetadataSchema, JSON.parse(await readFile(metadataPath, "utf8")));
-    plan.labels["com.atelier.source-commit"] = metadata.resolvedCommit;
+    if (metadata.resolvedCommit !== null) plan.labels["com.atelier.source-commit"] = metadata.resolvedCommit;
     plan.labels["com.atelier.source-template"] = metadata.templateKey;
   });
 }
