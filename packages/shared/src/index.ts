@@ -389,7 +389,11 @@ export function composerSubmitKey(
 ): ComposerSubmitKey | undefined {
   if (event.key !== "Enter") return undefined;
   if (event.metaKey || event.ctrlKey) return "shortcut";
-  if ((focusOpensSoftwareKeyboard ?? focusLikelyOpensSoftwareKeyboard()) && !event.altKey && !event.shiftKey && !event.isComposing) return "software-keyboard";
+  // iOS auto-capitalization can report Shift on the software keyboard's Send
+  // key. Only disregard Shift while that keyboard is actually visible, so a
+  // hardware Shift+Enter still inserts a newline on touch devices.
+  const shiftedSoftwareSend = event.shiftKey && document.documentElement.classList.contains("software-keyboard-visible");
+  if ((focusOpensSoftwareKeyboard ?? focusLikelyOpensSoftwareKeyboard()) && !event.altKey && (!event.shiftKey || shiftedSoftwareSend) && !event.isComposing) return "software-keyboard";
   return undefined;
 }
 
