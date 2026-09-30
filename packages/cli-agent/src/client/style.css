@@ -31,5 +31,7 @@
 
 /* The composer opener must not cover the right-arrow key during terminal input. */
 html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) > .agent-composer-opener { display:none; }
+/* The stage already ends above the key bar; no composer-opener clearance is needed. */
+html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) .cli-transcript-switch { bottom:12px; }
 
 html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) .observable-terminal-host { top:var(--cli-terminal-top, 0px); bottom:auto; }
