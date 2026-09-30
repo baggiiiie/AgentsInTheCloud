@@ -67,3 +67,18 @@ test("failures suppress unrelated sign-in actions", () => {
   expect(status.action).toBeUndefined();
   expect(status.appUrl).toBeUndefined();
 });
+
+test("HTTPS setup is recoverable and cannot advertise readiness or a stale app URL", () => {
+  for (const action of [
+    { description: "Enable MagicDNS and HTTPS Certificates", url: "https://login.tailscale.com/admin/dns" },
+    { description: "Could not provision a certificate. Retrying automatically." },
+  ]) {
+    const pending = installationStatus({ ...input, connectionAction: action });
+    expect(pending.state).toBe("starting");
+    expect(pending.action).toEqual(action);
+    expect(pending.supervisorUrl).toBeUndefined();
+    expect(pending.appUrl).toBeUndefined();
+    expect(installationStatus({ ...input, connectionAction: action, localMode: true, localOrigin: "http://atelier.localhost:5000" }).state).toBe("ready");
+  }
+  expect(installationStatus(input).state).toBe("ready");
+});

@@ -1,3 +1,4 @@
+import { tailscaleHttpsSettingsUrl, TailscaleHttpsDisabledError } from "../../../packages/shared/src/tailscale.ts";
 import { hostSocketPath } from "../../../packages/host/src/protocol.ts";
 import { startHostService } from "../../../packages/host/src/system/service.ts";
 import { dirname } from "node:path";
@@ -15,6 +16,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { chown, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { command, docker, sleep, stopCommands } from "./process.ts";
+import { TailscaleHttps, TailscaleCertificateError } from "./tailscale-https.ts";
 import { setSupervisorRoutes } from "./tailscale.ts";
 import { supervisorFragment, page } from "./ui.ts";
 import { readAppTheme } from "./app-theme.ts";
@@ -71,6 +73,8 @@ let authUrl: string | undefined;
 let connectionAttempt: "idle" | "running" | "finished" = "idle";
 let connectionFailure: string | undefined;
 let networkError: string | undefined;
+const tailscaleHttps = new TailscaleHttps();
+let httpsAction: { description: string; url?: string } | undefined;
 let lastNetworkSuccess = Date.now();
 let connectionStateSince = Date.now();
 let routeTarget = 3001;
@@ -79,7 +83,8 @@ const logs: string[] = [];
 const subscribers = new Set<ReadableStreamDefaultController<Uint8Array>>();
 const encoder = new TextEncoder();
 function connectionProblem() {
-  if (persisted.accessMode === "localhost") return;
+  if (persisted.accessMode === "localhost" && !remoteRequested) return;
+  if (httpsAction) return;
   if (connectionFailure) return connectionFailure;
   if (networkError && Date.now() - lastNetworkSuccess >= 60_000)
     return `Could not prepare the private connection: ${networkError}`;
@@ -90,7 +95,7 @@ function connectionProblem() {
 }
 function fragment() {
   return supervisorFragment({ operation, phase, healthy, recoveringHealth, stopping, failure, candidate,
-    accessMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), authUrl, logs });
+    accessMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), connectionAction: remoteRequested ? httpsAction : undefined, authUrl, logs });
 }
 function emit(event = "progress", data = fragment()) {
   for (const subscriber of subscribers)
@@ -386,7 +391,7 @@ const server = Bun.serve({
           activity: healthy && !appResponding ? { description: "Checking Atelier is healthy" } : activity,
           failure: failure ?? connectionProblem(),
           stopping, busy, appResponding, hostname: tailnetHost, appliedRoute,
-          connectionState, authUrl, logs,
+          connectionState, authUrl, connectionAction: httpsAction, logs,
           localOrigin: persisted.localPort ? `http://atelier.localhost:${persisted.localPort}` : undefined,
           localMode: persisted.accessMode === "localhost" && !remoteRequested,
         }),
@@ -664,6 +669,13 @@ async function initialize() {
             : undefined;
         if (host) {
           const changed = host !== tailnetHost;
+          if (changed) {
+            tailnetHost = undefined;
+            appliedRoute = "";
+            httpsAction = { description: "Preparing Tailscale HTTPS…" };
+            accessChanged();
+          }
+          await tailscaleHttps.prepare(host, Value.Parse(Type.Optional(Type.Union([Type.Null(), Type.Array(Type.String())])), status.CertDomains));
           tailnetHost = host;
           if (remoteRequested && persisted.accessMode !== "tailscale") { persisted.accessMode = "tailscale"; await persist(); emit(); }
           await configureRoutes(routeTarget);
@@ -671,15 +683,24 @@ async function initialize() {
         } else {
           tailnetHost = undefined;
           appliedRoute = "";
+          tailscaleHttps.reset();
         }
         lastNetworkSuccess = Date.now();
         networkError = undefined;
+        httpsAction = undefined;
         if (host) connectionFailure = undefined;
       } catch (error) {
-        networkError = String(error);
+        networkError = error instanceof Error ? error.message : String(error);
+        if (error instanceof TailscaleHttpsDisabledError || error instanceof TailscaleCertificateError) {
+          tailnetHost = undefined;
+          appliedRoute = "";
+          httpsAction = { description: networkError, url: tailscaleHttpsSettingsUrl };
+        } else {
+          httpsAction = undefined;
+        }
         log(`Tailscale: ${networkError}`);
       }
-      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError]);
+      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError, httpsAction]);
       if (nextAccess !== lastAccess) { lastAccess = nextAccess; accessChanged(); }
       await sleep(3000);
     }

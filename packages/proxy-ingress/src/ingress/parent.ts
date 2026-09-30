@@ -1,3 +1,4 @@
+import { requireTailscaleHttps } from "../../../shared/src/tailscale.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { dirname } from "node:path";
@@ -6,7 +7,7 @@ import { request } from "node:http";
 import { createTailscaleOriginPublisher, defaultTailscaleLocalApiSocketPath, tailscaleLocalApiRequest, type PortRange } from "./tailscale-serve.ts";
 
 const originSchema = Type.Object({ origin: Type.String() });
-const statusSchema = Type.Object({ BackendState: Type.Literal("Running"), Self: Type.Object({ DNSName: Type.String() }) });
+const statusSchema = Type.Object({ BackendState: Type.Literal("Running"), Self: Type.Object({ DNSName: Type.String() }), CertDomains: Type.Optional(Type.Union([Type.Null(), Type.Array(Type.String())])) });
 
 export interface ParentOriginPublisher {
   kind: "atelier" | "tailscale" | "localhost" | "system";
@@ -45,22 +46,23 @@ export function createParentAtelierPublisher(socketPath = parentIngressSocket): 
 
 /** Resolve identity when publishing: first-install login can happen after app startup. */
 export function createTailscaleParentPublisher(socketPath = defaultTailscaleLocalApiSocketPath, portRange?: PortRange): ParentOriginPublisher {
-  async function connectedPublisher() {
+  async function connectedPublisher(requireHttps: boolean) {
     const status: unknown = JSON.parse(await tailscaleLocalApiRequest(socketPath, "GET", "/localapi/v0/status"));
     if (!Value.Check(statusSchema, status)) throw new Error("Tailscale has no DNS name; connect Tailscale before publishing a preview");
     const host = status.Self.DNSName.replace(/\.$/, "");
     if (!host) throw new Error("Tailscale has no DNS name; connect Tailscale before publishing a preview");
+    if (requireHttps) requireTailscaleHttps(host, status.CertDomains);
     return { host, publisher: createTailscaleOriginPublisher({ host, socketPath, portRange }) };
   }
   return {
     kind: "tailscale",
     async publish(port) {
-      const { host, publisher } = await connectedPublisher();
+      const { host, publisher } = await connectedPublisher(true);
       await publisher.publish(port);
       return `https://${host}:${port}`;
     },
     async unpublish(port) {
-      const { publisher } = await connectedPublisher();
+      const { publisher } = await connectedPublisher(false);
       await publisher.unpublish(port);
     },
   };

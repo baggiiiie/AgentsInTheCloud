@@ -22,17 +22,21 @@ export function installationStatus(input: {
   appliedRoute: string;
   connectionState: string;
   authUrl?: string;
+  connectionAction?: InstallationStatus["action"];
   logs: string[];
 }): InstallationStatus {
   const { hostname, appliedRoute } = input;
   const localSupervisor = input.localOrigin?.replace("//atelier.", "//system.atelier.");
-  const supervisorUrl = !input.localMode && hostname && appliedRoute.startsWith(`${hostname}:`)
+  const supervisorUrl = !input.localMode && !input.connectionAction && hostname && appliedRoute.startsWith(`${hostname}:`)
     ? `https://${hostname}:8443` : localSupervisor;
   const ready = input.appResponding && !input.busy && !input.stopping && !input.failure &&
+    (input.localMode || !input.connectionAction) &&
     (input.localMode ? !!input.localOrigin : !!hostname && appliedRoute === `${hostname}:3000`);
   const state = input.failure || input.stopping ? "failed" : ready ? "ready" : "starting";
   let action: InstallationStatus["action"];
-  if (!input.localMode && input.connectionState === "NeedsMachineAuth") {
+  if (!input.localMode && input.connectionAction) {
+    action = input.connectionAction;
+  } else if (!input.localMode && input.connectionState === "NeedsMachineAuth") {
     action = {
       description: "Ask your Tailscale administrator to approve this server, then leave this installer running to continue.",
       url: "https://login.tailscale.com/admin/machines",

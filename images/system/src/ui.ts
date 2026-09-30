@@ -42,6 +42,7 @@ export interface SupervisorView {
   accessMode: string;
   connectionState: string;
   connectionProblem?: string;
+  connectionAction?: { description: string; url?: string };
   authUrl?: string;
   logs: string[];
 }
@@ -51,10 +52,10 @@ function foldout(id: string, label: string, body: string): string {
 }
 
 export function supervisorFragment(view: SupervisorView): string {
-  const title = view.stopping ? "Stopping Atelier" : view.failure ? "Atelier needs attention" : view.healthy ? "Atelier is ready" : view.operation === "update" ? "Updating Atelier" : "Starting Atelier";
+  const title = view.stopping ? "Stopping Atelier" : view.failure ? "Atelier needs attention" : view.connectionAction ? "Setting up remote access" : view.healthy ? "Atelier is ready" : view.operation === "update" ? "Updating Atelier" : "Starting Atelier";
   const labels = ["Prepare Atelier images", "Stop the previous version", "Start Atelier", "Check health", "Open Atelier"];
   const checklist = labels.map((label, index) => {
-    const done = view.healthy || index < view.phase;
+    const done = (view.healthy || index < view.phase) && !(index === 4 && view.connectionAction);
     const failed = !done && index === view.phase && !!view.failure;
     const running = !done && !failed && index === view.phase;
     return `<li class="status-list__item"${done ? ' role="checkbox" aria-checked="true"' : failed ? ' data-status="failed"' : running ? ' aria-busy="true"' : ''}><span class="status-list__marker"${failed ? ' role="img" aria-label="Failed"' : ''}>${done ? "✓" : failed ? "✕" : ""}</span><div>${label}${failed ? `<span class="system-detail system-error">${escapeHtml(view.failure!)}</span>` : ""}</div></li>`;
@@ -70,6 +71,7 @@ export function supervisorFragment(view: SupervisorView): string {
   return `<section aria-label="Atelier System"><h1>${title}</h1>
     <section class="system-checklist" aria-label="Atelier preparation">${view.stopping ? "" : `<ol class="status-list">${checklist}</ol>`}${failureActions}</section>
     ${view.authUrl ? `<p>Sign in to finish setting up remote access.</p>${actionLinkHtml({ href: view.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" } })}` : ""}
+    ${view.connectionAction ? `<p>${escapeHtml(view.connectionAction.description)}</p>${view.connectionAction.url ? actionLinkHtml({ href: view.connectionAction.url, variant: "primary", content: { kind: "caption", caption: "Open Tailscale DNS settings" }, attributesHtml: 'target="_blank" rel="noreferrer"' }) : ""}` : ""}
     ${view.connectionProblem ? `<p class="system-error">${escapeHtml(view.connectionProblem)}</p>` : ""}
     ${foldout("system-logs", "Docker logs", `<pre class="system-log" data-progress-log>${escapeHtml(view.logs.join("\n") || "Waiting for output…")}</pre>`)}
     ${foldout("system-access", "Connection & system details", `<p>Access: ${escapeHtml(view.accessMode)}<br>Tailscale: ${escapeHtml(view.connectionState)}</p><p class="system-detail">Image: ${escapeHtml(view.candidate)}</p><div class="system-actions"><form method="post" action="/connect">${button("Enable remote access")}</form><form method="post" action="/local">${button("Use local access")}</form></div>`)}
