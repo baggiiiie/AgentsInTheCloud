@@ -1,7 +1,7 @@
 import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
-import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
+import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
 import type { AtelierEventBus } from "@atelier/core";
 import type { CliAgentAdapter } from "./adapter.ts";
@@ -75,6 +75,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
               ${renderCliTranscriptSwitch(adapter, workspaceId, conversationId)}
             </div>
+            ${terminal.exists ? renderTerminalKeyBar("cli-terminal") : ""}
             ${composer ? renderOpenComposerButton() : ""}
             ${composer}
           </section>`;

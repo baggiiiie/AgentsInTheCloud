@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { controlModifiedTerminalInput, terminalInputForAccessoryKey } from "../../src/client/terminal-controllers.ts";
+import { controlModifiedTerminalInput, terminalInputForAccessoryKey } from "../../src/client/key-bar.ts";
 
 describe("terminal mobile accessory keys", () => {
   test("maps each accessory key to terminal input", () => {
@@ -17,6 +17,10 @@ describe("terminal mobile accessory keys", () => {
     expect(controlModifiedTerminalInput("?")).toBe("\x7f");
     expect(controlModifiedTerminalInput(" ")).toBe("\x00");
     expect(controlModifiedTerminalInput("é")).toBe("é");
+  });
+  test("encodes control-modified cursor keys in normal and application mode", () => {
+    expect(controlModifiedTerminalInput("\x1b[A")).toBe("\x1b[1;5A");
+    expect(controlModifiedTerminalInput("\x1bOD")).toBe("\x1b[1;5D");
   });
 
 });

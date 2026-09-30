@@ -1,4 +1,4 @@
-import { atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
+import { createTerminalKeyBarController, atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
 import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
@@ -15,7 +15,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         run: () => terminal.toggleMode(),
       }] : [];
     });
-    application.register("cli-terminal", class extends Controller {
+    application.register("cli-terminal", class extends createTerminalKeyBarController(Controller) {
       static values = { url: String, workspaceId: String };
       static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptEnd"];
       declare readonly element: HTMLElement;
@@ -31,6 +31,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
       private viewer?: ObservableTerminalViewer;
+      protected get accessoryViewer(): ObservableTerminalViewer | undefined { return this.viewer; }
       private connected = false;
       private sending = false;
       private get draftKey(): string { return `atelier.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
@@ -63,6 +64,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`), hideUnfocusedCursor: true,
           theme: atelierObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
+          transformInput: (data) => this.transformAccessoryInput(data),
           onConnectionStateChange: (state) => { this.connected = state === "connected"; },
           onFileLink: ({ path, line, column }) => {
             const anchor = document.createElement("a");
@@ -83,6 +85,7 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.inputTarget.removeEventListener("input", this.inputChanged);
         }
         this.cancelTerminalTouch();
+        if (this.hasTerminalTarget) this.resetAccessoryKeys();
         this.viewer?.dispose();
         this.viewer = undefined;
       }

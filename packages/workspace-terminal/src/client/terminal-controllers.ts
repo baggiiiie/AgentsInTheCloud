@@ -5,33 +5,11 @@ import {
   createObservableTerminalViewer,
   observableWebSocketUrl,
   TerminalTouchFocus,
+  createTerminalKeyBarController,
   type ObservableTerminalViewer,
 } from "@atelier/observable-terminal/client";
 import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
 import { terminalViewKey } from "../shared.ts";
-
-const terminalAccessoryInput = new Map([
-  ["escape", "\x1b"],
-  ["up", "\x1b[A"],
-  ["down", "\x1b[B"],
-  ["right", "\x1b[C"],
-  ["left", "\x1b[D"],
-]);
-
-export function terminalInputForAccessoryKey(key: string): string {
-  const input = terminalAccessoryInput.get(key);
-  if (input === undefined) throw new Error(`unknown terminal accessory key: ${key}`);
-  return input;
-}
-
-export function controlModifiedTerminalInput(data: string): string {
-  if (data.length !== 1) return data;
-  const code = data.toUpperCase().charCodeAt(0);
-  if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
-  if (data === "?") return "\x7f";
-  if (data === " ") return "\x00";
-  return data;
-}
 
 function createTerminalSessionPickerController(Controller: WorkspaceClientControllerConstructor) {
   return class TerminalSessionPickerController extends Controller {
@@ -50,11 +28,10 @@ function createTerminalSessionPickerController(Controller: WorkspaceClientContro
 }
 
 function createTerminalPaneController(Controller: WorkspaceClientControllerConstructor) {
-  return class TerminalPaneController extends Controller {
+  return class TerminalPaneController extends createTerminalKeyBarController(Controller) {
     static values = { workspaceId: String, id: String };
-    static targets = ["connectionStatus", "host", "control"];
+    static targets = ["connectionStatus", "host"];
     declare readonly hostTarget: HTMLElement;
-    declare readonly controlTarget: HTMLButtonElement;
     declare readonly connectionStatusTarget: HTMLElement;
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;
@@ -63,7 +40,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
     private pointerDrag?: { id: number; select: boolean };
 
     private viewer?: ObservableTerminalViewer;
-    private controlPending = false;
+    protected get accessoryViewer(): ObservableTerminalViewer | undefined { return this.viewer; }
 
     start(): void {
       if (!this.viewer) {
@@ -76,11 +53,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
           fontSize: Number.parseFloat(style.getPropertyValue("--text-code")),
           theme: atelierObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
-          transformInput: (data) => {
-            if (!this.controlPending) return data;
-            this.setControlPending(false);
-            return controlModifiedTerminalInput(data);
-          },
+          transformInput: (data) => this.transformAccessoryInput(data),
         });
       } else {
         this.viewer.reconnect();
@@ -92,15 +65,10 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
     stop(): void {
       this.viewer?.dispose();
       this.viewer = undefined;
-      this.setControlPending(false);
+      this.resetAccessoryKeys();
     }
 
     theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
-
-    private setControlPending(pending: boolean): void {
-      this.controlPending = pending;
-      this.controlTarget.setAttribute("aria-pressed", String(pending));
-    }
 
     connect(): void {
       if (isWorkspacePaneVisible(this.element)) {
@@ -152,23 +120,6 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
       // Gespenst otherwise encodes Ctrl+V as terminal input and cancels the
       // browser paste event. Keep Ctrl+C untouched for shell interrupts.
       if (event.ctrlKey && !event.altKey && event.code === "KeyV") event.stopImmediatePropagation();
-    }
-
-    preserveTerminalFocus(event: MouseEvent): void {
-      if (event.button !== 0) return;
-      // Cancel only the focus transfer, not the touch/pointer activation: WebKit
-      // can suppress the accessory's native click after a cancelled pointerdown.
-      event.preventDefault();
-    }
-
-    sendAccessoryKey(event: Event): void {
-      if (!(event.currentTarget instanceof HTMLButtonElement)) throw new Error("terminal accessory action must come from a button");
-      const key = event.currentTarget.dataset.terminalKey;
-      if (!key) throw new Error("terminal accessory button is missing its key");
-      const viewer = this.viewer;
-      if (key === "control") this.setControlPending(!this.controlPending);
-      else viewer?.sendInput(terminalInputForAccessoryKey(key));
-      viewer?.focus();
     }
   };
 }

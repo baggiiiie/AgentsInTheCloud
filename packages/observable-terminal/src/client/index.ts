@@ -605,3 +605,5 @@ function lastCursorVisibility(data: string | Uint8Array): boolean | undefined {
   if (shown === hidden) return undefined;
   return shown > hidden;
 }
+
+export { createTerminalKeyBarController } from "./key-bar.ts";

@@ -36,3 +36,5 @@ export {
 } from "./host-command.ts";
 export { createObservableTerminalSocket, terminalSocketDimensions } from "./socket.ts";
 export { renderTerminalConnectionStatus } from "./status.ts";
+
+export { renderTerminalKeyBar } from "./key-bar.ts";
