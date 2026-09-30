@@ -8,8 +8,8 @@
       "packages/*"
     ],
     "catalog": {
-      "@earendil-works/pi-ai": "^0.99.1",
-      "@earendil-works/pi-coding-agent": "^0.99.1",
+      "@earendil-works/pi-ai": "^0.99.2",
+      "@earendil-works/pi-coding-agent": "^0.99.2",
       "@gespenst/core": "0.1.1"
     }
   },
@@ -42,6 +42,6 @@
     "typescript": "6.0.3"
   },
   "patchedDependencies": {
-    "@earendil-works/pi-ai@0.99.1": "patches/@earendil-works%2Fpi-ai@0.99.1.patch"
+    "@earendil-works/pi-ai@0.99.2": "patches/@earendil-works%2Fpi-ai@0.99.2.patch"
   }
 }

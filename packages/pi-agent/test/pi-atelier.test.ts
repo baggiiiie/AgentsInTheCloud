@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { createMcpExtension, defineTool, type ExtensionAPI, type McpServerConfig, type ToolInfo, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { createMcpExtension, createCodemodeExtension, defineTool, type ExtensionAPI, type McpServerConfig, type ToolInfo, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { createAgentMcpServer } from "../../agent/src/server/mcp-server.ts";
 import { registerPiAtelier } from "../src/extension/pi-atelier.ts";
@@ -32,8 +32,8 @@ function fakePi() {
   };
   // SAFETY: The protocol integrations under test use only the API members implemented here.
   const pi = partial as ExtensionAPI;
-  async function emit(name: string): Promise<void> {
-    for (const handler of handlers.get(name) ?? []) await handler({ systemPrompt: "Base" }, {
+  async function emit(name: string, event: { systemPrompt?: string; systemPromptOptions?: { sections: object }; toolName?: string; input?: object } = { systemPrompt: "Base", systemPromptOptions: { sections: {} } }): Promise<void> {
+    for (const handler of handlers.get(name) ?? []) await handler(event, {
       cwd: process.cwd(), ui: { notify: (message: string) => notices.push(message) },
     });
   }
@@ -86,16 +86,19 @@ test("Pi native MCP discovers Atelier tools and carries instructions in their na
   const mcp = fixture();
   const f = fakePi();
   registerPiAtelier(f.pi, mcp);
+  createCodemodeExtension()(f.pi);
   createMcpExtension({ loadConfig: () => ({ servers: [], errors: [] }) })(f.pi);
   cleanup.push(() => f.emit("session_shutdown"));
   await f.emit("session_start");
   await f.emit("before_agent_start");
+  // Pi 0.99.2 connects codemode MCP servers in the background until a script or resource tool needs them.
+  await f.emit("tool_call", { toolName: "codemode", input: { code: "searchTools('present')" } });
 
   expect(f.notices.filter((message) => message.startsWith("MCP failed"))).toEqual([]);
-  expect([...f.tools.keys()]).toEqual(["mcp__atelier__present", "mcp__atelier__fail"]);
+  expect([...f.tools.keys()].filter((name) => name.startsWith("mcp__"))).toEqual(["mcp__atelier__present", "mcp__atelier__fail"]);
   const present = f.tools.get("mcp__atelier__present")!;
-  expect(present.exposure).toBe("codemode");
-  expect(present.namespace).toEqual({ name: "mcp__atelier", description: "Use present to show interactive work." });
+  expect(present.exposure).toBe("deferred");
+  expect(present.namespace).toEqual({ name: "mcp__atelier", instructions: "Use present to show interactive work." });
   const updates: string[] = [];
   const result = await present.execute("call", { kind: "browser" }, undefined, (update) => {
     updates.push(update.content[0]!.type === "text" ? update.content[0]!.text : "image");
