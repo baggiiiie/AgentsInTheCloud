@@ -70,8 +70,18 @@ function renderUsageLimits({ reported, error, windows }: ProviderUsageOverview):
   if (error) return `<p class="usage-error" role="alert">${escapeHtml(error)}</p>`;
   if (!reported) return "<p>Disconnected.</p>";
   const used = windows.filter(({ reported }) => reported.usedPercent > 0);
-  const unused = windows.filter(({ reported }) => reported.usedPercent === 0);
-  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${windows.length ? "" : '<p>No limits reported.</p>'}`;
+  const unused = windows.filter(({ reported }) => reported.usedPercent === 0 && reported.meteredFeature !== "chatpass");
+  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length ? "" : '<p>No limits reported.</p>'}`;
+}
+
+function renderUsageAccount({ reported, error }: ProviderUsageOverview): string {
+  if (!reported || error) return "";
+  const { credits, resets } = reported;
+  const rows: string[] = [];
+  if (resets) rows.push(`<div class="usage-limit-heading"><dt>Available resets</dt><dd><strong>${number(resets.available)}</strong></dd></div>`);
+  if (credits) rows.push(`<div class="usage-limit-heading"><dt>Credit balance</dt><dd><strong>${credits.unlimited ? "Unlimited" : credits.balance !== null ? Number(credits.balance).toLocaleString("en-US", { maximumFractionDigits: 0 }) : "Not reported"}</strong></dd></div>`);
+  if (!rows.length) return "";
+  return `<article class="usage-limit"><h3>Account allowance</h3><dl class="usage-account">${rows.join("")}</dl></article>`;
 }
 
 function renderUsageProvider(overview: ProviderUsageOverview): string {
@@ -79,6 +89,7 @@ function renderUsageProvider(overview: ProviderUsageOverview): string {
   return `<section class="usage-provider" data-controller="usage-snapshot"><header class="usage-provider-heading"><h2>${providerBadgeHtml(overview.provider.id, overview.provider.label, "usage-provider-icon")}${escapeHtml(overview.provider.label)}</h2>${reported?.plan ? `<span class="usage-plan">${escapeHtml(reported.plan)}</span>` : ""}</header>
     <section class="usage-section">
       ${renderUsageLimits(overview)}
+      ${renderUsageAccount(overview)}
     </section>
   </section>`;
 }

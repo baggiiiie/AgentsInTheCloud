@@ -24,3 +24,7 @@
 .usage-provider-icon .brand-icon { width: 18px; height: 18px; }
 .usage-provider-icon .brand-icon-fallback { width: 100%; height: 100%; }
 .usage-error { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-surface); padding: 8px; }
+
+.usage-account { display: grid; gap: 8px; margin: 0; font-size: var(--text-small); }
+.usage-account dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.usage-unused > .usage-account { margin-top: 12px; }

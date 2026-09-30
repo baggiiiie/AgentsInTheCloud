@@ -40,7 +40,7 @@ test("preserves an exhausted allowance and a missing secondary window", async ()
 });
 
 test("rejects malformed credentials before making a request", async () => {
-  for (const token of ["invalid", "a.e30.b"]) {
+  for (const token of ["invalid", "a.bnVsbA.b"]) {
     await expect(fetchCodexSubscriptionUsage(token, (async () => { throw new Error("must not fetch"); }))).rejects.toThrow("Reconnect OpenAI Codex");
   }
 });
@@ -87,4 +87,57 @@ test("includes code-review windows when OpenAI reports them", async () => {
   expect(usage.windows).toHaveLength(1);
   expect(usage.windows[0]!.limitName).toBe("Code review");
   expect(usage.windows[0]!.meteredFeature).toBe("code_review");
+});
+
+test("normalizes account details and a weekly-only allowance without leaking identity", async () => {
+  const usage = await fetchCodexSubscriptionUsage(token, fetcher({
+    plan_type: "pro", user_id: "private-user", account_id: "private-account", email: "private@example.com",
+    rate_limit: { allowed: true, limit_reached: false, primary_window: { ...window, used_percent: 8, limit_window_seconds: 604800 }, secondary_window: null },
+    credits: { has_credits: true, unlimited: false, balance: "87295.0551000000", overage_limit_reached: false },
+    rate_limit_reset_credits: { available_count: 4, applicable_available_count: 0 },
+    chatpass: { windows: [{ ...window, used_percent: 0, limit_window_seconds: 604800 }] },
+    model_usage: { "example-model": { available: true, available_at: null, credits_would_enable: false } },
+    spend_control: { reached: false, individual_limit: null },
+  }));
+  expect(usage.resets).toEqual({ available: 4 });
+  expect(usage.credits).toEqual({ unlimited: false, balance: "87295.0551000000" });
+  expect(usage.windows).toHaveLength(2);
+  expect(usage.windows[1]).toEqual({ limitName: "Chatpass", meteredFeature: "chatpass", kind: "primary", usedPercent: 0, durationSeconds: 604800, resetsAt: new Date(window.reset_at * 1000).toISOString() });
+  expect(JSON.stringify(usage)).not.toContain("private");
+});
+
+test("distinguishes zero resets from missing counts", async () => {
+  const zero = await fetchCodexSubscriptionUsage(token, fetcher({ ...payload, rate_limit_reset_credits: { available_count: 0 } }));
+  expect(zero.resets).toEqual({ available: 0 });
+  const missingDetails: JsonObject[] = [{}, { credits: null, rate_limit_reset_credits: null, chatpass: null }];
+  for (const extra of missingDetails) {
+    const usage = await fetchCodexSubscriptionUsage(token, fetcher({ ...payload, ...extra }));
+    expect(usage.resets).toBeUndefined();
+    expect(usage.credits).toBeUndefined();
+    expect(usage.windows).toHaveLength(2);
+  }
+});
+
+test("rejects invalid reset counts and account details", async () => {
+  const invalidDetails: JsonObject[] = [
+    { rate_limit_reset_credits: { available_count: -1 } },
+    { rate_limit_reset_credits: { available_count: 1.5 } },
+    { credits: { has_credits: true, unlimited: false, balance: 123 } },
+    { chatpass: { windows: [{ ...window, used_percent: -1 }] } },
+  ];
+  for (const extra of invalidDetails) {
+    await expect(fetchCodexSubscriptionUsage(token, fetcher({ ...payload, ...extra }))).rejects.toThrow("unrecognized usage response");
+  }
+});
+
+
+test("subscription tokens without an account-ID claim omit the routing header", async () => {
+  const accessToken = `header.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { organization_id: "org-example" } })).toString("base64url")}.signature`;
+  const usage = await fetchCodexSubscriptionUsage(accessToken, async (_url, init) => {
+    const headers = new Headers(init.headers);
+    expect(headers.get("authorization")).toBe(`Bearer ${accessToken}`);
+    expect(headers.has("chatgpt-account-id")).toBe(false);
+    return Response.json(payload);
+  });
+  expect(usage.plan).toBe("plus");
 });

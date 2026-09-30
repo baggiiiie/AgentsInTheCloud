@@ -3,6 +3,8 @@ export type SubscriptionUsage = {
   checkedAt: string;
   allowed: boolean | null;
   limitReached: boolean | null;
+  credits?: { unlimited: boolean; balance: string | null };
+  resets?: { available: number };
   windows: { limitName: string; meteredFeature: string | null; kind: "primary" | "secondary"; usedPercent: number; durationSeconds: number; resetsAt: string | null }[];
 };
 

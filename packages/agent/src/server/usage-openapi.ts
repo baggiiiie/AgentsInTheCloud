@@ -21,6 +21,8 @@ const providerUsageSchema = {
     provider: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } } }, connected: { type: "boolean" }, error: { type: ["string", "null"] },
     reported: { type: ["object", "null"], properties: {
       plan: { type: ["string", "null"], description: "Null when the provider does not report the subscription plan." }, checkedAt: { type: "string", format: "date-time" }, allowed: { type: ["boolean", "null"] }, limitReached: { type: ["boolean", "null"] },
+      credits: { type: "object", properties: { unlimited: { type: "boolean" }, balance: { type: ["string", "null"], description: "Provider-reported units, not dollars." } } },
+      resets: { type: "object", properties: { available: { type: "integer", minimum: 0 } } },
       windows: { type: "array", items: reportedUsageWindowSchema },
     } },
     windows: { type: "array", items: { type: "object", properties: {
