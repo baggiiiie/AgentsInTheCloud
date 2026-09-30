@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createPiModelRuntime, disconnectModelProvider, seedProviderFavoriteModels, getCustomModelsJson, setCustomModelsJson, setConfiguredModels } from "@atelier/llm/server";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentProviderServiceTier, getAgentProviderServiceTier, createPiModelRuntime, disconnectModelProvider, seedProviderFavoriteModels, getCustomModelsJson, setCustomModelsJson, setConfiguredModels } from "@atelier/llm/server";
 import { reconcileAgentModelPreferences, getConfiguredAgentModels, getLastProviderServiceTier, getModelThinkingLevel, setActiveAgentModel, setLastProviderServiceTier, setModelThinkingLevel } from "../../src/server/model-preferences.ts";
 
 let dataDir: string;
@@ -27,6 +27,9 @@ describe("Agent model settings transactions", () => {
       setLastProviderServiceTier("openai-codex", "priority"),
     ]);
 
+    expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
+    // Selecting a model is a preference update, not a catalogue update.
+    await setActiveAgentModel("openai-codex", "not-a-favorite");
     expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
     expect(await getModelThinkingLevel("openai-codex", "gpt-5.4")).toBe("high");
     expect(await getModelThinkingLevel("anthropic", "claude")).toBe("medium");
@@ -86,7 +89,7 @@ test("catalogue changes forget a removed native default without losing thinking 
   expect(await getModelThinkingLevel(first.provider, first.id)).toBe("high");
   await setConfiguredModels([]);
   await reconcileAgentModelPreferences();
-  expect(JSON.parse(await readFile(join(dataDir, "pi-config", "models.json"), "utf8")).activeModel).toBeUndefined();
+  expect(await getAgentModelPreference("builtin")).toBeUndefined();
 });
 
 
@@ -109,7 +112,35 @@ test("reads individual legacy preferences and preserves unrelated persisted fiel
   await setModelThinkingLevel("openai", "valid", "medium");
   await setLastProviderServiceTier("valid", "default");
   const saved = JSON.parse(await readFile(path, "utf8"));
-  expect(saved.modelPreferences["openai::valid"]).toEqual({ thinkingLevel: "medium", retained: true });
-  expect(saved.providerPreferences.valid).toEqual({ serviceTier: "default", retained: true });
+  expect(saved.agentPreferences.builtin.modelPreferences["openai::valid"]).toEqual({ thinkingLevel: "medium", retained: true });
+  expect(saved.agentPreferences.builtin.providerPreferences.valid).toEqual({ serviceTier: "default", retained: true });
   expect(saved.otherOwner).toEqual({ retained: true });
+  expect(saved.modelPreferences).toBeUndefined();
+  expect(saved.providerPreferences).toBeUndefined();
+});
+
+test("all agent types share storage but isolate selections, model thinking levels, and service tiers", async () => {
+  const model = { provider: "openai", id: "shared" };
+  const agents = ["builtin", "pi", "codex", "claude"];
+  await Promise.all(agents.map(async (agent, index) => {
+    await setAgentModelPreference(agent, model, `level-${index}`);
+    await setAgentProviderServiceTier(agent, model.provider, index % 2 ? "priority" : "default");
+  }));
+  for (const [index, agent] of agents.entries()) {
+    expect(await getAgentModelPreference(agent)).toEqual(model);
+    expect(await getAgentModelThinkingLevel(agent, model)).toBe(`level-${index}`);
+    expect(await getAgentProviderServiceTier(agent, model.provider)).toBe(index % 2 ? "priority" : "default");
+  }
+  await setAgentModelPreference("pi", { provider: "anthropic", id: "different" });
+  expect(await getAgentModelPreference("builtin")).toEqual(model);
+  expect(await getAgentModelThinkingLevel("pi", model)).toBe("level-1");
+});
+
+test("legacy active model belongs only to Built-in and survives namespacing", async () => {
+  const model = { provider: "openai", id: "legacy" };
+  await updateJsonSettings(join(dataDir, "pi-config", "models.json"), stored => { stored.activeModel = model; });
+  expect(await getAgentModelPreference("builtin")).toEqual(model);
+  expect(await getAgentModelPreference("pi")).toBeUndefined();
+  await setModelThinkingLevel(model.provider, model.id, "high");
+  expect(await getAgentModelPreference("builtin")).toEqual(model);
 });

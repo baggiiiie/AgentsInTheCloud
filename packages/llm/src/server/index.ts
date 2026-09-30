@@ -1,4 +1,5 @@
 export * from "./pi-config-models.ts";
+export { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentModelThinkingLevel, getAgentProviderServiceTier, setAgentProviderServiceTier } from "./agent-model-preferences.ts";
 export { modelRefValue, parseModelRef, type ModelRef } from "./model-reference.ts";
 export { renderModelSetupDialog, handleModelSettingsRequest } from "./settings.ts";
 export { llmWorkspaceModule as atelierServerModule } from "./web.ts";

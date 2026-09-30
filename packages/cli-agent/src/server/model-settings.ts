@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { invalidArguments, type JsonObject } from "@atelier/core";
-import { createPiModelRuntime, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@atelier/llm/server";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, createPiModelRuntime, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@atelier/llm/server";
 import type { AgentLaunchFooterContext } from "@atelier/shared";
 
 const settingsSchema = Type.Object({ model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()) });
@@ -16,6 +16,7 @@ export function createCliModelSettings(options: {
   effort(level: string, mapped: string | null | undefined): string | undefined;
 }) {
   async function choices(requestedModel?: string, requestedLevel?: string) {
+    const remembered = await getAgentModelPreference(options.agentProvider);
     const runtime = await createPiModelRuntime();
     const favorites = (await getConfiguredModels()).filter((model) => !options.provider || model.provider === options.provider);
     const availability = await providerAvailability(runtime, favorites.map((model) => model.provider));
@@ -26,7 +27,8 @@ export function createCliModelSettings(options: {
         : connection === "needs_attention" ? "Reconnect in Settings → Models" : "Model unavailable for this account";
       return { ...model, name: model.label, selected: false, available: !unavailableReason, unavailableReason };
     }));
-    const selected = models.find((model) => model.available && modelRefValue(model) === requestedModel)
+    const preferredModel = requestedModel || (remembered ? modelRefValue(remembered) : undefined);
+    const selected = models.find((model) => model.available && modelRefValue(model) === preferredModel)
       ?? models.find((model) => model.available);
     if (selected) selected.selected = true;
     const selectedValue = selected ? modelRefValue(selected) : "";
@@ -37,9 +39,10 @@ export function createCliModelSettings(options: {
       const effort = options.effort(level, mapped);
       return effort === undefined ? [] : [effort];
     }))] : [];
-    const selectedThinkingLevel = requestedLevel && thinkingLevels.includes(requestedLevel) ? requestedLevel
+    const preferredLevel = requestedLevel || (selected ? await getAgentModelThinkingLevel(options.agentProvider, selected) : undefined);
+    const selectedThinkingLevel = preferredLevel && thinkingLevels.includes(preferredLevel) ? preferredLevel
       : thinkingLevels.includes("medium") ? "medium" : thinkingLevels[0] ?? "";
-    return { models, selectedValue, thinkingLevels, selectedThinkingLevel, connectedProvider: options.provider ? runtime.getProviderAuthStatus(options.provider).configured : hasConnectedModelProvider(runtime) };
+    return { models, selected, selectedValue, thinkingLevels, selectedThinkingLevel, connectedProvider: options.provider ? runtime.getProviderAuthStatus(options.provider).configured : hasConnectedModelProvider(runtime) };
   }
 
   async function renderFooter(context: AgentLaunchFooterContext): Promise<string> {
@@ -54,6 +57,9 @@ export function createCliModelSettings(options: {
     const selection = await choices(model, level);
     if (model && !selection.models.some((item) => modelRefValue(item) === model && item.available)) throw invalidArguments(`Choose an available favorite ${options.label} model`);
     if (level && !selection.thinkingLevels.includes(level)) throw invalidArguments(`Unsupported ${options.label} thinking level`);
+    if (selection.selected) {
+      await setAgentModelPreference(options.agentProvider, { provider: selection.selected.provider, id: selection.selected.id }, selection.selectedThinkingLevel);
+    }
     return { model: selection.selectedValue || undefined, thinkingLevel: selection.selectedThinkingLevel || undefined };
   }
 
