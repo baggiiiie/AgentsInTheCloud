@@ -56,6 +56,7 @@ export function createTerminalKeyBarController(Controller: WorkspaceClientContro
       if (!(event.currentTarget instanceof HTMLButtonElement)) throw new Error("terminal key action must come from a button");
       const key = event.currentTarget.dataset.terminalKey;
       if (!key) throw new Error("terminal key button is missing its key");
+      this.element.querySelector(".gespenst__input")?.dispatchEvent(new Event("terminal-text-input:reset"));
       const viewer = this.accessoryViewer;
       if (key === "control") this.setControlPending(!this.controlPending);
       else viewer?.sendInput(this.transformAccessoryInput(terminalInputForAccessoryKey(key)));

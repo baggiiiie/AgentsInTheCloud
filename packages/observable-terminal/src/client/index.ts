@@ -141,6 +141,8 @@ export interface ObservableTerminalViewerOptions {
   disconnectedMessage?: string;
   errorMessage?: string;
   transformInput?: (data: string) => string;
+  /** Preserve native editing context for CLI prose; shell terminals remain literal. */
+  nativeTextInput?: boolean;
   onOutput?: (text: string) => void;
   /** Opt-in file navigation for agent terminals, not arbitrary shell terminals. */
   onFileLink?: (link: TerminalFileLink) => void;
@@ -253,6 +255,10 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
   try {
     const terminalInput = term.element.querySelector<HTMLTextAreaElement>(".gespenst__input");
     if (terminalInput && options.mode === "fixed-readonly") terminalInput.readOnly = true;
+    if (terminalInput && options.mode === "interactive" && options.nativeTextInput) {
+      terminalInput.dataset.controller = "native-terminal-text-input";
+      terminalInput.dataset.action = "keydown->native-terminal-text-input#keydown:capture input->native-terminal-text-input#input:capture compositionstart->native-terminal-text-input#startComposition:capture compositionend->native-terminal-text-input#finishComposition:capture blur->native-terminal-text-input#reset paste->native-terminal-text-input#reset:capture terminal-text-input:reset->native-terminal-text-input#reset";
+    }
     if (options.mode === "fixed-readonly" && options.cols !== undefined && options.rows !== undefined) {
       const devicePixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
       options.host.style.width = `${term.geometry.widthPx / devicePixelRatio}px`;
@@ -607,3 +613,5 @@ function lastCursorVisibility(data: string | Uint8Array): boolean | undefined {
 }
 
 export { createTerminalKeyBarController } from "./key-bar.ts";
+
+export { createNativeTerminalTextInputController } from "./native-text-input.ts";

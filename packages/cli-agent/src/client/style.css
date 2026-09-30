@@ -28,3 +28,8 @@
 }
 .cli-terminal-status[hidden], .cli-terminal-status:empty { display:none; }
 .cli-terminal-status { padding:12px 20px; display:flex; align-items:center; gap:12px; color:var(--text); }
+
+/* The composer opener must not cover the right-arrow key during terminal input. */
+html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) > .agent-composer-opener { display:none; }
+
+html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) .observable-terminal-host { top:var(--cli-terminal-top, 0px); bottom:auto; }

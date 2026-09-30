@@ -1,4 +1,4 @@
-import { createTerminalKeyBarController, atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
+import { createNativeTerminalTextInputController, createTerminalKeyBarController, atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
 import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
 
 export const atelierClientModule: WorkspaceClientModule = {
@@ -15,6 +15,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         run: () => terminal.toggleMode(),
       }] : [];
     });
+    application.register("native-terminal-text-input", createNativeTerminalTextInputController(Controller));
     application.register("cli-terminal", class extends createTerminalKeyBarController(Controller) {
       static values = { url: String, workspaceId: String };
       static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptEnd"];
@@ -42,6 +43,9 @@ export const atelierClientModule: WorkspaceClientModule = {
       private paneWidth = 0;
       private keyboardOccluded = false;
       private resize = new ResizeObserver(() => this.refresh());
+      private readonly cursorPosition = new MutationObserver((records) => {
+        if (records.some(({ target }) => target instanceof HTMLTextAreaElement && target.classList.contains("gespenst__input"))) this.frameTerminalCursor();
+      });
 
       connect(): void {
         terminals.add(this);
@@ -59,12 +63,14 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!this.hasTerminalTarget || this.viewer) return;
         this.resize.observe(this.element);
         this.resize.observe(this.terminalTarget.parentElement!);
+        this.cursorPosition.observe(this.terminalTarget, { subtree: true, attributes: true, attributeFilter: ["style"] });
         this.refresh();
         this.viewer = createObservableTerminalViewer({
           host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`), hideUnfocusedCursor: true,
           theme: atelierObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
           transformInput: (data) => this.transformAccessoryInput(data),
+          nativeTextInput: true,
           onConnectionStateChange: (state) => { this.connected = state === "connected"; },
           onFileLink: ({ path, line, column }) => {
             const anchor = document.createElement("a");
@@ -81,6 +87,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         terminals.delete(this);
         window.removeEventListener("atelier:workspace-pane-visible", this.activate);
         this.resize.disconnect();
+        this.cursorPosition.disconnect();
         if (this.hasFormTarget) {
           this.inputTarget.removeEventListener("input", this.inputChanged);
         }
@@ -167,6 +174,11 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.momentum = requestAnimationFrame(frame);
         };
         this.momentum = requestAnimationFrame(frame);
+      }
+      sendNativeInput(event: CustomEvent<{ data: string }>): void {
+        const data = this.transformAccessoryInput(event.detail.data);
+        this.viewer?.sendInput(data);
+        if (data !== event.detail.data) event.target!.dispatchEvent(new Event("terminal-text-input:reset"));
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
       toggleMode(): void {
@@ -302,7 +314,17 @@ export const atelierClientModule: WorkspaceClientModule = {
           this.paneWidth = width;
         }
         this.element.style.setProperty("--cli-terminal-height", `${this.terminalHeight}px`);
+        this.frameTerminalCursor();
         this.viewer?.refresh();
+      }
+      private frameTerminalCursor(): void {
+        const input = this.terminalTarget.querySelector<HTMLTextAreaElement>(".gespenst__input");
+        if (!input || document.activeElement !== input) return;
+        const cursorBottom = Number.parseFloat(input.style.top) + Number.parseFloat(input.style.lineHeight);
+        // Keep the editor visible in the keyboard-sized stage without resizing the
+        // PTY (which would make the CLI redraw/reflow its entire history).
+        const top = Math.min(0, this.terminalTarget.parentElement!.clientHeight - cursorBottom - 8);
+        this.terminalTarget.style.setProperty("--cli-terminal-top", `${top}px`);
       }
       theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
     });
