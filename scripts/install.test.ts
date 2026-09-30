@@ -64,7 +64,7 @@ docker() {
     // Mock terminal availability and answers; these tests exercise Docker orchestration.
     .replace('{ [ -t 0 ]; } 2>/dev/null <"$prompt_input"', "true")
     .replace(
-      'IFS= read -r -t 10 "$1" <"$prompt_input"',
+      'IFS= read -r -t 120 "$1" <"$prompt_input"',
       `if [ "$1" = action ]; then action=update; else answer=${options.installed ? "yes" : "1"}; fi`,
     );
   const result = Bun.spawnSync([process.platform === "darwin" ? "/bin/bash" : "bash", "-c", mock + script, "installer", ...args], { stdin: "ignore" });
@@ -75,7 +75,7 @@ docker() {
 
 test("piped sudo installs read prompts from the caller's terminal", () => {
   expect(installer).toContain('prompt_input="${SUDO_TTY:-/dev/tty}"');
-  expect(installer).toContain('IFS= read -r -t 10 "$1" <"$prompt_input"');
+  expect(installer).toContain('IFS= read -r -t 120 "$1" <"$prompt_input"');
 });
 
 test("fresh install launches privileged System with persistent named volume and bootstrap app", () => {

@@ -60,7 +60,7 @@ fail() {
 }
 prompt() {
   printf '%s' "$2"
-  IFS= read -r -t 10 "$1" <"$prompt_input" || fail "No response received within 10 seconds, or terminal input closed. Run the installer again when ready."
+  IFS= read -r -t 120 "$1" <"$prompt_input" || fail "No response received within 2 minutes, or terminal input closed. Run the installer again when ready."
 }
 run_quiet() {
   local label="$1" pid start=$SECONDS code=0
