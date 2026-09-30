@@ -14,7 +14,7 @@ export type HtmlAutocompleteOptions = {
   loadingHtml?: string;
   triggerKeysWhenClosed?: string[];
   fullscreenShortcut?(option: HTMLElement): boolean;
-  keepOpenOnBlur?(input: HTMLInputElement | HTMLTextAreaElement, menu: HTMLElement): boolean;
+  keepOpenOnBlur?(input: HTMLInputElement | HTMLTextAreaElement): boolean;
   /** Return true when an event inside the menu has been handled. */
   menuEvent?(event: Event, input: HTMLInputElement | HTMLTextAreaElement): boolean | void;
 };
@@ -181,7 +181,7 @@ export function createHtmlAutocompleteController(Controller: StimulusControllerC
 
     private readonly blur = (event: Event): void => {
       if (!(event instanceof FocusEvent)) throw new Error("Autocomplete blur handler received a non-focus event");
-      if (autocomplete.keepOpenOnBlur?.(this.inputTarget, this.menuTarget)) return;
+      if (autocomplete.keepOpenOnBlur?.(this.inputTarget)) return;
       const relatedTarget = event.relatedTarget;
       if (relatedTarget instanceof Node && this.menuTarget.contains(relatedTarget)) return;
       this.close();

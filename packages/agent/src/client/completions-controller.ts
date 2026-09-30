@@ -156,7 +156,11 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
     loadingHtml: autocompleteHtml({ kind: "message", role: "status", content: { kind: "html", html: '<span class="agent-completion-spinner" aria-hidden="true"></span>Loading completions…' } }),
     triggerKeysWhenClosed: ["/", "@"],
     fullscreenShortcut: (option) => option.dataset.completionKind === "prompt-template",
-    keepOpenOnBlur: (input, menu) => !composerIsTranscribing(input) && input.value === "" && Boolean(menu.querySelector("[data-agent-quick-launch]")),
+    // Sending can blur the composer while the menu still shows its loading state.
+    // Use the catalog so blur does not cancel the pending quick-launch refresh.
+    keepOpenOnBlur: (input) => !composerIsTranscribing(input)
+      && input.value === ""
+      && Boolean(input.closest(".composer")!.querySelector('[data-agent-completions-target="catalog"] [data-agent-quick-launch]')),
     menuEvent: handleAgentTreeMenuEvent,
     request(input, force) {
       if (composerIsTranscribing(input)) return undefined;
