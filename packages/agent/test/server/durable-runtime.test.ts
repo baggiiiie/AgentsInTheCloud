@@ -329,3 +329,47 @@ test.each(["close", "delete"] as const)("live %s cancels work and withdraws queu
   await watch.stop();
   expect(faux.state.callCount).toBe(1);
 });
+
+test("committed titles survive stale attachment metadata and remain discoverable after close and deletion", async () => {
+  const { runtime, faux, load, open } = await setup();
+  expect(await runtime.catalog()).toEqual([]);
+  const one = await runtime.conversation(record);
+  const otherRecord = { ...record, conversationId: "other", title: "Independent title" };
+  const two = await runtime.conversation(otherRecord);
+  const renamed = await one.setTitle("searchable-durable-title");
+  expect(renamed).toEqual({ ...record, durableId: one.id, title: "searchable-durable-title" });
+  expect(await runtime.catalog()).toEqual([renamed, { ...otherRecord, durableId: two.id }]);
+  await runtime.suspend();
+  load.prepare = async () => { throw new Error("Catalog reads must not prepare prompts"); };
+  const reopened = await open();
+  expect((await reopened.catalog())[0]).toEqual(renamed);
+  const restored = await reopened.conversation(record);
+  expect((await reopened.catalog())[0]?.title).toBe("searchable-durable-title");
+  await restored.close();
+  await expect(restored.setTitle("Closed rename")).rejects.toThrow("closed");
+  expect((await reopened.catalog())[0]).toEqual(renamed);
+  await reopened.delete();
+  const retained = await reopened.catalog();
+  expect(retained).toHaveLength(2);
+  expect(retained[0]).toEqual(renamed);
+  expect(faux.state.callCount).toBe(0);
+  await reopened.suspend();
+  expect(await (await open()).catalog()).toEqual(retained);
+});
+
+test("title changes serialize with commands and cannot cross a close fence", async () => {
+  const { runtime, load } = await setup();
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  load.expand = async (_workspace, text) => { entered.resolve(); await release.promise; return text; };
+  const agent = await runtime.conversation(record);
+  const pending = agent.submit({ requestId: "blocked", text: "Waiting" });
+  await entered.promise;
+  const title = agent.setTitle("Must not commit");
+  const close = agent.close();
+  release.resolve();
+  await expect(pending).rejects.toThrow("closed");
+  await expect(title).rejects.toThrow("closed");
+  await close;
+  expect((await runtime.catalog())[0]?.title).toBe(record.title);
+});

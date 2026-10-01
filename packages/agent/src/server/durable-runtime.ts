@@ -95,6 +95,15 @@ export async function openDurableAgentRuntime(
       image(entryId: string, contentIndex: number) {
         return durableImageEndpoint(conversation, entryId, contentIndex, context);
       },
+      /** Commit searchable metadata without creating a second history file. */
+      setTitle(title: string) {
+        return command(() => harness.commit(async (tx) => {
+          const catalog = await tx.doc(WorkspaceConversations);
+          const record = catalog.conversations.find((item) => item.durableId === conversation.id)!;
+          record.title = title;
+          return { ...record };
+        }, context));
+      },
       submit(input: DurableInput) {
         return command(async () => {
           if (!input.requestId.trim()) throw new Error("A request ID is required for durable input");
@@ -141,6 +150,11 @@ export async function openDurableAgentRuntime(
   }
 
   return {
+    /** Discover retained histories without preparing prompts or starting work. */
+    async catalog() {
+      assertOpen();
+      return (await harness.snapshot(WorkspaceConversations, context))!.conversations;
+    },
     /** Reuse one host command line per Atelier UUID; reopening never rebuilds its prompt. */
     conversation(record: ConversationIdentity, initial: SettingsChange = {}) {
       assertOpen();
