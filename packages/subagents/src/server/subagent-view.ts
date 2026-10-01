@@ -1,11 +1,11 @@
 import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@atelier/agent/server";
-import { escapeHtml as h, ids, listWorkspaceAgentConversations } from "@atelier/agent/server";
+import { ids, listWorkspaceAgentConversations } from "@atelier/agent/server";
 import type { AtelierEventBus } from "@atelier/core";
 import { requestAcceptsJson, type JsonValue } from "@atelier/core";
 import { actionItemHtml } from "@atelier/design-system/action-item";
 import { Icons } from "@atelier/design-system/icons";
 import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } from "@atelier/shared";
-import { createLivePresentation } from "@atelier/shared";
+import { createLivePresentation, escapeHtml as h } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentPath } from "./subagent-protocol.ts";

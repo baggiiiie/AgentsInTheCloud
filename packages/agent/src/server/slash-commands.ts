@@ -2,7 +2,7 @@ import { actionItemHtml } from "@atelier/design-system/action-item";
 import { autocompleteHtml } from "@atelier/design-system/autocomplete";
 import { buttonHtml } from "@atelier/design-system/button";
 import type { Skill } from "@earendil-works/pi-coding-agent";
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 import type { PromptTemplate } from "./prompt-templates.ts";
 
 interface SlashCommand {

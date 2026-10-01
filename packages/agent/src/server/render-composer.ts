@@ -3,7 +3,7 @@ import { buttonHtml } from "@atelier/design-system/button";
 import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@atelier/llm/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
-import { domId, escapeHtml } from "./html.ts";
+import { domId, escapeHtml } from "@atelier/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { configuredModelOptionViews, launchComposerThinkingSettings, selectAvailableConfiguredModel } from "./model-state.ts";
 import { agentConversationKey, agentPath, ids, type AgentRenderContext } from "./render-context.ts";

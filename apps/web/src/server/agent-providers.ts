@@ -4,7 +4,7 @@ import { hasAvailableBuiltinAgentModel } from "@atelier/agent/server";
 import { atelierDataPath, getAtelierRuntimeContext, invalidArguments, type AtelierEventBus } from "@atelier/core";
 import { createPiModelRuntime, usesAnthropicSubscription } from "@atelier/llm/server";
 import type { WorkspaceAgentProvider } from "@atelier/shared";
-import { workspaceModules } from "./workspace-modules.ts";
+import { workspaceModules } from "./workspace-modules.generated.ts";
 
 export function registeredAgentProviders(): readonly WorkspaceAgentProvider[] { return workspaceModules.flatMap((module) => module.agentProvider ? [module.agentProvider] : []); }
 

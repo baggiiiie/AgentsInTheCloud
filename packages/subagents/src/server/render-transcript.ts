@@ -1,4 +1,5 @@
-import { escapeHtml, transcriptRow, transcriptActionItemHtml, statusHtml, type AgentRenderContext } from "@atelier/agent/server";
+import { escapeHtml } from "@atelier/shared";
+import { transcriptRow, transcriptActionItemHtml, statusHtml, type AgentRenderContext } from "@atelier/agent/server";
 import { communicationCardHtml, communicationEnvelopeHtml, communicationTraceHtml } from "./render-markup.ts";
 import type { SubagentMessage } from "./subagent-runtime.ts";
 import type { SubagentDelivery } from "./subagent-delivery.ts";

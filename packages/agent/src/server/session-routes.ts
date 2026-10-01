@@ -1,5 +1,5 @@
 import { requestAcceptsJson } from "@atelier/core";
-import { turboStreamResponse } from "./html.ts";
+import { turboStreamResponse } from "@atelier/shared";
 import { invalidateAgentView, matchRoute, requireAgentConversation, requireAgentRuntime, resolveAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { sessionImageEndpoint } from "./session-images.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";

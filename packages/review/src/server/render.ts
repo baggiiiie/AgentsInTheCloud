@@ -11,7 +11,7 @@ import { preloadDiffHTML } from "@pierre/diffs/ssr";
 import { domId, escapeHtml, type WorkspaceWorkViewPresentation } from "@atelier/shared";
 import type { ReviewFile, ReviewFileStats, ReviewFileSummary, ReviewIndex } from "./diff.ts";
 import { defaultReviewSettings, reviewCommentsPrompt, type ReviewCommentModel, type ReviewSettings } from "../model.ts";
-import { reviewDiffOptions, reviewViewKey } from "../pierre.ts";
+import { reviewDiffOptions } from "@atelier/syntax/pierre";
 import type { ReviewComment } from "./state.ts";
 
 export const reviewReference = { type: "review" } as const;
@@ -309,7 +309,7 @@ export function renderReviewBody(workspaceId: string, index: ReviewIndex, commen
 
 export const reviewWorkViewPresentation: WorkspaceWorkViewPresentation = {
   reference: reviewReference,
-  sourceKey: reviewViewKey,
+  sourceKey: "review:workspace",
   label: "Review",
   kind: "contextual", iconHtml: Icons.Review,
   availability: { phase: "live" },

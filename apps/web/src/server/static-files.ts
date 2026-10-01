@@ -1,7 +1,7 @@
 import { designSystemStaticFiles } from "@atelier/design-system/assets";
 import type { StaticFileContribution } from "@atelier/shared";
 import { workspaceProvisioningStaticFiles } from "@atelier/workspace/server/provisioning";
-import { workspaceModules } from "./workspace-modules.ts";
+import { workspaceModules } from "./workspace-modules.generated.ts";
 
 export type StaticFileEntry = StaticFileContribution;
 interface StaticFileRegistry {

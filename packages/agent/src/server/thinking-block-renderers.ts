@@ -1,4 +1,4 @@
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 import type { ModelRef } from "@atelier/llm/server";
 
 type ThinkingBlockRenderer = (input: { contentId: string; text: string }) => string;

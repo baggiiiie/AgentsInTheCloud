@@ -26,7 +26,6 @@ export { registerAgentEvents } from "./agent-events.ts";
 export { suggestSessionSlug } from "./agent-title-suggestion.ts";
 export { handleAgentRequest } from "./routes.ts";
 export { workspaceFileEndpoint } from "./workspace-files.ts";
-export { resolveWorkspacePortProxyBackend } from "./workspace-proxy.ts";
 export { agentConversationKey } from "./render-context.ts";
 export { renderReadOnlyTranscript, renderReadOnlyTranscriptDetail } from "./read-only-transcript.ts";
 export { recordsFromSessionEntries } from "./session-records.ts";
@@ -44,11 +43,9 @@ export {
   type WorkspacePresenterDefinition,
   type WorkspacePresenterDeps,
 } from "./tools.ts";
-export { agentStaticFiles } from "./static.ts";
 
 export { configureAgentDelegation, resolveAgentConversation, type AgentDelegation, type AgentSessionPreparation, type AgentSessionAttachment, type AgentModelRequestTransform, type AgentDelegationTranscript, type AgentToolPresentation } from "./delegation.ts";
 export { ids, type AgentRenderContext } from "./render-context.ts";
-export { escapeHtml, turboStream, turboStreamResponse } from "./html.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
 export { statusHtml } from "./render-tool.ts";
 export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";

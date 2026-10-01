@@ -1,5 +1,5 @@
 import { AtelierCoreError, readJsonObject, requestAcceptsJson } from "@atelier/core";
-import { turboStreamResponse } from "./html.ts";
+import { turboStreamResponse } from "@atelier/shared";
 import { parseModelRef } from "@atelier/llm/server";
 import { setModelThinkingLevel } from "./model-preferences.ts";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";

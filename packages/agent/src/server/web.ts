@@ -1,7 +1,9 @@
 import { AtelierCoreError, createKeyedOperationQueue, dockerHostAtelierDataPath, getAtelierRuntimeContext, type AtelierEventBus } from "@atelier/core";
 import { Icons } from "@atelier/design-system/icons";
 import type { WorkspaceAgentTabProvider, WorkspaceCommandContribution, WorkspaceModule } from "@atelier/shared";
+import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
 import type { WorkspaceDockerMount, WorkspaceInitInstruction } from "@atelier/workspace";
+import { workspacePortBackend } from "@atelier/workspace";
 import { mkdir } from "node:fs/promises";
 import { registerAgentEvents } from "./agent-events.ts";
 import { createAgentTermSocketSession } from "./bash-tmux.ts";
@@ -14,7 +16,6 @@ import { agentConversationKey } from "./render-context.ts";
 import { handleAgentRequest } from "./routes.ts";
 import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgentConversation, getWorkspaceAgentRuntime, restoreWorkspaceAgentRuntime, subscribeWorkspaceAgentBusy } from "./runtime.ts";
 import { archiveWorkspaceAgentConversation, createNextWorkspaceAgentConversation, listWorkspaceAgentConversations, sessionShareDir, sessionShareKeyForInit, sessionShareMountPath, publishWorkspaceAgentHistory, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
-import { agentStaticFiles } from "./static.ts";
 import {
   createDeleteCurrentWorkspaceTool,
   registerWorkspaceAgentTool,
@@ -22,7 +23,6 @@ import {
 import { usageOpenApiPaths } from "./usage-openapi.ts";
 import { handleUsageRequest, renderUsagePaneAction } from "./usage-web.ts";
 import { workspaceFileEndpoint } from "./workspace-files.ts";
-import { resolveWorkspacePortProxyBackend } from "./workspace-proxy.ts";
 
 let agentEvents: AtelierEventBus | undefined;
 
@@ -137,7 +137,12 @@ export const agentWorkspaceModule: WorkspaceModule = {
       return runtime.subscribeTurnPresentation(identifier.turnId, identifier.branchId, listener);
     },
   }],
-  staticFiles: agentStaticFiles,
+  staticFiles: {
+    "/agent-usage.css": { url: new URL("../client/usage.css", import.meta.url), contentType: "text/css; charset=utf-8" },
+    "/agent.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
+    "/agent-tree.css": { url: new URL("../client/tree.css", import.meta.url), contentType: "text/css; charset=utf-8" },
+    ...observableTerminalStaticFiles,
+  },
   renderWorkspacePaneActions: renderUsagePaneAction,
   openApiPaths: {
     "/agent-notifications/public-key": { get: {
@@ -209,7 +214,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
       }
       const portMatch = app.appKey.match(/^port-(\d+)$/);
       if (!portMatch) return undefined;
-      return await resolveWorkspacePortProxyBackend(app.workspaceId, Number(portMatch[1]), requestUrl.pathname, requestUrl.search);
+      return await workspacePortBackend(app.workspaceId, Number(portMatch[1]), `${requestUrl.pathname}${requestUrl.search}`);
     });
     subscribeWorkspaceAgentBusy(({ workspaceId, agentKey, busy }) => context.registry.setAgentBusy(workspaceId, agentKey, busy));
     context.onWorkspaceRemoved(removeWorkspaceInitialPromptDrafts);

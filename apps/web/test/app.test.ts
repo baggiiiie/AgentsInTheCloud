@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
 import { createWebApp, type WebApp } from "../src/server/app.ts";
-import { workspaceModules } from "../src/server/workspace-modules.ts";
+import { workspaceModules } from "../src/server/workspace-modules.generated.ts";
 import { createWorkspaceRegistry, type WorkspaceRegistry } from "../src/server/workspace-registry.ts";
 import { workspaceWarnings } from "../src/server/workspace-warnings.ts";
 

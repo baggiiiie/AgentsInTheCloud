@@ -9,7 +9,7 @@ import { terminalViewKey } from "../shared.ts";
 import { createTmuxPresenter } from "./agent-tool.ts";
 import { renderTerminalPane } from "./render.ts";
 import { createTerminalSocketHandler } from "./sockets.ts";
-import { terminalStaticFiles } from "./static.ts";
+import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
 import { attachWorkspaceTerminal, createWorkspaceTerminal, deleteWorkspaceTerminal, listTmuxSessions, listWorkspaceTerminals, type WorkspaceTerminal } from "./workspace-terminals.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -122,7 +122,7 @@ export const terminalWorkspaceModule: WorkspaceModule = {
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "terminal"; terminalId: string } }) => deleteWorkspaceTerminal(workspaceId, reference.terminalId),
   }],
-  staticFiles: terminalStaticFiles,
+  staticFiles: { "/terminal.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" }, ...observableTerminalStaticFiles },
   initialize(context) {
     context.registerSocketHandler(createTerminalSocketHandler());
     registerWorkspacePresenter("tmux", (workspaceId, options) => createTmuxPresenter(workspaceId, {

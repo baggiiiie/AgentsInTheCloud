@@ -2,4 +2,3 @@ export { vscodeWorkspaceModule, vscodeWorkspaceModule as atelierServerModule, cr
 export { deleteWorkspaceVSCodeView, ensureWorkspaceVSCodeServer, listWorkspaceVSCodeViews } from "./workspace-vscode.ts";
 export { renderVSCodePane, vscodeViewKey } from "./render.ts";
 export { patchVSCodeWorkspaceAppResponse, resolveVSCodeWorkspaceAppBackend, vscodeAppKey } from "./proxy.ts";
-export { vscodeStaticFiles } from "./static.ts";

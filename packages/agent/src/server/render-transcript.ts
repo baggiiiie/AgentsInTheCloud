@@ -1,5 +1,5 @@
 import { renderStreamingMarkdownSnapshot } from "@atelier/markdown";
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 import { commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, renderMarkdownRow, transcriptActionItemHtml, transcriptRow } from "./render-markup.ts";
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";

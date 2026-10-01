@@ -4,7 +4,7 @@ import { actionItemHtml } from "@atelier/design-system/action-item";
 import { buttonHtml } from "@atelier/design-system/button";
 import { contentText } from "@earendil-works/pi-ai";
 import type { SessionEntry, SessionManager, SessionTreeNode } from "@earendil-works/pi-coding-agent";
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 
 interface VisibleTreeNode {
   node: SessionTreeNode;

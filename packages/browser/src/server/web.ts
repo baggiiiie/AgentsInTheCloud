@@ -9,7 +9,6 @@ import { createBrowserPresenter } from "./agent-tool.ts";
 import { browserWorkViewPresentation, renderBrowserWorkViewBody } from "./render.ts";
 import type { WorkspaceBrowserView } from "./state.ts";
 import { createWorkspaceBrowserView, deleteWorkspaceBrowserState, deleteWorkspaceBrowserView, getWorkspaceBrowserView, listWorkspaceBrowserViews, setWorkspaceBrowserTarget } from "./state.ts";
-import { browserStaticFiles } from "./static.ts";
 
 let publishWorkspacePort: (workspaceId: string, port: number, protocol?: "http" | "https") => Promise<string>;
 async function previewUrl(workspaceId: string, view: WorkspaceBrowserView): Promise<string> {
@@ -84,7 +83,7 @@ export const browserWorkspaceModule: WorkspaceModule = {
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "browser"; browserId: string } }) => deleteWorkspaceBrowserView(workspaceId, reference.browserId),
   }],
-  staticFiles: browserStaticFiles,
+  staticFiles: { "/browser.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   commands: [browserCreateCommand, browserOpenCommand],
   routes: [{
     async handle(request, url) {

@@ -29,7 +29,7 @@ import { parseAssetManifest } from "./asset-manifest.ts";
 import { createCableServer, type CableSocketData } from "./cable.ts";
 import { createProjectSecretRequester } from "./project-secret-request.ts";
 import { legacyStaticFiles } from "./static-files.ts";
-import { workspaceModules } from "./workspace-modules.ts";
+import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
 import { createFileWorkspaceActivityStore, createFileWorkspaceAttentionStore, createFileWorkspaceDeletionStore, createWorkspaceRegistry } from "./workspace-registry.ts";
 

@@ -2,7 +2,7 @@ import { actionItemHtml, type ActionItemLabel } from "@atelier/design-system/act
 import { Icons } from "@atelier/design-system/icons";
 import { renderMarkdown } from "@atelier/markdown";
 import { highlightCodeHtmlForPath } from "@atelier/syntax";
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 import type { AgentRenderContext } from "./render-context.ts";
 
 export function markdown(ctx: AgentRenderContext, text: string): string {

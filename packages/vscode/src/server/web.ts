@@ -3,7 +3,6 @@ import type { JsonValue } from "@atelier/core";
 import { turboStreamResponse, type WorkspaceFileTarget, type WorkspaceModuleRouteContext, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@atelier/shared";
 import { renderVSCodePane, vscodeViewKey, renderVSCodeNavigationSignal, vscodeFileNavigationStream } from "./render.ts";
 import { createWorkspaceVSCodeView, deleteWorkspaceVSCodeState, deleteWorkspaceVSCodeView, listWorkspaceVSCodeViews, openFileInConnectedVSCodeWindows, type WorkspaceVSCodeView } from "./workspace-vscode.ts";
-import { vscodeStaticFiles } from "./static.ts";
 import { patchVSCodeWorkspaceAppResponse, resolveVSCodeWorkspaceAppBackend, vscodeAppKey } from "./proxy.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -55,7 +54,7 @@ export const vscodeWorkspaceModule: WorkspaceModule = {
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "vscode"; title: string } }) => deleteWorkspaceVSCodeView(workspaceId, reference.title),
   }],
-  staticFiles: vscodeStaticFiles,
+  staticFiles: { "/vscode.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   initialize(context) {
     context.registerWorkspaceAppResolver(async (app, requestUrl) => app.appKey === vscodeAppKey
       ? {

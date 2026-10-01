@@ -1,5 +1,5 @@
 import type { ModelRef } from "@atelier/llm/server";
-import { domId } from "./html.ts";
+import { domId } from "@atelier/shared";
 import type { SessionImageRef } from "./transcript.ts";
 
 export interface AgentRenderContext {

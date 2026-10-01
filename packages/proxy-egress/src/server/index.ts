@@ -1,6 +1,6 @@
 import { listWorkspaces } from "@atelier/workspace";
 import type { WorkspaceModule } from "@atelier/shared";
-import { ensureWorkspaceEgressProxy, registerWorkspaceProxyEvents } from "../egress/index.ts";
+import { ensureWorkspaceEgressProxy, registerWorkspaceProxyEvents } from "../egress/egress-proxy.ts";
 
 export const proxyEgressServerModule: WorkspaceModule = {
   id: "proxy-egress",

@@ -2,7 +2,7 @@ import { posix } from "node:path";
 import { actionItemHtml } from "@atelier/design-system/action-item";
 import { autocompleteHtml } from "@atelier/design-system/autocomplete";
 import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
-import { escapeHtml } from "./html.ts";
+import { escapeHtml } from "@atelier/shared";
 
 export type FileCompletionMode = "direct" | "fuzzy";
 

@@ -10,7 +10,7 @@ import { clearWorkspaceGitHubToken } from "@atelier/proxy-egress";
 import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@atelier/projects";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
-import { workspaceModules } from "../workspace-modules.ts";
+import { workspaceModules } from "../workspace-modules.generated.ts";
 import { remove, replace, response, stream, update, wantsStream } from "@atelier/shared/http";
 import { listSettingsContributions, registerSettingsContribution } from "./registry.ts";
 import { renderThemeSettings } from "./theme.ts";
