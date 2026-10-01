@@ -38,7 +38,7 @@ interface CompoundActionItemOptions extends ActionItemContent {
   kind: "compound";
   container?: Omit<ActionItemElement, "tag">;
   primary: ActionItemElement;
-  /** Trusted controls revealed while the item is hovered, focused, active, or selected. */
+  /** Trusted controls revealed on hover, keyboard focus, or touch devices. */
   engagedActionsHtml?: string;
 }
 

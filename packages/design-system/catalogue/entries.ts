@@ -32,10 +32,10 @@ export interface CatalogueEntry {
 }
 export const entries: CatalogueEntry[] = [
   {
-    id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Work and Host terminals.",
-    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering.",
+    id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Agent, Work and Host terminals.",
+    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering. Tabs stay content-sized up to 24rem and shrink when crowded.",
     imports: { "tab-strip": "tabHtml, tabStripHtml" },
-    sources: ["src/tab-strip/tab-strip-html.ts", "src/tab-strip/tab-strip-controller.ts", "src/tab-strip/tab-strip.css"],
+    sources: ["tab-strip/tab-strip-controller.ts", "tab-strip/tab-strip.css"],
     examples: [{ title: "Terminal tabs", render: () => tabStripHtml({ label: "Example terminals", tabsHtml: ["Shell", "Diagnostics"].map((text, index) => tabHtml({ label: { kind: "text", text }, selected: index === 0, primary: { tag: "button", attributesHtml: 'type="button"' }, iconHtml: Icons.Terminal })).join("") }) }],
   },
   {
@@ -474,7 +474,7 @@ export const entries: CatalogueEntry[] = [
     title: "Action item",
     when: "Rows in menus, navigation, trees and action lists. Use compound when a row has separately actionable trailing controls.",
     contract:
-      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement.",
+      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
     imports: {
       "action-item": "actionItemHtml",
       "copy-button": "copyButtonHtml",

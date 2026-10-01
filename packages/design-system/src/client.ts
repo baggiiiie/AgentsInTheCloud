@@ -8,6 +8,7 @@ import { WarningBannersController } from "./warning-banner/warning-banner-contro
 import { ManagedListController } from "./managed-list/managed-list-controller.ts";
 
 import type { Application } from "@hotwired/stimulus";
+import { ActionItemActionsController } from "./action-item/action-item-actions-controller.ts";
 import { ActionItemController } from "./action-item/action-item-controller.ts";
 import { CopyButtonController } from "./copy-button/copy-button-controller.ts";
 import { DestructiveConfirmationController } from "./destructive-confirmation/destructive-confirmation-controller.ts";
@@ -20,6 +21,7 @@ import { ToggleController } from "./toggle/toggle-controller.ts";
 const automaticBehaviors = [
   ['[role="tablist"]', "tab-strip"],
   ["body", "action-items"],
+  [".action-item__actions--engaged", "action-item-actions"],
   ["body", "warning-banners"],
   [".activity-button, .progress-button", "perimeter-button"],
   [".copy-button", "copy-button", "click->copy-button#copy"],
@@ -54,6 +56,7 @@ export function registerDesignSystemControllers(application: Pick<Application, "
   application.register("perimeter-button", PerimeterButtonController);
   application.register("warning-banners", WarningBannersController);
   application.register("action-items", ActionItemController);
+  application.register("action-item-actions", ActionItemActionsController);
   application.register("copy-button", CopyButtonController);
   application.register("destructive-confirmation", DestructiveConfirmationController);
   application.register("dialog", DialogController);

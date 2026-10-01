@@ -2,7 +2,7 @@ import { escapeHtml } from "@atelier/shared";
 import { actionItemHtml, type ActionItemLabel, type ActionItemElement } from "../action-item/action-item-html.ts";
 import { attributesHtml } from "../html.ts";
 
-/** Closable tabs share Work pane anatomy; feature forms and selection stay feature-owned. */
+/** Shared tab anatomy; feature forms and selection stay feature-owned. */
 export function tabHtml(options: {
   label: ActionItemLabel; iconHtml?: string; metadataHtml?: string;
   selected: boolean; primary: ActionItemElement; containerAttributesHtml?: string; closeHtml?: string;
