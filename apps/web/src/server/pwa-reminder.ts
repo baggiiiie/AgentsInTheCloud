@@ -100,12 +100,12 @@ export function renderPwaReminder(): string {
     itemsHtml: buttonHtml({
       type: "submit",
       variant: "secondary",
-      content: { kind: "caption", caption: "Stop bugging me, maybe later" },
+      content: { kind: "caption", caption: "Don’t remind me" },
       attributesHtml: 'data-action="click->pwa-reminder#quiet"',
     }) + buttonHtml({
       type: "submit",
       variant: "primary",
-      content: { kind: "caption", caption: "OK" },
+      content: { kind: "caption", caption: "Done" },
     }),
   })}</form>`;
   const body = guides.map(guide => `<section data-pwa-reminder-target="guide" data-platform="${guide.id}" hidden>
@@ -116,8 +116,8 @@ export function renderPwaReminder(): string {
   const dialog = dialogHtml({
     element: { attributesHtml: 'data-pwa-reminder-target="dialog"' },
     iconHtml: Icons.Atelier,
-    titleCaption: "Atelier works better as an app",
-    bodyHtml: `<div class="pwa-reminder-body"><p>Install Atelier as a PWA for a dedicated window and quick access.</p>${body}</div>`,
+    titleCaption: "Install Atelier as an app",
+    bodyHtml: `<div class="pwa-reminder-body"><p>Open Atelier in its own window and launch it from your home screen or apps.</p>${body}</div>`,
     footerHtml: footer,
   });
   return `<div data-controller="pwa-reminder" data-action="storage@window->pwa-reminder#refresh focus@window->pwa-reminder#refresh" hidden>${button}${dialog}</div>`;
