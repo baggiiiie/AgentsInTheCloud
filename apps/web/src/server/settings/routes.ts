@@ -2,11 +2,9 @@ import { handleAccessSettings } from "./access.ts";
 import { handleGitHubSettingsRequest } from "./github.ts";
 import { handleModelSettingsRequest } from "@atelier/llm/server";
 import { finishOnboarding } from "../onboarding/state.ts";
-import { handleSettingsPageRequest, renderDevelopmentSettingsDialog, renderSettingsDialog, type WorkspaceCleanupResult } from "./page.ts";
+import { handleSettingsPageRequest, type WorkspaceCleanupResult } from "./page.ts";
 import { listSettingsContributions } from "./registry.ts";
 import { handleThemeSettingsRequest } from "./theme.ts";
-
-export { renderDevelopmentSettingsDialog, renderSettingsDialog };
 
 export async function handleSettingsRequest(
   request: Request,

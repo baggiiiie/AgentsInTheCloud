@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentProviderServiceTier, getAgentProviderServiceTier, createPiModelRuntime, disconnectModelProvider, seedProviderFavoriteModels, getCustomModelsJson, setCustomModelsJson, setConfiguredModels } from "@atelier/llm/server";
-import { reconcileAgentModelPreferences, getConfiguredAgentModels, getLastProviderServiceTier, getModelThinkingLevel, setActiveAgentModel, setLastProviderServiceTier, setModelThinkingLevel } from "../../src/server/model-preferences.ts";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentModelThinkingLevel, setAgentProviderServiceTier, getAgentProviderServiceTier, createPiModelRuntime, disconnectModelProvider, seedProviderFavoriteModels, getCustomModelsJson, setCustomModelsJson, setConfiguredModels } from "@atelier/llm/server";
+import { reconcileAgentModelPreferences, getConfiguredAgentModels } from "../../src/server/model-preferences.ts";
 
 let dataDir: string;
 
@@ -22,27 +22,27 @@ describe("Agent model settings transactions", () => {
   test("concurrent preference and picker updates preserve each other", async () => {
     await Promise.all([
       setConfiguredModels([{ provider: "openai-codex", id: "gpt-5.4", label: "My model" }]),
-      setActiveAgentModel("openai-codex", "gpt-5.4", "high"),
-      setModelThinkingLevel("anthropic", "claude", "medium"),
-      setLastProviderServiceTier("openai-codex", "priority"),
+      setAgentModelPreference("builtin", { provider: "openai-codex", id: "gpt-5.4" }, "high"),
+      setAgentModelThinkingLevel("builtin", { provider: "anthropic", id: "claude" }, "medium"),
+      setAgentProviderServiceTier("builtin", "openai-codex", "priority"),
     ]);
 
     expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
     // Selecting a model is a preference update, not a catalogue update.
-    await setActiveAgentModel("openai-codex", "not-a-favorite");
+    await setAgentModelPreference("builtin", { provider: "openai-codex", id: "not-a-favorite" });
     expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
-    expect(await getModelThinkingLevel("openai-codex", "gpt-5.4")).toBe("high");
-    expect(await getModelThinkingLevel("anthropic", "claude")).toBe("medium");
-    expect(await getLastProviderServiceTier("openai-codex")).toBe("priority");
+    expect(await getAgentModelThinkingLevel("builtin", { provider: "openai-codex", id: "gpt-5.4" })).toBe("high");
+    expect(await getAgentModelThinkingLevel("builtin", { provider: "anthropic", id: "claude" })).toBe("medium");
+    expect(await getAgentProviderServiceTier("builtin", "openai-codex")).toBe("priority");
   });
 
   test("custom model materialization preserves concurrent preferences", async () => {
     await Promise.all([
       setCustomModelsJson(JSON.stringify({ providers: { "openai-codex": { models: [{ id: "future-model" }] } } })),
-      ...Array.from({ length: 8 }, (_, index) => setModelThinkingLevel("openai-codex", `model-${index}`, "high")),
+      ...Array.from({ length: 8 }, (_, index) => setAgentModelThinkingLevel("builtin", { provider: "openai-codex", id: `model-${index}` }, "high")),
     ]);
 
-    for (let index = 0; index < 8; index++) expect(await getModelThinkingLevel("openai-codex", `model-${index}`)).toBe("high");
+    for (let index = 0; index < 8; index++) expect(await getAgentModelThinkingLevel("builtin", { provider: "openai-codex", id: `model-${index}` })).toBe("high");
     expect(JSON.parse(await getCustomModelsJson()).providers["openai-codex"].models).toEqual([{ id: "future-model" }]);
   });
 });
@@ -81,12 +81,12 @@ test("catalogue changes forget a removed native default without losing thinking 
   const first = { provider: "openai", id: "first", label: "First" };
   const second = { provider: "openai", id: "second", label: "Second" };
   await setConfiguredModels([first, second]);
-  await setActiveAgentModel(first.provider, first.id, "high");
+  await setAgentModelPreference("builtin", { provider: first.provider, id: first.id }, "high");
   await setConfiguredModels([second]);
   await reconcileAgentModelPreferences();
   await setConfiguredModels([first, second]);
   expect((await getConfiguredAgentModels()).find((model) => model.active)?.id).toBe("second");
-  expect(await getModelThinkingLevel(first.provider, first.id)).toBe("high");
+  expect(await getAgentModelThinkingLevel("builtin", { provider: first.provider, id: first.id })).toBe("high");
   await setConfiguredModels([]);
   await reconcileAgentModelPreferences();
   expect(await getAgentModelPreference("builtin")).toBeUndefined();
@@ -103,14 +103,14 @@ test("reads individual legacy preferences and preserves unrelated persisted fiel
     stored.providerPreferences = { valid: { serviceTier: "priority", retained: true }, legacy: { serviceTier: "unknown" }, invalid: 42 };
     stored.otherOwner = { retained: true };
   });
-  expect(await getModelThinkingLevel("openai", "valid")).toBe("high");
-  expect(await getModelThinkingLevel("openai", "invalid")).toBeUndefined();
-  expect(await getModelThinkingLevel("openai", "missing")).toBeUndefined();
-  expect(await getLastProviderServiceTier("valid")).toBe("priority");
-  expect(await getLastProviderServiceTier("legacy")).toBe("default");
-  expect(await getLastProviderServiceTier("invalid")).toBeUndefined();
-  await setModelThinkingLevel("openai", "valid", "medium");
-  await setLastProviderServiceTier("valid", "default");
+  expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "valid" })).toBe("high");
+  expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "invalid" })).toBeUndefined();
+  expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "missing" })).toBeUndefined();
+  expect(await getAgentProviderServiceTier("builtin", "valid")).toBe("priority");
+  expect(await getAgentProviderServiceTier("builtin", "legacy")).toBe("default");
+  expect(await getAgentProviderServiceTier("builtin", "invalid")).toBeUndefined();
+  await setAgentModelThinkingLevel("builtin", { provider: "openai", id: "valid" }, "medium");
+  await setAgentProviderServiceTier("builtin", "valid", "default");
   const saved = JSON.parse(await readFile(path, "utf8"));
   expect(saved.agentPreferences.builtin.modelPreferences["openai::valid"]).toEqual({ thinkingLevel: "medium", retained: true });
   expect(saved.agentPreferences.builtin.providerPreferences.valid).toEqual({ serviceTier: "default", retained: true });
@@ -141,6 +141,6 @@ test("legacy active model belongs only to Built-in and survives namespacing", as
   await updateJsonSettings(join(dataDir, "pi-config", "models.json"), stored => { stored.activeModel = model; });
   expect(await getAgentModelPreference("builtin")).toEqual(model);
   expect(await getAgentModelPreference("pi")).toBeUndefined();
-  await setModelThinkingLevel(model.provider, model.id, "high");
+  await setAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.id }, "high");
   expect(await getAgentModelPreference("builtin")).toEqual(model);
 });

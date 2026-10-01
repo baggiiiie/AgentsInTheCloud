@@ -1,10 +1,9 @@
 import { AtelierCoreError, isJsonObject } from "@atelier/core";
-import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesAnthropicSubscription } from "@atelier/llm/server";
+import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesAnthropicSubscription, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { BaseAgentRuntime } from "./base-agent-runtime.ts";
 import { collectCacheMisses, detectCacheMiss } from "./cache-miss.ts";
-import { getModelThinkingLevel } from "./model-preferences.ts";
 import { configuredModelOptionViews, launchComposerThinkingSettings, resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { createPiSession, type AgentSessionDelegation } from "./pi-session.ts";
 import type { AgentStatsView } from "./render-composer.ts";
@@ -578,7 +577,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     if (provider === "anthropic" && await usesAnthropicSubscription(this.session.modelRuntime)) throw new AtelierCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
     await this.session.setModel(model);
     this.ctx.model = this.currentModel();
-    const remembered = await getModelThinkingLevel(provider, modelId);
+    const remembered = await getAgentModelThinkingLevel("builtin", { provider, id: modelId });
     if (remembered && this.availableThinkingLevels().includes(remembered)) this.session.setThinkingLevel(remembered);
     this.session.setActiveToolsByName(this.session.getActiveToolNames());
     await this.refreshStats();

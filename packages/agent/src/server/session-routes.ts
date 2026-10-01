@@ -1,6 +1,7 @@
 import { requestAcceptsJson } from "@atelier/core";
 import { turboStreamResponse } from "@atelier/shared";
-import { invalidateAgentView, matchRoute, requireAgentConversation, requireAgentRuntime, resolveAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
+import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
+import { resolveAgentConversation } from "./delegation.ts";
 import { sessionImageEndpoint } from "./session-images.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";
 
@@ -12,13 +13,13 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     return Response.json({ turnId: runtime.revealTurn(target) ?? null });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/transcript-items\/([^/]+)$/)) && request.method === "GET") {
-    const runtime = await resolveAgentRuntime(await requireAgentConversation(params[0], params[1], options.events), options);
+    const runtime = await requireAgentRuntime(params[0], params[1], options);
     const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
     const html = await runtime.detailHtml(params[2], count);
     return new Response(html || "not found", { status: html ? 200 : 404, headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
-    const agent = await requireAgentConversation(params[0], params[1], options.events);
+    const agent = await resolveAgentConversation(params[0], params[1], options.events);
     return await sessionImageEndpoint(agent.path, params[2], Number(params[3]));
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tree(\/summary|\/label|)$/))) {

@@ -25,8 +25,6 @@ export async function resolveAgentRuntime(agent: WorkspaceAgentConversationInfo,
   return await (options.getRuntime ?? getWorkspaceAgentRuntime)(agent, { events: options.events });
 }
 
-export const requireAgentConversation = resolveAgentConversation;
-
 export async function requireAgentRuntime(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentRuntime> {
-  return await resolveAgentRuntime(await requireAgentConversation(workspaceId, conversationId, options.events), options);
+  return await resolveAgentRuntime(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
 }

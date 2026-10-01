@@ -32,7 +32,8 @@ import { domId, escapeHtml, turboStreamResponse } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
-import { jsonResponse, response, turboReplaceStream, turboUpdateStream, wantsTurboStream } from "./http-responses.ts";
+import { jsonResponse } from "./http-responses.ts";
+import { replace, response, update, wantsStream } from "@atelier/shared/http";
 
 const jsonStringSchema = Type.String();
 const jsonBooleanSchema = Type.Boolean();
@@ -367,7 +368,7 @@ export function createProjectRoutes(deps: {
     }
     deps.invalidatePresentation();
     if (json) return jsonResponse({ project });
-    if (wantsTurboStream(request)) return turboStreamResponse(`${turboReplaceStream("project-editor-modal", onboardingModal(project))}`);
+    if (wantsStream(request)) return turboStreamResponse(`${replace("project-editor-modal", onboardingModal(project))}`);
     return Response.redirect(new URL(`/projects/${encodeURIComponent(project.id)}/onboarding`, url).toString(), 303);
   }
 
@@ -420,7 +421,7 @@ export function createProjectRoutes(deps: {
 
   async function renderProjectEnvironmentStreams(projectId: string): Promise<string> {
     const project = await projectById(projectId);
-    return turboReplaceStream(domId("project_environment_fields", projectId), projectEnvironmentFields(project, await listProjectEnvironmentVariables(projectId)));
+    return replace(domId("project_environment_fields", projectId), projectEnvironmentFields(project, await listProjectEnvironmentVariables(projectId)));
   }
 
   async function projectEnvironmentVariableValues(request: Request): Promise<{ name: string; value: string }> {
@@ -474,13 +475,13 @@ export function createProjectRoutes(deps: {
     const input = requestAcceptsJson(request) ? await readJsonObject(request) : Object.fromEntries(await request.formData());
     if (!Value.Check(projectSecretValueInputSchema, input)) throw invalidArguments("Supply a secret value and the routing confirmation from the secret dialog");
     const secret = await setProjectSecretValue(projectId, secretId, input);
-    return projectSettingsResponse(request, { secret }, async () => turboReplaceStream("project-editor-modal", '<div id="project-editor-modal"></div>'));
+    return projectSettingsResponse(request, { secret }, async () => replace("project-editor-modal", '<div id="project-editor-modal"></div>'));
   }
 
   async function renderProjectSecretStreams(projectId: string): Promise<string> {
     const project = await projectById(projectId);
     const secrets = await listProjectSecrets(projectId);
-    return `${turboReplaceStream(domId("project_secret_fields", projectId), projectSecretFields(project, secrets))}${turboReplaceStream(domId("project_secret_warning", projectId), collapsedSecretWarning(project, secrets))}`;
+    return `${replace(domId("project_secret_fields", projectId), projectSecretFields(project, secrets))}${replace(domId("project_secret_warning", projectId), collapsedSecretWarning(project, secrets))}`;
   }
 
   async function projectSecretValues(request: Request): Promise<ProjectSecretInput> {
@@ -527,13 +528,13 @@ export function createProjectRoutes(deps: {
   async function renderProjectSshKeyStreams(projectId: string): Promise<string> {
     const project = await projectById(projectId);
     deps.invalidatePresentation();
-    return `${turboReplaceStream(domId("project_ssh_key_fields", projectId), projectSshKeyFields(project, await listProjectSshKeys(projectId)))}`;
+    return `${replace(domId("project_ssh_key_fields", projectId), projectSshKeyFields(project, await listProjectSshKeys(projectId)))}`;
   }
 
   async function updateProjectSshKnownHostsEndpoint(projectId: string, request: Request): Promise<Response> {
     const input = requestAcceptsJson(request) ? jsonString(await readJsonObject(request), "knownHosts") : String((await request.formData()).get("knownHosts") ?? "");
     const knownHosts = await setProjectSshKnownHosts(projectId, input);
-    return projectSettingsResponse(request, { knownHosts }, async () => turboReplaceStream(domId("project_ssh_host_trust", projectId), projectSshHostTrustFields(projectId, knownHosts)));
+    return projectSettingsResponse(request, { knownHosts }, async () => replace(domId("project_ssh_host_trust", projectId), projectSshHostTrustFields(projectId, knownHosts)));
   }
 
   async function createProjectSshKeyFromForm(projectId: string, request: Request): Promise<Response> {
@@ -564,12 +565,12 @@ export function createProjectRoutes(deps: {
         blocked: true,
         references,
       });
-      return turboStreamResponse(turboReplaceStream(domId("project_delete_control", project.id), projectDeleteControl(project.id, references)), { status: 422 });
+      return turboStreamResponse(replace(domId("project_delete_control", project.id), projectDeleteControl(project.id, references)), { status: 422 });
     }
     await deleteProject(projectId);
     deps.invalidatePresentation();
     if (json) return jsonResponse({ deleted: true, blocked: false, project });
-    return turboStreamResponse(`${turboUpdateStream("project_editor_body", "")}`);
+    return turboStreamResponse(`${update("project_editor_body", "")}`);
   }
 
   async function githubRepositorySearchEndpoint(url: URL): Promise<Response> {

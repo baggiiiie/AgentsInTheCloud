@@ -1,7 +1,7 @@
+import { getAgentProviderServiceTier, setAgentProviderServiceTier } from "@atelier/llm/server";
 import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
 import type { AgentServiceTier } from "@atelier/shared";
 import type { ModelRuntime, SessionEntry, SessionManager } from "@earendil-works/pi-coding-agent";
-import { getLastProviderServiceTier, setLastProviderServiceTier } from "./model-preferences.ts";
 
 
 export type { AgentServiceTier } from "@atelier/shared";
@@ -36,7 +36,7 @@ export class AgentServiceTierState {
     const cached = this.values.get(provider);
     if (cached) return cached;
     const persisted = serviceTierFromBranch(this.sessionManager.getBranch(), provider);
-    const serviceTier = persisted ?? await getLastProviderServiceTier(provider) ?? "default";
+    const serviceTier = persisted ?? await getAgentProviderServiceTier("builtin", provider) ?? "default";
     this.values.set(provider, serviceTier);
     if (!persisted) this.sessionManager.appendCustomEntry(serviceTierEntryType, { provider, serviceTier });
     return serviceTier;
@@ -54,7 +54,7 @@ export class AgentServiceTierState {
 
 type RecordProviderServiceTier = (provider: string, serviceTier: AgentServiceTier) => Promise<void>;
 
-export function modelRuntimeWithServiceTiers<Runtime extends Pick<ModelRuntime, "streamSimple">>(runtime: Runtime, state: Pick<AgentServiceTierState, "get">, recordProviderServiceTier: RecordProviderServiceTier = setLastProviderServiceTier): Runtime {
+export function modelRuntimeWithServiceTiers<Runtime extends Pick<ModelRuntime, "streamSimple">>(runtime: Runtime, state: Pick<AgentServiceTierState, "get">, recordProviderServiceTier: RecordProviderServiceTier = (provider, serviceTier) => setAgentProviderServiceTier("builtin", provider, serviceTier)): Runtime {
   const streamSimple: ModelRuntime["streamSimple"] = (model, context, options) => runtime.streamSimple(model, context, {
     ...options,
     onPayload: async (payload, requestModel) => {

@@ -1,7 +1,6 @@
 import { AtelierCoreError, readJsonObject, requestAcceptsJson } from "@atelier/core";
 import { turboStreamResponse } from "@atelier/shared";
-import { parseModelRef } from "@atelier/llm/server";
-import { setModelThinkingLevel } from "./model-preferences.ts";
+import { parseModelRef, setAgentModelThinkingLevel } from "@atelier/llm/server";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { parseAgentServiceTier } from "./service-tier.ts";
 
@@ -40,7 +39,7 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     const runtime = await requireAgentRuntime(params[0], params[1], options);
     await runtime.setThinkingLevel(level);
     const model = runtime.currentModel();
-    if (model) await setModelThinkingLevel(model.provider, model.id, level);
+    if (model) await setAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.id }, level);
     await invalidateAgentView(options, params[0], params[1]);
     return json ? Response.json({ agent: { conversationId: params[1], thinkingLevel: level } }) : turboStreamResponse("");
   }

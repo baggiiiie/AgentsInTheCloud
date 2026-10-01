@@ -7,7 +7,7 @@ import { turboStreamResponse } from "@atelier/shared";
 import { hasWorkspaceGitHubToken } from "@atelier/proxy-egress";
 import { hasAvailableConfiguredModel, renderModelSetupDialog } from "@atelier/llm/server";
 import { renderGitHubConnectButton, renderGitHubSetup } from "../settings/github.ts";
-import { turboUpdateStream as update } from "../http-responses.ts";
+import { update } from "@atelier/shared/http";
 
 export async function renderOnboardingDialog(options: { includeCompleted?: boolean; resumeAfter?: "github" } = {}): Promise<string> {
   if (!options.includeCompleted && !options.resumeAfter && await onboardingCompleted()) return "";

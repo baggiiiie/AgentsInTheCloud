@@ -52,14 +52,16 @@ import { createAgentPaneHost } from "./agent-pane-host.ts";
 import { agentContentId, selectAgentTurboStream } from "./agent-pane.ts";
 import { agentProvider, defaultAgentProvider, orderedAgentProviders, registeredAgentProviders, rememberAgentProvider } from "./agent-providers.ts";
 import { openWorkspaceFile } from "./file-navigation.ts";
-import { httpErrorStatus, jsonResponse, problemJsonResponse, response, turboReplaceStream, turboUpdateStream, wantsTurboStream } from "./http-responses.ts";
+import { httpErrorStatus, jsonResponse, problemJsonResponse } from "./http-responses.ts";
+import { replace, response, update, wantsStream } from "@atelier/shared/http";
 import { launchComposerContent, renderLaunchComposer, renderLaunchProvider } from "./launch-composer.ts";
 import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
 import { atelierOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
 import { createProjectRoutes, type ProjectEditorModalOptions } from "./project-routes.ts";
-import { handleSettingsRequest, renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/routes.ts";
+import { renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/page.ts";
+import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
@@ -605,8 +607,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function projectEditorResponse(request: Request, options: ProjectEditorModalOptions): Promise<Response> {
     const dialogHtml = await projectRoutes.editorModal(options, request);
-    return wantsTurboStream(request)
-      ? turboStreamResponse(turboReplaceStream("project-editor-modal", dialogHtml))
+    return wantsStream(request)
+      ? turboStreamResponse(replace("project-editor-modal", dialogHtml))
       : surfacePage({ kind: "project-editor", dialogHtml });
   }
 
@@ -755,7 +757,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     });
     const location = `/workspaces/${encodeURIComponent(id)}`;
     if (requestAcceptsJson(request)) return workspaceCreatedJsonResponse(id);
-    if (wantsTurboStream(request)) return turboStreamResponse(`${turboReplaceStream("project-editor-modal", '<div id="project-editor-modal"></div>')}${selectWorkspaceTurboStream(id)}`);
+    if (wantsStream(request)) return turboStreamResponse(`${replace("project-editor-modal", '<div id="project-editor-modal"></div>')}${selectWorkspaceTurboStream(id)}`);
     return new Response(null, { status: 303, headers: { location } });
   }
 
@@ -776,7 +778,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
     const { id } = await createWorkspaceFromCommand({});
     const location = `/workspaces/${encodeURIComponent(id)}`;
-    if (wantsTurboStream(request)) return turboStreamResponse("", { headers: { location } });
+    if (wantsStream(request)) return turboStreamResponse("", { headers: { location } });
     return new Response(null, { status: 303, headers: { location } });
   }
 
@@ -799,7 +801,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       launchComposerSubmissions.set(submissionId, launch);
     }
     const { id, isFirstWorkspace } = await launch;
-    return turboStreamResponse(`${turboUpdateStream(launchComposerFrameId, "")}${isFirstWorkspace ? selectWorkspaceTurboStream(id) : ""}`);
+    return turboStreamResponse(`${update(launchComposerFrameId, "")}${isFirstWorkspace ? selectWorkspaceTurboStream(id) : ""}`);
   }
 
   async function createEmptyAgentWorkspaceEndpoint(request: Request): Promise<Response> {
@@ -872,7 +874,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       hostTrustPanels.delete(id);
     } else hostTrustPanels.set(id, await scanSshHost(address.host, address.port));
     invalidateWorkspace(id);
-    return wantsTurboStream(request) ? turboStreamResponse(turboReplaceStream(workspaceResidentId(id), workspaceBootResidentHtml(entry))) : workspacePage(id, request);
+    return wantsStream(request) ? turboStreamResponse(replace(workspaceResidentId(id), workspaceBootResidentHtml(entry))) : workspacePage(id, request);
   }
 
   async function workspaceRuntimeSshTrustEndpoint(id: string, trustId: string, request: Request, reject = false): Promise<Response> {
@@ -955,18 +957,18 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const entry = requireWorkspace(id);
     if (entry.phase.kind !== "runningPhase") return requestAcceptsJson(request)
       ? jsonResponse({ error: { code: "workspace_not_ready", message: `workspace ${id} is not ready` } }, { status: 409 })
-      : wantsTurboStream(request) ? turboStreamResponse("", { status: 409 }) : response("Workspace is not ready", { status: 409 });
+      : wantsStream(request) ? turboStreamResponse("", { status: 409 }) : response("Workspace is not ready", { status: 409 });
     const force = new URL(request.url).searchParams.get("force") === "1";
     const result = await requestWorkspaceParkedState(id, parked, force);
     if (result.kind === "confirmation") {
       if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal and VS Code sessions cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
       const confirmation = renderWorkspaceParkConfirmation(id, workspaceTitle(entry));
-      return wantsTurboStream(request)
-        ? turboStreamResponse(turboUpdateStream(workspaceModuleModalFrameId, confirmation))
+      return wantsStream(request)
+        ? turboStreamResponse(update(workspaceModuleModalFrameId, confirmation))
         : await surfacePage({ kind: "module-modal", dialogHtml: confirmation });
     }
     if (requestAcceptsJson(request)) return jsonResponse({ workspace: { id, parked } });
-    if (wantsTurboStream(request)) return turboStreamResponse(result.stream);
+    if (wantsStream(request)) return turboStreamResponse(result.stream);
     return Response.redirect(request.headers.get("referer") ?? "/", 303);
   }
 
@@ -1043,7 +1045,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const { key } = await openAvailableWorkView(workspaceId, reference);
       // Navigation GETs can open a view too; they do not pass through the POST invalidation path.
       invalidateWorkspace(workspaceId);
-      return turboStreamResponse(options.select === false || (requestAcceptsJson(request) && !wantsTurboStream(request)) ? "" : presentWorkViewTurboStream(workspaceId, key));
+      return turboStreamResponse(options.select === false || (requestAcceptsJson(request) && !wantsStream(request)) ? "" : presentWorkViewTurboStream(workspaceId, key));
     });
   }
 
@@ -1054,7 +1056,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       ({ reference: createdWorkView } = await openAvailableWorkView(workspaceId, result.createdWorkView));
     }
     const origin = `${result.createdAgentConversationId ? selectAgentTurboStream(workspaceId, result.createdAgentConversationId) : ""}${createdWorkView ? presentWorkViewTurboStream(workspaceId, workViewKey(createdWorkView)) : ""}${result.streamHtml ?? ""}`;
-    if (requestAcceptsJson(request) && !wantsTurboStream(request)) {
+    if (requestAcceptsJson(request) && !wantsStream(request)) {
       const command: WorkspaceCommandResponse = { id: commandId };
       if (createdWorkView) command.workView = createdWorkView;
       if (result.createdAgentConversationId) command.agentConversationId = result.createdAgentConversationId;
@@ -1079,7 +1081,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const before = await presentationStore.listWorkViews(workspaceId);
     if (!before.some(view => workViewKey(view.reference) === workViewKey(parsed))) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${workViewKey(parsed)}`);
     await closeWorkView(workspaceId, parsed);
-    if (requestAcceptsJson(request) && !wantsTurboStream(request)) return jsonResponse({ closed: parsed, workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
+    if (requestAcceptsJson(request) && !wantsStream(request)) return jsonResponse({ closed: parsed, workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
     return turboStreamResponse("");
   }
 
@@ -1088,7 +1090,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const stored = (await presentationStore.listWorkViews(workspaceId)).find((view) => workViewKey(view.reference) === body.key);
     if (!stored) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${body.key}`);
     await presentationStore.reorderWorkView(workspaceId, stored.reference, body.index);
-    if (requestAcceptsJson(request) && !wantsTurboStream(request)) return jsonResponse({ workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
+    if (requestAcceptsJson(request) && !wantsStream(request)) return jsonResponse({ workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
     return turboStreamResponse("");
   }
 
@@ -1119,7 +1121,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (!stored) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${key}`);
     registry.setParked(workspaceId, false);
     registry.requestSurfaceAttention(workspaceId, key);
-    return requestAcceptsJson(request) && !wantsTurboStream(request) ? jsonResponse({ attention: stored.reference }) : turboStreamResponse("");
+    return requestAcceptsJson(request) && !wantsStream(request) ? jsonResponse({ attention: stored.reference }) : turboStreamResponse("");
   }
 
   async function closeAgentConversationEndpoint(workspaceId: string, conversationId: string, request: Request): Promise<Response> {
@@ -1128,7 +1130,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (!before.some(agent => agent.id === conversationId)) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
     await agentTabs.close({ workspaceId, conversationId });
     registry.clearSurfaceAttention(workspaceId, `agent:${conversationId}`);
-    if (requestAcceptsJson(request) && !wantsTurboStream(request)) {
+    if (requestAcceptsJson(request) && !wantsStream(request)) {
       const agents = await agentPaneContributions(workspaceId);
       return jsonResponse({ archivedConversationId: conversationId, agentConversations: agents.map(({ id, title, providerId, busy, requestingAttention }) => ({ id, title, providerId, busy, requestingAttention })) });
     }
@@ -1137,7 +1139,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function renderModelPickerUpdates(request: Request): Promise<string> {
     const launchUpdates = (await Promise.all(agentProviders.map(provider => provider.launch.refreshConfiguration?.(launchComposerSettingsFrameId)))).join("");
-    return requestAcceptsJson(request) && !wantsTurboStream(request) ? "" : launchUpdates;
+    return requestAcceptsJson(request) && !wantsStream(request) ? "" : launchUpdates;
   }
 
   function openOldestAttentionWorkspaceEndpoint(): Response {
@@ -1199,8 +1201,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/projects/new" && request.method === "GET") {
       return projectEditorResponse(request, { kind: "new" });
     }
-    if (url.pathname === "/settings" && request.method === "GET" && !wantsTurboStream(request)) return await surfacePage({ kind: "settings", section: url.searchParams.get("section") ?? undefined });
-    if (url.pathname === "/settings/development" && request.method === "GET" && !wantsTurboStream(request)) return await surfacePage({ kind: "settings", section: undefined, development: true });
+    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", section: url.searchParams.get("section") ?? undefined });
+    if (url.pathname === "/settings/development" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", section: undefined, development: true });
     if (url.pathname === "/workspaces" && request.method === "GET") return workspaceListEndpoint(request, url);
     if (url.pathname === "/workspaces" && request.method === "POST") return await createWorkspaceEndpoint(request);
     if (url.pathname === "/workspaces/open-oldest-attention" && request.method === "POST") return openOldestAttentionWorkspaceEndpoint();

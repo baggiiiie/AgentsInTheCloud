@@ -1,5 +1,5 @@
-import { getConfiguredAgentModels, getModelThinkingLevel } from "./model-preferences.ts";
-import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesAnthropicSubscription, type ModelRef } from "@atelier/llm/server";
+import { getConfiguredAgentModels } from "./model-preferences.ts";
+import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesAnthropicSubscription, getAgentModelThinkingLevel, type ModelRef } from "@atelier/llm/server";
 
 export interface AgentModelOptionView {
   provider: string;
@@ -55,6 +55,6 @@ export async function configuredModelOptionViews(current?: ModelRef | null, runt
 export async function launchComposerThinkingSettings(model: ModelRef | undefined): Promise<{ levels: string[]; selected?: string }> {
   if (!model) return { levels: [] };
   const levels: string[] = await modelThinkingLevels(model);
-  const remembered = await getModelThinkingLevel(model.provider, model.id);
+  const remembered = await getAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.id });
   return { levels, selected: remembered && levels.includes(remembered) ? remembered : levels.includes("medium") ? "medium" : levels[0] };
 }

@@ -1,8 +1,8 @@
-import { reconcileAgentModelPreferences, setActiveAgentModel } from "./model-preferences.ts";
+import { reconcileAgentModelPreferences } from "./model-preferences.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { invalidArguments, type JsonObject } from "@atelier/core";
-import { renderModelSetupDialog, parseModelRef, modelRefValue } from "@atelier/llm/server";
+import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@atelier/llm/server";
 import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@atelier/shared";
 import { listStagedAttachments } from "@atelier/prompt/server";
 import { hasAvailableBuiltinAgentModel, resolveNewWorkspaceAgentModel } from "./model-state.ts";
@@ -58,7 +58,7 @@ export const nativeAgentLaunch: WorkspaceAgentLaunch = {
     return {
       async prepare() {
         const ref = parseModelRef(model);
-        if (ref) await setActiveAgentModel(ref.provider, ref.id, thinkingLevel);
+        if (ref) await setAgentModelPreference("builtin", ref, thinkingLevel);
         const context = await prepareAgentLaunch({ model, thinkingLevel });
         return context ?? { agent: {} };
       },

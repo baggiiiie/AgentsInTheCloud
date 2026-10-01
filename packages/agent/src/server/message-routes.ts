@@ -5,7 +5,8 @@ import { turboStreamResponse } from "@atelier/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { expandPromptTemplate, parseCompactCommand } from "./prompt-templates.ts";
 import { runAgentSessionNameCommand } from "./session-name-command.ts";
-import { matchRoute, requireAgentConversation, resolveAgentRuntime, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
+import { matchRoute, resolveAgentRuntime, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
+import { resolveAgentConversation } from "./delegation.ts";
 
 export const handleMessageRequest: AgentRouteHandler = async (request, url, options) => {
   const params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/messages$/);
@@ -14,7 +15,7 @@ export const handleMessageRequest: AgentRouteHandler = async (request, url, opti
 };
 
 async function submitMessage(workspaceId: string, conversationId: string, request: Request, options: AgentRouteOptions): Promise<Response> {
-  const agent = await requireAgentConversation(workspaceId, conversationId);
+  const agent = await resolveAgentConversation(workspaceId, conversationId);
   const json = requestAcceptsJson(request) ? await readJsonObject(request) : undefined;
   const form = json ? undefined : await request.formData();
   const text = String(json?.text ?? form?.get("text") ?? "");

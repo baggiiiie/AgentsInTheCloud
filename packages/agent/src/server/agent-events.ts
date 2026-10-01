@@ -2,8 +2,7 @@ import type { AtelierEventBus } from "@atelier/core";
 import type { AgentWorkspaceParameters } from "@atelier/shared";
 import { agentAttachmentDraftId, moveAttachmentDraft, validDraftId } from "@atelier/prompt/server";
 import { stageInitialPrompt } from "./initial-prompt-draft.ts";
-import { parseModelRef } from "@atelier/llm/server";
-import { getModelThinkingLevel } from "./model-preferences.ts";
+import { parseModelRef, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { expandPromptTemplate } from "./prompt-templates.ts";
 import { getWorkspaceAgentRuntime, removeWorkspaceAgentRuntimes } from "./runtime.ts";
 import { resumeInterruptedAgentSessions } from "./restart-recovery.ts";
@@ -30,7 +29,7 @@ async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorks
   const runtime = await getWorkspaceAgentRuntime(agent, { events });
   const modelRef = context.model ? parseModelRef(context.model) : undefined;
   if (modelRef) await runtime.setModel(modelRef.provider, modelRef.id);
-  const thinkingLevel = context.thinkingLevel || (modelRef ? await getModelThinkingLevel(modelRef.provider, modelRef.id) : undefined);
+  const thinkingLevel = context.thinkingLevel || (modelRef ? await getAgentModelThinkingLevel("builtin", modelRef) : undefined);
   if (thinkingLevel) await runtime.setThinkingLevel(thinkingLevel);
   if (context.serviceTier) await runtime.setServiceTier(context.serviceTier);
 

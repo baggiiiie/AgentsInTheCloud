@@ -3,8 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configuredModelOptionViews, selectAvailableConfiguredModel, type AgentModelOptionView } from "../../src/server/model-state.ts";
-import { modelRefValue, parseModelRef, setConfiguredModels } from "@atelier/llm/server";
-import { setActiveAgentModel } from "../../src/server/model-preferences.ts";
+import { modelRefValue, parseModelRef, setConfiguredModels, setAgentModelPreference } from "@atelier/llm/server";
 import type { Api, Model } from "@earendil-works/pi-ai";
 
 const model = (provider: string, id: string, options: { selected?: boolean; available?: boolean } = {}): AgentModelOptionView => ({
@@ -56,7 +55,7 @@ describe("Anthropic subscription models", () => {
     dataDir = await mkdtemp(join(tmpdir(), "atelier-model-state-"));
     process.env.ATELIER_DATA_DIR = dataDir;
     await setConfiguredModels([{ provider: "anthropic", id: "claude", label: "Claude" }, { provider: "openai", id: "gpt", label: "GPT" }]);
-    await setActiveAgentModel("anthropic", "claude");
+    await setAgentModelPreference("builtin", { provider: "anthropic", id: "claude" });
   });
   afterEach(async () => {
     delete process.env.ATELIER_DATA_DIR;
