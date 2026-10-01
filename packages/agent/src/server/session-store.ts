@@ -14,6 +14,7 @@ export interface WorkspaceAgentConversationInfo {
   label: string;
   title: string;
   path: string;
+  storage?: "durable";
 }
 
 // Unprefixed files are historical built-in sessions written before the provider prefix.
@@ -97,8 +98,8 @@ async function touch(path: string): Promise<void> {
   await file.close();
 }
 
-interface ConversationRecord { conversationId: string; label: string; title: string }
-const conversationsSchema = Type.Object({ conversations: Type.Array(Type.Object({ conversationId: Type.String(), label: Type.String(), title: Type.String() })) });
+interface ConversationRecord { conversationId: string; label: string; title: string; storage?: "durable" }
+const conversationsSchema = Type.Object({ conversations: Type.Array(Type.Object({ conversationId: Type.String(), label: Type.String(), title: Type.String(), storage: Type.Optional(Type.Literal("durable")) })) });
 function conversationMetadataPath(workspaceId: string): string {
   return join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "metadata", "agent-conversations.json");
 }
@@ -121,7 +122,7 @@ async function saveConversationRecords(workspaceId: string, records: Conversatio
 }
 async function persistConversation(agent: WorkspaceAgentConversationInfo): Promise<void> {
   const records = (await conversationRecords(agent.workspaceId)).filter((item) => item.conversationId !== agent.conversationId);
-  records.push({ conversationId: agent.conversationId, label: agent.label, title: agent.title });
+  records.push({ conversationId: agent.conversationId, label: agent.label, title: agent.title, storage: agent.storage });
   await saveConversationRecords(agent.workspaceId, records);
 }
 
@@ -139,7 +140,7 @@ export async function publishSessionSnapshot(source: string, target: string): Pr
 
 /** Unnamed conversations stay workspace-local; only named transcripts enter the search share. */
 export async function publishWorkspaceAgentHistory(agent: WorkspaceAgentConversationInfo): Promise<void> {
-  if (agent.title === untitledAgentConversationTitle) return;
+  if (agent.storage === "durable" || agent.title === untitledAgentConversationTitle) return;
   // Historical sessions already reside in the share; they remain readable as-is.
   if (await isLegacySharedSession(agent)) return;
   await publishSessionSnapshot(agent.path, await publishedSessionPath(agent));
@@ -154,10 +155,10 @@ async function archivePublishedHistory(agent: WorkspaceAgentConversationInfo): P
 
 async function createWorkspaceAgentConversation(workspaceId: string, label: string): Promise<WorkspaceAgentConversationInfo> {
   const conversationId = randomUUID();
-  const path = conversationSessionPath(workspaceId, conversationId);
+  const { workspaceDurableJournalDirectory } = await import("./durable-storage.ts");
+  const path = await workspaceDurableJournalDirectory(workspaceId);
   await mkdir(join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "agent-sessions"), { recursive: true });
-  const agent = { workspaceId, conversationId, label, title: untitledAgentConversationTitle, path };
-  await touch(path);
+  const agent: WorkspaceAgentConversationInfo = { workspaceId, conversationId, label, title: untitledAgentConversationTitle, path, storage: "durable" };
   await persistConversation(agent);
   return agent;
 }
@@ -170,9 +171,11 @@ export async function ensureDefaultWorkspaceAgentConversation(workspaceId: strin
 }
 
 async function listWorkspaceAgentConversationsUnlocked(workspaceId: string): Promise<WorkspaceAgentConversationInfo[]> {
+  const { workspaceDurableJournalDirectory } = await import("./durable-storage.ts");
+  const journal = await workspaceDurableJournalDirectory(workspaceId);
   const local = (await conversationRecords(workspaceId)).map((info) => ({
-    workspaceId, conversationId: info.conversationId, label: info.label, title: info.title,
-    path: conversationSessionPath(workspaceId, info.conversationId),
+    workspaceId, conversationId: info.conversationId, label: info.label, title: info.title, storage: info.storage,
+    path: info.storage === "durable" ? journal : conversationSessionPath(workspaceId, info.conversationId),
   }));
   // Existing pre-change sessions are still discoverable; new sessions do not use sidecars.
   const directory = sessionShareDir(await workspaceSessionShareKey(workspaceId));
@@ -204,6 +207,7 @@ export async function createNextWorkspaceAgentConversation(workspaceId: string):
 
 /** Archive an Agent conversation's current session and create a fresh session for the same display label. */
 export async function replaceWorkspaceAgentSession(agent: WorkspaceAgentConversationInfo): Promise<WorkspaceAgentConversationInfo> {
+  if (agent.storage === "durable") throw new Error("Native conversations reset through their execution owner");
   return await serializeConversationOperation(agent.workspaceId, async () => {
     const current = (await listWorkspaceAgentConversationsUnlocked(agent.workspaceId)).find((item) => item.conversationId === agent.conversationId)!;
     await archivePublishedHistory(current);
@@ -218,7 +222,11 @@ export async function setWorkspaceAgentConversationTitle(agent: WorkspaceAgentCo
   return await serializeConversationOperation(agent.workspaceId, async () => {
     const current = (await listWorkspaceAgentConversationsUnlocked(agent.workspaceId)).find((item) => item.conversationId === agent.conversationId)!;
     const updated = { ...current, title };
-    if (await isLegacySharedSession(current)) {
+    if (current.storage === "durable") {
+      const { existingDurableController } = await import("./durable-owner.ts");
+      await (await existingDurableController(current))?.setTitle(title);
+      await persistConversation(updated);
+    } else if (await isLegacySharedSession(current)) {
       const path = current.path.replace(/\.jsonl$/, ".title");
       await writeFile(path, `${title}\n`);
     } else {
@@ -235,6 +243,10 @@ export async function setWorkspaceAgentConversationTitle(agent: WorkspaceAgentCo
 export async function archiveWorkspaceAgentConversation(agent: WorkspaceAgentConversationInfo): Promise<void> {
   await serializeConversationOperation(agent.workspaceId, async () => {
     const current = (await listWorkspaceAgentConversationsUnlocked(agent.workspaceId)).find((item) => item.conversationId === agent.conversationId)!;
+    if (current.storage === "durable") {
+      await saveConversationRecords(current.workspaceId, (await conversationRecords(current.workspaceId)).filter((item) => item.conversationId !== current.conversationId));
+      return;
+    }
     await archivePublishedHistory(current);
     await rename(current.path, current.path.replace(/\.jsonl$/, ".archived.jsonl"));
     if (await isLegacySharedSession(current)) {

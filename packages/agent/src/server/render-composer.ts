@@ -27,6 +27,7 @@ export interface AgentStatsView {
 }
 
 export interface AgentPaneState {
+  readOnly?: boolean;
   transcriptHtml: string;
   busy: boolean;
   stats: AgentStatsView;
@@ -52,8 +53,8 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
         </div>
         ${renderTranscriptEndNavigation()}
       </div>
-      ${renderOpenComposerButton()}
-      ${renderAgentPaneComposer({
+      ${state.readOnly ? "" : renderOpenComposerButton()}
+      ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({
         ctx,
         action: agentPath(ctx, "/messages"),
         draftId,

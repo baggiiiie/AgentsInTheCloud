@@ -1,14 +1,19 @@
+import { configureDurableOwnerEvents } from "./durable-owner.ts";
 import type { AtelierEventBus } from "@atelier/core";
 import type { AgentWorkspaceParameters } from "@atelier/shared";
 import { agentAttachmentDraftId, moveAttachmentDraft, validDraftId } from "@atelier/prompt/server";
 import { stageInitialPrompt } from "./initial-prompt-draft.ts";
 import { parseModelRef, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { expandPromptTemplate } from "./prompt-templates.ts";
-import { getWorkspaceAgentRuntime, removeWorkspaceAgentRuntimes } from "./runtime.ts";
+import { getWorkspaceAgentRuntime, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, stopWorkspaceAgentRuntimes } from "./runtime.ts";
 import { resumeInterruptedAgentSessions } from "./restart-recovery.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";
 
 export function registerAgentEvents(events: AtelierEventBus): void {
+  configureDurableOwnerEvents(events);
+  events.on("atelier_host_stopping", stopWorkspaceAgentRuntimes);
+  events.on("workspace_suspending", ({ workspaceId }) => suspendWorkspaceAgentRuntimes(workspaceId));
+  events.on("workspace_runtime_ready", ({ workspaceId }) => resumeInterruptedAgentSessions([{ id: workspaceId, parked: false }], events));
   events.on("workspace_deleting", ({ workspaceId }) => removeWorkspaceAgentRuntimes(workspaceId));
   events.on("atelier_host_started", ({ workspaces }) => {
     void resumeInterruptedAgentSessions(workspaces, events).catch((error) => {

@@ -1,6 +1,12 @@
 import { agentDelegation } from "./delegation.ts";
 import { AtelierCoreError } from "@atelier/core";
-import { createRealRuntime } from "./real-agent-runtime.ts";
+import { NativeAgentRuntime } from "./native-agent-runtime.ts";
+import { LegacyAgentRuntime } from "./legacy-agent-runtime.ts";
+import { durableWorkspaceOwner, suspendDurableWorkspaceOwner, existingDurableController, suspendAllDurableWorkspaceOwners } from "./durable-owner.ts";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
+import { listWorkspaceAgentConversations } from "./session-store.ts";
 import type { WorkspaceAgentRuntime, WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 
@@ -10,6 +16,9 @@ export { subscribeWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 const runtimes = new Map<string, Promise<WorkspaceAgentRuntime>>();
 const removedWorkspaceIds = new Set<string>();
 const closedConversationKeys = new Set<string>();
+const nativeClosedConversationKeys = new Set<string>();
+const suspendedWorkspaceIds = new Set<string>();
+let stopping = false;
 
 function runtimeKey(workspaceId: string, conversationId: string): string {
   return `${workspaceId}\u0000${conversationId}`;
@@ -21,29 +30,37 @@ export async function unloadWorkspaceAgentRuntime(workspaceId: string, conversat
   if (!runtime) return;
   runtimes.delete(key);
   await (await runtime).dispose();
+  if (![...runtimes.keys()].some(key => key.startsWith(`${workspaceId}\u0000`))) await suspendDurableWorkspaceOwner(workspaceId);
 }
 
 /** Roll back a failed close after the durable session remained published. */
 export function restoreWorkspaceAgentRuntime(workspaceId: string, conversationId: string): void {
-  closedConversationKeys.delete(runtimeKey(workspaceId, conversationId));
+  const key = runtimeKey(workspaceId, conversationId);
+  if (!nativeClosedConversationKeys.has(key)) closedConversationKeys.delete(key);
 }
 
 export async function removeWorkspaceAgentRuntimes(workspaceId: string): Promise<void> {
   removedWorkspaceIds.add(workspaceId);
+  const pending = [...runtimes.entries()].filter(([key]) => key.startsWith(`${workspaceId}\u0000`));
+  await Promise.allSettled(pending.map(([, runtime]) => runtime));
+  const native = existsSync(join(await workspaceDurableJournalDirectory(workspaceId), "main.jsonl"));
+  if (native) await (await durableWorkspaceOwner(workspaceId)).delete();
   await agentDelegation?.removingWorkspace(workspaceId);
   const matching = [...runtimes.entries()].filter(([key]) => key.startsWith(`${workspaceId}\u0000`));
   for (const [key] of matching) runtimes.delete(key);
   const settled = await Promise.allSettled(matching.map(([, runtime]) => runtime));
   await Promise.all(settled.flatMap((result) => result.status === "fulfilled" ? [result.value.dispose()] : []));
+  await suspendDurableWorkspaceOwner(workspaceId);
 }
 
 export function getWorkspaceAgentRuntime(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions = {}): Promise<WorkspaceAgentRuntime> {
+  if (stopping || suspendedWorkspaceIds.has(agent.workspaceId)) throw new Error("Workspace agent execution is suspended");
   if (removedWorkspaceIds.has(agent.workspaceId)) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${agent.workspaceId}`);
   const key = runtimeKey(agent.workspaceId, agent.conversationId);
   if (closedConversationKeys.has(key)) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${agent.conversationId}`);
   let runtime = runtimes.get(key);
   if (!runtime) {
-    runtime = createRealRuntime(agent, options).catch((error) => {
+    runtime = (agent.storage === "durable" ? NativeAgentRuntime.create(agent, options) : Promise.resolve(new LegacyAgentRuntime(agent))).catch((error) => {
       runtimes.delete(key);
       throw error;
     });
@@ -54,7 +71,15 @@ export function getWorkspaceAgentRuntime(agent: WorkspaceAgentConversationInfo, 
 
 /** Explicit user close, distinct from unloading a runtime. */
 export async function closeWorkspaceAgentConversation(workspaceId: string, conversationId: string): Promise<void> {
-  closedConversationKeys.add(runtimeKey(workspaceId, conversationId));
+  const key = runtimeKey(workspaceId, conversationId);
+  closedConversationKeys.add(key);
+  const pending = runtimes.get(key);
+  if (pending) await pending;
+  const agent = (await listWorkspaceAgentConversations(workspaceId)).find(item => item.conversationId === conversationId);
+  if (agent?.storage === "durable") {
+    nativeClosedConversationKeys.add(key);
+    await (await existingDurableController(agent))?.close();
+  }
   await unloadWorkspaceAgentRuntime(workspaceId, conversationId);
   await agentDelegation?.closingConversation(workspaceId, conversationId);
 }
@@ -70,4 +95,23 @@ export async function refreshConfiguredAgentRuntimes(): Promise<void> {
 export async function refreshWorkspaceCompletionCatalogs(workspaceId: string): Promise<void> {
   const matching = [...runtimes.entries()].filter(([key]) => key.startsWith(`${workspaceId}\u0000`));
   await Promise.all(matching.map(async ([, pending]) => (await pending).refreshCompletionCatalog()));
+}
+
+/** Host parking/shutdown suspends execution, unlike permanent close/delete. */
+export async function suspendWorkspaceAgentRuntimes(workspaceId: string): Promise<void> {
+  suspendedWorkspaceIds.add(workspaceId);
+  const matching = [...runtimes.entries()].filter(([key]) => key.startsWith(`${workspaceId}\u0000`));
+  for (const [key] of matching) runtimes.delete(key);
+  for (const [, runtime] of matching) await (await runtime).dispose();
+  await suspendDurableWorkspaceOwner(workspaceId);
+}
+
+export function allowWorkspaceAgentResume(workspaceId: string): void {
+  suspendedWorkspaceIds.delete(workspaceId);
+}
+export async function stopWorkspaceAgentRuntimes(): Promise<void> {
+  stopping = true;
+  const workspaces = new Set([...runtimes.keys()].map(key => key.split("\u0000")[0]!));
+  for (const workspaceId of workspaces) await suspendWorkspaceAgentRuntimes(workspaceId);
+  await suspendAllDurableWorkspaceOwners();
 }

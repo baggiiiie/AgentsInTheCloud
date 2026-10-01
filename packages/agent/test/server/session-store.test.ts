@@ -6,7 +6,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   archiveWorkspaceAgentConversation,
   createNextWorkspaceAgentConversation,
-  ensureDefaultWorkspaceAgentConversation,
+  ensureDefaultWorkspaceAgentConversation as ensureNativeConversation,
   listWorkspaceAgentConversations,
   parseWorkspaceAgentFilename,
   replaceWorkspaceAgentSession,
@@ -22,6 +22,20 @@ async function dataDir(): Promise<string> {
   dir = await mkdtemp(join(tmpdir(), "atelier-agent-test-"));
   process.env.ATELIER_DATA_DIR = dir;
   return dir;
+}
+
+async function legacyFixture(workspaceId: string, agent: Awaited<ReturnType<typeof ensureNativeConversation>>) {
+  const metadata = join(process.env.ATELIER_DATA_DIR!, "workspaces", workspaceId, "metadata", "agent-conversations.json");
+  const records = await Bun.file(metadata).json();
+  for (const record of records.conversations) if (record.conversationId === agent.conversationId) delete record.storage;
+  await writeFile(metadata, JSON.stringify(records));
+  const path = join(process.env.ATELIER_DATA_DIR!, "workspaces", workspaceId, "agent-sessions", `${agent.conversationId}.jsonl`);
+  await writeFile(path, "");
+  return (await listWorkspaceAgentConversations(workspaceId)).find(item => item.conversationId === agent.conversationId)!;
+}
+async function ensureDefaultWorkspaceAgentConversation(workspaceId: string) {
+  const agent = await ensureNativeConversation(workspaceId);
+  return agent.storage === "durable" ? legacyFixture(workspaceId, agent) : agent;
 }
 
 async function writeProjectInit(workspaceId: string, projectId: string, sessionShareKey: string): Promise<void> {
@@ -108,8 +122,8 @@ describe("Workspace Agent conversation store", () => {
     await dataDir();
 
     const [defaultA, defaultB] = await Promise.all([
-      ensureDefaultWorkspaceAgentConversation("ws1"),
-      ensureDefaultWorkspaceAgentConversation("ws1"),
+      ensureNativeConversation("ws1"),
+      ensureNativeConversation("ws1"),
     ]);
     const created = await Promise.all(Array.from({ length: 4 }, () => createNextWorkspaceAgentConversation("ws1")));
 
@@ -122,7 +136,7 @@ describe("Workspace Agent conversation store", () => {
   test("concurrent list readers observe a newly published conversation with its title", async () => {
     await dataDir();
 
-    const creation = ensureDefaultWorkspaceAgentConversation("ws1");
+    const creation = ensureNativeConversation("ws1");
     const readers = Array.from({ length: 8 }, () => listWorkspaceAgentConversations("ws1"));
     const [created, ...snapshots] = await Promise.all([creation, ...readers]);
 
@@ -143,7 +157,7 @@ describe("Workspace Agent conversation store", () => {
   test("archiving an Agent conversation retains its transcript and title as history", async () => {
     await dataDir();
     const first = await ensureDefaultWorkspaceAgentConversation("ws1");
-    const second = await createNextWorkspaceAgentConversation("ws1");
+    const second = await legacyFixture("ws1", await createNextWorkspaceAgentConversation("ws1"));
     await writeFile(second.path, '{"type":"message"}\n');
 
     await archiveWorkspaceAgentConversation(second);
@@ -245,4 +259,17 @@ describe("host-owned project onboarding permission", () => {
     expect(await ensureDefaultWorkspaceAgentConversation("ws1")).toEqual(agent);
     expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(true);
   });
+});
+
+test("new conversations explicitly select durable storage without a legacy transcript", async () => {
+  const root = await dataDir();
+  const agent = await ensureNativeConversation("native");
+  expect(agent.storage).toBe("durable");
+  expect(agent.path).toBe(join(root, "session-shares", "projectless", "builtin-durable", "native"));
+  expect(await Bun.file(join(root, "workspaces", "native", "agent-sessions", `${agent.conversationId}.jsonl`)).exists()).toBe(false);
+  const renamed = await setWorkspaceAgentConversationTitle(agent, "Before first turn");
+  expect(renamed.storage).toBe("durable");
+  await expect(replaceWorkspaceAgentSession(agent)).rejects.toThrow("execution owner");
+  await archiveWorkspaceAgentConversation(renamed);
+  expect(await listWorkspaceAgentConversations("native")).toEqual([]);
 });

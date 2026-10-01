@@ -143,6 +143,9 @@ export async function openDurableAgentRuntime(
           return { ...record };
         }, context));
       },
+      knownRequest(requestId: string) {
+        return command(async () => Boolean(await harness.commit((tx) => tx.submissionByRequest(conversation.id, requestId), context)));
+      },
       submit(input: DurableInput) {
         return command(async () => {
           if (!input.requestId.trim()) throw new Error("A request ID is required for durable input");
