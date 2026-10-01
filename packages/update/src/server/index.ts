@@ -6,11 +6,13 @@ import { toggleHtml } from "@atelier/design-system/toggle";
 import { transientFeedbackHtml } from "@atelier/design-system/transient-feedback";
 import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@atelier/shared";
 import { isReleaseChannel, type ReleaseChannel } from "./channels.ts";
-import { pollIntervalMs, repository, updateSidebarContributionId } from "./constants.ts";
 import { detectSelfUpdateRuntime, prepareUpdate, type PreparedUpdate, type PullProgress, type SelfUpdateRuntime } from "./docker.ts";
-import { fetchChannelImageMetadata, type ImageMetadata } from "./registry.ts";
+import { fetchChannelImageMetadata, repository, type ImageMetadata } from "./registry.ts";
 import { readStoredReleaseChannel, writeStoredReleaseChannel } from "./settings-store.ts";
 import { requestSupervisorUpdate } from "./supervisor.ts";
+
+const updateSidebarContributionId = "atelier-update";
+const pollIntervalMs = 5 * 60 * 1000;
 
 export type UpdateState = "idle" | "checking" | "available" | "pulling" | "ready_to_restart" | "failed" | "restarting";
 

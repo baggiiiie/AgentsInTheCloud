@@ -3,8 +3,12 @@ import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { buttonHtml } from "@atelier/design-system/button";
 import { buttonGroupHtml } from "@atelier/design-system/button-group";
 import { domId, escapeHtml, type WorkspaceWorkViewPresentation } from "@atelier/shared";
-import { isWorkspaceLoopbackHost } from "../shared.ts";
 import { browserFrameId, type WorkspaceBrowserView } from "./state.ts";
+
+export function isWorkspaceLoopbackHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1" || normalized === "[::1]" || normalized === "0.0.0.0";
+}
 
 export function browserWorkViewPresentation(view: WorkspaceBrowserView): WorkspaceWorkViewPresentation {
   return {

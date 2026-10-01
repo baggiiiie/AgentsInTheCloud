@@ -5,7 +5,21 @@ import crypto from "node:crypto";
 import { HttpRequestBlockedError } from "./errors.ts";
 import { isInternalAddress } from "./ip.ts";
 import { matchesAnyHost, normalizeHostnamePattern } from "./patterns.ts";
-import { ON_REQUEST_EARLY_POLICY_SAFE, type HttpHooks } from "./types.ts";
+
+type HttpIpAllowInfo = {
+  hostname: string;
+  ip: string;
+  family: 4 | 6;
+  port: number;
+  protocol: "http" | "https";
+};
+
+export type HttpHooks = {
+  isRequestAllowed?: (request: Request) => Promise<boolean> | boolean;
+  isIpAllowed?: (info: HttpIpAllowInfo) => Promise<boolean> | boolean;
+  onRequest?: (request: Request) => Promise<Request | Response | void> | Request | Response | void;
+  onResponse?: (response: Response, request: Request) => Promise<Response | void> | Response | void;
+};
 
 export type SecretDefinition = { hosts: string[]; value: string; resolve?: () => Promise<string>; placeholder?: string };
 export type CreateHttpHooksOptions = {
@@ -77,7 +91,6 @@ export function createHttpHooks(options: CreateHttpHooksOptions = {}): CreateHtt
     }
     return applySecretsToRequest(nextRequest);
   };
-  onRequest[ON_REQUEST_EARLY_POLICY_SAFE] = !options.onRequest;
 
   return {
     env,

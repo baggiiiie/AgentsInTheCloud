@@ -2,7 +2,6 @@ import { AtelierCoreError, isJsonObject } from "@atelier/core";
 import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesAnthropicSubscription } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
-import { isFinalAssistantTextEvent } from "./assistant-text-phase.ts";
 import { BaseAgentRuntime } from "./base-agent-runtime.ts";
 import { collectCacheMisses, detectCacheMiss } from "./cache-miss.ts";
 import { getModelThinkingLevel } from "./model-preferences.ts";
@@ -27,6 +26,7 @@ import {
   finalAssistantText,
   finalAssistantTextIndexes,
   isFinalAssistantMessage,
+  isFinalAssistantTextEvent,
   isToolViewDetails,
   type SessionImageRef,
   type TranscriptItem,

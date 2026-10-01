@@ -1,8 +1,10 @@
 import { type ReleaseChannel } from "./channels.ts";
-import { repository } from "./constants.ts";
-import type { HttpFetcher } from "./http.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
+
+export const repository = "lucasmeijer/atelier";
+
+export type HttpFetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 export interface ImageMetadata { digest: string; revision?: string; }
 

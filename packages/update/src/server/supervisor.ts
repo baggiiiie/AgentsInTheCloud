@@ -1,4 +1,4 @@
-import type { HttpFetcher } from "./http.ts";
+import type { HttpFetcher } from "./registry.ts";
 
 const supervisorOrigin = "http://127.0.0.1:3001";
 

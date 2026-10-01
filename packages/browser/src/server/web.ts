@@ -4,9 +4,8 @@ import { Icons } from "@atelier/design-system/icons";
 import { turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@atelier/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { isWorkspaceLoopbackHost } from "../shared.ts";
 import { createBrowserPresenter } from "./agent-tool.ts";
-import { browserWorkViewPresentation, renderBrowserWorkViewBody } from "./render.ts";
+import { browserWorkViewPresentation, isWorkspaceLoopbackHost, renderBrowserWorkViewBody } from "./render.ts";
 import type { WorkspaceBrowserView } from "./state.ts";
 import { createWorkspaceBrowserView, deleteWorkspaceBrowserState, deleteWorkspaceBrowserView, getWorkspaceBrowserView, listWorkspaceBrowserViews, setWorkspaceBrowserTarget } from "./state.ts";
 

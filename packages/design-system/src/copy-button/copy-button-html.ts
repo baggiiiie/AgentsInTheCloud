@@ -1,7 +1,7 @@
 import { Icons } from "../icons/icons-html.ts";
 import { escapeHtml } from "@atelier/shared";
 import { classNames } from "../html.ts";
-import { transientFeedbackMarkup } from "../transient-feedback/transient-feedback-markup.ts";
+import { transientFeedbackMarkup } from "../transient-feedback/transient-feedback-html.ts";
 
 interface CopyButtonOptions {
   label: string;

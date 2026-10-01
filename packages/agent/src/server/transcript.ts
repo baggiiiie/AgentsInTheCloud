@@ -155,6 +155,22 @@ export function isFinalAssistantMessage(parts: ReadonlyArray<AssistantContentPar
     && finalAssistantTextIndexes(parts).some((index) => Boolean(parts[index]!.text?.trim()));
 }
 
+interface AssistantTextEventView {
+  type: "text_start" | "text_delta";
+  contentIndex: number;
+  delta?: string;
+  partial: { stopReason?: StopReason; content?: AssistantContentPart[] };
+}
+
+/** True at the earliest Pi event that identifies streamed text as the final answer. */
+export function isFinalAssistantTextEvent(event: AssistantTextEventView): boolean {
+  const part = event.partial.content?.[event.contentIndex];
+  if (part?.type !== "text") return false;
+  const phase = assistantTextPhase(part.textSignature);
+  if (phase !== undefined) return phase === "final_answer";
+  return event.partial.stopReason !== undefined && isFinalAssistantStopReason(event.partial.stopReason);
+}
+
 export function finalAssistantText(parts: ReadonlyArray<AssistantContentPart>): string {
   return finalAssistantTextIndexes(parts).map((index) => parts[index]!.text ?? "").join("");
 }
