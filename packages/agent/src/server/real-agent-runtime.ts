@@ -56,6 +56,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private readonly pendingSteering: string[] = [];
   private summarizing = false;
   private unsubscribeSession?: () => void;
+  private lastThinkingChangeId?: string;
   private postCompactionEstimate?: { entryId: string; tokens: number };
   private pendingAcceptedPrompt?: symbol;
   private readonly terminalSessionOperations = new Set<Promise<void>>();
@@ -443,6 +444,16 @@ export class RealAgentRuntime extends BaseAgentRuntime {
       case "summarization_retry_finished":
         this.setTransientStatus(undefined);
         break;
+      case "thinking_level_changed": {
+        const entries: SessionEntry[] = this.session.sessionManager.getBranch();
+        const entry = entries.at(-1)!;
+        const record = recordsFromSessionEntries(entries).at(-1);
+        if (record?.kind === "note" && record.id === entry.id) {
+          this.livePersistedStatus(entry.id, record.text, this.lastThinkingChangeId);
+          this.lastThinkingChangeId = entry.id;
+        }
+        break;
+      }
       // Internal lifecycle: the settled event, not these events, finishes our run.
       case "agent_end":
       case "turn_end":
@@ -450,7 +461,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
       // Explicitly silent for now; review these one by one before adding statuses.
       case "queue_update":
       case "session_info_changed":
-      case "thinking_level_changed":
       case "bash_execution_update":
         break;
       default: {

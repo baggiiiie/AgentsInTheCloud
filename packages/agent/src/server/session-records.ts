@@ -78,7 +78,7 @@ export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" 
 
 export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<any, CacheMiss>()): TranscriptRecord[] {
   const records: TranscriptRecord[] = [];
-  let lastModelChangeRecord: TranscriptRecord | undefined;
+  let lastSettingChange: { type: "model_change" | "thinking_level_change"; record: TranscriptRecord } | undefined;
   let cacheNoticeInsertIndex: number | undefined;
   for (const entry of entries) {
     if (entry.type === "custom" && entry.customType === turnStartEntryType && Value.Check(turnStartSchema, entry.data)) {
@@ -151,12 +151,13 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       records.push({ kind: "note", id: entry.id, text: contentText(entry.content), tone: "summary", timestamp: entryTimestamp(entry) });
       continue;
     }
-    if (entry.type === "model_change") {
+    if (entry.type === "model_change" || entry.type === "thinking_level_change") {
       if (records.length === 0) continue;
-      const record: TranscriptRecord = { kind: "note", id: entry.id, text: `model → ${entry.provider}/${entry.modelId}`, tone: "system", timestamp: entryTimestamp(entry) };
-      if (records.at(-1) === lastModelChangeRecord) records[records.length - 1] = record;
+      const text = entry.type === "model_change" ? `model → ${entry.provider}/${entry.modelId}` : `Thinking → ${entry.thinkingLevel}`;
+      const record: TranscriptRecord = { kind: "note", id: entry.id, text, tone: "system", timestamp: entryTimestamp(entry) };
+      if (lastSettingChange && lastSettingChange.type === entry.type && records.at(-1) === lastSettingChange.record) records[records.length - 1] = record;
       else records.push(record);
-      lastModelChangeRecord = record;
+      lastSettingChange = { type: entry.type, record };
       continue;
     }
   }
