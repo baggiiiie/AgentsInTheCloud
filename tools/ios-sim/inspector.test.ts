@@ -6,6 +6,7 @@ test('touch expression rejects elements with nested interactive controls',()=>{
   expect(expression).toContain('interactive descendants');
   expect(expression).toContain('element.querySelector');
   expect(expression).toContain('getBoundingClientRect');
+  expect(expression).toContain('outside the visible viewport');
 });
 test('inspector socket discovery scopes to a UDID',()=>{
   const udid='12345678-1234-1234-1234-123456789ABC';

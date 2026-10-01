@@ -22,7 +22,9 @@ main{max-width:1200px;margin:auto;padding:26px 22px 65px}.empty{border:1px dashe
 .empty code{color:#d6c5ff}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:22px;align-items:start}
 .device{border:1px solid #343a46;border-radius:16px;background:#1b202a;overflow:hidden}.device-head{padding:15px 18px;border-bottom:1px solid #343a46;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .device-head strong{font-size:17px}.subtitle{display:block;color:#a5aeba;font-size:12px;margin-top:3px;word-break:break-all}.state{border:1px solid #465160;border-radius:99px;padding:3px 9px;font-size:12px;color:#b9c7dc;white-space:nowrap}
-.screen-wrap{background:#0b0d12;display:flex;justify-content:center;padding:18px;min-height:160px}.screen{display:block;max-width:100%;width:auto;height:auto;max-height:68vh;object-fit:contain;border-radius:20px;touch-action:none;user-select:none;-webkit-user-drag:none;cursor:crosshair;background:#08090c}
+.screen-wrap{background:#0b0d12;display:flex;justify-content:center;padding:18px;min-height:160px}
+.landscape{width:100%;aspect-ratio:852/393;container-type:size;position:relative}.landscape .screen{position:absolute;left:50%;top:50%;width:100cqh;height:100cqw;max-width:none;max-height:none}
+.landscape-left .screen{transform:translate(-50%,-50%) rotate(-90deg)}.landscape-right .screen{transform:translate(-50%,-50%) rotate(90deg)}.screen{display:block;max-width:100%;width:auto;height:auto;max-height:68vh;object-fit:contain;border-radius:20px;touch-action:none;user-select:none;-webkit-user-drag:none;cursor:crosshair;background:#08090c}
 .controls{padding:16px 18px 19px;display:grid;gap:13px}.row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}form{margin:0}label{display:block;font-size:12px;color:#b8c2d0;margin-bottom:5px}
 input,select,button,.button{font:inherit;border-radius:8px;min-height:37px}input,select{background:#10151d;color:#f1f3f6;border:1px solid #4a5260;padding:7px 10px;min-width:0}input:focus-visible,select:focus-visible,button:focus-visible,.button:focus-visible{outline:2px solid #a6afff;outline-offset:2px}
 button,.button{border:1px solid #5b6475;background:#303948;color:#f4f5f8;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}button:hover,.button:hover{background:#425066}.primary{background:#6963d7;border-color:#8380e9}.primary:hover{background:#7b76e9}.field{flex:1;min-width:170px}.field input,.field select{width:100%}.hint{color:#939dad;font-size:12px;margin:0}.error{border:1px solid #ad6060;color:#ffd1cf;background:#3a2428;padding:10px;border-radius:8px;margin-bottom:20px}
@@ -33,8 +35,10 @@ function deviceHtml(device: Sim, models: string[]): string {
   const handle = encodeURIComponent(device.handle);
   const action = `/viewer/action/${handle}`;
   const options = models.map((model) => `<option value="${escapeHtml(model)}"${model === device.model ? " selected" : ""}>${escapeHtml(model)}</option>`).join("");
+  // The stream is always the portrait framebuffer; turn it upright so clicks map to the rotated screen AXe expects.
+  const rotated = device.orientation === "landscape-left" || device.orientation === "landscape-right";
   const stream = device.state.toLowerCase() === "booted"
-    ? `<img class="screen" src="/viewer/stream/${handle}" alt="Live screen of ${escapeHtml(device.handle)}" draggable="false" data-gesture-sim="${escapeHtml(device.handle)}">`
+    ? `${rotated ? `<div class="landscape ${device.orientation}">` : ""}<img class="screen" src="/viewer/stream/${handle}" alt="Live screen of ${escapeHtml(device.handle)}" draggable="false" data-gesture-sim="${escapeHtml(device.handle)}">${rotated ? "</div>" : ""}`
     : `<p class="hint">Simulator is ${escapeHtml(device.state)}. Start it to view its screen.</p>`;
   return `<article class="device">
     <div class="device-head"><div><strong>${escapeHtml(device.handle)} · ${escapeHtml(device.model)}</strong><span class="subtitle" title="${escapeHtml(device.udid)}">${escapeHtml(device.name)} · ${escapeHtml(device.udid)}</span></div><span class="state">${escapeHtml(device.state)}</span></div>
@@ -65,6 +69,9 @@ for (const form of document.querySelectorAll('[data-confirm-model]')) {
   });
 }
 for (const img of document.querySelectorAll('[data-gesture-sim]')) {
+  // Rotated streams need the frame's aspect ratio, swapped, for their layout box.
+  const frame = img.closest('.landscape');
+  if (frame) img.addEventListener('load', () => { frame.style.aspectRatio = img.naturalHeight + '/' + img.naturalWidth; }, {once: true});
   let start;
   const point = event => {
     // Send screen fractions; the server resolves current native point dimensions.
