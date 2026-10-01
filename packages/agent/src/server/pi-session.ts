@@ -1,6 +1,7 @@
 import { agentDelegation, type AgentSessionAttachment, type AgentDelegationTranscript } from "./delegation.ts";
+import { observeProviderLimits, type ProviderLimit } from "./provider-limits.ts";
 import { observeCacheWarmingDecisions, type CacheWarmingDecisionOutcome } from "./cache-warming-decisions.ts";
-import { observeMcpServerChanges, type McpServerChange } from "./mcp-server-changes.ts";
+import { observeExtensionStatusEvents, type ExtensionStatusEvent } from "./extension-status-events.ts";
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -22,8 +23,9 @@ import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import type { AgentToolDefinitionView } from "./render-transcript.ts";
 
 export interface AgentSessionDelegation {
+  subscribeProviderLimits?: (listener: (limit: ProviderLimit | undefined) => void) => () => void;
   subscribeCacheWarmingDecisions?: (listener: (outcome: CacheWarmingDecisionOutcome) => void) => () => void;
-  subscribeMcpServerChanges?: (listener: (change: McpServerChange) => void) => () => void;
+  subscribeExtensionStatusEvents?: (listener: (event: ExtensionStatusEvent) => void) => () => void;
   attachment?: AgentSessionAttachment;
   transcript?: AgentDelegationTranscript;
   dispose(): Promise<void>;
@@ -118,8 +120,9 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
       session,
       serviceTiers,
       delegation: {
+        subscribeProviderLimits: listener => observeProviderLimits(session, listener),
         subscribeCacheWarmingDecisions: listener => observeCacheWarmingDecisions(session, listener),
-        subscribeMcpServerChanges: listener => observeMcpServerChanges(session, listener),
+        subscribeExtensionStatusEvents: listener => observeExtensionStatusEvents(session, listener),
         attachment,
         transcript: preparation?.transcript?.(session),
         dispose: disposeDelegation,

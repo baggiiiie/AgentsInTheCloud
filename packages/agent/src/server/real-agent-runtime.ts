@@ -23,6 +23,7 @@ import {
   assistantErrorText,
   buildTranscript,
   finalAssistantText,
+  formatDuration,
   finalAssistantTextIndexes,
   isFinalAssistantMessage,
   isFinalAssistantTextEvent,
@@ -71,8 +72,9 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private unsubscribeCosts?: () => void;
   private settledCost: number;
   private unsubscribeTranscript?: () => void;
-  private unsubscribeMcpServerChanges?: () => void;
+  private unsubscribeExtensionStatusEvents?: () => void;
   private unsubscribeCacheWarmingDecisions?: () => void;
+  private unsubscribeProviderLimits?: () => void;
 
   constructor(agent: WorkspaceAgentConversationInfo, private session: any, private toolsForModel: AgentToolDefinitionView[], private serviceTiers: AgentServiceTierState, options: WorkspaceAgentRuntimeOptions = {}, private delegation: AgentSessionDelegation = { dispose: async () => {} }) {
     super(agent, options);
@@ -90,6 +92,11 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private attachContributions(): void {
+    this.unsubscribeProviderLimits = this.delegation.subscribeProviderLimits?.(limit => {
+      this.setTransientStatus("provider-limit", limit
+        ? `Provider rate limit reached; requested wait: ${formatDuration(Math.ceil(limit.retryAfterMs / 1000) * 1000)}.`
+        : undefined, 8000);
+    });
     this.unsubscribeCacheWarmingDecisions = this.delegation.subscribeCacheWarmingDecisions?.(outcome => {
       if (outcome.action === "warm") {
         this.setTransientStatus("cache-warming", undefined);
@@ -101,7 +108,13 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         : "Cache warming stopped.";
       this.setTransientStatus("cache-warming", message, 8000);
     });
-    this.unsubscribeMcpServerChanges = this.delegation.subscribeMcpServerChanges?.(change => {
+    this.unsubscribeExtensionStatusEvents = this.delegation.subscribeExtensionStatusEvents?.(change => {
+      if (change.type === "session_tree") {
+        if (change.newLeafId !== change.oldLeafId) {
+          this.notice("info", change.summaryEntry ? "Rewound with a branch summary." : "Conversation branch changed.");
+        }
+        return;
+      }
       const parts: string[] = [];
       if (change.added.length) parts.push(`added: ${change.added.join(", ")}`);
       if (change.removed.length) parts.push(`removed: ${change.removed.join(", ")}`);
@@ -116,8 +129,11 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private detachContributions(): void {
-    this.unsubscribeMcpServerChanges?.();
-    this.unsubscribeMcpServerChanges = undefined;
+    this.unsubscribeProviderLimits?.();
+    this.unsubscribeProviderLimits = undefined;
+    this.setTransientStatus("provider-limit", undefined);
+    this.unsubscribeExtensionStatusEvents?.();
+    this.unsubscribeExtensionStatusEvents = undefined;
     this.setTransientStatus("mcp-servers", undefined);
     this.unsubscribeCacheWarmingDecisions?.();
     this.unsubscribeCacheWarmingDecisions = undefined;
@@ -503,8 +519,10 @@ export class RealAgentRuntime extends BaseAgentRuntime {
       case "agent_end":
       case "turn_end":
         break;
-      // Explicitly silent for now; review these one by one before adding statuses.
+      // Session metadata does not add a transcript status.
       case "session_info_changed":
+        break;
+      // Reviewed: the user chose not to surface Pi-executed command output.
       case "bash_execution_update":
         break;
       default: {
@@ -768,7 +786,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     const lifecycle = (async () => {
       this.beginBranchSummary();
       try {
-        this.notice("info", "Summarizing the abandoned branch…");
         this.invalidatePresentation();
         this.assertActive();
         const navigation = this.session.navigateTree(target, { summarize: true, customInstructions: customInstructions?.trim() || undefined });
@@ -823,6 +840,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private beginBranchSummary(): void {
+    this.setTransientStatus("branch-summary", "Summarizing the abandoned branch…");
     this.summarizing = true;
     this.setBusy(true);
   }
@@ -830,6 +848,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private async finishBranchSummary(): Promise<void> {
     if (!this.summarizing) return;
     this.summarizing = false;
+    this.setTransientStatus("branch-summary", undefined);
     this.setBusy(false);
     await this.emitTurnFinished();
   }
