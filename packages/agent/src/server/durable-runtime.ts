@@ -2,6 +2,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { LiveDoc, type AgentChange, type Conversation, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
+import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
@@ -21,8 +22,8 @@ const dependencies = {
 /**
  * Native execution owner, not an AgentSession adapter. One instance per workspace.
  * Reads/attachment are passive; resume requires the host to make the workspace ready.
- * Permanent close/delete admission gates must be applied by the production owner
- * before this module can replace runtime.ts.
+ * Close/delete gates are durable; production must persist them before removing
+ * tabs or disposing execution workspaces.
  */
 export async function openDurableAgentRuntime(
   directory: string,
@@ -34,7 +35,21 @@ export async function openDurableAgentRuntime(
   const workspace = await openDurableWorkspace(directory, workspaceId, harnessOptions);
   const { harness } = workspace;
   const agents = new Map<string, Promise<ReturnType<typeof controller>>>();
+  const commandDrains = new Set<() => Promise<void>>();
   let suspended = false;
+  const gates = await harness.snapshot(WorkspaceAdmission, context);
+  let deleted = gates?.deleted ?? false;
+  const closed = new Set(gates?.closed ?? []);
+  let deleting: Promise<void> | undefined;
+
+  async function persistGates() {
+    await harness.commit(async (tx) => {
+      const admission = await tx.doc(WorkspaceAdmission);
+      admission.deleted = deleted;
+      admission.closed = [...closed];
+    }, context);
+    await markGatedDurableWork(harness);
+  }
 
   function assertOpen() {
     if (suspended) throw new Error("Durable agent runtime is suspended");
@@ -45,16 +60,33 @@ export async function openDurableAgentRuntime(
     // roots prepare independently, while model changes cannot race image sizing
     // and skill expansion for this root's next admission.
     let tail: Promise<void> = Promise.resolve();
+    let closing: Promise<void> | undefined;
+    function assertAdmission() {
+      assertOpen();
+      if (deleted) throw new Error("Durable workspace is deleted");
+      if (closed.has(conversation.id)) throw new Error("Durable conversation is closed");
+    }
     function command<T>(run: () => Promise<T>): Promise<T> {
-      const result = tail.then(() => { assertOpen(); return run(); });
+      const result = tail.then(() => { assertAdmission(); return run(); });
       // The caller receives the rejection; a rejected command must not poison
       // the command line and prevent a later correction or Stop.
       tail = result.then(() => {}, () => {});
       return result;
     }
 
+    commandDrains.add(() => tail);
     return {
       id: conversation.id,
+      /** Fence immediately, persist before cancellation, retain passive history. */
+      close() {
+        assertOpen();
+        closed.add(conversation.id);
+        return closing ??= (async () => {
+          await tail;
+          await persistGates();
+          await conversation.abort(context, { background: true });
+        })();
+      },
       /** Canonical committed state, including partials and queued input. No scheduling. */
       watch: conversation.watch.bind(conversation),
       history: conversation.entries.bind(conversation),
@@ -72,9 +104,9 @@ export async function openDurableAgentRuntime(
           if (existing) return (await harness.submission(existing.id, context))!;
           return submitDurableInput(conversation, workspaceId, harnessOptions.models, input, context, async (id, text) => {
             const expanded = await load.expand(id, text);
-            assertOpen();
+            assertAdmission();
             return expanded;
-          });
+          }, assertAdmission);
         });
       },
       configure(change: SettingsChange) {
@@ -117,8 +149,10 @@ export async function openDurableAgentRuntime(
         pending = (async () => {
           const catalog = await harness.snapshot(WorkspaceConversations, context);
           const existing = catalog?.conversations.find((item) => item.conversationId === record.conversationId);
+          if (!existing && deleted) throw new Error("Durable workspace is deleted");
           const prepared = existing ? {} : await load.prepare(workspaceId, record.conversationId, options, initial);
           assertOpen();
+          if (!existing && deleted) throw new Error("Durable workspace is deleted");
           return controller(await workspace.conversation(record, prepared));
         })().catch((error) => {
           agents.delete(record.conversationId);
@@ -127,6 +161,20 @@ export async function openDurableAgentRuntime(
         agents.set(record.conversationId, pending);
       }
       return pending;
+    },
+    /** Permanent admission fence; journal remains available for history and recovery. */
+    delete() {
+      assertOpen();
+      deleted = true;
+      return deleting ??= (async () => {
+        // New attachment/admission is fenced before waiting for in-flight preparation.
+        // Failed attachment still rejects to its caller, but cannot prevent deletion.
+        await Promise.allSettled([...agents.values()]);
+        await Promise.all([...commandDrains].map((drain) => drain()));
+        await persistGates();
+        const inspection = await harness.inspect(context);
+        await Promise.all(inspection.tasks.map(({ record }) => harness.waitForTask(record.id, context)));
+      })();
     },
     /** Host restart resumes durable tasks, never submits a synthetic user prompt. */
     resume() {

@@ -9,6 +9,7 @@ import {
   type ConversationId,
   type HarnessOptions,
 } from "@earendil-works/pi-durable";
+import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { openNodeJsonlStorage } from "@earendil-works/pi-durable/storage/jsonl/node";
 
 export type DurableConversationRecord = {
@@ -56,6 +57,7 @@ export async function openDurableWorkspace(directory: string, workspaceId: strin
         }
         workspace.workspaceId = workspaceId;
       }, BACKGROUND_CONTEXT);
+      await markGatedDurableWork(harness);
     } catch (error) {
       await harness.close(BACKGROUND_CONTEXT);
       throw error;
@@ -69,6 +71,7 @@ export async function openDurableWorkspace(directory: string, workspaceId: strin
           const workspace = await tx.doc(WorkspaceConversations);
           const existing = workspace.conversations.find((item) => item.conversationId === record.conversationId);
           if (existing) return existing.durableId;
+          if ((await tx.doc(WorkspaceAdmission)).deleted) throw new Error("Durable workspace is deleted");
           const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
           await configure(tx, created.id, agent);
           workspace.conversations.push({ ...record, durableId: created.id });
