@@ -17,7 +17,12 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
         mock.module('node:fs', () => ({...fs, existsSync: path => path === '/run/atelier-parent' ? ${innerAtelier} : fs.existsSync(path)}));
         const localPath = ${JSON.stringify(join(import.meta.dir, "local-images.ts"))};
         const local = await import(localPath);
-        const checks = [], builds = [];
+        const checks = [], builds = [], prunes = [];
+        // Building is simulated below, so its detached cleanup must also be
+        // simulated: otherwise this unit test prunes the developer's real images.
+        const prunePath = ${JSON.stringify(join(import.meta.dir, "prune.ts"))};
+        const prune = await import(prunePath);
+        mock.module(prunePath, () => ({...prune, pruneSupersededWorkspaceImages: kind => { prunes.push(kind); }}));
         mock.module(localPath, () => ({...local, reuseDefaultWorkspaceImage: async tag => {
           checks.push(tag);
           // A different signature must not count as the requested image.
@@ -33,9 +38,9 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
         try {
           const first = await ensureDefaultWorkspaceImage();
           const second = await ensureDefaultWorkspaceImage();
-          console.log(JSON.stringify({first,second,checks,builds}));
+          console.log(JSON.stringify({first,second,checks,builds,prunes}));
         } catch (error) {
-          console.log(JSON.stringify({error: error.message,checks,builds}));
+          console.log(JSON.stringify({error: error.message,checks,builds,prunes}));
           process.exitCode = 1;
         }
       `);
@@ -56,6 +61,7 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
           expect(signature).toMatch(/^[a-f0-9]{16}$/);
           expect(result.error).toBe(`Inner Atelier needs a default workspace image with signature ${signature} but that has not been preloaded. Exiting instead of building this image, so we do not flood the outer atelier with many parallel image builds.`);
           expect(result.builds).toEqual([]);
+          expect(result.prunes).toEqual([]);
           continue;
         }
         expect(code).toBe(0);
@@ -63,6 +69,7 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
         expect(result.second).toBe(result.first);
         expect(result.checks).toEqual(!innerAtelier && scenario === "no-cache" ? [] : [result.first, result.first]);
         expect(result.builds).toHaveLength(innerAtelier || scenario === "cached" ? 0 : 2);
+        expect(result.prunes).toEqual(result.builds.map(() => "default"));
         for (const command of result.builds) {
           expect(command).toContain("docker");
           expect(command).toContain(result.first);
