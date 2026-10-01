@@ -16,7 +16,6 @@ type PendingExtensionEvent =
   | "session_tree"
   | "context"
   | "context_with_system"
-  | "cache_warming_decision"
   | "before_provider_request"
   | "before_provider_headers"
   | "after_provider_response"
@@ -32,8 +31,8 @@ type PendingExtensionEvent =
   | "tool_call"
   | "tool_result";
 
-// Observed without installing a connector extension (see mcp-server-changes.ts).
-type ObservedExtensionEvent = "mcp_servers_change";
+// Observed without installing policy-changing extension handlers.
+type ObservedExtensionEvent = "mcp_servers_change" | "cache_warming_decision";
 
 type ExtensionOnlyEvent = Exclude<ExtensionEvent["type"], AgentSessionEvent["type"]>;
 type AssertNever<Event extends never> = Event;

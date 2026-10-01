@@ -96,6 +96,7 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   private footer: AgentStatsView = { contextPercent: null, compactAvailable: false, inputTokens: 0, outputTokens: 0, cost: 0, modelName: undefined, thinkingLevel: "", thinkingLevels: [], models: [] };
   private readonly transcriptRendering = new LiveTranscriptRenderer();
   private readonly transientStatuses = new Map<string, string>();
+  private readonly transientStatusTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly noticeListeners = new Set<AgentLivePresentationListener>();
   private readonly textRendering = new Map<string, { source: string; renderer: StreamingMarkdownRenderer; stableHtml: string; tailHtml: string }>();
   private readonly footerRefresh = createPublishedRefresh(() => this.statsView(), footer => {
@@ -249,6 +250,8 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
     this.disposed = true;
     this.livePresentation.dispose();
     this.noticeListeners.clear();
+    for (const timer of this.transientStatusTimers.values()) clearTimeout(timer);
+    this.transientStatusTimers.clear();
     this.footerRefresh.dispose();
     this.completionCatalogRefresh.dispose();
     this.resetTurnSubscriptions(this.ctx.branchId ?? "");
@@ -268,9 +271,14 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   }
 
   /** Server-owned activity survives reconnects but is never persisted in history. */
-  protected setTransientStatus(key: string, message: string | undefined): void {
+  protected setTransientStatus(key: string, message: string | undefined, clearAfterMs?: number): void {
+    clearTimeout(this.transientStatusTimers.get(key));
+    this.transientStatusTimers.delete(key);
     if (message === undefined) this.transientStatuses.delete(key);
     else this.transientStatuses.set(key, message);
+    if (message !== undefined && clearAfterMs !== undefined) {
+      this.transientStatusTimers.set(key, setTimeout(() => this.setTransientStatus(key, undefined), clearAfterMs));
+    }
     this.invalidatePresentation();
   }
 

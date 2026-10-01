@@ -72,7 +72,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private settledCost: number;
   private unsubscribeTranscript?: () => void;
   private unsubscribeMcpServerChanges?: () => void;
-  private mcpStatusTimer?: ReturnType<typeof setTimeout>;
+  private unsubscribeCacheWarmingDecisions?: () => void;
 
   constructor(agent: WorkspaceAgentConversationInfo, private session: any, private toolsForModel: AgentToolDefinitionView[], private serviceTiers: AgentServiceTierState, options: WorkspaceAgentRuntimeOptions = {}, private delegation: AgentSessionDelegation = { dispose: async () => {} }) {
     super(agent, options);
@@ -90,17 +90,23 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private attachContributions(): void {
+    this.unsubscribeCacheWarmingDecisions = this.delegation.subscribeCacheWarmingDecisions?.(outcome => {
+      if (outcome.action === "warm") {
+        this.setTransientStatus("cache-warming", undefined);
+        return;
+      }
+      const message = outcome.overridden ? "Cache warming stopped by an extension."
+        : outcome.economicsAvailable === true ? "Cache warming stopped; estimated savings too low."
+        : outcome.economicsAvailable === false ? "Cache warming stopped; pricing or prompt usage unavailable."
+        : "Cache warming stopped.";
+      this.setTransientStatus("cache-warming", message, 8000);
+    });
     this.unsubscribeMcpServerChanges = this.delegation.subscribeMcpServerChanges?.(change => {
       const parts: string[] = [];
       if (change.added.length) parts.push(`added: ${change.added.join(", ")}`);
       if (change.removed.length) parts.push(`removed: ${change.removed.join(", ")}`);
       parts.push(`${change.registered} registered`);
-      this.setTransientStatus("mcp-servers", `MCP servers updated · ${parts.join(" · ")}`);
-      clearTimeout(this.mcpStatusTimer);
-      this.mcpStatusTimer = setTimeout(() => {
-        this.mcpStatusTimer = undefined;
-        this.setTransientStatus("mcp-servers", undefined);
-      }, 8000);
+      this.setTransientStatus("mcp-servers", `MCP servers updated · ${parts.join(" · ")}`, 8000);
     });
     this.unsubscribeCosts = this.delegation.attachment?.costs?.subscribe(() => {
       void this.refreshStats().catch((error) => console.error("Could not refresh Agent costs", normalizedPromiseError(error)));
@@ -112,9 +118,10 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private detachContributions(): void {
     this.unsubscribeMcpServerChanges?.();
     this.unsubscribeMcpServerChanges = undefined;
-    clearTimeout(this.mcpStatusTimer);
-    this.mcpStatusTimer = undefined;
     this.setTransientStatus("mcp-servers", undefined);
+    this.unsubscribeCacheWarmingDecisions?.();
+    this.unsubscribeCacheWarmingDecisions = undefined;
+    this.setTransientStatus("cache-warming", undefined);
     this.unsubscribeCosts?.();
     this.unsubscribeCosts = undefined;
     const unsubscribe = this.unsubscribeTranscript;

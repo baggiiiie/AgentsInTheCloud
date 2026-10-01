@@ -1,4 +1,5 @@
 import { agentDelegation, type AgentSessionAttachment, type AgentDelegationTranscript } from "./delegation.ts";
+import { observeCacheWarmingDecisions, type CacheWarmingDecisionOutcome } from "./cache-warming-decisions.ts";
 import { observeMcpServerChanges, type McpServerChange } from "./mcp-server-changes.ts";
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -21,6 +22,7 @@ import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import type { AgentToolDefinitionView } from "./render-transcript.ts";
 
 export interface AgentSessionDelegation {
+  subscribeCacheWarmingDecisions?: (listener: (outcome: CacheWarmingDecisionOutcome) => void) => () => void;
   subscribeMcpServerChanges?: (listener: (change: McpServerChange) => void) => () => void;
   attachment?: AgentSessionAttachment;
   transcript?: AgentDelegationTranscript;
@@ -116,6 +118,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
       session,
       serviceTiers,
       delegation: {
+        subscribeCacheWarmingDecisions: listener => observeCacheWarmingDecisions(session, listener),
         subscribeMcpServerChanges: listener => observeMcpServerChanges(session, listener),
         attachment,
         transcript: preparation?.transcript?.(session),
