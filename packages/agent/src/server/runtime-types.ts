@@ -37,6 +37,8 @@ export interface WorkspaceAgentRuntime {
   refreshCompletionCatalog(): Promise<string>;
   revealTurn(target: string): string | undefined;
   userMessages(): string[];
+  knownRequest?(requestId: string): Promise<boolean>;
+  image?(entryId: string, contentIndex: number): Promise<Response>;
   submit(text: string, options?: SubmitOptions): Promise<void>;
   compact(customInstructions?: string): Promise<void>;
   abort(): Promise<void>;

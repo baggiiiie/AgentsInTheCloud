@@ -20,6 +20,10 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
     const agent = await resolveAgentConversation(params[0], params[1], options.events);
+    if (agent.storage === "durable") {
+      const runtime = await requireAgentRuntime(params[0], params[1], options);
+      return await runtime.image!(params[2], Number(params[3]));
+    }
     return await sessionImageEndpoint(agent.path, params[2], Number(params[3]));
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tree(\/summary|\/label|)$/))) {

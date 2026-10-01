@@ -10,6 +10,7 @@ export interface AtelierHostStartedEvent {
 
 export interface AtelierEventMap {
   agent_system_prompt_prepare: AgentSystemPromptPrepareEvent;
+  atelier_host_stopping: Record<string, never>;
   atelier_host_started: AtelierHostStartedEvent;
 }
 

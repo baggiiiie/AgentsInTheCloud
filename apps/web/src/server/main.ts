@@ -241,6 +241,7 @@ app = createWebApp({
     if (draft && validDraftId(draft)) await removeAttachmentDraft(draft);
   },
   async persistWorkspaceParked(id, parked) {
+    if (parked) await atelierEvents.emit("workspace_suspending", { workspaceId: id });
     await setWorkspaceParked(id, parked);
     if (!parked && registry.get(id)!.phase.kind === "runningPhase") {
       registry.startProvisioning(id);
@@ -569,3 +570,14 @@ function resumeWorkspace(id: string): void {
     if (registry.get(id) === entry && !entry.phase.deletion && !entry.parked) registry.startRunning(id);
   }).catch((error) => console.error(`Workspace startup failed for ${id}`, error));
 }
+
+// Release durable writer leases without turning host shutdown into user Stop.
+let hostStopping = false;
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => {
+  if (hostStopping) return;
+  hostStopping = true;
+  void atelierEvents.emit("atelier_host_stopping", {}).then(() => process.exit(0), error => {
+    console.error("Atelier shutdown failed", error);
+    process.exit(1);
+  });
+});
