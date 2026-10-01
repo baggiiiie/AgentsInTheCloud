@@ -8,7 +8,7 @@ for (const id of ["codex", "claude", "pi"]) {
     const directory = await mkdtemp(join(tmpdir(), `${id}-adapter-`));
     const source = join(import.meta.dir, `../../../packages/${id}-agent/src/server`);
     const model = id === "pi" ? "custom::model" : id === "codex" ? "openai-codex::gpt-5.4" : "anthropic::claude-opus-4-6";
-    const npmPackage = id === "pi" ? "@earendil-works/pi-coding-agent@" : id === "codex" ? "@openai/codex@latest" : "@anthropic-ai/claude-code@latest";
+    const npmPackage = id === "pi" ? "@earendil-works/pi-coding-agent@latest" : id === "codex" ? "@openai/codex@latest" : "@anthropic-ai/claude-code@latest";
     const mcpConfigMarker = id === "codex" ? "config.toml" : id === "claude" ? "claude-mcp.json" : "/pi-atelier";
     try {
       const child = Bun.spawn([process.execPath, "-e", `
