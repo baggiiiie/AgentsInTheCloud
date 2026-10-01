@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
+import { Type } from "typebox";
 import { createDurableReadTool } from "../../src/server/durable-tools.ts";
 import { durableEntryContent, durableImageEndpoint } from "../../src/server/durable-images.ts";
 import { openDurableWorkspace, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
@@ -35,7 +36,7 @@ async function setup() {
     workspaces.push(workspace);
     return workspace;
   };
-  return { path, faux, open, workspace: await open() };
+  return { path, faux, registry, open, workspace: await open() };
 }
 const record = { conversationId: "tab", label: "Agent 1", title: "Images" };
 
@@ -119,4 +120,64 @@ test("unsupported image MIME types are not served as active content", async () =
     kind: "test.images", model: [{ role: "user", timestamp: 1, content: [{ type: "image", mimeType: "text/html", data: Buffer.from("<script>alert(1)</script>").toString("base64") }] }],
   }), context);
   expect((await durableImageEndpoint(conversation, String(entry.id), 0, context)).status).toBe(404);
+});
+
+
+test("queued image identities survive passive reopen, remain scoped, and retire at placement", async () => {
+  const { workspace, faux, registry, open } = await setup();
+  const started = Promise.withResolvers<void>();
+  registry.install(defineExtension({ name: "blocking", tools: [defineTool({
+    name: "block", description: "Wait for suspension", parameters: Type.Object({}),
+    async execute(_args, _api, invocation) {
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([
+    fauxAssistantMessage([fauxToolCall("block", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage("Recovered"),
+  ]);
+  const conversation = await workspace.conversation(record, { model: { provider: "faux", modelId: "small" } });
+  await conversation.submit({ type: "input", content: "Start" }, context);
+  await started.promise;
+  const queued = await conversation.submit({ type: "input", whenBusy: "steer", content: [
+    { type: "text", text: "Queued image" }, { type: "image", mimeType: "image/png", data: png },
+  ] }, context);
+  expect((await queued.status(context)).status).toBe("queued");
+  const id = `queued-${queued.id}`;
+  expect((await durableImageEndpoint(conversation, id, 1, context)).status).toBe(200);
+  await workspace.close();
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  const other = await reopened.conversation({ ...record, conversationId: "other-root" });
+  const frame = await restored.watch(context);
+  const initial = frame.value;
+  const response = await durableImageEndpoint(restored, id, 1, context);
+  expect(Buffer.from(await response.arrayBuffer()).toString("base64")).toBe(png);
+  expect(response.headers.get("content-security-policy")).toContain("sandbox");
+  expect((await durableImageEndpoint(other, id, 1, context)).status).toBe(404);
+  for (const invalid of ["queued-0", "queued--1", "queued-1.2", "queued-NaN", "queued-9007199254740992", "queued-01"]) {
+    expect((await durableImageEndpoint(restored, invalid, 1, context)).status).toBe(404);
+  }
+  expect((await durableImageEndpoint(restored, id, 0, context)).status).toBe(404);
+  expect((await reopened.harness.inspect(context)).scheduling).toBe("paused");
+  // Observe placement as one committed frame: queue removal and entry creation
+  // must not require stitching independent reads or event-based optimistic rows.
+  const placed = Promise.withResolvers<void>();
+  frame.start(async next => {
+    if (!JSON.stringify(next.docs["pi.inbox"]).includes("Queued image")) {
+      expect(JSON.stringify(next.entries)).toContain("Queued image");
+      placed.resolve();
+    }
+  });
+  const resumed = await reopened.harness.submission(queued.id, context);
+  expect((await resumed!.wait(context)).status).toBe("done");
+  await placed.promise;
+  await frame.stop();
+  expect(JSON.stringify(initial.docs["pi.inbox"])).toContain("Queued image");
+  expect((await durableImageEndpoint(restored, id, 1, context)).status).toBe(404);
+  const entry = (await restored.entries({}, 100, undefined, context)).items.find(item => JSON.stringify(item.model).includes("Queued image"))!;
+  expect((await durableImageEndpoint(restored, String(entry.id), 1, context)).status).toBe(200);
 });

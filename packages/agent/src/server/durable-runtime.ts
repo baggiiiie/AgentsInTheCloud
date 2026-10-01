@@ -4,6 +4,7 @@ import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { LiveDoc, type AgentChange, type Conversation, type ConversationId, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
 import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
+import { DurableConversationPresentation } from "./durable-presentation.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
@@ -85,7 +86,7 @@ export async function openDurableAgentRuntime(
     if (suspended) throw new Error("Durable agent runtime is suspended");
   }
 
-  function controller(conversation: Conversation) {
+  function controller(conversation: Conversation, identity: ConversationIdentity) {
     // Only host commands queue here, never generation/tool execution. Different
     // roots prepare independently, while model changes cannot race image sizing
     // and skill expansion for this root's next admission.
@@ -122,6 +123,11 @@ export async function openDurableAgentRuntime(
       },
       /** Canonical committed state, including partials and queued input. No scheduling. */
       watch: conversation.watch.bind(conversation),
+      /** Host-owned mount; disposal detaches observation, not execution. */
+      presentation: (onCommit?: Parameters<typeof DurableConversationPresentation.attach>[3]) => {
+        assertOpen();
+        return DurableConversationPresentation.attach(conversation, { workspaceId, conversationId: identity.conversationId }, context, onCommit);
+      },
       history: conversation.entries.bind(conversation),
       context: conversation.context.bind(conversation),
       agent: conversation.agent.bind(conversation),
@@ -216,7 +222,7 @@ export async function openDurableAgentRuntime(
           const prepared = existing ? {} : await load.prepare(workspaceId, record.conversationId, options, initial);
           assertOpen();
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
-          return controller(await workspace.conversation(record, prepared));
+          return controller(await workspace.conversation(record, prepared), record);
         })().catch((error) => {
           agents.delete(record.conversationId);
           throw error;
