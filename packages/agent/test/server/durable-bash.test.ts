@@ -180,3 +180,28 @@ test("SIGKILL after workspace launch but before host receipt reattaches without 
     await child.exited;
   }
 }, 20_000);
+
+test("a result committed while probing a dead supervisor is not reported as uncertain", async () => {
+  const f = await fixture();
+  const input = request("unused", f.path);
+  const operation = join(f.root, input.id);
+  await mkdir(operation, { recursive: true });
+  await writeFile(join(operation, "intent.json"), JSON.stringify(input));
+  // Deterministic process/protocol fault injection: the supervisor publishes its
+  // receipt and exits exactly when the reader probes pane liveness. Exercise the
+  // real receipt reader with only its subprocess transport replaced.
+  const output = await command(["python3", "-c", `
+import json, pathlib, runpy, subprocess, sys
+script, root, request = sys.argv[1:]
+operation = pathlib.Path(root) / json.loads(request)["id"]
+def tmux(argv, **kwargs):
+    if "display-message" in argv:
+        (operation / "result.json").write_text(json.dumps({"status": "done", "aborted": True}))
+        return subprocess.CompletedProcess(argv, 0, "1\\n", "")
+    return subprocess.CompletedProcess(argv, 0, "", "")
+subprocess.run = tmux
+sys.argv = [script, "status", request, "--root", root]
+runpy.run_path(script, run_name="__main__")
+`, join(import.meta.dir, "../../workspace-image/atelier-agent-bash"), f.root, JSON.stringify(input)]);
+  expect(JSON.parse(output)).toEqual({ status: "done", aborted: true });
+});
