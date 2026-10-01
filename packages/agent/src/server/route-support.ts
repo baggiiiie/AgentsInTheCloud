@@ -5,6 +5,7 @@ import { getWorkspaceAgentRuntime } from "./runtime.ts";
 import { type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 export interface AgentRouteOptions {
+  renderPage?: (body: string) => Response;
   events?: AtelierEventBus;
   getRuntime?: typeof getWorkspaceAgentRuntime;
   knownRequest?: typeof import("./durable-owner.ts").knownWorkspaceAgentRequest;

@@ -250,7 +250,9 @@ export async function openDurableAgentRuntime(
           const catalog = await tx.doc(WorkspaceConversations);
           const record = catalog.conversations.find((item) => item.durableId === conversation.id)!;
           record.title = title;
-          return { ...record, ...(record.branches ? { branches: [...record.branches] } : {}) };
+          const result = { ...record };
+          if (record.branches) result.branches = [...record.branches];
+          return result;
         }, context));
       },
       knownRequest(requestId: string) {

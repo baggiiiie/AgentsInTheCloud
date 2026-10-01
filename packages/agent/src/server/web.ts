@@ -176,7 +176,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
   routes: [{ handle: handleUsageRequest }, {
     async handle(request, url, context) {
       // SAFETY: The module boundary validates or constructs this value with the asserted domain shape.
-      return handleAgentRequest(request, url, { events: context.events as AtelierEventBus | undefined });
+      return handleAgentRequest(request, url, { events: context.events as AtelierEventBus | undefined, renderPage: context.renderPage });
     },
   }],
   agentProvider: {

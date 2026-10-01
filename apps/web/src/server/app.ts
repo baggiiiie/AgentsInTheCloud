@@ -1237,6 +1237,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     for (const moduleRoute of workspaceModuleRoutes()) {
       const moduleResponse = await moduleRoute.handle(request, url, {
         events: deps.events,
+        renderPage: (body) => response(layout(body)),
         renderModalPage: (dialogHtml) => surfacePage({ kind: "module-modal", dialogHtml }),
         openWorkView: (workspaceId, reference, options) => openWorkspaceModuleWorkView(workspaceId, reference, request, options),
       });
