@@ -1,3 +1,4 @@
+import type { Models } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, type AgentChange, type Extension, type HarnessOptions } from "@earendil-works/pi-durable";
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
 import { createPiModelRuntime } from "@atelier/llm/server";
@@ -13,9 +14,9 @@ import { compactionKeepRecentTokens } from "./runtime-status.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 /** Workspace-scoped code, including the task definitions needed to recover bash. */
-export function createDurableWorkspaceRegistry(workspaceId: string, options: WorkspaceAgentToolOptions = {}, onboarding: readonly Extension[] = createRegisteredDurableOnboardingExtensions(workspaceId)) {
+export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick<Models, "getModel">, options: WorkspaceAgentToolOptions = {}, onboarding: readonly Extension[] = createRegisteredDurableOnboardingExtensions(workspaceId)) {
   const registry = createRegistry();
-  registry.install(defineExtension({ name: "atelier.workspace-tools", tools: createDurableWorkspaceTools(workspaceId, options) }));
+  registry.install(defineExtension({ name: "atelier.workspace-tools", tools: createDurableWorkspaceTools(workspaceId, models, options) }));
   registry.install(createDurableBashExtension(workspaceId));
   for (const extension of onboarding) registry.install(extension);
   return registry;
@@ -23,9 +24,10 @@ export function createDurableWorkspaceRegistry(workspaceId: string, options: Wor
 
 /** No AgentSession, delegation coordinator, or host-local filesystem environment. */
 export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions = {}): Promise<HarnessOptions> {
+  const models = await createPiModelRuntime();
   return {
-    models: await createPiModelRuntime(),
-    registry: createDurableWorkspaceRegistry(workspaceId, options),
+    models,
+    registry: createDurableWorkspaceRegistry(workspaceId, models, options),
     settings: { compaction: { enabled: true, keepRecentTokens: compactionKeepRecentTokens } },
   };
 }
