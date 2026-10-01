@@ -7,6 +7,8 @@ import { createModels, fauxAssistantMessage, fauxProvider, InMemoryCredentialSto
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { createRegistry, defineExtension, defineTool, type HarnessOptions } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
+import { durableWorkspaceTool } from "../../src/server/durable-tools.ts";
+import { defineWorkspaceTool } from "../../src/server/workspace-tool.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -176,13 +178,13 @@ describe("Durable workspace journal", () => {
       await utimes(`${path}.lock`, expired, expired);
       const options = provider();
       options.faux.setResponses([fauxAssistantMessage("Recovered without submitting another user message.")]);
-      options.registry.install(defineExtension({ name: "crash-test", tools: [defineTool({
-        name: "effect", description: "Exercise recovery after execution started", parameters: Type.Object({}), replay,
+      options.registry.install(defineExtension({ name: "crash-test", tools: [durableWorkspaceTool(defineWorkspaceTool({
+        name: "effect", label: "Effect", description: "Exercise recovery after execution started", parameters: Type.Object({}),
         async execute() {
           await appendFile(join(path, "executions.txt"), "executed\n");
-          return { content: [{ type: "text", text: "Replayed safely" }] };
+          return { content: [{ type: "text", text: "Replayed safely" }], details: undefined };
         },
-      })] }));
+      }), replay)] }));
       const reopened = await open(path, options, "crash-workspace");
       const inspection = await reopened.harness.inspect(context);
       expect(inspection.scheduling).toBe("paused");
