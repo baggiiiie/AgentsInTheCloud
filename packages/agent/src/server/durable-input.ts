@@ -21,6 +21,7 @@ export async function submitDurableInput(
   input: DurableInput,
   context: Context,
   expand: typeof expandWorkspaceSkillCommand = expandWorkspaceSkillCommand,
+  beforeAdmit: () => void = () => {},
 ) {
   if (!input.requestId.trim()) throw new Error("A request ID is required for durable input");
   const text = [input.text.trim(), ...(input.attachmentNotes ?? [])].filter(Boolean).join("\n\n");
@@ -40,5 +41,6 @@ export async function submitDurableInput(
   if (input.images?.length && model && !model.input.includes("image")) {
     content.push({ type: "text", text: "Current model does not support images. Attached images are retained in history but omitted from this request." });
   }
+  beforeAdmit();
   return conversation.submit({ type: "input", requestId: input.requestId, content, whenBusy: input.whenBusy ?? "steer" }, context);
 }

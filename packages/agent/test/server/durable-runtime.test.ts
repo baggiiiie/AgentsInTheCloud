@@ -220,3 +220,112 @@ test("suspending during preparation fences pending admission without adding a re
   expect((await restored.history({}, 100, undefined, context)).items).toHaveLength(0);
   expect(faux.state.callCount).toBe(0);
 });
+
+test.each(["close", "delete"] as const)("permanent %s fences preparation and survives reopen with readable history", async (operation) => {
+  const { runtime, faux, load, open } = await setup();
+  faux.setResponses([fauxAssistantMessage("Saved answer"), fauxAssistantMessage("Other root")]);
+  const agent = await runtime.conversation(record);
+  await (await agent.submit({ requestId: "saved", text: "Saved input" })).wait(context);
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  load.expand = async (_workspace, text) => { entered.resolve(); await release.promise; return text; };
+  const pending = agent.submit({ requestId: "blocked", text: "Not admitted" });
+  await entered.promise;
+  const closing = operation === "close" ? agent.close() : runtime.delete();
+  release.resolve();
+  await expect(pending).rejects.toThrow(operation === "close" ? "closed" : "deleted");
+  await closing;
+  await expect(agent.configure({ thinkingLevel: "off" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
+  await runtime.suspend();
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  expect(JSON.stringify((await restored.history({}, 100, undefined, context)).items)).toContain("Saved input");
+  await expect(restored.submit({ requestId: "saved", text: "Even retries cannot start work" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
+  if (operation === "delete") {
+    await expect(reopened.conversation({ ...record, conversationId: "new" })).rejects.toThrow("deleted");
+  } else {
+    load.expand = async (_workspace, text) => text;
+    const other = await reopened.conversation({ ...record, conversationId: "new" });
+    await (await other.submit({ requestId: "other", text: "Independent" })).wait(context);
+  }
+  expect(faux.state.callCount).toBe(operation === "close" ? 2 : 1);
+});
+
+test.each(["close", "delete"] as const)("recovery after %s gate commit marks work before any scheduler resume", async (operation) => {
+  const { runtime, path, faux, load, registry, open } = await setup();
+  const { openDurableWorkspace } = await import("../../src/server/durable-workspace.ts");
+  const { WorkspaceAdmission } = await import("../../src/server/durable-lifecycle.ts");
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "replay-probe", tools: [defineTool({
+    name: "probe", description: "Safe execution must not recover after close", parameters: Type.Object({}),
+    replay: "safe",
+    async execute(_args, _api, invocation) {
+      executions++;
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" })]);
+  const agent = await runtime.conversation(record);
+  await agent.submit({ requestId: "run", text: "Start tool" });
+  await started.promise;
+  await agent.submit({ requestId: "queued", text: "Must not execute" });
+  await runtime.suspend();
+  // Simulate the durable boundary: host died after committing the gate and
+  // before withdrawing inputs or cancelling tasks. No destructive UI fixture.
+  const workspace = await openDurableWorkspace(path, "native-workspace", await load.harness());
+  await workspace.harness.commit(async (tx) => {
+    const admission = await tx.doc(WorkspaceAdmission);
+    if (operation === "delete") admission.deleted = true;
+    else admission.closed.push(agent.id);
+  }, context);
+  await workspace.close();
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  const watch = await restored.watch(context);
+  const idle = Promise.withResolvers<void>();
+  watch.start(async (value) => { if (!value.docs["pi.live"]?.run) idle.resolve(); });
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  reopened.resume();
+  await idle.promise;
+  await watch.stop();
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  expect(JSON.stringify((await restored.history({}, 100, undefined, context)).items)).not.toContain("Must not execute");
+});
+
+test.each(["close", "delete"] as const)("live %s cancels work and withdraws queued input before resolving", async (operation) => {
+  const { runtime, faux, registry } = await setup();
+  const started = Promise.withResolvers<void>();
+  let interrupted = false;
+  registry.install(defineExtension({ name: "live-close", tools: [defineTool({
+    name: "hold", description: "Wait for cancellation", parameters: Type.Object({}),
+    async execute(_args, _api, invocation) {
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => {
+          interrupted = true;
+          reject(invocation.abortSignal!.reason);
+        }, { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" })]);
+  const agent = await runtime.conversation(record);
+  const first = await agent.submit({ requestId: "first", text: "Begin" });
+  await started.promise;
+  const queued = await agent.submit({ requestId: "queued", text: "Never run" });
+  if (operation === "close") await agent.close();
+  else await runtime.delete();
+  expect(interrupted).toBe(true);
+  expect((await first.status(context)).status).toBe("unanswered");
+  expect((await queued.status(context)).status).toBe("unanswered");
+  const watch = await agent.watch(context);
+  expect(watch.value.docs["pi.live"]?.run).toBeUndefined();
+  await watch.stop();
+  expect(faux.state.callCount).toBe(1);
+});
