@@ -1,4 +1,4 @@
-import { configureAgentDelegation, configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@atelier/agent/server";
+import { configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@atelier/agent/server";
 import { createAtelierEventBus, getAtelierRuntimeContext } from "@atelier/core";
 import { designSystemCatalogueHtml } from "@atelier/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@atelier/observable-terminal/server";
@@ -14,7 +14,6 @@ import {
   StoppedWorkspaceError,
 } from "@atelier/proxy-ingress/server";
 import { atelierName, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@atelier/shared";
-import { subagentsDelegation } from "@atelier/subagents/server";
 import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@atelier/workspace";
 import { ensureDefaultWorkspaceImage } from "@atelier/workspace-image";
 import type { ServerWebSocket } from "bun";
@@ -32,9 +31,6 @@ import { legacyStaticFiles } from "./static-files.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
 import { createFileWorkspaceActivityStore, createFileWorkspaceAttentionStore, createFileWorkspaceDeletionStore, createWorkspaceRegistry } from "./workspace-registry.ts";
-
-// Explicit feature assembly; workspace-module discovery still owns routes, views and assets.
-configureAgentDelegation(workspaceModules.some((module) => module.id === "subagents") ? subagentsDelegation : undefined);
 
 const requestedPort = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? "0.0.0.0";
