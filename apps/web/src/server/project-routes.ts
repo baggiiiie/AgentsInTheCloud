@@ -129,7 +129,7 @@ export function createProjectRoutes(deps: {
       </form>
     </div>`;
     return `<section class="project-configuration-list" id="${domId("project_dockerfile", project.id)}"${revealSection(section, "dockerfile")}>
-      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a custom dockerfile to make sure workspaces for your project start up with all their system dependencies ready to go.</p></div>
+      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a <code>./.atelier/Dockerfile</code> to install the system dependencies your project’s workspaces need.</p></div>
       ${projectConfigurationDisclosure("Custom Dockerfile", fields, section === "dockerfile")}
     </section>`;
   }
@@ -193,7 +193,7 @@ export function createProjectRoutes(deps: {
 
   function projectSecretEditor(project: ProjectSummary, secrets: ProjectSecretSummary[], section?: ProjectSettingsSection): string {
     return `<section class="project-configuration-list project-secrets" id="${domId("project_secrets", project.id)}"${revealSection(section, "secrets")}>
-      <div class="project-configuration-head"><h3>Secrets</h3><p>Atelier lets you use secrets without exposing them to agents. Your encrypted secret stays outside agent sandboxes. Agents receive a placeholder that Atelier replaces with the real secret in matching network requests. Secret changes apply to new connections from running workspaces. Reconnect existing clients: open HTTPS tunnels are not reconfigured. New workspaces receive placeholder environment variables automatically; existing processes need those variables set when started.</p></div>
+      <div class="project-configuration-head"><h3>Secrets</h3><p>Secrets let your agents connect to services without seeing your passwords or API keys.</p><p>Agents see a placeholder. Atelier intercepts network requests to services you specify and replaces the placeholder with the real secret.</p></div>
       ${collapsedSecretWarning(project, secrets)}
       ${projectConfigurationDisclosure("Configure secrets", projectSecretFields(project, secrets), section === "secrets" || secrets.some(secretNeedsValue))}
     </section>`;
