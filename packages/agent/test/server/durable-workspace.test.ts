@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { appendFile, mkdtemp, readFile, rm, utimes } from "node:fs/promises";
+import { appendFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -100,6 +100,19 @@ describe("Durable workspace journal", () => {
     await expect(openDurableWorkspace(path, "workspace-1", options)).rejects.toThrow("Lock file is already being held");
     await first.close();
     await open(path, options);
+  }, 20_000);
+
+  test("waits for a live writer to release its lease without opening storage early", async () => {
+    const path = await directory();
+    const options = provider();
+    const first = await open(path, options);
+    let acquired = false;
+    const pending = open(path, options).then((workspace) => { acquired = true; return workspace; });
+    await Bun.sleep(700);
+    expect(acquired).toBe(false);
+    await first.close();
+    const second = await pending;
+    expect((await second.harness.inspect(context)).scheduling).toBe("paused");
   });
 
   test("rejects workspace identity mismatches without leaking the writer lease", async () => {
@@ -174,9 +187,6 @@ describe("Durable workspace journal", () => {
       reader.releaseLock();
       child.kill("SIGKILL");
       await child.exited;
-      // Simulate expiry of the dead process's heartbeat without slowing the suite.
-      const expired = new Date(Date.now() - 60_000);
-      await utimes(`${path}.lock`, expired, expired);
       const options = provider();
       options.faux.setResponses([fauxAssistantMessage("Recovered without submitting another user message.")]);
       options.registry.install(defineExtension({ name: "crash-test", tools: [durableWorkspaceTool(defineWorkspaceTool({

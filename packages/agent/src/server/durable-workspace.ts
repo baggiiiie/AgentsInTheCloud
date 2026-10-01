@@ -39,7 +39,14 @@ export async function openDurableWorkspace(directory: string, workspaceId: strin
   await mkdir(directory, { recursive: true });
   // Pi's JSONL backend has no writer exclusion. A compromised lease is fatal (the
   // lock library's default), rather than allowing two writers to corrupt history.
-  const release = await lock(directory);
+  // An immediate host restart must allow the previous writer's heartbeat to
+  // expire. Wait a bounded 12 seconds (past the 10-second lease plus timestamp
+  // rounding), but never remove a fresh lock or admit a concurrent writer.
+  const release = await lock(directory, {
+    stale: 10_000,
+    update: 5_000,
+    retries: { retries: 24, factor: 1, minTimeout: 500, maxTimeout: 500, randomize: false },
+  });
   try {
     const storage = await openNodeJsonlStorage(directory, BACKGROUND_CONTEXT, { fsync: true });
     let harness: Harness;
