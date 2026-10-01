@@ -38,7 +38,7 @@ async function inspector(s:Sim) {
   let instance = inspectors.get(s.udid);
   if (!instance) {
     const offset=41000 + Number(s.handle.slice(3))*2;
-    instance = await startInspectorProxy(s.udid, offset, offset+1000, remote, (command,forward)=>mac.spawn(command,forward));
+    instance = await startInspectorProxy(s.udid, offset, await mac.freeRemotePortPair(offset), remote, (command,forward)=>mac.spawn(command,forward));
     inspectors.set(s.udid,instance);
   }
   return instance.inspector;

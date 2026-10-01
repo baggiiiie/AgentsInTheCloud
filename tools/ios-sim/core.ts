@@ -76,6 +76,15 @@ export class Mac {
     }
     throw Error('No reverse forward port available');
   }
+  /** Mac-wide free pair (port - 1, port): other workspaces run proxies on the same Mac. */
+  async freeRemotePortPair(seed: number): Promise<number> {
+    const first = portCandidate(this.id, seed);
+    for (let n=0;n<200;n++) {
+      const port = 40001 + 2 * ((first + n) % 5000);
+      if (await this.run(`lsof -nP -iTCP:${port - 1} -iTCP:${port} -sTCP:LISTEN >/dev/null && echo busy || echo free`) === 'free') return port;
+    }
+    throw Error('No free Mac port pair for the Web Inspector proxy');
+  }
   async devices() { return ownDevices(await this.run('xcrun simctl list devices -j'), this.id); }
   async resolve(handleOrUdid: string) {
     const sim = (await this.devices()).find(d=>d.handle === handleOrUdid || d.udid === handleOrUdid);
