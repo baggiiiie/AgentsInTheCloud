@@ -34,10 +34,6 @@ export {
 } from "./json.ts";
 
 export {
-  defaultDataDir,
-} from "./data-dir.ts";
-
-export {
   acquireFileLock,
   createProcessFileLock,
 } from "./file-lock.ts";

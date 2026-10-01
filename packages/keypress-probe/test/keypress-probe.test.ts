@@ -4,19 +4,19 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { atelierServerModule } from "../src/server/index.ts";
 
-let dataHome: string;
-let previousDataHome: string | undefined;
+let dataDir: string;
+let previousDataDir: string | undefined;
 
 beforeEach(async () => {
-  previousDataHome = process.env.XDG_DATA_HOME;
-  dataHome = await mkdtemp(join(tmpdir(), "atelier-keypress-probe-test-"));
-  process.env.XDG_DATA_HOME = dataHome;
+  previousDataDir = process.env.ATELIER_DATA_DIR;
+  dataDir = await mkdtemp(join(tmpdir(), "atelier-keypress-probe-test-"));
+  process.env.ATELIER_DATA_DIR = dataDir;
 });
 
 afterEach(async () => {
-  if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME;
-  else process.env.XDG_DATA_HOME = previousDataHome;
-  await rm(dataHome, { recursive: true, force: true });
+  if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
+  else process.env.ATELIER_DATA_DIR = previousDataDir;
+  await rm(dataDir, { recursive: true, force: true });
 });
 
 describe("keypress probe settings", () => {

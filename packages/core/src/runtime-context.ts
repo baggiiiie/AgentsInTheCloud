@@ -1,6 +1,5 @@
-import { platform } from "node:os";
-import { join } from "node:path";
-import { defaultDataDir } from "./data-dir.ts";
+import { homedir, platform } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 export interface AtelierRuntimeContext {
   /** Path as seen by the Atelier process itself. Use this for normal Atelier file IO. */
@@ -53,6 +52,18 @@ function runtimePathsFromEnv(): Pick<AtelierRuntimeContext, "atelierDataDir" | "
     atelierDataDir,
     dockerHostAtelierDataDir: envString("ATELIER_DOCKER_HOST_DATA_DIR") ?? atelierDataDir,
   };
+}
+
+function xdgDataHome(): string {
+  const configured = process.env.XDG_DATA_HOME;
+  if (configured && isAbsolute(configured)) return configured;
+  return join(homedir(), ".local", "share");
+}
+
+function defaultDataDir(): string {
+  if (platform() === "darwin") return join(homedir(), "Library", "Application Support", "atelier-host");
+  if (platform() === "linux") return join(xdgDataHome(), "atelier-host");
+  return "/var/lib/atelier-host";
 }
 
 function envString(name: string): string | undefined {

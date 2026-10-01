@@ -1,32 +1,25 @@
 import { buttonHtml } from "@atelier/design-system/button";
-import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { defaultDataDir, isJsonObject } from "@atelier/core";
+import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
+import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
 import { toggleHtml } from "@atelier/design-system/toggle";
 import { turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule } from "@atelier/shared";
 
 const settingsPath = "/settings/keypress-probe";
 const settingsSectionId = "settings-sec-keypress-probe";
 
-function keypressProbeSettingsFile(dataDir = defaultDataDir()): string {
-  return join(dataDir, "keypress-probe-settings.json");
+function keypressProbeSettingsFile(): string {
+  return atelierDataPath(getAtelierRuntimeContext(), "keypress-probe-settings.json");
 }
 
-async function isKeypressProbeEnabled(file = keypressProbeSettingsFile()): Promise<boolean> {
-  if (!existsSync(file)) return false;
-  const settings: unknown = JSON.parse(await readFile(file, "utf8"));
-  if (!isJsonObject(settings) || (settings.enabled !== true && settings.enabled !== false)) {
-    throw new Error(`Invalid keypress probe settings in ${file}`);
-  }
-  return settings.enabled;
+async function isKeypressProbeEnabled(): Promise<boolean> {
+  const file = keypressProbeSettingsFile();
+  const { enabled = false } = await readJsonSettings(file);
+  if (enabled !== true && enabled !== false) throw new Error(`Invalid keypress probe settings in ${file}`);
+  return enabled;
 }
 
-async function setKeypressProbeEnabled(enabled: boolean, file = keypressProbeSettingsFile()): Promise<void> {
-  await mkdir(dirname(file), { recursive: true });
-  const tempPath = `${file}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify({ enabled }, null, 2)}\n`);
-  await rename(tempPath, file);
+async function setKeypressProbeEnabled(enabled: boolean): Promise<void> {
+  await updateJsonSettings(keypressProbeSettingsFile(), (settings) => { settings.enabled = enabled; });
 }
 
 function renderKeypressProbe(): string {

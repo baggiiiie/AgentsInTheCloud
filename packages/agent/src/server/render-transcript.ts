@@ -1,9 +1,9 @@
 import { renderStreamingMarkdownSnapshot } from "@atelier/markdown";
+import type { ModelRef } from "@atelier/llm/server";
 import { escapeHtml } from "@atelier/shared";
 import { commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, renderMarkdownRow, transcriptActionItemHtml, transcriptRow } from "./render-markup.ts";
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";
-import { thinkingBlockRendererFor } from "./thinking-block-renderers.ts";
 import { formatDuration, formatTokens, type TranscriptItem, type WorkingTranscriptItem } from "./transcript.ts";
 
 export interface AgentToolDefinitionView {
@@ -123,9 +123,17 @@ function renderWorkingTiming(section: Omit<WorkingTranscriptItem, "items">): str
   return ` <span class="agent-working-timing" title="Wall-clock tool wait (parallel calls counted once). Output-token count and tokens per inference second, including reported thinking tokens.">(${escapeHtml(toolsLabel)}${timing.usageComplete ? `${formatTokens(timing.outputTokens)} tok` : "tokens unavailable"} @ ${escapeHtml(rate)})</span>`;
 }
 
+/** These models write short, final-quality thoughts, so they render in full rather than clamped until expanded. */
+function showsFullThinking(model?: ModelRef): boolean {
+  return model?.provider === "openai-codex" && /^gpt-5\.(?:5|6)(?:$|[-.])/.test(model.id);
+}
+
 function renderThinkingItem(ctx: AgentRenderContext, item: Extract<TranscriptItem, { type: "thinking" }>): string {
-  const renderer = thinkingBlockRendererFor(ctx.model);
-  return transcriptRow(renderer({ contentId: ids.itemText(ctx, item.key), text: item.text }));
+  const contentId = escapeHtml(ids.itemText(ctx, item.key));
+  const text = escapeHtml(item.text.trimEnd());
+  return transcriptRow(showsFullThinking(ctx.model)
+    ? `<div class="agent-thinking-text expanded"><span id="${contentId}">${text}</span></div>`
+    : `<div class="agent-thinking-text" data-controller="agent-thinking" data-action="click->agent-thinking#expand keydown->agent-thinking#keydown"><span id="${contentId}" data-agent-thinking-target="content">${text}</span><span data-agent-thinking-target="preview" hidden></span><button class="agent-thinking-more" type="button" data-agent-thinking-target="more" tabindex="-1" hidden>...(show more)</button></div>`);
 }
 
 export function renderTranscriptItemDetailFrame(ctx: AgentRenderContext, item: TranscriptItem, options: { count?: number } = {}): string {
