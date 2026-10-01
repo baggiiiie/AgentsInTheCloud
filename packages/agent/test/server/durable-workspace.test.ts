@@ -7,6 +7,7 @@ import { createModels, fauxAssistantMessage, fauxProvider, InMemoryCredentialSto
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { createRegistry, defineExtension, defineTool, type HarnessOptions } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
+import { submitDurableInput } from "../../src/server/durable-input.ts";
 import { durableWorkspaceTool } from "../../src/server/durable-tools.ts";
 import { defineWorkspaceTool } from "../../src/server/workspace-tool.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
@@ -132,9 +133,9 @@ describe("Durable workspace journal", () => {
     ]);
     const first = await open(path, options);
     const conversation = await first.conversation(record, agent);
-    const initial = await conversation.submit({ type: "input", content: "Begin", requestId: "initial" }, context);
+    const initial = await submitDurableInput(conversation, "workspace-1", options.models, { text: "Begin", requestId: "initial" }, context, async (_workspace, text) => text);
     await started.promise;
-    const steer = await conversation.submit({ type: "input", content: "Use the steered instruction", whenBusy: "steer", requestId: "steer" }, context);
+    const steer = await submitDurableInput(conversation, "workspace-1", options.models, { text: "Use the steered instruction", requestId: "steer" }, context, async (_workspace, text) => text);
     expect((await steer.status(context)).status).toBe("queued");
     if (operation === "stop") {
       await conversation.abort(context);

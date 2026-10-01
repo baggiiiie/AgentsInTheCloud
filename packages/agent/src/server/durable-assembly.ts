@@ -9,7 +9,7 @@ import { createRegisteredDurableOnboardingExtensions } from "./durable-onboardin
 import { loadWorkspaceAgentsFiles } from "./workspace-agents-files.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
 import { atelierSystemPrompt, prepareAppendedAtelierInstructions } from "./system-prompt.ts";
-import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
+import { launchComposerThinkingSettings, resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { compactionKeepRecentTokens } from "./runtime-status.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
@@ -36,6 +36,7 @@ const resourceLoaders = {
   agents: loadWorkspaceAgentsFiles,
   skills: loadWorkspaceSkills,
   model: resolveNewWorkspaceAgentModel,
+  thinking: launchComposerThinkingSettings,
 };
 
 /**
@@ -57,6 +58,9 @@ export async function prepareDurableConversation(
     initial.model !== undefined ? Promise.resolve(undefined) : load.model(),
     prepareAppendedAtelierInstructions(options.events, workspaceId, conversationId),
   ]);
+  const selectedModel = initial.model !== undefined ? initial.model : model ? { provider: model.provider, modelId: model.id } : undefined;
+  const thinking = initial.thinkingLevel !== undefined ? initial.thinkingLevel
+    : (await load.thinking(selectedModel ? { provider: selectedModel.provider, id: selectedModel.modelId } : undefined)).selected;
   const instructions = [
     atelierSystemPrompt,
     ...appended,
@@ -66,8 +70,8 @@ export async function prepareDurableConversation(
   ].filter(Boolean).join("\n\n");
   return {
     cwd: workspaceRoot,
-    model: initial.model !== undefined ? initial.model : model ? { provider: model.provider, modelId: model.id } : undefined,
-    thinkingLevel: initial.thinkingLevel,
+    model: selectedModel,
+    thinkingLevel: thinking,
     instructions,
   };
 }
