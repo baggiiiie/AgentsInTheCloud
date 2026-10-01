@@ -36,6 +36,7 @@ const storedProjectSecretSchema = Type.Object({
   projectId: Type.String(),
   envName: Type.String(),
   hostPattern: Type.String(),
+  allowInPath: Type.Optional(Type.Boolean()),
   placeholder: Type.Optional(Type.String()),
   createdAt: Type.String(),
   updatedAt: Type.String(),
@@ -197,7 +198,7 @@ export function projectConfigurationFingerprint(project: Pick<ProjectRecord, "gi
     gitUrl: project.gitUrl, branch: project.branch, sessionShareKey: project.sessionShareKey,
     dockerfile: project.dockerfile ?? "",
     environment: (project.environment ?? []).map(({ name, value }) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name)),
-    secrets: (project.secrets ?? []).filter((secret) => secret.encryptedSecret).map(({ envName, hostPattern, placeholder, encryptedSecret }) => ({ envName, hostPattern, placeholder, encryptedSecret })).sort((a, b) => a.envName.localeCompare(b.envName)),
+    secrets: (project.secrets ?? []).filter((secret) => secret.encryptedSecret).map(({ envName, hostPattern, placeholder, allowInPath, encryptedSecret }) => ({ envName, hostPattern, placeholder, allowInPath, encryptedSecret })).sort((a, b) => a.envName.localeCompare(b.envName)),
     sshKnownHosts: project.sshKnownHosts ?? "",
   };
   return createHash("sha256").update(JSON.stringify(configuration)).digest("hex");

@@ -1,7 +1,7 @@
 import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
 import type { DeleteCurrentWorkspaceResult } from "@atelier/shared";
 import { AtelierCoreError } from "@atelier/core";
-import { isGitProjectInit, projectWorkspaceInitWithSettings, projectWorkspaceSettingsSchema, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, type GitProjectInitInstruction, type ProjectWorkspaceSettings } from "@atelier/projects";
+import { isGitProjectInit, projectSecretPathPermissionSchema, projectWorkspaceInitWithSettings, projectWorkspaceSettingsSchema, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, type GitProjectInitInstruction, type ProjectWorkspaceSettings } from "@atelier/projects";
 import { getWorkspaceInit, type WorkspaceInitInstruction, type WorkspaceProvisionStep } from "@atelier/workspace";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -13,6 +13,7 @@ export interface SecretValueRequest {
   purpose: string;
   hostPattern: string;
   placeholder?: string;
+  allowInPath?: boolean;
 }
 export interface CreatedOnboardingWorkspace {
   workspaceId: string;
@@ -77,7 +78,7 @@ export function createOnboardingTools(workspaceId: string, conversationId: strin
     defineTool({
       name: "request_secret_value", label: "Request project secret",
       description: "Ask the user to enter a secret in a focused secure dialog, never in chat. The value is saved to the project immediately and egress replacement is updated for new connections from running workspaces. Reconnect existing HTTP/HTTPS clients (or restart the relevant application) before using the placeholder: existing opaque CONNECT tunnels are not reconfigured. A workspace restart is not required. Waits for user input; stopping the call cancels the wait, not a saved secret. Use the returned placeholder as the environment variable's value for commands; existing processes do not receive new environment variables. Reread project settings afterward before writing settings. Host restrictions limit where the credential can be used. Requests that conflict with an existing secret’s hosts or placeholder are rejected; read the stored metadata first.",
-      parameters: Type.Object({ envName: Type.String(), purpose: Type.String(), hostPattern: Type.String(), placeholder: Type.Optional(Type.String()) }, { additionalProperties: false }),
+      parameters: Type.Object({ envName: Type.String(), purpose: Type.String(), hostPattern: Type.String(), placeholder: Type.Optional(Type.String()), allowInPath: Type.Optional(projectSecretPathPermissionSchema) }, { additionalProperties: false }),
       execute: async (_id, args, signal, update) => result(await deps.requestSecretValue((await project()).projectId, args, signal, update)),
     }),
     defineTool({

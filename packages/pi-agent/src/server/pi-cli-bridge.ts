@@ -2,7 +2,7 @@ import type { Api, AuthResult, Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { HttpRequestBlockedError } from "@atelier/proxy-egress/server";
+import { HttpRequestBlockedError, type SecretRequestTransform } from "@atelier/proxy-egress/server";
 import { availableProviderModels, anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
@@ -106,10 +106,14 @@ export async function piCliCredentialHosts(runtime: Runtime): Promise<string[]> 
 }
 
 /** Resolve only markers addressed to a currently configured endpoint. OAuth refresh stays in ModelRuntime. */
-export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime>): (request: Request) => Promise<Request> {
-  return async (request) => {
+export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime>): SecretRequestTransform {
+  return async (request, registerSecret) => {
     const url = new URL(request.url);
-    const values = [...request.headers.values(), url.pathname, ...[...url.searchParams].flat()];
+    // Pi model APIs use headers or query parameters for credentials, never paths.
+    if (url.pathname.match(markerPattern) || url.pathname.includes("atelier-pi-no-key")) {
+      throw new HttpRequestBlockedError("Pi credentials cannot be injected into URL paths");
+    }
+    const values = [...request.headers.values(), ...[...url.searchParams].flat()];
     if (!values.some((value) => value.match(markerPattern) || value.includes("atelier-pi-no-key"))) return request;
     const runtime = await getRuntime();
     const resolutions = new Map<string, Promise<{ model: Model<Api>; auth: AuthResult }>>();
@@ -157,6 +161,7 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
         if (replacement === undefined) throw new HttpRequestBlockedError("Pi authentication changed; launch a new Pi tab to refresh its configuration");
         const expected = placeholder(marker);
         if (!value.includes(expected)) throw new HttpRequestBlockedError("Malformed Pi credential placeholder");
+        if (replacement) registerSecret(replacement);
         value = value.replaceAll(expected, replacement ?? "");
       }
       return value;
@@ -171,7 +176,6 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
     const query = new URLSearchParams();
     for (const [name, value] of url.searchParams) query.append(await replace(name), await replace(value));
     url.search = query.toString();
-    url.pathname = await replace(url.pathname);
     const init: RequestInit & { duplex: "half" } = { method: request.method, headers, body: request.body, duplex: "half" };
     return new Request(url, init);
   };

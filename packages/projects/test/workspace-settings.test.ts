@@ -29,7 +29,7 @@ describe("complete project workspace settings", () => {
     const result = await readProjectWorkspaceSettings(projectId);
     expect(result.settings).toEqual(defaults);
     expect(result.project.branch).toBe("main");
-    expect(result.secrets).toEqual([{ envName: "TOKEN", hostPattern: "api.example.com", placeholder: "ATELIER_PROXY_READY_TOKEN", configured: true }]);
+    expect(result.secrets).toEqual([{ envName: "TOKEN", hostPattern: "api.example.com", placeholder: "ATELIER_PROXY_READY_TOKEN", configured: true, allowInPath: false }]);
     expect(JSON.stringify(result)).not.toContain("private-credential");
     expect(JSON.stringify(result)).not.toContain("encryptedSecret");
   });

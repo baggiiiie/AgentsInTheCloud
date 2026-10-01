@@ -61,7 +61,7 @@ describe("workspace secrets", () => {
     expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "ATELIER_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
     expect(context.secrets).toContainEqual({ name: "STRICT_TOKEN", placeholder: "sk-test-placeholder", hosts: ["api.example.com"] });
     expect(result.headers.get("authorization")).toBe("Bearer strict-secret");
-    expect(result.url).toBe("https://api.example.com/v1/strict-secret");
+    expect(result.url).toBe("https://api.example.com/v1/sk-test-placeholder");
   });
 
   test.each(["api.example.com; *.example.org", " ; api.example.com, ; *.example.org;; "])("accepts semicolon-separated secret hosts: %s", async (hostPattern) => {
@@ -113,6 +113,33 @@ describe("workspace secrets", () => {
     expect((await load()).env.TOKEN).toBeUndefined();
   });
 
+  test("path injection defaults to Telegram only and respects live per-secret overrides", async () => {
+    setWorkspaceGitHubToken("github-credential");
+    const project = (await addProject("https://github.com/org/path-secrets.git")).project;
+    const init = projectInit(project.id);
+    const values = { envName: "BOT_TOKEN", hostPattern: "api.telegram.org", secretValue: "123:telegram-credential" };
+    const bot = await createProjectSecret(project.id, values);
+    const load = () => getWorkspaceSecretContext("test-workspace", async () => init);
+    for (const scheme of ["http", "https"]) {
+      const context = await load();
+      const githubUrl = `${scheme}://github.com/${context.env.GH_TOKEN}`;
+      expect((await context.hooks.onRequest(new Request(githubUrl))).url).toBe(githubUrl);
+      const githubAuth = await context.hooks.onRequest(new Request(`${scheme}://api.github.com/user`, { headers: { authorization: `Bearer ${context.env.GH_TOKEN}` } }));
+      expect(githubAuth.headers.get("authorization")).toBe("Bearer github-credential");
+    }
+    const botRequest = () => new Request("https://api.telegram.org/botATELIER_PROXY_READY_BOT_TOKEN/getMe");
+    expect((await (await load()).hooks.onRequest(botRequest())).url).toBe("https://api.telegram.org/bot123:telegram-credential/getMe");
+    await updateProjectSecret(project.id, bot.id, { ...values, allowInPath: false });
+    expect((await (await load()).hooks.onRequest(botRequest())).url).toBe(botRequest().url);
+    await updateProjectSecret(project.id, bot.id, { ...values, allowInPath: true });
+    expect((await (await load()).hooks.onRequest(botRequest())).url).toContain("bot123:telegram-credential/");
+    const custom = await createProjectSecret(project.id, { envName: "CUSTOM", hostPattern: "api.example.com", secretValue: "custom-credential", allowInPath: true });
+    const customRequest = () => new Request("https://api.example.com/ATELIER_PROXY_READY_CUSTOM");
+    expect((await (await load()).hooks.onRequest(customRequest())).url).toBe("https://api.example.com/custom-credential");
+    await updateProjectSecret(project.id, custom.id, { envName: "CUSTOM", hostPattern: "api.example.com", allowInPath: false });
+    expect((await (await load()).hooks.onRequest(customRequest())).url).toBe(customRequest().url);
+  });
+
   test("egress permits LAN and tailnet destinations but still blocks loopback and link-local", async () => {
     const context = await createWorkspaceSecretContext("test-workspace");
     for (const ip of ["127.0.0.1", "169.254.169.254", "::1"]) {
@@ -139,19 +166,27 @@ test("host credential transforms precede secret replacement and are replaceable 
   const workspaceId = "request-transform-test";
   try {
     const before = await createWorkspaceSecretContext(workspaceId);
-    registerWorkspaceRequestTransform("test-bridge", async (request) => {
-      if (request.headers.has("x-bridge")) request.headers.set("x-bridge", "resolved");
+    registerWorkspaceRequestTransform("test-bridge", async (request, registerSecret) => {
+      if (request.headers.has("x-bridge")) {
+        request.headers.set("x-bridge", "resolved");
+        registerSecret("resolved");
+      }
       return request;
     });
+    registerWorkspaceRequestTransform("test-bridge-clone", async request => new Request(request));
     const context = await getWorkspaceSecretContext(workspaceId, async () => undefined);
     expect(context).not.toBe(before);
     expect(Object.values(context.env)).not.toContain("resolved");
     const request = new Request("https://model.example/", { headers: { "x-bridge": "placeholder" } });
-    expect((await context.hooks.onRequest(request)).headers.get("x-bridge")).toBe("resolved");
+    const transformed = await context.hooks.onRequest(request);
+    expect(transformed).not.toBe(request);
+    expect(transformed.headers.get("x-bridge")).toBe("resolved");
+    expect(context.hooks.scrubResponseHeader("https://model.example/resolved", transformed)).toBe("https://model.example/[REDACTED]");
     registerWorkspaceRequestTransform("test-bridge", async () => { throw new Error("Provider disconnected"); });
     await expect(context.hooks.onRequest(new Request("https://model.example/"))).rejects.toThrow("Provider disconnected");
   } finally {
     registerWorkspaceRequestTransform("test-bridge", async (request) => request);
+    registerWorkspaceRequestTransform("test-bridge-clone", async (request) => request);
     forgetWorkspaceSecretContext(workspaceId);
   }
 });

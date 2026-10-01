@@ -77,8 +77,9 @@ async function fixture() {
       received.push(request.headers);
       const path = new URL(request.url).pathname;
       if (path === "/reject") return new Response("subscription unavailable", { status: 429, headers: { "retry-after": "10" } });
-      if (path === "/redirect") return new Response(null, { status: 302, headers: { location: "https://example.com/" } });
+      if (path === "/redirect") return new Response(null, { status: 302, headers: { location: `https://example.com/${request.headers.get("authorization")}` } });
       const headers = new Headers();
+      headers.set("x-echo-authorization", request.headers.get("authorization")!);
       if (request.headers.has("sec-websocket-protocol")) headers.set("sec-websocket-protocol", "atelier-test");
       if (server.upgrade(request, { headers })) return;
       return new Response("Expected WebSocket", { status: 405 });
@@ -137,6 +138,7 @@ test("MITM WebSockets preserve workspace identity, negotiation, head bytes, bina
     // A frame arriving with the HTTP headers exercises the parser's client head buffer.
     wire.socket.write(Buffer.concat([Buffer.from(handshake("/echo", "ATELIER_WS_PLACEHOLDER", "Sec-WebSocket-Protocol: atelier-test\r\n")), frame(Buffer.from("early"))]));
     const headers = await wire.headers();
+    expect(headers).toContain("x-echo-authorization: Bearer [REDACTED]");
     expect(headers).toContain("101 Switching Protocols");
     expect(headers).toContain(`sec-websocket-accept: ${accept}`);
     expect(headers).toContain("sec-websocket-protocol: atelier-test");
@@ -172,7 +174,10 @@ test("WebSocket rejection status/body and redirects are forwarded without retrie
   expect((await rejected.read(Buffer.byteLength("subscription unavailable"))).toString()).toBe("subscription unavailable");
   const redirected = await proxy.connect();
   redirected.socket.write(handshake("/redirect"));
-  expect(await redirected.headers()).toContain("302");
+  const redirectHeaders = await redirected.headers();
+  expect(redirectHeaders).toContain("302");
+  expect(redirectHeaders).toContain("https://example.com/Bearer [REDACTED]");
+  expect(redirectHeaders).not.toContain("alpha-secret");
   expect(f.upgrades).toBe(2);
 });
 

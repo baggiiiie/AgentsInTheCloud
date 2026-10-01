@@ -1,3 +1,4 @@
+import { ProjectSecretPathController } from "./project-secret-path-controller.ts";
 import type { ToggleChangeEvent } from "@atelier/design-system/toggle/client";
 import { showTransientFeedback } from "@atelier/design-system/transient-feedback/client";
 import { copyTextToClipboard } from "@atelier/shared";
@@ -224,6 +225,7 @@ export function registerWorkspaceSettingsControllers(): void {
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
     "project-settings": ProjectSettingsController,
+    "project-secret-path": ProjectSecretPathController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,
   });

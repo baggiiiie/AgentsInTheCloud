@@ -18,32 +18,36 @@ export type HttpHooks = {
   isRequestAllowed?: (request: Request) => Promise<boolean> | boolean;
   isIpAllowed?: (info: HttpIpAllowInfo) => Promise<boolean> | boolean;
   onRequest?: (request: Request) => Promise<Request | Response | void> | Request | Response | void;
+  scrubResponseHeader?: (value: string, request: Request) => string;
   onResponse?: (response: Response, request: Request) => Promise<Response | void> | Response | void;
 };
 
-export type SecretDefinition = { hosts: string[]; value: string; resolve?: () => Promise<string>; placeholder?: string };
+export type RegisterRequestSecret = (value: string) => void;
+export type SecretRequestTransform = (request: Request, registerSecret: RegisterRequestSecret) => Promise<Request>;
+
+export type SecretDefinition = { hosts: string[]; value: string; allowInPath?: boolean; resolve?: () => Promise<string>; placeholder?: string };
 export type CreateHttpHooksOptions = {
   allowedHosts?: string[];
   allowedInternalHosts?: string[];
   secrets?: Record<string, SecretDefinition>;
-  replaceSecretsInPath?: boolean;
   replaceSecretsInQuery?: boolean;
   blockInternalRanges?: boolean;
   isRequestAllowed?: HttpHooks["isRequestAllowed"];
   isIpAllowed?: HttpHooks["isIpAllowed"];
-  onRequest?: HttpHooks["onRequest"];
+  onRequest?: (request: Request, registerSecret: RegisterRequestSecret) => ReturnType<NonNullable<HttpHooks["onRequest"]>>;
   onResponse?: HttpHooks["onResponse"];
 };
 export type SecretInfo = { name: string; placeholder: string; hosts: string[] };
 export type RequestTransformHttpHooks = Omit<HttpHooks, "onRequest"> & {
   onRequest(request: Request): Promise<Request>;
+  scrubResponseHeader: NonNullable<HttpHooks["scrubResponseHeader"]>;
 };
 export type CreateHttpHooksResult<Hooks extends HttpHooks = HttpHooks> = { httpHooks: Hooks; env: Record<string, string>; allowedHosts: string[]; secrets: SecretInfo[] };
 
-type SecretEntry = { name: string; placeholder: string; value: string; resolve?: () => Promise<string>; hosts: string[] };
+type SecretEntry = SecretDefinition & { name: string; placeholder: string };
 
 export function createHttpHooks(options?: CreateHttpHooksOptions & { onRequest?: undefined }): CreateHttpHooksResult<RequestTransformHttpHooks>;
-export function createHttpHooks(options: CreateHttpHooksOptions & { onRequest: (request: Request) => Promise<Request> }): CreateHttpHooksResult<RequestTransformHttpHooks>;
+export function createHttpHooks(options: CreateHttpHooksOptions & { onRequest: SecretRequestTransform }): CreateHttpHooksResult<RequestTransformHttpHooks>;
 export function createHttpHooks(options: CreateHttpHooksOptions): CreateHttpHooksResult;
 export function createHttpHooks(options: CreateHttpHooksOptions = {}): CreateHttpHooksResult {
   const env: Record<string, string> = {};
@@ -58,38 +62,52 @@ export function createHttpHooks(options: CreateHttpHooksOptions = {}): CreateHtt
     if (!placeholder) throw new Error(`invalid placeholder for secret: ${name}`);
     assertSecretPlaceholderIsSafe(name, placeholder, entries);
     env[name] = placeholder;
-    entries.push({ name, placeholder, value: secret.value, resolve: secret.resolve, hosts: uniqueHosts(secret.hosts) });
+    entries.push({ ...secret, name, placeholder, hosts: uniqueHosts(secret.hosts) });
   }
+
+  // Keep refreshed credentials attached to the exact request, not a mutable
+  // "latest token": concurrent requests can use different credential versions.
+  const requestSecrets = new WeakMap<Request, string[]>();
+  const configuredSecrets = entries.flatMap(entry => responseSecretForms(entry.value));
 
   const secrets = entries.map((entry) => ({ name: entry.name, placeholder: entry.placeholder, hosts: [...entry.hosts] }));
 
-  const applySecretsToRequest = async (request: Request): Promise<Request> => {
+  const applySecretsToRequest = async (request: Request, injectedSecrets: string[]): Promise<Request> => {
     const hostname = getHostname(request.url);
     const resolvedEntries = await Promise.all(entries.map(async (entry) => {
+      if (!entry.resolve) return entry;
       const usedInHeaders = requestContainsSecretValuesInHeaders(request.headers, [entry.placeholder]);
-      const usedInUrl = (options.replaceSecretsInPath && new URL(request.url).pathname.includes(entry.placeholder))
+      const usedInUrl = (entry.allowInPath && new URL(request.url).pathname.includes(entry.placeholder))
         || (options.replaceSecretsInQuery && requestContainsSecretValuesInQuery(request.url, [entry.placeholder]));
-      const resolve = entry.resolve && matchesAnyHost(hostname, entry.hosts) && (usedInHeaders || usedInUrl);
-      return { ...entry, value: resolve ? await entry.resolve!() : entry.value };
+      const resolve = matchesAnyHost(hostname, entry.hosts) && (usedInHeaders || usedInUrl);
+      return { ...entry, value: resolve ? await entry.resolve() : entry.value };
     }));
     assertSecretValuesAllowedForHost(request, hostname, resolvedEntries, options.replaceSecretsInQuery ?? false);
     const headers = replaceSecretPlaceholdersInHeaders(request.headers, hostname, resolvedEntries);
-    const url = replaceSecretPlaceholdersInUrl(request.url, hostname, resolvedEntries, options.replaceSecretsInPath ?? false, options.replaceSecretsInQuery ?? false);
-    if (url === request.url) {
-      if (headers !== request.headers) headers.forEach((value, name) => request.headers.set(name, value));
-      return request;
-    }
-    return cloneRequestWith(request, { url, headers });
+    const url = replaceSecretPlaceholdersInUrl(request.url, hostname, resolvedEntries, options.replaceSecretsInQuery ?? false);
+    const transformed = url === request.url ? request : cloneRequestWith(request, { url, headers });
+    if (transformed === request && headers !== request.headers) headers.forEach((value, name) => request.headers.set(name, value));
+    const knownValues = [...injectedSecrets, ...resolvedEntries.map(entry => entry.value)].filter(Boolean);
+    // Basic auth encodes the username and password together. Protect the exact
+    // wire representation, not base64(secret), which is not present on the wire.
+    const encodedCredentials = basicAuthSecretRepresentations(headers, knownValues);
+    const extraSecrets = [...injectedSecrets, ...resolvedEntries.filter(entry => entry.resolve).map(entry => entry.value), ...encodedCredentials];
+    requestSecrets.set(transformed, [...new Set([...configuredSecrets, ...extraSecrets.flatMap(responseSecretForms)])]);
+    return transformed;
   };
 
   const onRequest: NonNullable<HttpHooks["onRequest"]> = async (request) => {
     let nextRequest = request;
+    const injectedSecrets: string[] = [];
     if (options.onRequest) {
-      const updated = await options.onRequest(nextRequest);
-      if (updated instanceof Response) return updated;
+      const updated = await options.onRequest(nextRequest, value => { injectedSecrets.push(value); });
+      if (updated instanceof Response) {
+        requestSecrets.set(request, [...configuredSecrets, ...injectedSecrets.flatMap(responseSecretForms)]);
+        return updated;
+      }
       if (updated) nextRequest = updated;
     }
-    return applySecretsToRequest(nextRequest);
+    return applySecretsToRequest(nextRequest, injectedSecrets);
   };
 
   return {
@@ -105,6 +123,7 @@ export function createHttpHooks(options: CreateHttpHooksOptions = {}): CreateHtt
       },
       onRequest,
       onResponse: options.onResponse,
+      scrubResponseHeader: (value, request) => scrubSecretValues(value, requestSecrets.get(request) ?? configuredSecrets),
     },
   };
 }
@@ -162,6 +181,19 @@ function decodeBasicAuth(value: string): string | null {
   }
 }
 
+function basicAuthSecretRepresentations(headers: Headers, secrets: string[]): string[] {
+  const representations: string[] = [];
+  for (const name of ["authorization", "proxy-authorization"]) {
+    const value = headers.get(name);
+    if (!value) continue;
+    const match = value.match(/^Basic\s+(\S+)\s*$/i);
+    if (!match) continue;
+    const decoded = decodeBasicAuth(value)!;
+    if (secrets.some(secret => value.includes(secret) || decoded.includes(secret))) representations.push(match[1]!);
+  }
+  return representations;
+}
+
 function collectStringMatchRanges(container: string, search: string): Array<{ start: number; end: number }> {
   const ranges: Array<{ start: number; end: number }> = [];
   if (!search) return ranges;
@@ -180,15 +212,13 @@ function replaceSecretPlaceholdersInHeaders(incomingHeaders: Headers, hostname: 
   }
   return headers ?? incomingHeaders;
 }
-function replaceSecretPlaceholdersInUrl(url: string, hostname: string, entries: SecretEntry[], replacePath: boolean, replaceQuery: boolean): string {
-  if (!replacePath && !replaceQuery) return url;
+function replaceSecretPlaceholdersInUrl(url: string, hostname: string, entries: SecretEntry[], replaceQuery: boolean): string {
+  if (!entries.some(entry => entry.allowInPath) && !replaceQuery) return url;
   const parsed = new URL(url);
   const matchingEntries = entries.filter((entry) => matchesAnyHost(hostname, entry.hosts));
   let changed = false;
-  if (replacePath) {
-    const pathname = replaceSecretPlaceholdersInString(parsed.pathname, hostname, matchingEntries);
-    if (pathname !== parsed.pathname) { parsed.pathname = pathname; changed = true; }
-  }
+  const pathname = replaceSecretPlaceholdersInString(parsed.pathname, hostname, matchingEntries.filter(entry => entry.allowInPath));
+  if (pathname !== parsed.pathname) { parsed.pathname = pathname; changed = true; }
   if (replaceQuery) {
     let queryChanged = false;
     const params = new URLSearchParams();
@@ -229,4 +259,26 @@ function replaceSecretPlaceholdersInString(value: string, hostname: string, entr
 }
 function uniqueHosts(hosts: string[]): string[] {
   return [...new Set(hosts.map(normalizeHostnamePattern).filter(Boolean))];
+}
+
+// Match literal secrets and the common URL representations used by redirect
+// headers. This is not a general defense against arbitrary server-side encoding.
+function responseSecretForms(value: string): string[] {
+  if (!value) return [];
+  const path = new URL("https://secret.invalid");
+  path.pathname = value;
+  return [...new Set([value, path.pathname.slice(1), encodeURIComponent(value), new URLSearchParams({ v: value }).toString().slice(2)])].filter(Boolean);
+}
+
+function scrubSecretValues(value: string, secrets: string[]): string {
+  const ranges = secrets.flatMap(secret => collectStringMatchRanges(value, secret));
+  if (!ranges.length) return value;
+  ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+  let result = "";
+  let offset = 0;
+  for (const range of ranges) {
+    if (range.start >= offset) result += value.slice(offset, range.start) + "[REDACTED]";
+    offset = Math.max(offset, range.end);
+  }
+  return result + value.slice(offset);
 }

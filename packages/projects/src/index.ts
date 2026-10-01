@@ -52,7 +52,7 @@ export {
   projectSecretRoutingRevision,
   secretNeedsValue,
   projectSecretPlaceholder,
-  projectSecretHosts,
+  projectSecretPathPermissionSchema,
   type ProjectSecretInput,
   type ProjectSecretPlaintext,
 } from "./secrets.ts";
@@ -85,3 +85,5 @@ export { getProjectSshKnownHosts, setProjectSshKnownHosts } from "./ssh-host-tru
 export { sshHostTrustFailure, unknownSshHost, scanSshHost, trustScannedSshHost } from "./ssh-trust-recovery.ts";
 export { onWorkspaceSshTrustChanged, workspaceSshTrustRequests, requestWorkspaceSshTrust, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, type WorkspaceSshTrustRequest } from "./ssh-trust-broker.ts";
 export { isSshAuthenticationFailure } from "./git-access-failure.ts";
+
+export { projectSecretHosts, projectSecretAllowsPath } from "./secret-path-policy.ts";

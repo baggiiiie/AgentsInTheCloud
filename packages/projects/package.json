@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server/index.ts"
+    "./server": "./src/server/index.ts",
+    "./secret-path-policy": "./src/secret-path-policy.ts"
   },
   "dependencies": {
     "@atelier/core": "workspace:*",

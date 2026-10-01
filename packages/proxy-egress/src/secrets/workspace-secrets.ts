@@ -1,9 +1,9 @@
 import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@atelier/core";
-import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts } from "@atelier/projects";
+import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts, projectSecretAllowsPath } from "@atelier/projects";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@atelier/workspace";
 import { matchHostname } from "./patterns.ts";
 import { isWorkspaceDestinationAllowed } from "./workspace-destinations.ts";
-import { createHttpHooks, type RequestTransformHttpHooks, type SecretDefinition } from "./placeholder-hooks.ts";
+import { createHttpHooks, type RequestTransformHttpHooks, type SecretRequestTransform, type SecretDefinition } from "./placeholder-hooks.ts";
 
 export const githubTokenEnvVar = "GH_TOKEN";
 
@@ -15,11 +15,11 @@ export type WorkspaceSecretContext = {
 };
 
 const subscriptionSecrets: Record<string, SecretDefinition> = {};
-const requestTransforms = new Map<string, { transform: (request: Request) => Promise<Request>; hosts: () => Promise<string[]> }>();
+const requestTransforms = new Map<string, { transform: SecretRequestTransform; hosts: () => Promise<string[]> }>();
 const responseTransforms = new Map<string, (response: Response, request: Request) => Promise<Response>>();
 
-/** Host-owned credential bridges run before ordinary secret substitution. */
-export function registerWorkspaceRequestTransform(id: string, transform: (request: Request) => Promise<Request>, hosts: () => Promise<string[]> = async () => []): void {
+/** Host-owned bridges run before ordinary substitution and must register every injected secret for response scrubbing. */
+export function registerWorkspaceRequestTransform(id: string, transform: SecretRequestTransform, hosts: () => Promise<string[]> = async () => []): void {
   requestTransforms.set(id, { transform, hosts });
   invalidateContexts();
 }
@@ -78,7 +78,7 @@ export async function createWorkspaceSecretContext(workspaceId: string, init?: W
     : {};
   if (isGitProjectInit(init)) {
     for (const secret of await revealProjectSecrets(init.projectId)) {
-      secrets[secret.envName] = { value: secret.secretValue, hosts: projectSecretHosts(secret.hostPattern), placeholder: secret.placeholder ?? projectSecretPlaceholder(secret.envName) };
+      secrets[secret.envName] = { value: secret.secretValue, allowInPath: projectSecretAllowsPath(secret), hosts: projectSecretHosts(secret.hostPattern), placeholder: secret.placeholder ?? projectSecretPlaceholder(secret.envName) };
     }
   }
   if (generation !== configurationGeneration) return createWorkspaceSecretContext(workspaceId, init);
@@ -105,11 +105,10 @@ function buildContext(workspaceId: string, secrets: Record<string, SecretDefinit
     allowedHosts: ["*"],
     blockInternalRanges: false,
     isIpAllowed: ({ ip }) => isWorkspaceDestinationAllowed(ip),
-    replaceSecretsInPath: true,
     replaceSecretsInQuery: false,
     secrets,
-    onRequest: async (request) => {
-      for (const { transform } of requestTransforms.values()) request = await transform(request);
+    onRequest: async (request, registerSecret) => {
+      for (const { transform } of requestTransforms.values()) request = await transform(request, registerSecret);
       return request;
     },
     onResponse: async (response, request) => {

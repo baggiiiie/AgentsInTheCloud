@@ -5,7 +5,7 @@ import type { OnboardingToolDependencies, SecretValueRequest } from "@atelier/ag
 
 function requireMatchingSecret(secret: ProjectSecretSummary, expectedRoutingRevision: string): void {
   if (projectSecretRoutingRevision(secret) !== expectedRoutingRevision) {
-    throw new AtelierCoreError("project_secret_configuration_conflict", `Secret ${secret.envName} already has different host restrictions or placeholder settings. Stored hosts: ${secret.hostPattern}; stored placeholder: ${secret.placeholder ?? projectSecretPlaceholder(secret.envName)}. Review project secrets rather than replacing its value for a different destination.`);
+    throw new AtelierCoreError("project_secret_configuration_conflict", `Secret ${secret.envName} already has different host restrictions, URL path permissions, or placeholder settings. Stored hosts: ${secret.hostPattern}; stored placeholder: ${secret.placeholder ?? projectSecretPlaceholder(secret.envName)}. Review project secrets rather than replacing its value for a different destination.`);
   }
 }
 
@@ -26,7 +26,7 @@ export function createProjectSecretRequester(deps: {
     const expectedRoutingRevision = projectSecretRoutingRevision(request);
     let secret = (await deps.list(projectId)).find((secret) => secret.envName === request.envName.trim());
     if (!secret) {
-      secret = await deps.create(projectId, { envName: request.envName, hostPattern: request.hostPattern, placeholder: request.placeholder, annotation: request.purpose });
+      secret = await deps.create(projectId, { envName: request.envName, hostPattern: request.hostPattern, placeholder: request.placeholder, allowInPath: request.allowInPath, annotation: request.purpose });
     }
     requireMatchingSecret(secret, expectedRoutingRevision);
     const initial = secret;

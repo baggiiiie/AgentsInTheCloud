@@ -19,7 +19,7 @@ import {
   listProjectEnvironmentVariables, listProjectSecrets,
   listProjectSshKeys, listProjects, parseProjectSpec, renameProjectSshKey,
   projectSecretRoutingRevision, projectSecretValueInputSchema,
-  secretNeedsValue,
+  secretNeedsValue, projectSecretAllowsPath, projectSecretPathPermissionSchema,
   setProjectDockerfile, setProjectPreloadImages,
   setProjectSecretValue,
   setProjectSshKnownHosts,
@@ -156,6 +156,7 @@ export function createProjectRoutes(deps: {
   }
 
   function projectSecretRow(project: ProjectSummary, secret?: ProjectSecretSummary): string {
+    const allowInPath = secret ? projectSecretAllowsPath(secret) : undefined;
     const secretPath = `/projects/${encodeURIComponent(project.id)}/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`;
     const deleteButton = secret ? destructiveConfirmationHtml({
       id: domId("delete_secret", project.id, secret.id),
@@ -167,10 +168,21 @@ export function createProjectRoutes(deps: {
     const status = secret?.configured
       ? '<p class="project-secret-saved" role="status">✓ Secret stored</p>'
       : secret && secretNeedsValue(secret) ? warningBannerHtml({ title: "Mandatory secret — needs a value" }) : "";
-    return `<form class="project-secret${secret ? "" : " new"}" aria-label="${secret ? "Secret" : "Add secret"}" method="post" action="${secretPath}" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving${secret ? "" : " submit->settings-autosave#submit"}">
+    return `<form class="project-secret${secret ? "" : " new"}" aria-label="${secret ? "Secret" : "Add secret"}" method="post" action="${secretPath}" data-turbo="true" data-controller="settings-autosave${secret ? "" : " project-secret-path"}" data-action="focusout->settings-autosave#saveWhenLeaving${secret ? "" : " submit->settings-autosave#submit"}">
       ${status}
       <label><span>Environment variable</span><input class="text-field" name="envName" value="${escapeHtml(secret?.envName ?? "")}" placeholder="GOOGLE_MAPS_API_KEY" autocomplete="off"${secret ? "" : " required"}></label>
-      <label><span>Host</span><input class="text-field" name="hostPattern" value="${escapeHtml(secret?.hostPattern ?? "")}" placeholder="maps.googleapis.com" autocomplete="off"${secret ? "" : " required"}></label>
+      <label><span>Host</span><input class="text-field" name="hostPattern" value="${escapeHtml(secret?.hostPattern ?? "")}" placeholder="maps.googleapis.com" autocomplete="off"${secret ? "" : ' required data-project-secret-path-target="host" data-action="input->project-secret-path#useDefault"'}></label>
+      <div class="project-secret-requirement"><span>URL paths ${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: "?", label: "Only set to Allow if you need to have this secret injected into the URL path instead of in the headers" } })}</span><input type="hidden" name="allowInPath" value="${allowInPath ?? false}"${secret ? "" : ' data-project-secret-path-target="permission"'}>${toggleHtml({
+        variant: "button",
+        label: "Allow secret in URL paths",
+        name: "allowInPath",
+        value: String(allowInPath ?? false),
+        options: [{ value: "true", label: "Allow" }, { value: "false", label: "Disallow" }],
+        element: {
+          dataAction: `${secret ? "" : "click->project-secret-path#choose change->project-secret-path#choose "}change->settings-autosave#toggleChanged`,
+          data: secret ? undefined : { "project-secret-path-target": "toggle" },
+        },
+      })}</div>
       <label><span>Secret</span><input class="text-field" name="secretValue" type="password" data-1p-ignore data-action="change->settings-autosave#save" placeholder="${secret?.configured ? "Secret stored — leave blank to keep it" : "No secret stored — enter a value"}" autocomplete="new-password"></label>
       <label><span>Placeholder</span><input class="text-field" name="placeholder" value="${escapeHtml(secret?.placeholder ?? "")}" placeholder="You rarely need to fill this in" autocomplete="off"></label>
       <label><span>Needed for</span><textarea class="textarea" name="annotation" rows="2" placeholder="For example, running payment integration tests">${escapeHtml(secret?.annotation ?? "")}</textarea></label>
@@ -460,6 +472,7 @@ export function createProjectRoutes(deps: {
       titleCaption: "Provide a secret",
       bodyHtml: `<div class="secret-value-request"><p>${escapeHtml(purpose ?? secret.annotation)}</p>
         <p>Allowed destinations: <strong>${escapeHtml(secret.hostPattern)}</strong></p>
+        <p>Secret in URL paths: <strong>${projectSecretAllowsPath(secret) ? "allowed" : "not allowed"}</strong></p>
         <form id="${formId}" method="post" action="/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}/value" data-turbo="true" data-action="turbo:submit-end->dialog#submitted">
           <input type="hidden" name="expectedRoutingRevision" value="${projectSecretRoutingRevision(secret)}">
           <label class="secret-value-request__field"><span>${escapeHtml(secret.envName)}</span><input class="text-field" name="secretValue" type="password" autocomplete="new-password" data-1p-ignore autofocus required placeholder="Paste secret value"></label>
@@ -487,7 +500,10 @@ export function createProjectRoutes(deps: {
   async function projectSecretValues(request: Request): Promise<ProjectSecretInput> {
     if (!requestAcceptsJson(request)) {
       const formData = await request.formData();
+      const pathPermission = formData.get("allowInPath") ?? undefined;
+      if (pathPermission !== undefined && !["true", "false"].includes(String(pathPermission))) throw invalidArguments("Invalid URL path permission");
       return {
+        allowInPath: pathPermission === undefined ? undefined : pathPermission === "true",
         envName: String(formData.get("envName") ?? ""),
         hostPattern: String(formData.get("hostPattern") ?? ""),
         placeholder: String(formData.get("placeholder") ?? ""),
@@ -497,6 +513,8 @@ export function createProjectRoutes(deps: {
       };
     }
     const body = await readJsonObject(request);
+    const allowInPath = body.allowInPath;
+    if (allowInPath !== undefined && !Value.Check(projectSecretPathPermissionSchema, allowInPath)) throw invalidArguments("allowInPath must be a boolean");
     const optional = body.optional;
     if (optional !== undefined && !Value.Check(jsonBooleanSchema, optional)) throw invalidArguments("optional must be a boolean");
     return {
@@ -506,6 +524,7 @@ export function createProjectRoutes(deps: {
       secretValue: optionalJsonString(body, "secretValue"),
       annotation: optionalJsonString(body, "annotation"),
       optional,
+      allowInPath,
     };
   }
 

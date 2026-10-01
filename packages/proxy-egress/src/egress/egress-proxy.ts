@@ -304,15 +304,10 @@ async function handleProxyHttp(context: ProxyContext, req: IncomingMessage, res:
   if (canHaveBody) requestInit.duplex = "half";
   const request = new Request(parsed.toString(), requestInit);
 
-  const secrets = await context.secrets();
-  const hooks = secrets.hooks;
-  let next: Request | Response = request;
-  if (hooks?.onRequest) {
-    const updated = await hooks.onRequest(request);
-    if (updated) next = updated;
-  }
-  if (next instanceof Response) return await writeFetchResponse(res, next);
-  if (hooks?.isRequestAllowed && !(await hooks.isRequestAllowed(new Request(next.url, { method: next.method, headers: next.headers })))) throw new HttpRequestBlockedError("request blocked by policy");
+  const { hooks } = await context.secrets();
+  const next = await hooks.onRequest(request);
+  const scrubHeader = (value: string) => hooks.scrubResponseHeader(value, next);
+  if (hooks.isRequestAllowed && !(await hooks.isRequestAllowed(new Request(next.url, { method: next.method, headers: next.headers })))) throw new HttpRequestBlockedError("request blocked by policy");
 
   const upstreamHeaders = filteredForwardHeaders(next.headers);
   const upstreamInit: RequestInit & { duplex?: "half" } = {
@@ -323,8 +318,8 @@ async function handleProxyHttp(context: ProxyContext, req: IncomingMessage, res:
   };
   if (!["GET", "HEAD"].includes(next.method.toUpperCase())) upstreamInit.duplex = "half";
   const upstream = await context.fetch(next.url, upstreamInit);
-  const finalResponse = hooks?.onResponse ? await hooks.onResponse(upstream, next) ?? upstream : upstream;
-  await writeFetchResponse(res, finalResponse);
+  const finalResponse = hooks.onResponse ? await hooks.onResponse(upstream, next) ?? upstream : upstream;
+  await writeFetchResponse(res, finalResponse, scrubHeader);
 }
 
 async function handleProxyUpgrade(context: ProxyContext, req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
@@ -348,7 +343,7 @@ async function handleProxyUpgrade(context: ProxyContext, req: IncomingMessage, s
   if (next.url !== request.url) await checkDestination(new URL(next.url));
   if (hooks.isRequestAllowed && !await hooks.isRequestAllowed(next)) throw new HttpRequestBlockedError("request blocked by policy");
   if (socket.destroyed) return;
-  await bridgeWebSocket(next, socket, head, context.upgrade);
+  await bridgeWebSocket(next, socket, head, context.upgrade, value => hooks.scrubResponseHeader(value, next));
 }
 
 async function assertDestinationAllowed(context: ProxyContext, hostname: string, port: number, protocol: "http" | "https"): Promise<void> {
@@ -402,12 +397,14 @@ function filteredForwardHeaders(headers: Headers): Headers {
   return out;
 }
 
-async function writeFetchResponse(res: ServerResponse, response: Response): Promise<void> {
+async function writeFetchResponse(res: ServerResponse, response: Response, scrubHeader: (value: string) => string): Promise<void> {
   res.statusCode = response.status;
-  res.statusMessage = response.statusText;
+  res.statusMessage = scrubHeader(response.statusText);
   response.headers.forEach((value, key) => {
     if (isHopByHopHeader(key) || key.toLowerCase() === "content-encoding") return;
-    res.setHeader(key, value);
+    if (scrubHeader(key) !== key) return;
+    if (key.toLowerCase() === "set-cookie") res.setHeader(key, response.headers.getSetCookie().map(scrubHeader));
+    else res.setHeader(key, scrubHeader(value));
   });
   const body = response.body;
   if (!body) { res.end(); return; }

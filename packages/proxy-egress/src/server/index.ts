@@ -25,3 +25,5 @@ export {
   type WorkspaceSecretContext,
 } from "../secrets/workspace-secrets.ts";
 export { HttpRequestBlockedError } from "../secrets/errors.ts";
+
+export type { SecretRequestTransform } from "../secrets/placeholder-hooks.ts";

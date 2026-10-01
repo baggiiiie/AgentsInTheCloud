@@ -61,13 +61,14 @@ describe("secure project secret requests", () => {
 
   test.each([
     { hostPattern: "old.example.com" },
+    { hostPattern: request.hostPattern, allowInPath: true },
     { hostPattern: request.hostPattern, placeholder: "old-placeholder" },
   ])("rejects existing secrets with conflicting routing before asking for a value: %j", async (routing) => {
     await createProjectSecret(projectId, { ...request, ...routing, secretValue: "original" });
     const initial = await readProjectWorkspaceSettings(projectId);
     const ask = requester(async () => { throw new Error("Must not wait for input"); });
     const updates: any[] = [];
-    await expect(ask(projectId, request, undefined, (update) => updates.push(update))).rejects.toThrow("different host restrictions or placeholder");
+    await expect(ask(projectId, request, undefined, (update) => updates.push(update))).rejects.toThrow("different host restrictions, URL path permissions, or placeholder");
     expect(updates).toEqual([]);
     expect(await readProjectWorkspaceSettings(projectId)).toEqual(initial);
     expect((await revealProjectSecrets(projectId))[0]?.secretValue).toBe("original");
@@ -83,7 +84,7 @@ describe("secure project secret requests", () => {
   test("detects routing changes while a request waits instead of claiming the requested destination is ready", async () => {
     const secret = await createProjectSecret(projectId, request);
     const ask = requester(async () => { await updateProjectSecret(projectId, secret.id, { ...request, hostPattern: "other.example.com" }); });
-    await expect(ask(projectId, request, undefined, undefined)).rejects.toThrow("different host restrictions or placeholder");
+    await expect(ask(projectId, request, undefined, undefined)).rejects.toThrow("different host restrictions, URL path permissions, or placeholder");
     expect((await listProjectSecrets(projectId))[0]?.configured).toBe(false);
   });
 
