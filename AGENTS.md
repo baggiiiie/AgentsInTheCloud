@@ -1,5 +1,7 @@
 # Agent instructions
 
+## Implementation guidelines
+
 Do not write UI tests. Follow the [UI testing policy](docs/ui-testing-policy.md).
 
 To run remote iOS simulators for web/PWA work, start with `bun tools/ios-sim/cli.ts --help`.
@@ -23,3 +25,22 @@ To run remote iOS simulators for web/PWA work, start with `bun tools/ios-sim/cli
 - Whenever modifying the user interface, use elements from the [Atelier design system catalogue](packages/design-system/README.md) whenever possible.
 
 Run the development server with `bun run web`. It watches TypeScript, CSS, assets, and server code, automatically reloading open pages after successful changes. Successful asset reloads log `[assets] ready`.
+
+## User-facing copy and dialogs
+
+Follow these guidelines whenever writing or changing user-facing text, panels, or dialogs.
+
+### Copy
+
+- Be friendly, helpful, informal, and lighthearted.
+- Before writing user-facing text, put yourself in the user’s shoes. Consider what they know, what they’re trying to do, and what message would help them in that moment.
+- Use as little writing as gets the job done, in the simplest language that remains accurate.
+- Explain consequences plainly. Say what will close, change, or be lost. For warnings, distinguish expected situations from possible problems.
+- Keep information relevant to the current task. Omit unnecessary reassurance and put special-case instructions where they’re needed.
+
+### Panels and dialogs
+
+- Use the fewest headings needed to orient the user. A simple dialog usually needs one title, not a title plus a body heading.
+- Give each element a distinct job: the title orients, the body adds context or consequences, labels identify content, and buttons offer actions. Avoid repeating the same message across them.
+- Write for the person using the app—not the person requesting the implementation. Apply requirements silently; don’t turn implementation commentary into app copy.
+- Make button labels understandable in context. Explicit action labels are useful, but conversational labels can work too.
