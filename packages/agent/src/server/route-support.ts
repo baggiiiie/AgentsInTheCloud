@@ -7,6 +7,7 @@ import { type WorkspaceAgentConversationInfo } from "./session-store.ts";
 export interface AgentRouteOptions {
   events?: AtelierEventBus;
   getRuntime?: typeof getWorkspaceAgentRuntime;
+  knownRequest?: typeof import("./durable-owner.ts").knownWorkspaceAgentRequest;
   suggestTitleFromPrompt?: typeof maybeNameAgentFromPrompt;
 }
 
