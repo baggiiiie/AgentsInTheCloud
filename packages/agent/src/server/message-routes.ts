@@ -1,3 +1,5 @@
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import { readJsonObject, requestAcceptsJson } from "@atelier/core";
 import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments } from "@atelier/prompt/server";
 import { maybeNameAgentFromPrompt, setAgentSessionTitle, suggestSessionSlug } from "./agent-title-suggestion.ts";
@@ -18,6 +20,12 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   const agent = await resolveAgentConversation(workspaceId, conversationId);
   const json = requestAcceptsJson(request) ? await readJsonObject(request) : undefined;
   const form = json ? undefined : await request.formData();
+  // Older API callers can omit the identity, but cannot retry idempotently.
+  const requestId = json?.requestId ?? form?.get("requestId") ?? crypto.randomUUID();
+  if (!Value.Check(Type.String({ pattern: "^[a-zA-Z0-9_-]{1,128}$" }), requestId)) {
+    const message = "Request ID must contain 1–128 letters, numbers, underscores, or hyphens";
+    return json ? Response.json({ error: { code: "invalid_arguments", message } }, { status: 422 }) : turboStreamResponse("", { status: 422 });
+  }
   const text = String(json?.text ?? form?.get("text") ?? "");
   if (text.trim() === "/new") {
     const runtime = await resolveAgentRuntime(agent, options);
@@ -67,7 +75,7 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   }
   const runtime = await resolveAgentRuntime(agent, options);
   const namingContext = trimmed ? { messages: [...runtime.userMessages(), trimmed], agentModel: runtime.currentModel() } : undefined;
-  await runtime.submit(expandedText, { images, attachmentNotes });
+  await runtime.submit(expandedText, { requestId, images, attachmentNotes });
   if (namingContext) {
     await options.events?.emit("workspace_user_activity", { workspaceId });
     (options.suggestTitleFromPrompt ?? maybeNameAgentFromPrompt)(agent, namingContext.messages, { events: options.events, agentModel: namingContext.agentModel });

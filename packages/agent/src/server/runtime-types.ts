@@ -8,6 +8,8 @@ export type AgentLivePresentationListener = (streamHtml: string) => void;
 export type AgentLivePresentationSubscription = import("@atelier/shared").LiveSubscription;
 
 export interface SubmitOptions {
+  /** Caller-owned admission identity; reuse for retries, not for a new message. */
+  requestId?: string;
   images?: ImageRef[];
   /** Extra lines appended to the prompt describing non-image attachments. */
   attachmentNotes?: string[];
