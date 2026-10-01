@@ -1,3 +1,4 @@
+import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,7 +8,7 @@ import { agentAttachmentDraftId, findStagedAttachment, stageAttachment } from "@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { createRegistry } from "@earendil-works/pi-durable";
-import { openDurableAgentRuntime, type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
+import { type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "../../src/server/session-store.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
 import type { WorkspaceAgentRuntime } from "../../src/server/runtime-types.ts";
@@ -16,7 +17,7 @@ let directory: string;
 let owner: DurableAgentRuntime | undefined;
 const originalDataDir = process.env.ATELIER_DATA_DIR;
 afterEach(async () => {
-  await owner?.suspend();
+  await suspendAllDurableWorkspaceOwners();
   owner = undefined;
   if (originalDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
   else process.env.ATELIER_DATA_DIR = originalDataDir;
@@ -31,7 +32,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   const faux = fauxProvider({ tokensPerSecond: 100_000, models: [{ id: "test", input: ["text", "image"] }] });
   models.setProvider(faux.provider);
   faux.setResponses([fauxAssistantMessage("Received the image")]);
-  owner = await openDurableAgentRuntime(agent.path, agent.workspaceId, {}, {
+  owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => ({ model: { provider: "faux", modelId: "test" } }),
     expand: async (_workspace, text) => text,
@@ -67,9 +68,9 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   expect(response?.headers.get("x-atelier-attachment-draft-consumed")).toBe("true");
   expect(await findStagedAttachment(draft, attachment.id)).toBeUndefined();
   expect((await accepted!.wait(BACKGROUND_CONTEXT)).status).toBe("done");
-  await owner.suspend();
+  await suspendAllDurableWorkspaceOwners();
   // Reopen the same journal; retry must remain passive, even when execution is unavailable.
-  owner = await openDurableAgentRuntime(agent.path, agent.workspaceId, {}, {
+  owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => { throw new Error("Must not prepare prompts on retry"); },
     expand: async () => { throw new Error("Must not expand on retry"); },

@@ -1,0 +1,84 @@
+import { afterEach, expect, test } from "bun:test";
+import { mkdtemp, mkdir, rm, writeFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
+import { createRegistry } from "@earendil-works/pi-durable";
+import { retainedDurableHistories } from "../../src/server/durable-history.ts";
+import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
+import { durableJournalDirectory } from "../../src/server/durable-storage.ts";
+import { ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
+
+const original = process.env.ATELIER_DATA_DIR;
+let directory: string;
+afterEach(async () => {
+  await suspendAllDurableWorkspaceOwners();
+  if (original === undefined) delete process.env.ATELIER_DATA_DIR;
+  else process.env.ATELIER_DATA_DIR = original;
+  if (directory) await rm(directory, { recursive: true, force: true });
+});
+
+async function setup() {
+  directory = await mkdtemp(join(tmpdir(), "atelier-history-"));
+  process.env.ATELIER_DATA_DIR = directory;
+  const models = createModels();
+  const faux = fauxProvider({ tokensPerSecond: 100_000 });
+  models.setProvider(faux.provider);
+  const load = {
+    harness: async () => ({ models, registry: createRegistry() }),
+    prepare: async () => ({ model: { provider: "faux", modelId: "faux-1" } }),
+    ready: async () => {}, expand: async (_workspace: string, text: string) => text,
+  };
+  async function project(id: string, share: string) {
+    const path = join(directory, "workspaces", id, "metadata");
+    await mkdir(path, { recursive: true });
+    await writeFile(join(path, "init.json"), JSON.stringify({ type: "project.git", projectId: "p", name: "p", gitUrl: "https://example.com/p.git", branch: null, sessionShareKey: share }));
+  }
+  return { faux, load, project };
+}
+
+test("retained discovery is share-scoped and reads closed/deleted native history without workspace metadata or readiness", async () => {
+  const { faux, load, project } = await setup();
+  await project("viewer", "team");
+  await project("deleted", "team");
+  faux.setResponses([fauxAssistantMessage("Retained answer")]);
+  const path = durableJournalDirectory("team", "deleted");
+  const owner = await retainedDurableWorkspaceOwner(path, "deleted", {}, load);
+  const controller = await owner.conversation({ conversationId: "tab", title: "Retained title", label: "Agent 1" });
+  await (await controller.submit({ requestId: "once", text: "Retained input" })).wait(BACKGROUND_CONTEXT);
+  await controller.close();
+  await owner.delete();
+  await rm(join(directory, "workspaces", "deleted"), { recursive: true });
+  const foreign = await retainedDurableWorkspaceOwner(durableJournalDirectory("other-team", "foreign"), "foreign", {}, load);
+  await foreign.conversation({ conversationId: "foreign-tab", title: "Private", label: "Agent 1" });
+  load.ready = async () => { throw new Error("Read-only discovery must not probe execution"); };
+  load.prepare = async () => { throw new Error("Read-only discovery must not prepare prompts"); };
+  const before = await readFile(join(path, "main.jsonl"), "utf8");
+  const histories = await retainedDurableHistories("viewer");
+  expect(histories.map(item => item.workspaceId)).toEqual(["deleted"]);
+  const found = histories[0]!;
+  expect(found.owner).toBe(owner);
+  expect((await found.owner.catalog())[0]?.title).toBe("Retained title");
+  expect((await found.owner.admission())?.deleted).toBe(true);
+  const view = await controller.historyView();
+  expect(JSON.stringify(view)).toContain("Retained answer");
+  expect(await readFile(join(path, "main.jsonl"), "utf8")).toBe(before);
+  expect(faux.state.callCount).toBe(1);
+});
+
+test("committed catalog title reconciles stale tab metadata without reopening a closed tab", async () => {
+  const { load } = await setup();
+  const agent = await ensureDefaultWorkspaceAgentConversation("workspace");
+  const owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, load);
+  const controller = await owner.conversation(agent);
+  await controller.setTitle("Committed rename");
+  const metadata = join(directory, "workspaces", "workspace", "metadata", "agent-conversations.json");
+  expect(await readFile(metadata, "utf8")).toContain("Untitled");
+  expect((await listWorkspaceAgentConversations("workspace"))[0]?.title).toBe("Committed rename");
+  await controller.close();
+  await writeFile(metadata, JSON.stringify({ conversations: [] }));
+  expect(await listWorkspaceAgentConversations("workspace")).toEqual([]);
+  expect((await retainedDurableHistories("workspace"))[0]?.owner).toBe(owner);
+  expect((await owner.catalog())[0]?.title).toBe("Committed rename");
+});

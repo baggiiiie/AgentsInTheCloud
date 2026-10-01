@@ -17,6 +17,8 @@ export type DurableConversationRecord = {
   durableId: ConversationId;
   label: string;
   title: string;
+  /** Retained branch IDs; durableId is the selected immutable fork. */
+  branches?: ConversationId[];
 };
 
 /** Application identity is independent of Durable's storage-local numeric IDs. */
