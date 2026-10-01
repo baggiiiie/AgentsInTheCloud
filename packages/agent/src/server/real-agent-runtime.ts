@@ -33,6 +33,13 @@ import {
 } from "./transcript.ts";
 import { TurnTiming, turnStartEntryType, turnTimingEntryType } from "./turn-timing.ts";
 
+const compactionStartMessages = {
+  manual: "Compacting context…",
+  threshold: "Context getting full; compacting automatically…",
+  // Pi also uses overflow for truncated responses, and does not always retry.
+  overflow: "Compacting context to recover from a limit…",
+} satisfies Record<Extract<AgentSessionEvent, { type: "compaction_start" }>["reason"], string>;
+
 interface AgentPromptPreflightOptions {
   images?: Array<{ type: "image"; data: string; mimeType: string }>;
   preflightResult(success: boolean): void;
@@ -411,7 +418,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         break;
       case "compaction_start":
         this.setBusy(true);
-        this.notice("info", event.reason === "manual" ? "Compacting context…" : "Auto-compacting context…");
+        this.notice("info", compactionStartMessages[event.reason]);
         break;
       case "compaction_end": {
         const entry = event.result && this.latestCompactionEntry();
@@ -424,6 +431,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         await this.refreshStats();
         const notice = terminalCompactionNotice(event);
         if (notice) this.notice(notice.level, notice.message);
+        else if (event.result && event.willRetry) this.notice("info", "Context compacted; retrying request…");
         break;
       }
       case "auto_retry_end":
