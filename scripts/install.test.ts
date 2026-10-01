@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 
 const installer = await Bun.file(new URL("./install.sh", import.meta.url)).text();
 
-function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean } = {}, args: string[] = []) {
+function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean; uninstallAnswer?: string; uninstallFails?: boolean; uninstallRequestFails?: boolean; inventoryFails?: boolean; volumeOnly?: boolean; volumeRemovalFails?: boolean; initiallyStopped?: boolean } = {}, args: string[] = []) {
   const logPath = `/tmp/atelier-install-test-${crypto.randomUUID()}.log`;
   const mock = `
 mktemp() { echo "${logPath}"; }
@@ -15,6 +15,8 @@ sudo() {
   "$@"
 }
 module_loaded=0
+container_present=${options.installed ? 1 : 0}
+volume_present=${options.installed || options.volumeOnly ? 1 : 0}
 grep() { if [[ "$*" == *microsoft* ]]; then return ${options.wsl ? 0 : 1}; fi; [ "$module_loaded" -eq 1 ] || return ${options.missingFilesystem ? 1 : 0}; }
 modprobe() {
   printf 'MODPROBE %s\\n' "$*" >&2
@@ -31,6 +33,21 @@ docker() {
         atelier) return ${options.old ? 0 : 1} ;;
       esac ;;
     'pull '*) return ${options.pullFails ? 1 : 0} ;;
+    'volume ls') if [ "$volume_present" -eq 1 ] && [ ! -e "${logPath}.volume-removed" ]; then echo atelier-system; fi; return 0 ;;
+    'volume rm')
+      if [ "${options.volumeRemovalFails ? 1 : 0}" -eq 1 ]; then return 1; fi
+      touch "${logPath}.volume-removed"; return 0 ;;
+    'ps -a') if [ "$container_present" -eq 1 ] && [ ! -e "${logPath}.container-removed" ]; then echo atelier-system; fi; return 0 ;;
+    'rm atelier-system') touch "${logPath}.container-removed"; return 0 ;;
+    'exec --user')
+      if [[ "$*" == *http://supervisor/uninstall* ]]; then
+        if [[ "$*" == *'method:"POST"'* ]]; then return ${options.uninstallRequestFails ? 1 : 0}; fi
+        if [ "${options.inventoryFails ? 1 : 0}" -eq 1 ]; then return 2; fi
+        printf '8\\n${"a".repeat(64)}\\n'; return 0
+      fi
+      if [[ "$*" == *3001/status* ]]; then
+        printf '${options.uninstallFails ? "failed\\nvolume is in use" : "complete\\nManaged resources deleted"}\\n'; return 0
+      fi ;;
     'exec atelier-system')
       if [[ "$*" == *3001/update-channel* ]]; then
         if [ "${options.rejectUpdateRequest ? 1 : 0}" -eq 1 ]; then return 2; fi
@@ -55,7 +72,7 @@ docker() {
         return
       fi ;;
     'logs --tail') echo 'supervisor startup failed: io.weight unavailable';;
-    'inspect --format') if [[ "$*" == *State.Status* ]]; then echo ${options.systemState ?? 'running'}; elif [[ "$*" == *3080/tcp* ]]; then echo 55123; else echo true; fi ;;
+    'inspect --format') if [[ "$*" == *State.Status* ]]; then echo ${options.systemState ?? 'running'}; elif [[ "$*" == *3080/tcp* ]]; then echo 55123; else echo ${options.initiallyStopped ? "false" : "true"}; fi ;;
   esac
 }
 `;
@@ -65,11 +82,11 @@ docker() {
     .replace('{ [ -t 0 ]; } 2>/dev/null <"$prompt_input"', "true")
     .replace(
       'IFS= read -r -t 120 "$1" <"$prompt_input"',
-      `if [ "$1" = action ]; then action=update; else answer=${options.installed ? "yes" : "1"}; fi`,
+      `if [ "$1" = action ]; then action=update; else answer=${JSON.stringify(options.uninstallAnswer ?? (options.installed ? "yes" : "1"))}; fi`,
     );
   const result = Bun.spawnSync([process.platform === "darwin" ? "/bin/bash" : "bash", "-c", mock + script, "installer", ...args], { stdin: "ignore" });
   const log = Bun.spawnSync(["cat", logPath]).stdout.toString();
-  Bun.spawnSync(["rm", "-f", logPath, `${logPath}.checked`, `${logPath}.update-attempted`, `${logPath}.update-accepted`]);
+  Bun.spawnSync(["rm", "-f", logPath, `${logPath}.checked`, `${logPath}.update-attempted`, `${logPath}.update-accepted`, `${logPath}.container-removed`, `${logPath}.volume-removed`]);
   return { status: result.exitCode, output: result.stdout.toString() + result.stderr.toString() + log };
 }
 
@@ -261,3 +278,81 @@ for (const action of ["install", "open", "connect"]) {
     expect(result.output).not.toContain("3001/update-channel");
   });
 }
+
+test("--uninstall cannot be combined with an install/update action", () => {
+  const result = run({ installed: true }, ["--uninstall", "--action", "update"]);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain("--uninstall cannot be combined with --action");
+  expect(result.output).not.toContain("DOCKER pull");
+});
+
+test("uninstall cancellation warns with the exact inventory and deletes nothing", () => {
+  const result = run({ installed: true, uninstallAnswer: "no" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("8 workspaces will be permanently deleted, including parked workspaces");
+  expect(result.output).toContain("shared /persistent files, projects, settings, and locally saved credentials");
+  expect(result.output).toContain("Uninstall cancelled. No data was deleted");
+  expect(result.output).not.toContain("DOCKER stop");
+  expect(result.output).not.toContain("DOCKER rm");
+  expect(result.output).not.toContain("DOCKER volume rm");
+  expect(result.output).not.toContain("method:\"POST\"");
+  expect(result.output).not.toContain("MODPROBE");
+});
+
+test("confirmed uninstall delegates cleanup, polls status, then removes only System and its volume", () => {
+  const result = run({ installed: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("Uninstalled. System and all installation data have been removed");
+  expect(result.output).toContain("DOCKER exec --user root atelier-system");
+  expect(result.output).toContain("/run/atelier-system/uninstall.sock");
+  expect(result.output).toContain("DOCKER stop --time 120 atelier-system");
+  expect(result.output).toContain("DOCKER rm atelier-system");
+  expect(result.output).toContain("DOCKER volume rm atelier-system");
+  // Background run_quiet commands are captured in the log after foreground output.
+  expect(result.output.indexOf("http://supervisor/uninstall")).toBeLessThan(result.output.indexOf("DOCKER stop --time 120"));
+  expect(result.output).not.toContain("DOCKER system prune");
+  expect(result.output).not.toContain("DOCKER pull");
+});
+
+for (const option of ["uninstallFails", "uninstallRequestFails", "inventoryFails"] as const) {
+  test(`${option} retains the outer System container and volume`, () => {
+    const result = run({ installed: true, uninstallAnswer: "DELETE ATELIER", [option]: true }, ["--uninstall"]);
+    expect(result.status).toBe(1);
+    expect(result.output).not.toContain("DOCKER stop");
+    expect(result.output).not.toContain("DOCKER rm");
+    expect(result.output).not.toContain("DOCKER volume rm");
+  });
+}
+
+test("uninstall restarts a stopped supervisor to obtain its inventory, without downloading anything", () => {
+  const result = run({ installed: true, initiallyStopped: true, uninstallAnswer: "no" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER start atelier-system");
+  expect(result.output).toContain("8 workspaces");
+  expect(result.output).not.toContain("DOCKER pull");
+});
+
+test("uninstall can finish volume removal after System was already removed, with explicit unknown-count warning", () => {
+  const result = run({ volumeOnly: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("Workspace count unavailable");
+  expect(result.output).not.toContain("0 workspaces");
+  expect(result.output).toContain("DOCKER volume rm atelier-system");
+  expect(result.output).not.toContain("DOCKER exec");
+});
+
+test("uninstall does not claim success if installation volume removal fails", () => {
+  const result = run({ volumeOnly: true, volumeRemovalFails: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain("Deleting installation storage failed");
+  expect(result.output).not.toContain("Uninstalled. System");
+});
+
+test("uninstall is a no-op when no System container or volume remains", () => {
+  const result = run({}, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("Nothing to uninstall");
+  expect(result.output).not.toContain("DOCKER run");
+  expect(result.output).not.toContain("DOCKER pull");
+  expect(result.output).not.toContain("Type DELETE ATELIER");
+});

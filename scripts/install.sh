@@ -4,6 +4,7 @@ set -Eeuo pipefail
 system_image=ghcr.io/lucasmeijer/atelier-system:latest
 app_image=ghcr.io/lucasmeijer/atelier:stable
 action=""
+uninstall_requested=0
 access_mode=""
 system_name=atelier-system
 
@@ -117,6 +118,7 @@ Update also installs the newest Atelier app on the installation's selected chann
   --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/atelier:stable)
   --access-mode MODE  localhost or tailscale (default selected for this machine)
   --action ACTION     install, update, connect, or open
+  --uninstall         Permanently delete all workspaces, settings, and installation storage
   -h, --help          Show help
 
 The app image is only used when System has no persisted app selection.
@@ -135,11 +137,16 @@ while [ "$#" -gt 0 ]; do
         --access-mode) access_mode="$2" ;;
       esac
       shift 2 ;;
+    --uninstall) uninstall_requested=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "unknown option: $1" ;;
   esac
 done
-case "$action" in ""|install|update|connect|open) ;; *) fail "unknown action: $action" ;; esac
+if [ "$uninstall_requested" -eq 1 ]; then
+  [ -z "$action" ] || fail "--uninstall cannot be combined with --action"
+  action=uninstall
+fi
+case "$action" in ""|install|update|connect|open|uninstall) ;; *) fail "unknown action: $action" ;; esac
 case "$access_mode" in ""|localhost|tailscale) ;; *) fail "unknown access mode: $access_mode" ;; esac
 # stdin may carry the script itself (curl | bash). With sudo's use_pty option,
 # /dev/tty is sudo's relay PTY and receives no input when sudo itself was piped.
@@ -182,6 +189,7 @@ log_file="$(mktemp /tmp/atelier-install.XXXXXX)"
 printf "\n  %sLet's get your Atelier setup!%s\n\n" "$violet" "$reset"
 status "Preparing your server"
 if ! command -v docker >/dev/null; then
+  [ "$action" != uninstall ] || fail "Docker is not installed; no installation can be inspected or removed"
   [ "$host_os" != Darwin ] || fail "install and start Docker Desktop first, then run this installer again"
   request_root
   if command -v apt-get >/dev/null; then
@@ -203,7 +211,7 @@ run_quiet "Checking Docker" docker info
 
 # Nested daemons share the host kernel; privileged containers cannot supply
 # filesystem drivers missing from that kernel.
-if [ "$host_os" = Linux ] && [ "$desktop" -eq 0 ]; then
+if [ "$action" != uninstall ] && [ "$host_os" = Linux ] && [ "$desktop" -eq 0 ]; then
   request_root
   for filesystem in erofs overlay; do
     if ! grep -qw "$filesystem" /proc/filesystems; then
@@ -223,7 +231,11 @@ if [ "$installed" -eq 0 ] && docker container inspect atelier >/dev/null 2>&1; t
   fail "an old Atelier container exists; this installer does not migrate old installations"
 fi
 if [ "$installed" -eq 0 ]; then
-  case "$action" in ""|install|update) action=install ;; *) fail "Atelier System is not installed" ;; esac
+  case "$action" in
+    uninstall) ;; # A previous removal may have left only the outer volume.
+    ""|install|update) action=install ;;
+    *) fail "Atelier System is not installed" ;;
+  esac
 elif [ "$action" = install ]; then
   fail "Atelier System is already installed; use --action update"
 fi
@@ -390,6 +402,111 @@ wait_for_system() {
   finish_line
   printf '  %s✓ %s%s\n\n  Open %s\n\n' "$green" "$description" "$reset" "$app_url"
 }
+
+uninstall_system() {
+  local start=$SECONDS code reply token workspace_count state description remaining
+  local -a fields
+  if [ "$installed" -eq 1 ]; then
+    if [ "$(docker inspect --format '{{.State.Running}}' "$system_name")" != true ]; then
+      run_quiet "Starting System to inspect the uninstall inventory" docker start "$system_name"
+    fi
+    while true; do
+      check_system_running
+      code=0
+      reply="$(docker exec --user root "$system_name" bun -e '
+        let response;
+        try {
+          response = await fetch("http://supervisor/uninstall", {unix:"/run/atelier-system/uninstall.sock", signal:AbortSignal.timeout(3000)});
+        } catch (error) { console.error(error); process.exit(75); }
+        if (response.status === 503) process.exit(75);
+        if (!response.ok) { console.error(await response.text()); process.exit(2); }
+        const plan = await response.json();
+        if (!Number.isSafeInteger(plan.workspaceCount) || plan.workspaceCount < 0 ||
+            typeof plan.token !== "string" || !/^[a-f0-9]{64}$/.test(plan.token)) process.exit(2);
+        console.log(`${plan.workspaceCount}\n${plan.token}`);
+      ' 2>>"$log_file")" || code=$?
+      case "$code" in
+        0) break ;;
+        75) ;;
+        *) fail "Could not read workspace inventory. Nothing has been deleted. See the bootstrap log." ;;
+      esac
+      status "Waiting for System's uninstall inventory" "$((SECONDS-start))s"
+      [ "$((SECONDS-start))" -lt 240 ] || fail "System's uninstall inventory is unavailable. Update System with --action update first. Nothing has been deleted."
+      sleep 1
+    done
+    fields=()
+    while IFS= read -r field; do fields+=("$field"); done <<<"$reply"
+    workspace_count="${fields[0]}"; token="${fields[1]}"
+    finish_line
+    printf '\n  %s workspaces will be permanently deleted, including parked workspaces.\n' "$workspace_count"
+  else
+    remaining="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
+    if [ -z "$remaining" ]; then
+      finish_line
+      printf '\n  No installation container or volume remains. Nothing to uninstall.\n'
+      return
+    fi
+    finish_line
+    printf '\n  System was already removed, but its installation volume remains.\n  Workspace count unavailable: all remaining installation data will be deleted.\n'
+  fi
+  printf '\n  This also deletes workspace files, conversations, nested Docker data,\n  shared /persistent files, projects, settings, and locally saved credentials.\n  Nothing is imported into a new installation. Save anything you need first.\n\n'
+  prompt answer "  Type DELETE ATELIER to confirm, or anything else to cancel: "
+  if [ "$answer" != "DELETE ATELIER" ]; then
+    printf '\n  Uninstall cancelled. No data was deleted.\n'
+    return
+  fi
+  if [ "$installed" -eq 1 ]; then
+    docker exec --user root "$system_name" bun -e '
+      const response = await fetch("http://supervisor/uninstall", {
+        unix:"/run/atelier-system/uninstall.sock", method:"POST",
+        headers:{"content-type":"application/json"}, body:JSON.stringify({token:process.argv[1]}),
+        signal:AbortSignal.timeout(3000),
+      });
+      if (response.status !== 202) throw new Error(`Uninstall request: ${response.status} ${await response.text()}`);
+    ' "$token" >>"$log_file" 2>&1 || fail "System did not accept uninstall. Its container and volume have not been removed."
+    start=$SECONDS
+    while true; do
+      check_system_running
+      reply="$(docker exec --user root "$system_name" bun -e '
+        const response = await fetch("http://127.0.0.1:3001/status", {signal:AbortSignal.timeout(3000)});
+        if (!response.ok) throw new Error(`Uninstall status: ${response.status}`);
+        const {uninstall} = await response.json();
+        if (!["running","failed","complete"].includes(uninstall?.state) || typeof uninstall.description !== "string")
+          throw new Error("Invalid uninstall status contract");
+        console.log(`${uninstall.state}\n${uninstall.description.replace(/[\x00-\x1f\x7f-\x9f]/g," ")}`);
+      ' 2>>"$log_file")" || fail "Could not read uninstall status. System and its volume were retained; run --uninstall again."
+      fields=()
+      while IFS= read -r field; do fields+=("$field"); done <<<"$reply"
+      state="${fields[0]}"; description="${fields[1]}"
+      case "$state" in
+        complete) break ;;
+        failed) fail "Uninstall failed: $description System and its installation volume were retained; run --uninstall again." ;;
+      esac
+      status "$description" "$((SECONDS-start))s"
+      [ "$((SECONDS-start))" -lt 2400 ] || fail "Uninstall did not finish within 40 minutes. System and its volume were retained."
+      sleep 1
+    done
+    run_quiet "Stopping System" docker stop --time 120 "$system_name"
+    run_quiet "Removing System" docker rm "$system_name"
+  fi
+  remaining="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
+  if [ -n "$remaining" ]; then run_quiet "Deleting installation storage" docker volume rm "$system_name"; fi
+  remaining="$(docker ps -a --format '{{.Names}}' --filter "name=^${system_name}$")"
+  [ -z "$remaining" ] || fail "System container still exists"
+  remaining="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
+  [ -z "$remaining" ] || fail "Installation volume still exists"
+  if [ "$host_os" = Linux ] && [ -f /etc/modules-load.d/atelier-system.conf ]; then
+    request_root
+    run_root rm /etc/modules-load.d/atelier-system.conf
+  fi
+  finish_line
+  printf '\n  %s✓ Uninstalled. System and all installation data have been removed.%s\n  Docker and unrelated host resources were left installed.\n\n' "$green" "$reset"
+}
+
+if [ "$action" = uninstall ]; then
+  uninstall_system
+  exit 0
+fi
 
 if [ -z "$action" ]; then
   finish_line

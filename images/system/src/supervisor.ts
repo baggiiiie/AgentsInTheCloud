@@ -13,7 +13,8 @@ import { installWorkspaceFirewall } from "./firewall.ts";
 import { filesystemFailure } from "./filesystems.ts";
 import { initializeResources } from "./resources.ts";
 import { spawn, type ChildProcess } from "node:child_process";
-import { chown, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, chown, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { uninstallManagedResources, uninstallPlan, uninstallSocketPath, type UninstallState } from "./uninstall.ts";
 import { parseArgs } from "node:util";
 import { command, docker, sleep, stopCommands } from "./process.ts";
 import { TailscaleHttps, TailscaleCertificateError } from "./tailscale-https.ts";
@@ -45,7 +46,7 @@ await Promise.all(
 );
 await mkdir("/run/atelier-system", { recursive: true });
 await writeFile("/run/atelier-system/access-v1", "");
-type State = { accessMode?: "localhost" | "tailscale"; localPort?: number; currentImage?: string; runningContainers?: string[] };
+type State = { accessMode?: "localhost" | "tailscale"; localPort?: number; currentImage?: string; runningContainers?: string[]; uninstall?: UninstallState };
 const persisted: State = (await Bun.file(`${stateDir}/state.json`).exists())
   ? JSON.parse(await readFile(`${stateDir}/state.json`, "utf8"))
   : {};
@@ -55,6 +56,11 @@ async function persist() {
   await writeFile(`${stateDir}/state.next`, JSON.stringify(persisted));
   await rename(`${stateDir}/state.next`, `${stateDir}/state.json`);
 }
+if (persisted.uninstall?.state === "running") {
+  persisted.uninstall = { state: "failed", description: "Uninstall was interrupted. Run --uninstall again to finish removing the installation." };
+  await persist();
+}
+let uninstalling = persisted.uninstall !== undefined;
 let activity: Activity = { description: "Starting Atelier services" };
 let failure: string | undefined;
 let operation: "startup" | "update" = "startup";
@@ -225,7 +231,7 @@ function configureRoutes(target: number): Promise<void> {
 type Replacement = { image: string; pull: boolean } | { channel: true };
 let replacement: Replacement = { image: candidate, pull: !persisted.currentImage };
 async function replace(request: Replacement) {
-  if (busy || stopping)
+  if (busy || stopping || uninstalling)
     throw new Error(
       "An app operation is already running or System is stopping",
     );
@@ -400,6 +406,7 @@ const server = Bun.serve({
         busy,
         candidate,
         currentImage: persisted.currentImage,
+        uninstall: persisted.uninstall,
         tailnetHost,
         logs,
       });
@@ -436,6 +443,7 @@ const server = Bun.serve({
       return new Response(stream, { headers });
     }
     if (request.method === "POST") {
+      if (uninstalling) return new Response("Installation is being uninstalled", { status: 409 });
       if (!allowedOrigin(request))
         return new Response("Forbidden", { status: 403 });
       if (url.pathname === "/local") {
@@ -550,6 +558,60 @@ const server = Bun.serve({
     );
   },
 });
+// Only root inside System (the host installer via docker exec) can request deletion.
+// Never expose this operation through the public local/Tailscale supervisor routes.
+await rm(uninstallSocketPath, { force: true });
+const previousUmask = process.umask(0o077);
+const uninstallControl = Bun.serve({
+  unix: uninstallSocketPath,
+  async fetch(request) {
+    if (new URL(request.url).pathname !== "/uninstall") return new Response("Not found", { status: 404 });
+    if (!initialized || stopping || busy) return new Response("System is starting or busy", { status: 503 });
+    if (request.method === "GET") {
+      try { return Response.json(await uninstallPlan(docker)); }
+      catch (error) { log(String(error)); return new Response("Could not read workspace inventory. Nothing has been deleted.", { status: 500 }); }
+    }
+    if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+    const body: unknown = await request.json().catch(() => null);
+    if (!Value.Check(Type.Object({ token: Type.String({ pattern: "^[a-f0-9]{64}$" }) }, { additionalProperties: false }), body))
+      return new Response("Expected the reviewed uninstall inventory token", { status: 400 });
+    if (persisted.uninstall?.state === "complete") return new Response(null, { status: 202 });
+    // Reserve before yielding, so health recovery and updates cannot restart the app.
+    uninstalling = true;
+    busy = true;
+    healthy = false;
+    recoveringHealth = false;
+    activeOperation = (async () => {
+      const progress = async (description: string) => {
+        persisted.uninstall = { state: "running", description };
+        await persist();
+        stage(description);
+      };
+      try {
+        await progress("Preparing to uninstall Atelier");
+        await configureRoutes(3001);
+        logProcess?.kill();
+        logProcess = undefined;
+        await uninstallManagedResources({ token: body.token, docker, progress });
+        persisted.runningContainers = [];
+        persisted.uninstall = { state: "complete", description: "Managed resources deleted. Ready to remove System and its installation volume." };
+        await persist();
+        stage(persisted.uninstall.description);
+      } catch (error) {
+        const description = error instanceof Error ? error.message : String(error);
+        persisted.uninstall = { state: "failed", description };
+        await persist();
+        log(description);
+      } finally {
+        busy = false;
+      }
+    })();
+    return new Response(null, { status: 202 });
+  },
+});
+await chmod(uninstallSocketPath, 0o600);
+process.umask(previousUmask);
+
 async function shutdown(code: number) {
   if (stopping) return;
   stopping = true;
@@ -560,18 +622,20 @@ async function shutdown(code: number) {
   await activeOperation;
   await routing.catch((error) => log(String(error)));
   try {
-    const running = (await docker("ps", "-q", "--filter", "name=^atelier$"))
-      .split("\n")
-      .filter(Boolean);
-    const all = (await docker("ps", "-q")).split("\n").filter(Boolean);
-    persisted.runningContainers = [
-      ...new Set([
-        ...(persisted.runningContainers ?? []),
-        ...all.filter((id) => !running.includes(id)),
-      ]),
-    ];
-    await persist();
-    if (all.length) await docker("stop", "--time", "20", ...all);
+    if (!uninstalling) {
+      const running = (await docker("ps", "-q", "--filter", "name=^atelier$"))
+        .split("\n")
+        .filter(Boolean);
+      const all = (await docker("ps", "-q")).split("\n").filter(Boolean);
+      persisted.runningContainers = [
+        ...new Set([
+          ...(persisted.runningContainers ?? []),
+          ...all.filter((id) => !running.includes(id)),
+        ]),
+      ];
+      await persist();
+      if (all.length) await docker("stop", "--time", "20", ...all);
+    }
   } catch (error) {
     log(String(error));
     code = 1;
@@ -586,6 +650,7 @@ async function shutdown(code: number) {
     ]);
   }
   localIngress.stop(true);
+  uninstallControl.stop(true);
   server.stop(true);
   process.exit(code);
 }
@@ -637,6 +702,7 @@ async function initialize() {
     60000,
     "Docker",
   );
+  if (uninstalling) { initialized = true; return; }
   for (const id of persisted.runningContainers ?? []) await docker("start", id);
   persisted.runningContainers = [];
   await persist();
@@ -712,7 +778,7 @@ async function initialize() {
   void (async () => {
     while (!stopping) {
       await sleep(3000);
-      if ((!healthy && !recoveringHealth) || busy || stopping) continue;
+      if ((!healthy && !recoveringHealth) || busy || stopping || uninstalling) continue;
       activeOperation = recheckHealth();
       await activeOperation;
     }
