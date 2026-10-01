@@ -120,3 +120,7 @@ export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId:
   }
   return new Response("Not found", { status: 404 });
 }
+
+export async function hasClaudeSession(sessionId: string): Promise<boolean> {
+  return Bun.file(nativeSessionPath(sessionId)).exists();
+}

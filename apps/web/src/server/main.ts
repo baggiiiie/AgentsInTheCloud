@@ -222,6 +222,7 @@ let app: WebApp;
 const workspaceStartupOperations = {
   setRunning: setWorkspaceContainerRunning,
   checkReadiness: checkWorkspaceReadiness,
+  runtimeReady: (workspaceId: string) => atelierEvents.emit("workspace_runtime_ready", { workspaceId }),
   imageOutdated: (id: string) => workspaceImageOutdated(id, undefined, atelierEvents),
   get provisioning() { return app.provisioning; },
 };

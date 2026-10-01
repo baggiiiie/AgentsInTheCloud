@@ -3,7 +3,7 @@ import { createCliAgentModule, createCliModelSettings } from "@atelier/cli-agent
 import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscription } from "@atelier/llm/server";
 import { providerBrandIconHtml } from "@atelier/shared";
 import { codexLaunchScript } from "./launch-command.ts";
-import { loadCodexTranscript, loadCodexTranscriptImage } from "./transcript.ts";
+import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId } from "./transcript.ts";
 
 export const codexModelSettings = createCliModelSettings({
   agentProvider: "codex", provider: "openai-codex", label: "Codex",
@@ -17,6 +17,7 @@ export const atelierServerModule = createCliAgentModule({
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
   prepareSession: prepareCodexMcp,
   launchScript: codexLaunchScript,
+  resumeScript: async (workspaceId, settings, session) => codexLaunchScript({ text: "", images: [], attachmentNotes: [] }, [], settings, session, await codexResumeId(workspaceId, session.id)),
   loadTranscript: loadCodexTranscript,
   loadTranscriptImage: loadCodexTranscriptImage,
 });

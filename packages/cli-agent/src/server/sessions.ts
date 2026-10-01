@@ -49,13 +49,20 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
     const session: CliSession = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel };
     // Claim before side effects. Recovery must never submit the initial prompt twice.
     store().write(workspaceId, { sessions: [...list(workspaceId), session] });
+    await start(workspaceId, session, settings, input);
+    if (!session.error && input.text.trim()) void nameFromPrompt(workspaceId, session).catch((error) => console.error(`Could not publish ${adapter.label} session title ${id}`, error));
+    return id;
+  }
+
+  async function start(workspaceId: string, session: CliSession, settings: AgentWorkspaceParameters, input?: WorkspaceAgentInput): Promise<void> {
+    const { id } = session;
     const ready = Promise.withResolvers<void>();
     starting.set(id, ready.promise);
     try {
       await adapter.prepareWorkspace?.(workspaceId);
       const directory = `/tmp/atelier-attachments/${adapter.id}-${id}`;
       const imagePaths: string[] = [];
-      for (const [index, image] of input.images.entries()) {
+      for (const [index, image] of (input?.images ?? []).entries()) {
         const extension = Object.entries(imageMimeByExtension).find(([, mime]) => mime === image.mimeType)?.[0];
         if (!extension) throw new Error(`Unsupported image type: ${image.mimeType}`);
         const path = `${directory}/${index}.${extension}`;
@@ -71,8 +78,13 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
 exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${shellQuote("Authorization: Bearer " + mcp.token)} ${shellQuote(new URL("/agent-turn-", mcp.url).href)}"$1"
 `);
       const env = { HOME: "/home/atelier", ...await adapter.prepareSession?.(workspaceId, launchSession, mcp) };
-      const command = `/bin/bash -c ${shellQuote(adapter.launchScript(input, imagePaths, settings, launchSession))}`;
+      const script = input
+        ? adapter.launchScript(input, imagePaths, settings, launchSession)
+        : await adapter.resumeScript!(workspaceId, settings, launchSession);
+      const command = `/bin/bash -c ${shellQuote(script)}`;
       await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: session.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
+      delete session.error;
+      store().write(workspaceId, { sessions: list(workspaceId) });
     } catch (error) {
       // Startup failure is durable session state, shown in its tab rather than discarded.
       session.error = error instanceof Error ? error.message : String(error);
@@ -82,8 +94,18 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       starting.delete(id);
       ready.resolve();
     }
-    if (!session.error && input.text.trim()) void nameFromPrompt(workspaceId, session).catch((error) => console.error(`Could not publish ${adapter.label} session title ${id}`, error));
-    return id;
+  }
+
+  function restoreWorkspace(workspaceId: string): Promise<void> {
+    return serialize(workspaceId, async () => {
+      if (!adapter.resumeScript) return;
+      for (const session of list(workspaceId)) {
+        // Legacy placeholders are not runnable sessions. Existing (including dead)
+        // panes belong to the current runtime and must not be relaunched.
+        if (session.kind !== adapter.id || (await terminalState(workspaceId, session)).exists) continue;
+        await start(workspaceId, session, { model: session.model, thinkingLevel: session.thinkingLevel });
+      }
+    });
   }
 
   async function suggestSlug(session: CliSession): Promise<string | undefined> {
@@ -177,7 +199,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
     for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
   }
-  return { list, get, ready, create, prepareWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
+  return { list, get, ready, create, prepareWorkspace, restoreWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
 }
 
 export type CliSessions = ReturnType<typeof createCliSessions>;

@@ -96,3 +96,14 @@ test("installs the Atelier syntax theme in CODEX_HOME with terminal palette colo
   // Inline code uses palette slot 12 (bright blue), Atelier's accent.
   expect(theme).toContain("<string>markup.inline.raw.string.markdown, markup.raw.inline.markdown</string><key>settings</key><dict><key>foreground</key><string>#0c000000</string>");
 });
+
+
+test("native resume restores the exact conversation with no submitted prompt", async () => {
+  await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
+  const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
+  const [code, output] = await run(codexLaunchScript(empty, [], {}, session, "native-session-id"));
+  expect(code).toBe(0);
+  const args = output.split("\0").slice(0, -1);
+  expect(args.join(" ")).toContain(["resume", "native-session-id"].join(" "));
+  expect(args).not.toContain("--");
+});

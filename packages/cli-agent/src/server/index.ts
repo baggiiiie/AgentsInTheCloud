@@ -35,6 +35,9 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           void sessions.exportHistory(workspaceId, conversationId).catch((error) => console.error(`Could not export ${adapter.label} session ${conversationId}`, error));
         }
       });
+      context.events.on("workspace_runtime_ready", async ({ workspaceId }) => {
+        await sessions.restoreWorkspace(workspaceId);
+      });
       context.events.on("workspace_deleting", async ({ workspaceId }) => {
         await sessions.exportWorkspaceHistory(workspaceId);
       });

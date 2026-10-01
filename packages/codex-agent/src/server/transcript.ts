@@ -124,3 +124,13 @@ export async function loadCodexTranscriptImage(workspaceId: string, sessionId: s
   }
   return new Response("Not found", { status: 404 });
 }
+
+/** Read the native ID from the tab-private rollout, never use workspace-wide --last. */
+export async function codexResumeId(workspaceId: string, sessionId: string): Promise<string | undefined> {
+  const file = (await sessionFiles(workspaceId, sessionId)).at(-1);
+  if (!file) return undefined;
+  const schema = Type.Object({ type: Type.Literal("session_meta"), payload: Type.Object({ id: Type.String() }) });
+  const id = Array.from(nativeJsonlRows(await readFile(file, "utf8"), schema))[0]?.payload.id;
+  if (!id) throw new Error(`Codex rollout has no native session ID: ${file}`);
+  return id;
+}

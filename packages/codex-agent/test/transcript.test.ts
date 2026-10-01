@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { codexTranscriptRecords, loadCodexTranscript, loadCodexTranscriptImage } from "../src/server/transcript.ts";
+import { codexResumeId, codexTranscriptRecords, loadCodexTranscript, loadCodexTranscriptImage } from "../src/server/transcript.ts";
 
 function row(type: string, payload: Record<string, string | number | Array<Record<string, string>>>) { return JSON.stringify({ type, timestamp: "2026-01-01T00:00:00Z", payload }); }
 
@@ -60,6 +60,11 @@ test("loads only the tab-local Codex rollout and serves embedded user images", a
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, "rollout.jsonl"), row("response_item", { type: "message", id: "image-id", role: "user", content: [{ type: "input_text", text: "Look" }, { type: "input_image", image_url: "data:image/png;base64,aGVsbG8=" }] }));
     expect(await loadCodexTranscript("workspace", "tab")).toMatchObject([{ kind: "user", images: [{ entryId: "image-id", contentIndex: 1, mimeType: "image/png" }] }]);
+    await writeFile(join(dir, "rollout.jsonl"), row("session_meta", { id: "exact-native-id" }));
+    expect(await codexResumeId("workspace", "tab")).toBe("exact-native-id");
+    expect(await codexResumeId("workspace", "other-tab")).toBeUndefined();
+    await writeFile(join(dir, "rollout.jsonl"), row("response_item", { type: "message", id: "image-id", role: "user", content: [{ type: "input_text", text: "Look" }, { type: "input_image", image_url: "data:image/png;base64,aGVsbG8=" }] }));
+    await expect(codexResumeId("workspace", "tab")).rejects.toThrow("no native session ID");
     const response = await loadCodexTranscriptImage("workspace", "tab", "image-id", 1);
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("hello");

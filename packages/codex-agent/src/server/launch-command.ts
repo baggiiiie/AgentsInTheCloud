@@ -5,12 +5,12 @@ import { codexAtelierTmTheme, codexThemeName } from "./theme.ts";
 import type { WorkspaceAgentInput } from "@atelier/shared";
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
-export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession): string {
+export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resumeId?: string): string {
   const prompt = [input.text, ...input.attachmentNotes].filter(Boolean).join("\n\n");
   // Invocation-local overrides avoid trust prompts without changing shared config.
   // Codex splits dotted keys literally, so encode project paths in a TOML table value.
   // Config overrides also keep current Codex on its embedded server rather than a shared daemon.
-  const args = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", workspaceRoot,
+  const args = [...(resumeId ? ["resume", resumeId] : []), "--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", workspaceRoot,
     "-c", `projects={${JSON.stringify(workspaceRoot)}={trust_level="trusted"}}`,
     // Codex reports completion through notify; its lifecycle hooks report the start of a turn.
     ...(session ? [

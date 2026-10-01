@@ -13,7 +13,7 @@ function turnBoundaryHooks(turnSignalCommand: string) {
 }
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
-export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession): string {
+export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resume = false): string {
   // Claude has no --image flag. Its Read tool opens the materialized images.
   const prompt = [input.text, ...input.attachmentNotes, ...imagePaths.map((path) => `Read the attached image at ${JSON.stringify(path)}.`)].filter(Boolean).join("\n\n");
   const cliSettings = {
@@ -24,7 +24,7 @@ export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: strin
   // Added to whatever MCP servers the user configured; Claude merges both sets.
   const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session)] : [];
   const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), ...mcpArgs,
-    ...(session ? ["--session-id", session.id] : []),
+    ...(session ? [resume ? "--resume" : "--session-id", session.id] : []),
     ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["--effort", settings.thinkingLevel] : []), ...(prompt ? ["--", prompt] : [])];
   // The subscription is already connected in Atelier. Preserve other CLI preferences.

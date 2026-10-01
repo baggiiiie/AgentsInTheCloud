@@ -22,12 +22,14 @@ export interface CliAgentAdapter {
     renderFooter(context: AgentLaunchFooterContext): Promise<string>;
     prepare(parameters?: JsonObject): Promise<AgentWorkspaceParameters>;
   };
-  /** Runs once for a newly claimed session, before attachments and terminal launch. */
+  /** Refresh workspace configuration before a new or restored terminal launch. */
   prepareWorkspace?(workspaceId: string): Promise<void>;
   /** Session-local configuration; returned environment is passed only to its terminal. */
   prepareSession?(workspaceId: string, session: CliAgentSession, mcp: { url: string; token: string }): Promise<Record<string, string>>;
   /** Bash script with the CLI-specific flags and initial prompt. */
   launchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: AgentWorkspaceParameters, session: CliAgentSession): string;
+  /** Restore native context without submitting any prompt; an empty session opens idle. */
+  resumeScript?(workspaceId: string, settings: AgentWorkspaceParameters, session: CliAgentSession): Promise<string>;
   /** Optional native-history adapter. CLI providers without one remain terminal-only. */
   loadTranscript?(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined>;
   loadTranscriptImage?(workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response>;

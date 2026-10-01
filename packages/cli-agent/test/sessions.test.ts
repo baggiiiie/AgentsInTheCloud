@@ -15,8 +15,9 @@ async function scenario(script: string): Promise<void> {
       const preparations = [];
       let setupError;
       let preparationError;
+      let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
-      mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return result; } }));
+      mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
       const agentServer = await import("@atelier/agent/server");
       const slugRequests = [];
       let suggestedSlug;
@@ -316,4 +317,46 @@ test("startup failure revokes credentials issued before adapter preparation", ()
   expect(launches).toHaveLength(0);
   const request = new Request("http://localhost/agent-turn-finished", { method: "POST", headers: { authorization: "Bearer " + token } });
   expect((await handleAgentMcpRequest(request, "failed-credentials")).status).toBe(401);
+`));
+
+
+test("automatic recovery restores missing processes once without replaying saved input", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const resumed = [];
+  const sessions = createCliSessions({ ...adapter, resumeScript: async (...args) => { resumed.push(args); inspectionResult = { ...result, stdout: "0:\\n" }; return "printf resumed"; } }, async () => {});
+  const settings = { model: "provider::saved", thinkingLevel: "high", input: { text: "NEVER REPLAY", images: [], attachmentNotes: ["original attachment"] } };
+  const id = await sessions.create("restore", settings);
+  inspectionResult = { ...result, exitCode: 1 };
+  await Promise.all([sessions.restoreWorkspace("restore"), sessions.restoreWorkspace("restore")]);
+  expect(resumed).toHaveLength(1);
+  expect(resumed[0][0]).toBe("restore");
+  expect(resumed[0][1]).toEqual({ model: settings.model, thinkingLevel: settings.thinkingLevel });
+  expect(resumed[0][2].id).toBe(id);
+  expect(launches).toHaveLength(1);
+  expect((await saved("restore")).sessions[0]).toMatchObject({ id, input: settings.input });
+`));
+
+test("recovery leaves existing live and dead panes alone", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const sessions = createCliSessions({ ...adapter, resumeScript: async () => { throw new Error("must not resume"); } }, async () => {});
+  await sessions.create("existing");
+  for (const stdout of ["0:\\n", "1:42\\n"]) {
+    inspectionResult = { ...result, stdout };
+    await sessions.restoreWorkspace("existing");
+  }
+  expect((await saved("existing")).sessions[0].error).toBeUndefined();
+  expect(launches).toHaveLength(1);
+`));
+
+test("one restoration failure preserves its tab and does not block other agents", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const resumed = [];
+  const sessions = createCliSessions({ ...adapter, resumeScript: async (_workspaceId, _settings, session) => { resumed.push(session.id); if (resumed.length === 1) throw new Error("native history could not be loaded"); return "printf resumed"; } }, async () => {});
+  const first = await sessions.create("failure");
+  const second = await sessions.create("failure");
+  inspectionResult = { ...result, exitCode: 1 };
+  await sessions.restoreWorkspace("failure");
+  expect(resumed).toEqual([first, second]);
+  expect((await saved("failure")).sessions[0]).toMatchObject({ id: first, error: "native history could not be loaded" });
+  expect((await saved("failure")).sessions[1].error).toBeUndefined();
 `));

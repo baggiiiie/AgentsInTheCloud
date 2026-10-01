@@ -48,3 +48,9 @@ export async function loadPiTranscriptImage(workspaceId: string, sessionId: stri
   }
   return new Response("Not found", { status: 404 });
 }
+
+/** Session storage is private to this tab, not the workspace's most recent agent. */
+export async function piResumePath(workspaceId: string, sessionId: string): Promise<string | undefined> {
+  const file = (await sessionFiles(workspaceId, sessionId)).at(-1);
+  return file?.replace(join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "home-local"), "/home/atelier");
+}

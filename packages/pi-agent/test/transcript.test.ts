@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadPiTranscript, loadPiTranscriptImage, piTranscriptRecords } from "../src/server/transcript.ts";
+import { piResumePath, loadPiTranscript, loadPiTranscriptImage, piTranscriptRecords } from "../src/server/transcript.ts";
 
 function row(id: string, parentId: string | null, type: string, extra: { message?: { role: string; content: object[]; stopReason?: string; toolCallId?: string; isError?: boolean }; summary?: string }) {
   return JSON.stringify({ type, id, parentId, timestamp: "2026-01-01T00:00:00.000Z", ...extra });
@@ -42,6 +42,8 @@ test("loads native session files and serves only supported embedded images", asy
       { kind: "user", images: [{ entryId: "u", contentIndex: 1, mimeType: "image/png" }] },
       { kind: "toolResult", images: [] },
     ]);
+    expect(await piResumePath("ws", "tab")).toBe("/home/atelier/.local/share/pi/sessions/tab/2026_session.jsonl");
+    expect(await piResumePath("ws", "other-tab")).toBeUndefined();
     const image = await loadPiTranscriptImage("ws", "tab", "u", 1);
     expect(image.status).toBe(200);
     expect(await image.text()).toBe("hello");

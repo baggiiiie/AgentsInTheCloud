@@ -141,3 +141,15 @@ test("adds the session-local Atelier MCP configuration without disabling the use
   expect(args[args.indexOf("--session-id") + 1]).toBe(sessionId);
   expect(args).not.toContain("--strict-mcp-config");
 });
+
+
+test("native resume restores the exact conversation with no submitted prompt", async () => {
+  await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
+  const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
+  const [code, output] = await run(claudeLaunchScript(empty, [], {}, session, true));
+  expect(code).toBe(0);
+  const args = output.split("\0").slice(0, -1);
+  expect(args.join(" ")).toContain(["--resume", sessionId].join(" "));
+  expect(args).not.toContain("--session-id");
+  expect(args).not.toContain("--");
+});

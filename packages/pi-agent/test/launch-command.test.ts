@@ -110,3 +110,14 @@ test("installs an Atelier theme covering every color Pi requires, drawn from the
   expect(Object.keys(colorsSchema.properties)).toEqual(expect.arrayContaining(Object.keys(theme.colors)));
   for (const color of Object.values(theme.colors)) expect(Number.isInteger(color) && Number(color) < 16).toBe(true);
 });
+
+
+test("native resume restores the exact conversation with no submitted prompt", async () => {
+  await executable(binary(), 'printf "%s\\0" "$@"');
+  const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
+  const [code, output] = await run(piLaunchScript(empty, [], {}, session, "/home/atelier/.local/share/pi/sessions/tab/saved.jsonl"));
+  expect(code).toBe(0);
+  const args = output.split("\0").slice(0, -1);
+  expect(args.join(" ")).toContain(["--session", "/home/atelier/.local/share/pi/sessions/tab/saved.jsonl"].join(" "));
+  expect(args.at(-1)).toBe("--");
+});

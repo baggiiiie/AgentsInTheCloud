@@ -3,7 +3,7 @@ import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscripti
 import { providerBrandIconHtml } from "@atelier/shared";
 import { claudeLaunchScript } from "./launch-command.ts";
 import { prepareClaudeMcp } from "./mcp.ts";
-import { loadClaudeTranscript, loadClaudeTranscriptImage } from "./transcript.ts";
+import { loadClaudeTranscript, loadClaudeTranscriptImage, hasClaudeSession } from "./transcript.ts";
 
 export const claudeModelSettings = createCliModelSettings({
   agentProvider: "claude", provider: "anthropic", label: "Claude",
@@ -17,6 +17,7 @@ export const atelierServerModule = createCliAgentModule({
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
   prepareSession: prepareClaudeMcp,
   launchScript: claudeLaunchScript,
+  resumeScript: async (_workspaceId, settings, session) => claudeLaunchScript({ text: "", images: [], attachmentNotes: [] }, [], settings, session, await hasClaudeSession(session.id)),
   loadTranscript: loadClaudeTranscript,
   loadTranscriptImage: loadClaudeTranscriptImage,
 });
