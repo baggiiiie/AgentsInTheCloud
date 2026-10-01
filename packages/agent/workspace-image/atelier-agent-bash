@@ -64,17 +64,23 @@ def main():
         return tmux_call("has-session", "-t", session, check=False).returncode == 0
 
     def result():
+        # Probe the process BEFORE reading its receipt. A supervisor can publish
+        # the result and exit during this probe; reading in the opposite order
+        # would mistake that ordinary completion for a lost supervisor.
+        supervisor_alive = alive()
+        running = supervisor_alive and tmux_call("display-message", "-p", "-t", session, "#{pane_dead}").stdout.strip() == "0"
         if (operation / "result.json").exists():
             value = load(operation / "result.json")
-            if alive():
+            # The reader may observe rename before the writer syncs the directory.
+            # Finish publication before cleanup can terminate that writer.
+            sync_directory(operation)
+            if supervisor_alive:
                 tmux_call("kill-session", "-t", session)
             return value
         if not (operation / "intent.json").exists():
             return {"status": "uncertain", "message": f"Command receipt is missing; the command was not relaunched. Receipt directory: {operation}"}
-        if alive():
-            dead = tmux_call("display-message", "-p", "-t", session, "#{pane_dead}").stdout.strip()
-            if dead == "0":
-                return {"status": "running", "session": session}
+        if running:
+            return {"status": "running", "session": session}
         return {"status": "uncertain", "message": f"Command supervisor disappeared before recording a result; the command was not relaunched. Receipt directory: {operation}"}
 
     if args.action == "run":
