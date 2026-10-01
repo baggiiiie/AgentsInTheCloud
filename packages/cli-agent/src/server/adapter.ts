@@ -5,6 +5,8 @@ import type { AgentLaunchFooterContext, AgentWorkspaceParameters, WorkspaceAgent
 /** Identity of the session being launched, so adapters can address their session-local files. */
 export interface CliAgentSession {
   id: string;
+  /** Existing session-private directory (umask 077) for the adapter's configuration files. */
+  directory: string;
   /** Script the CLI must run at each turn boundary, already authorized for this session. */
   turnSignalCommand: string;
 }

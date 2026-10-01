@@ -81,7 +81,7 @@ test("passes the chosen Codex model and thinking level to the CLI", async () => 
 test("registers session-local turn boundary notifications", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const command = `${home}/turn signal.sh`;
-  const [code, output] = await run(codexLaunchScript(empty, [], {}, { id: sessionId, turnSignalCommand: command }));
+  const [code, output] = await run(codexLaunchScript(empty, [], {}, { id: sessionId, directory: `${home}/session`, turnSignalCommand: command }));
   expect(code).toBe(0);
   const args = output.split("\0");
   expect(args).toContain(`notify=${JSON.stringify(["sh", command, "finished"])}`);

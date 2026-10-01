@@ -1,5 +1,5 @@
 import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
-import { anthropicSubscriptionNotice, usesAnthropicSubscription } from "./anthropic-subscription.ts";
+import { anthropicSubscriptionNotice, usesProviderSubscription } from "./subscription.ts";
 import { providerConnections, type ProviderConnection } from "./provider-connections.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef } from "./model-reference.ts";
@@ -149,7 +149,7 @@ async function providerHasFavorite(provider: string): Promise<boolean> {
 }
 async function renderModelSelection(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
   const frameId = providerFrameId(surface, provider.provider);
-  const subscriptionNotice = provider.provider === "anthropic" && await usesAnthropicSubscription(await createPiModelRuntime()) ? warningBannerHtml(anthropicSubscriptionNotice) : "";
+  const subscriptionNotice = provider.provider === "anthropic" && await usesProviderSubscription(await createPiModelRuntime(), "anthropic") ? warningBannerHtml(anthropicSubscriptionNotice) : "";
   return setupFrame(surface, `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}${subscriptionNotice}
     ${renderFavorites(await getConfiguredModels(), surface, provider.provider)}
     <div class="model-all-models"><p>All models</p><div class="managed-list" data-managed-list-server-filter="true"><form class="managed-list__filter" method="get" action="/settings/models/catalogue" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${frameId}">

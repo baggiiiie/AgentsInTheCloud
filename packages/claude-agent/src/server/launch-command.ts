@@ -22,7 +22,7 @@ export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: strin
     hooks: session ? turnBoundaryHooks(session.turnSignalCommand) : undefined,
   };
   // Added to whatever MCP servers the user configured; Claude merges both sets.
-  const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session.id)] : [];
+  const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session)] : [];
   const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), ...mcpArgs,
     ...(session ? ["--session-id", session.id] : []),
     ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),

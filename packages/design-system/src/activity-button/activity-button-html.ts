@@ -28,24 +28,17 @@ export type ActivityButtonOptions = ActivityButtonBase & (
  * active operation. Both states participate in sizing, so captions do not shift.
  */
 export function activityButtonHtml(options: ActivityButtonOptions): string {
-  const label = options.iconOnly
-    ? options.state === "active" ? options.activeLabel : options.initialLabel
-    : undefined;
-  const ownedAttributes = [
-    options.state === "active" ? 'aria-busy="true"' : undefined,
-    options.iconOnly ? `title="${escapeHtml(label!)}" aria-label="${escapeHtml(label!)}" data-activity-initial-label="${escapeHtml(options.initialLabel)}" data-activity-active-label="${escapeHtml(options.activeLabel)}"` : undefined,
-  ].filter(Boolean).join(" ");
-
   return perimeterButtonHtml({
-    component: "activity-button",
+    kind: "activity",
     state: options.state,
     states: [
-      { name: "initial", content: options.initialContent },
-      { name: "active", content: options.activeContent },
+      { name: "initial", content: options.initialContent, label: options.initialLabel },
+      { name: "active", content: options.activeContent, label: options.activeLabel },
     ],
-    className: `${options.variant}${options.iconOnly ? " icon-only" : ""}`,
+    variant: options.variant,
+    iconOnly: options.iconOnly,
     attributesHtml: options.attributesHtml,
-    ownedAttributesHtml: ownedAttributes,
+    ownedAttributesHtml: options.iconOnly ? `data-activity-initial-label="${escapeHtml(options.initialLabel)}" data-activity-active-label="${escapeHtml(options.activeLabel)}"` : undefined,
     type: options.type,
     disabled: options.disabled,
     id: options.id,

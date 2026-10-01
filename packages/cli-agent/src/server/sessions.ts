@@ -1,4 +1,3 @@
-import { dirname } from "node:path";
 import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@atelier/agent/server";
 import { parseModelRef } from "@atelier/llm/server";
 import { exportCliHistory } from "./history.ts";
@@ -22,7 +21,7 @@ const sessionSchema = Type.Object({
 const stateSchema = Type.Object({ sessions: Type.Array(sessionSchema) });
 type CliSession = Static<typeof sessionSchema>;
 
-async function checkedShell(workspaceId: string, command: string, stdin?: string): Promise<void> {
+export async function checkedWorkspaceShell(workspaceId: string, command: string, stdin?: string): Promise<void> {
   const result = await execWorkspaceShell(workspaceId, command, { stdin });
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `Command failed (exit ${result.exitCode})`);
 }
@@ -60,19 +59,20 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
         const extension = Object.entries(imageMimeByExtension).find(([, mime]) => mime === image.mimeType)?.[0];
         if (!extension) throw new Error(`Unsupported image type: ${image.mimeType}`);
         const path = `${directory}/${index}.${extension}`;
-        await checkedShell(workspaceId, `mkdir -p ${shellQuote(directory)} && base64 -d > ${shellQuote(path)}`, image.data);
+        await checkedWorkspaceShell(workspaceId, `mkdir -p ${shellQuote(directory)} && base64 -d > ${shellQuote(path)}`, image.data);
         imagePaths.push(path);
       }
       const mcp = await prepareAgentMcp(workspaceId, id);
-      const turnSignalCommand = `/home/atelier/.local/share/atelier-agents/${id}/turn-signal.sh`;
-      const launchSession: CliAgentSession = { id, turnSignalCommand };
+      const sessionDirectory = `/home/atelier/.local/share/atelier-agents/${id}`;
+      const turnSignalCommand = `${sessionDirectory}/turn-signal.sh`;
+      const launchSession: CliAgentSession = { id, directory: sessionDirectory, turnSignalCommand };
       // $1 is the TurnBoundary the CLI reports.
-      await checkedShell(workspaceId, `umask 077; mkdir -p ${shellQuote(dirname(turnSignalCommand))} && cat > ${shellQuote(turnSignalCommand)}`, `#!/bin/sh
+      await checkedWorkspaceShell(workspaceId, `umask 077; mkdir -p ${shellQuote(sessionDirectory)} && cat > ${shellQuote(turnSignalCommand)}`, `#!/bin/sh
 exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${shellQuote("Authorization: Bearer " + mcp.token)} ${shellQuote(new URL("/agent-turn-", mcp.url).href)}"$1"
 `);
       const env = { HOME: "/home/atelier", ...await adapter.prepareSession?.(workspaceId, launchSession, mcp) };
       const command = `/bin/bash -c ${shellQuote(adapter.launchScript(input, imagePaths, settings, launchSession))}`;
-      await checkedShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: session.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
+      await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: session.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
     } catch (error) {
       // Startup failure is durable session state, shown in its tab rather than discarded.
       session.error = error instanceof Error ? error.message : String(error);
@@ -170,7 +170,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     await serialize(workspaceId, async () => {
       const session = get(workspaceId, id);
       await revokeAgentMcp(workspaceId, id);
-      if ((await terminalState(workspaceId, session)).exists) await checkedShell(workspaceId, `tmux kill-session -t ${shellQuote(session.tmuxSession)}`);
+      if ((await terminalState(workspaceId, session)).exists) await checkedWorkspaceShell(workspaceId, `tmux kill-session -t ${shellQuote(session.tmuxSession)}`);
       store().write(workspaceId, { sessions: list(workspaceId).filter((session) => session.id !== id) });
     });
   }

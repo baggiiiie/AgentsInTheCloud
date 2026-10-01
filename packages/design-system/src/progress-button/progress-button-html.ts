@@ -1,4 +1,3 @@
-import { escapeHtml } from "@atelier/shared";
 import type { ButtonVariant } from "../button/button-content.ts";
 import { type HtmlContent } from "../html.ts";
 import { perimeterButtonHtml } from "../perimeter-button/perimeter-button-html.ts";
@@ -38,22 +37,20 @@ export function progressButtonHtml(options: ProgressButtonOptions): string {
   }
 
   const inProgress = options.state === "in-progress";
-  const label = options.iconOnly ? inProgress ? options.progressLabel : options.initialLabel : undefined;
   const ownedAttributes = [
     inProgress && options.progress === undefined ? 'data-progress-kind="indeterminate"' : undefined,
     inProgress && options.progress !== undefined ? `style="--button-progress:${options.progress}"` : undefined,
-    inProgress ? 'aria-busy="true"' : undefined,
-    options.iconOnly ? `title="${escapeHtml(label!)}" aria-label="${escapeHtml(label!)}"` : undefined,
   ].filter(Boolean).join(" ");
 
   return perimeterButtonHtml({
-    component: "progress-button",
+    kind: "progress",
     state: options.state,
     states: [
-      { name: "initial", content: options.initialContent },
-      { name: "in-progress", content: options.progressContent },
+      { name: "initial", content: options.initialContent, label: options.initialLabel },
+      { name: "in-progress", content: options.progressContent, label: options.progressLabel },
     ],
-    className: `${options.variant}${options.iconOnly ? " icon-only" : ""}`,
+    variant: options.variant,
+    iconOnly: options.iconOnly,
     attributesHtml: options.attributesHtml,
     ownedAttributesHtml: ownedAttributes,
     type: options.type,

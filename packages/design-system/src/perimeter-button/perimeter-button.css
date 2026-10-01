@@ -25,7 +25,7 @@
   pointer-events: auto;
 }
 :is(.activity-button, .progress-button).icon-only :is(.activity-button__content, .progress-button__content) { padding-inline: 0; }
-:is(.button.activity-button > .activity-button__indicator, .button.progress-button > .progress-button__perimeter) {
+:is(.button.activity-button > .activity-button__perimeter, .button.progress-button > .progress-button__perimeter) {
   position: absolute;
   z-index: 1;
   inset: -1px;
@@ -35,9 +35,9 @@
   pointer-events: none;
   visibility: hidden;
 }
-.activity-button[data-activity-state="active"] > .activity-button__indicator,
+.activity-button[data-activity-state="active"] > .activity-button__perimeter,
 .progress-button[data-progress-state="in-progress"] > .progress-button__perimeter { visibility: visible; }
-:is(.button.activity-button > .activity-button__indicator, .button.progress-button > .progress-button__perimeter) rect {
+:is(.button.activity-button > .activity-button__perimeter, .button.progress-button > .progress-button__perimeter) rect {
   x: 1px;
   y: 1px;
   width: calc(100% - 2px);
@@ -65,5 +65,5 @@
     .activity-button[data-activity-state="active"] [data-activity-content="active"],
     .progress-button[data-progress-state="in-progress"] [data-progress-content="in-progress"] { opacity: 0; transform: translateY(3px); }
   }
-  :is(.activity-button__indicator, .progress-button__perimeter) { transition: opacity var(--motion-exit) ease-out, visibility var(--motion-exit) linear; }
+  :is(.activity-button__perimeter, .progress-button__perimeter) { transition: opacity var(--motion-exit) ease-out, visibility var(--motion-exit) linear; }
 }

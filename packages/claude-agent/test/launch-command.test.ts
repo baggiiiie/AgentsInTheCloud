@@ -122,7 +122,7 @@ for (const preferences of [{}, { autoUpdates: false }, { installMethod: "native"
 test("registers session-local turn boundary hooks", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
   const command = `${home}/turn signal.sh`;
-  const [code, output] = await run(claudeLaunchScript(empty, [], {}, { id: sessionId, turnSignalCommand: command }));
+  const [code, output] = await run(claudeLaunchScript(empty, [], {}, { id: sessionId, directory: `${home}/session`, turnSignalCommand: command }));
   expect(code).toBe(0);
   const args = output.split("\0");
   expect(JSON.parse(args[args.indexOf("--settings") + 1]!)).toMatchObject({ hooks: {
@@ -133,10 +133,11 @@ test("registers session-local turn boundary hooks", async () => {
 
 test("adds the session-local Atelier MCP configuration without disabling the user's own servers", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
-  const [code, output] = await run(claudeLaunchScript(empty, [], {}, { id: sessionId, turnSignalCommand: `${home}/turn signal.sh` }));
+  const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn signal.sh` };
+  const [code, output] = await run(claudeLaunchScript(empty, [], {}, session));
   expect(code).toBe(0);
   const args = output.split("\0");
-  expect(args[args.indexOf("--mcp-config") + 1]).toBe(claudeMcpConfigPath(sessionId));
+  expect(args[args.indexOf("--mcp-config") + 1]).toBe(claudeMcpConfigPath(session));
   expect(args[args.indexOf("--session-id") + 1]).toBe(sessionId);
   expect(args).not.toContain("--strict-mcp-config");
 });

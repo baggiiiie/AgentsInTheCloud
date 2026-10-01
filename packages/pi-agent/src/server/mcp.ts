@@ -1,14 +1,13 @@
 import { fileURLToPath } from "node:url";
-import type { CliAgentSession } from "@atelier/cli-agent/server";
+import { checkedWorkspaceShell, type CliAgentSession } from "@atelier/cli-agent/server";
 import { shellQuote } from "@atelier/core";
-import { execWorkspaceShell } from "@atelier/workspace";
 
-function piAtelierDirectory(sessionId: string): string {
-  return `/home/atelier/.local/share/atelier-agents/${sessionId}/pi-atelier`;
+function piAtelierDirectory(session: CliAgentSession): string {
+  return `${session.directory}/pi-atelier`;
 }
 
-export function piAtelierExtensionPath(sessionId: string): string {
-  return `${piAtelierDirectory(sessionId)}/extension.mjs`;
+export function piAtelierExtensionPath(session: CliAgentSession): string {
+  return `${piAtelierDirectory(session)}/extension.mjs`;
 }
 
 let bundledExtension: Promise<string> | undefined;
@@ -28,14 +27,13 @@ function buildExtension(): Promise<string> {
 
 /** Install native MCP registration and turn notifications with a session-private credential. */
 export async function preparePiMcp(workspaceId: string, session: CliAgentSession, mcp: { url: string; token: string }): Promise<Record<string, string>> {
-  const directory = piAtelierDirectory(session.id);
+  const directory = piAtelierDirectory(session);
   const extension = await buildExtension();
   const config = JSON.stringify({ ...mcp, turnSignalCommand: session.turnSignalCommand });
-  const result = await execWorkspaceShell(workspaceId, `set -eu
+  await checkedWorkspaceShell(workspaceId, `set -eu
 umask 077
 mkdir -p ${shellQuote(directory)}
-dd bs=1 count=${Buffer.byteLength(extension)} of=${shellQuote(piAtelierExtensionPath(session.id))} status=none
-cat > ${shellQuote(`${directory}/config.json`)}`, { stdin: extension + config });
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `Command failed (exit ${result.exitCode})`);
+dd bs=1 count=${Buffer.byteLength(extension)} of=${shellQuote(piAtelierExtensionPath(session))} status=none
+cat > ${shellQuote(`${directory}/config.json`)}`, extension + config);
   return {};
 }

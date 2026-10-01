@@ -12,7 +12,7 @@ export function piLaunchScript(input: WorkspaceAgentInput, imagePaths: string[],
   // Pi treats @-prefixed positionals as file attachments even after --.
   const message = prompt.startsWith("@") ? `\n${prompt}` : prompt;
   const args = ["--approve", "--offline", "--use-theme", piThemeName, "--tui-mode", "regular", "--session-dir", session ? `/home/atelier/.local/share/pi/sessions/${session.id}` : "/home/atelier/.local/share/pi/sessions",
-    ...(session ? ["--extension", piAtelierExtensionPath(session.id)] : []),
+    ...(session ? ["--extension", piAtelierExtensionPath(session)] : []),
     ...(model ? ["--provider", model.provider, "--model", model.id] : []),
     ...(settings.thinkingLevel ? ["--thinking", settings.thinkingLevel] : []),
     "--", ...imagePaths.map((path) => `@${path}`), ...(message ? [message] : [])];

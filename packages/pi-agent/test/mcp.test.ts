@@ -10,11 +10,12 @@ test("prepares bundled session-private native MCP registration without putting i
     mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
     const { preparePiMcp, piAtelierExtensionPath } = await import(${JSON.stringify(source)});
     const mcp = { url: "http://127.0.0.1:2988/mcp", token: "private-bearer-token" };
-    expect(await preparePiMcp("workspace", { id: "session", turnSignalCommand: "/session/signal.sh" }, mcp)).toEqual({});
+    const session = { id: "session", directory: "/session", turnSignalCommand: "/session/signal.sh" };
+    expect(await preparePiMcp("workspace", session, mcp)).toEqual({});
     expect(calls).toHaveLength(1);
     const [, command, options] = calls[0];
     expect(command).toContain("umask 077");
-    expect(command).toContain(piAtelierExtensionPath("session"));
+    expect(command).toContain(piAtelierExtensionPath(session));
     expect(command).not.toContain(mcp.token);
     const count = Number(command.match(/count=(\\d+)/)[1]);
     const input = Buffer.from(options.stdin);

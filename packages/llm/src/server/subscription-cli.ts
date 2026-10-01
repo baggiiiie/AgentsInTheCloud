@@ -7,6 +7,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { SubscriptionUsageError } from "./subscription-usage.ts";
 import { recordSubscriptionInference } from "./recent-subscription-activity.ts";
+import { usesProviderSubscription } from "./subscription.ts";
 
 const codexToken = "atelier-subscription-codex-access";
 const codexAccount = "atelier-subscription-codex-account";
@@ -112,9 +113,8 @@ export function subscriptionCliFiles(): Array<{ provider: string; path: string; 
 }
 
 export async function installSubscriptionCli(workspaceId: string, runtime: ModelRuntime): Promise<void> {
-  const credentials = await runtime.listCredentials();
   for (const file of subscriptionCliFiles()) {
-    const connected = credentials.some((credential) => credential.providerId === file.provider && credential.type === "oauth");
+    const connected = await usesProviderSubscription(runtime, file.provider);
     const path = shellQuote(`/home/atelier/${file.path}`);
     const result = await execWorkspaceCommand(workspaceId, ["sh", "-c", `set -eu
 umask 077

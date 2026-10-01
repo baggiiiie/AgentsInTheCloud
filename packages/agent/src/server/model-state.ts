@@ -1,5 +1,5 @@
 import { getConfiguredAgentModels } from "./model-preferences.ts";
-import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesAnthropicSubscription, getAgentModelThinkingLevel, type ModelRef } from "@atelier/llm/server";
+import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@atelier/llm/server";
 
 export interface AgentModelOptionView {
   provider: string;
@@ -31,7 +31,7 @@ export async function hasAvailableBuiltinAgentModel(): Promise<boolean> {
 export async function configuredModelOptionViews(current?: ModelRef | null, runtime?: Pick<Awaited<ReturnType<typeof createPiModelRuntime>>, "getAvailable" | "checkAuth" | "getModel" | "listCredentials">): Promise<AgentModelOptionView[]> {
   runtime ??= await createPiModelRuntime();
   // Anthropic permits Claude subscriptions only in Claude Code.
-  const hiddenProvider = await usesAnthropicSubscription(runtime) ? "anthropic" : undefined;
+  const hiddenProvider = await usesProviderSubscription(runtime, "anthropic") ? "anthropic" : undefined;
   const models = (await getConfiguredAgentModels()).filter((model) => model.provider !== hiddenProvider);
   const availability = await providerAvailability(runtime, models.map((model) => model.provider));
   return models.map((model) => {

@@ -1,5 +1,5 @@
 import { AtelierCoreError, isJsonObject } from "@atelier/core";
-import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesAnthropicSubscription, getAgentModelThinkingLevel } from "@atelier/llm/server";
+import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesProviderSubscription, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { BaseAgentRuntime } from "./base-agent-runtime.ts";
@@ -206,7 +206,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     if (model && !models.some((option) => option.selected)) {
       // Show the current session model for accuracy, but do not offer it as a
       // selectable choice unless it is also in the user's configured models list.
-      const unavailableReason = model.provider === "anthropic" && await usesAnthropicSubscription(this.session.modelRuntime) ? anthropicSubscriptionUnavailableReason : "Model is not configured";
+      const unavailableReason = model.provider === "anthropic" && await usesProviderSubscription(this.session.modelRuntime, "anthropic") ? anthropicSubscriptionUnavailableReason : "Model is not configured";
       models.unshift({ provider: model.provider, id: model.id, name: model.name ?? model.id, selected: true, available: false, unavailableReason });
     }
     return {
@@ -574,7 +574,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     this.followingSetupDefaults = false;
     const model = this.session.modelRuntime.getModel(provider, modelId);
     if (!model) throw new Error(`Model not available: ${provider}/${modelId}`);
-    if (provider === "anthropic" && await usesAnthropicSubscription(this.session.modelRuntime)) throw new AtelierCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
+    if (provider === "anthropic" && await usesProviderSubscription(this.session.modelRuntime, "anthropic")) throw new AtelierCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
     await this.session.setModel(model);
     this.ctx.model = this.currentModel();
     const remembered = await getAgentModelThinkingLevel("builtin", { provider, id: modelId });

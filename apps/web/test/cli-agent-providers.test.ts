@@ -7,7 +7,6 @@ for (const id of ["codex", "claude", "pi"]) {
   test(`${id} adapter validates settings, installs credentials and builds its CLI launch`, async () => {
     const directory = await mkdtemp(join(tmpdir(), `${id}-adapter-`));
     const source = join(import.meta.dir, `../../../packages/${id}-agent/src/server`);
-    const authExport = id === "pi" ? "requirePiModels" : id === "codex" ? "requireCodexSubscription" : "requireClaudeSubscription";
     const model = id === "pi" ? "custom::model" : id === "codex" ? "openai-codex::gpt-5.4" : "anthropic::claude-opus-4-6";
     const npmPackage = id === "pi" ? "@earendil-works/pi-coding-agent@" : id === "codex" ? "@openai/codex@latest" : "@anthropic-ai/claude-code@latest";
     const mcpConfigMarker = id === "codex" ? "config.toml" : id === "claude" ? "claude-mcp.json" : "/pi-atelier";
@@ -23,10 +22,11 @@ for (const id of ["codex", "claude", "pi"]) {
         const credentials = [];
         let authChecks = 0;
         mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
-        mock.module("@atelier/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId) }));
+        mock.module("@atelier/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId), requireProviderSubscription: async () => { authChecks++; } }));
+        const cliAgent = await import("@atelier/cli-agent/server");
+        mock.module("@atelier/cli-agent/server", () => ({ ...cliAgent, createCliModelSettings: () => ({ prepare: async (settings = {}) => settings, renderFooter: async () => "" }) }));
         if (${JSON.stringify(id)} === "pi") mock.module(${JSON.stringify(join(source, "pi-cli.ts"))}, () => ({ installPiCliConfiguration: async (workspaceId) => credentials.push(workspaceId) }));
-        mock.module(${JSON.stringify(join(source, "auth.ts"))}, () => ({ ${authExport}: async () => { authChecks++; } }));
-        mock.module(${JSON.stringify(join(source, "model-settings.ts"))}, () => ({ ${id}ModelSettings: { prepare: async (settings = {}) => settings, renderFooter: async () => "" } }));
+        if (${JSON.stringify(id)} === "pi") mock.module(${JSON.stringify(join(source, "auth.ts"))}, () => ({ requirePiModels: async () => { authChecks++; }, piModelSetupRequired: () => new Error("Pi setup required") }));
         const { atelierServerModule } = await import(${JSON.stringify(join(source, "index.ts"))});
         const provider = atelierServerModule.agentProvider;
         expect(provider.id).toBe(${JSON.stringify(id)});
