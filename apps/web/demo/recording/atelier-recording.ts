@@ -132,6 +132,78 @@ export function buildFfmpegArgs(inputPath: string, outputPath: string, frameRate
 	];
 }
 
+/** Recording-only overlay: normal Playwright pointer events drive it too. */
+function installRecordingPointer(): void {
+	if (window !== window.top) return;
+	const mount = () => {
+		if (document.querySelector("[data-atelier-recording-pointer]")) return;
+		const host = document.createElement("div");
+		host.setAttribute("data-atelier-recording-pointer", "");
+		host.setAttribute("aria-hidden", "true");
+		host.setAttribute("popover", "manual");
+		host.style.cssText = "all:initial;position:fixed;inset:0;width:100vw;height:100vh;margin:0;padding:0;border:0;background:transparent;pointer-events:none;overflow:visible;z-index:2147483647";
+		const shadow = host.attachShadow({ mode: "closed" });
+		shadow.innerHTML = `<style>
+			:host, * { pointer-events: none !important; }
+			.pointer { position:absolute; top:0; left:0; width:44px; height:56px; transform:translate(-2px,-2px); filter:drop-shadow(0 2px 3px #0009); }
+			.pulse { position:absolute; width:48px; height:48px; margin:-24px; border:4px solid #ffcc33; border-radius:50%; box-sizing:border-box; opacity:0; }
+		</style>
+		<div class="pulse"></div>
+		<svg class="pointer" viewBox="0 0 44 56" xmlns="http://www.w3.org/2000/svg">
+			<path d="M3 3 L3 42 L13 32 L23 52 L32 47 L22 28 L38 28 Z" fill="#151515" stroke="white" stroke-width="3" stroke-linejoin="round"/>
+		</svg>`;
+		const pointer = shadow.querySelector<SVGElement>(".pointer")!;
+		const pulse = shadow.querySelector<HTMLElement>(".pulse")!;
+		const move = (x: number, y: number) => {
+			host.dataset.x = String(x);
+			host.dataset.y = String(y);
+			pointer.style.left = `${x}px`;
+			pointer.style.top = `${y}px`;
+		};
+		move(32, 72);
+		document.documentElement.append(host);
+		host.showPopover();
+		document.addEventListener("pointermove", event => move(event.clientX, event.clientY), true);
+		document.addEventListener("pointerdown", event => {
+			move(event.clientX, event.clientY);
+			// Keep the pointer above application dialogs and popovers.
+			host.hidePopover();
+			host.showPopover();
+			pulse.style.left = `${event.clientX}px`;
+			pulse.style.top = `${event.clientY}px`;
+			pulse.getAnimations().forEach(animation => animation.cancel());
+			pulse.animate([
+				{ opacity: 1, transform: "scale(0.5)" },
+				{ opacity: 0, transform: "scale(1.5)" },
+			], { duration: 550, easing: "ease-out" });
+		}, true);
+	};
+	if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount, { once: true });
+	else mount();
+}
+
+async function movePointerTo(locator: Locator): Promise<void> {
+	// A trial click moves the mouse too, which would snap the visible pointer
+	// before animation. Prepare without clicking; locator.click() still performs
+	// its full actionability checks after the approach.
+	await locator.waitFor({ state: "visible" });
+	await locator.scrollIntoViewIfNeeded();
+	const box = await locator.boundingBox();
+	if (!box) throw new Error("Recording click target has no visible bounding box");
+	const page = locator.page();
+	const from = await page.evaluate(() => {
+		const pointer = document.querySelector<HTMLElement>("[data-atelier-recording-pointer]")!;
+		return { x: Number(pointer.dataset.x), y: Number(pointer.dataset.y) };
+	});
+	const to = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+	for (let step = 1; step <= 24; step++) {
+		const progress = step / 24;
+		const eased = progress * progress * (3 - 2 * progress);
+		await page.mouse.move(from.x + (to.x - from.x) * eased, from.y + (to.y - from.y) * eased);
+		await delay(16);
+	}
+}
+
 export async function createAtelierRecording(options: AtelierRecordingOptions): Promise<AtelierRecording> {
 	const paths = recordingPaths(options.name, options.artifactRoot);
 	const viewport = normalizeViewport(options.viewport);
@@ -151,7 +223,10 @@ export async function createAtelierRecording(options: AtelierRecordingOptions): 
 		await rm(captureDirectory, { recursive: true, force: true });
 		throw error;
 	}
+	await context.addInitScript(installRecordingPointer);
 	const page = await context.newPage();
+	// setContent also replaces the document, without running init scripts.
+	page.on("domcontentloaded", () => page.evaluate(installRecordingPointer));
 	const playwrightVideoPath = await page.video()!.path();
 	let finalized = false;
 
@@ -173,6 +248,7 @@ export async function createAtelierRecording(options: AtelierRecordingOptions): 
 			const afterMs = actionOptions.afterMs ?? timings.afterClickMs;
 			assertNonNegativeNumber(beforeMs, "click beforeMs");
 			assertNonNegativeNumber(afterMs, "click afterMs");
+			await movePointerTo(locator);
 			await delay(beforeMs);
 			await locator.click();
 			await delay(afterMs);
@@ -184,6 +260,7 @@ export async function createAtelierRecording(options: AtelierRecordingOptions): 
 			assertNonNegativeNumber(beforeMs, "type beforeMs");
 			assertNonNegativeNumber(keyDelayMs, "type keyDelayMs");
 			assertNonNegativeNumber(afterMs, "type afterMs");
+			await movePointerTo(locator);
 			await delay(beforeMs);
 			await locator.pressSequentially(text, { delay: keyDelayMs });
 			await delay(afterMs);
