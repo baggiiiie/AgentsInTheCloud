@@ -179,13 +179,13 @@ function fileConflictDialog(): string {
   const useTheirsButton = buttonHtml({
     type: "button",
     variant: "secondary",
-    content: { kind: "caption", caption: "Use theirs" },
+    content: { kind: "caption", caption: "Keep saved file" },
     attributesHtml: 'data-action="file-editor#useTheirs"',
   });
   const useMineButton = buttonHtml({
     type: "button",
-    variant: "primary",
-    content: { kind: "caption", caption: "Use mine" },
+    variant: "secondary",
+    content: { kind: "caption", caption: "Keep my edits" },
     attributesHtml: 'data-action="file-editor#useMine"',
   });
   return dialogHtml({
@@ -196,9 +196,9 @@ function fileConflictDialog(): string {
     iconHtml: Icons.Files,
     titleCaption: "File changed on disk",
     bodyHtml: `<div class="file-conflict-comparison">
-      <p>Compare both versions before choosing. Use theirs discards your edits. Use mine overwrites the file on disk. Dismiss to keep editing without resolving the conflict.</p>
-      <label>Theirs — current file on disk<textarea class="textarea" data-file-editor-target="conflictTheirs" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
-      <label>Mine — your unsaved edits<textarea class="textarea" data-file-editor-target="conflictMine" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
+      <p>The saved file changed while you were editing it.</p><p>Choose which version to keep. The other version’s changes will be lost.</p>
+      <label>Saved file<textarea class="textarea" data-file-editor-target="conflictTheirs" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
+      <label>Your unsaved edits<textarea class="textarea" data-file-editor-target="conflictMine" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
     </div>`,
     footerHtml: `${useTheirsButton}${useMineButton}`,
     closeLabel: "Dismiss file conflict",
