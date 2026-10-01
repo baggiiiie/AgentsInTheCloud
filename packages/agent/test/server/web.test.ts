@@ -261,10 +261,10 @@ describe("Workspace Agent-tab provider", () => {
     const draftId = agentAttachmentDraftId("workspace-1", conversation.conversationId);
     const attachment = await stageAttachment(draftId, new File(["image"], "reference.png", { type: "image/png" }));
     await stageInitialPrompt("workspace-1", conversation.conversationId, "Draft task");
-    const submissions: Array<{ text: string; imageCount: number }> = [];
+    const submissions: Array<{ text: string; imageCount: number; requestId?: string }> = [];
     const runtime = {
-      async submit(text: string, options: { images?: unknown[] }): Promise<void> {
-        submissions.push({ text, imageCount: options.images?.length ?? 0 });
+      async submit(text: string, options: { images?: unknown[]; requestId?: string }): Promise<void> {
+        submissions.push({ text, imageCount: options.images?.length ?? 0, requestId: options.requestId });
       },
       userMessages: () => [],
       currentModel: () => undefined,
@@ -272,7 +272,7 @@ describe("Workspace Agent-tab provider", () => {
     const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
       headers: { accept: "text/vnd.turbo-stream.html" },
-      body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id }),
+      body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id, requestId: "image-request" }),
     });
 
     const response = await handleAgentRequest(request, new URL(request.url), {
@@ -284,7 +284,7 @@ describe("Workspace Agent-tab provider", () => {
     expect(response?.status).toBe(200);
     expect(response?.headers.get("x-atelier-attachment-draft-consumed")).toBe("true");
     expect(html).toBe("");
-    expect(submissions).toEqual([{ text: "", imageCount: 1 }]);
+    expect(submissions).toEqual([{ text: "", imageCount: 1, requestId: "image-request" }]);
     expect(await readInitialPromptDraft("workspace-1", conversation.conversationId)).toBeUndefined();
     expect(await findStagedAttachment(draftId, attachment.id)).toBeUndefined();
   });
@@ -373,4 +373,28 @@ describe("Workspace Agent-tab provider", () => {
     expect(await response?.json()).toEqual({ agent: { conversationId: conversation.conversationId, state: "running" } });
     expect(submissions).toEqual(["Keep going"]);
   });
+  test("message request identities are forwarded unchanged and invalid identities reject before runtime admission", async () => {
+    await dataDir();
+    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const admissions: string[] = [];
+    const runtime = {
+      async submit(_text: string, options: { requestId: string }) { admissions.push(options.requestId); },
+      userMessages: () => [],
+      currentModel: () => undefined,
+    };
+    for (const requestId of ["browser_retry-123", "browser_retry-123", "", "has spaces", "x".repeat(129), 42]) {
+      const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+        method: "POST", headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ text: "Hello", requestId }),
+      });
+      const response = await handleAgentRequest(request, new URL(request.url), {
+        // SAFETY: This route fixture supplies only the operations message admission uses.
+        getRuntime: async () => runtime as never,
+        suggestTitleFromPrompt: () => {},
+      });
+      expect(response?.status).toBe(requestId === "browser_retry-123" ? 202 : 422);
+    }
+    expect(admissions).toEqual(["browser_retry-123", "browser_retry-123"]);
+  });
+
 });
