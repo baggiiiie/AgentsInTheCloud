@@ -22,7 +22,7 @@ for (const id of ["codex", "claude", "pi"]) {
         const credentials = [];
         let authChecks = 0;
         mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
-        mock.module("@atelier/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId), requireProviderSubscription: async () => { authChecks++; } }));
+        mock.module("@atelier/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId), requireProviderSubscription: async (_runtime, provider) => { expect(provider).toBe(${JSON.stringify(id === "codex" ? "openai-codex" : "anthropic")}); authChecks++; } }));
         const cliAgent = await import("@atelier/cli-agent/server");
         mock.module("@atelier/cli-agent/server", () => ({ ...cliAgent, createCliModelSettings: () => ({ prepare: async (settings = {}) => settings, renderFooter: async () => "" }) }));
         if (${JSON.stringify(id)} === "pi") mock.module(${JSON.stringify(join(source, "pi-cli.ts"))}, () => ({ installPiCliConfiguration: async (workspaceId) => credentials.push(workspaceId) }));

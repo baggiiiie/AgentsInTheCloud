@@ -5,7 +5,7 @@ import { anthropicUsageSource } from "../../src/server/anthropic-subscription-us
 import { forgetSubscriptionInference, providersInLastInferenceWindow } from "../../src/server/recent-subscription-activity.ts";
 
 test("Codex receives ChatGPT auth, not API-key auth or refresh credentials", () => {
-  const file = subscriptionCliFiles().find((file) => file.provider === "openai")!;
+  const file = subscriptionCliFiles().find((file) => file.provider === "openai-codex")!;
   const auth = JSON.parse(file.content);
   expect(auth.auth_mode).toBe("chatgpt");
   expect(auth.OPENAI_API_KEY).toBeNull();
@@ -24,7 +24,7 @@ test("Codex routing discovery sees its placeholder as the selected account witho
     { id: "other-account" },
   ], account_ordering: ["other-account", "account-123"], default_account_id: "account-123" }), { headers: { "content-length": "200", "content-type": "application/json" } });
   const translated = await maskCodexAccountDiscovery(response, "account-123");
-  const selected = JSON.parse(subscriptionCliFiles().find(file => file.provider === "openai")!.content).tokens.account_id;
+  const selected = JSON.parse(subscriptionCliFiles().find(file => file.provider === "openai-codex")!.content).tokens.account_id;
   expect(await translated.json()).toEqual({ accounts: [
     { id: selected, workspace_backend_origin: "https://chatgpt.com", account_routing_override: "NO_CONSTRAINT" },
     { id: "other-account" },
@@ -111,13 +111,13 @@ test("workspace proxy records Claude Code's subscription limits only for Atelier
   warn.mockRestore();
 });
 
-test("OpenAI subscription placeholders resolve only on ChatGPT and the OpenAI API", async () => {
+test("Codex placeholders use legacy OAuth when both OpenAI subscriptions are connected", async () => {
   const token = `header.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "account-123" } })).toString("base64url")}.signature`;
+  const directApiToken = `header.${Buffer.from(JSON.stringify({ aud: "https://api.openai.com/v1" })).toString("base64url")}.signature`;
   // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
-  registerSubscriptionCli(async () => ({ getAuth: async (provider: string) => {
-    expect(provider).toBe("openai");
-    return { source: "OAuth", auth: { apiKey: token } };
-  } }) as any);
+  registerSubscriptionCli(async () => ({ getAuth: async (provider: string) => ({
+    source: "OAuth", auth: { apiKey: provider === "openai-codex" ? token : directApiToken },
+  }) }) as any);
   const context = await createWorkspaceSecretContext("openai-hosts-test");
   for (const host of ["chatgpt.com", "api.openai.com"]) {
     // SAFETY: The workspace secret context returns a rewritten Request for these matched hosts.
