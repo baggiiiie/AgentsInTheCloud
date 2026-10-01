@@ -108,6 +108,52 @@ describe("Durable workspace journal", () => {
     await open(path, options);
   });
 
+  test.each(["suspend", "stop"] as const)("%s distinguishes host shutdown from withdrawing queued steering", async (operation) => {
+    const path = await directory();
+    const options = provider();
+    const started = Promise.withResolvers<void>();
+    options.registry.install(defineExtension({ name: "blocking", tools: [defineTool({
+      name: "block", description: "Hold a tool round open", parameters: Type.Object({}),
+      async execute(_args, _api, invocation) {
+        started.resolve();
+        return await new Promise<never>((_resolve, reject) => {
+          invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+        });
+      },
+    })] }));
+    options.faux.setResponses([
+      fauxAssistantMessage([{ type: "toolCall", id: "blocking-call", name: "block", arguments: {} }], { stopReason: "toolUse" }),
+      (request) => {
+        expect(request.messages.some((message) => message.role === "user" && JSON.stringify(message.content).includes("Use the steered instruction"))).toBe(true);
+        return fauxAssistantMessage("Steering survived shutdown.");
+      },
+    ]);
+    const first = await open(path, options);
+    const conversation = await first.conversation(record, agent);
+    const initial = await conversation.submit({ type: "input", content: "Begin", requestId: "initial" }, context);
+    await started.promise;
+    const steer = await conversation.submit({ type: "input", content: "Use the steered instruction", whenBusy: "steer", requestId: "steer" }, context);
+    expect((await steer.status(context)).status).toBe("queued");
+    if (operation === "stop") {
+      await conversation.abort(context);
+      expect((await initial.status(context)).status).toBe("unanswered");
+      expect((await steer.status(context)).status).toBe("unanswered");
+    }
+    await first.close();
+    const reopened = await open(path, options);
+    const restoredSteer = (await reopened.harness.submission(steer.id, context))!;
+    if (operation === "suspend") {
+      expect((await restoredSteer.status(context)).status).toBe("queued");
+      expect((await restoredSteer.wait(context)).status).toBe("done");
+      expect((await (await reopened.harness.submission(initial.id, context))!.status(context)).status).toBe("done");
+      expect(options.faux.state.callCount).toBe(2);
+    } else {
+      expect((await restoredSteer.status(context)).status).toBe("unanswered");
+      expect((await reopened.harness.inspect(context)).tasks).toHaveLength(0);
+      expect(options.faux.state.callCount).toBe(1);
+    }
+  });
+
   test.each(["unsafe", "safe"] as const)("recovers a SIGKILL during a %s tool without losing admission", async (replay) => {
     const path = await directory();
     const child = Bun.spawn([process.execPath, join(import.meta.dir, "fixtures/durable-crash.ts"), path, replay], {
