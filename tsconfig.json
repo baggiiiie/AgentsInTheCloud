@@ -59,6 +59,7 @@
   },
   "include": [
     "apps/**/*.ts",
-    "packages/**/*.ts"
+    "packages/**/*.ts",
+    "tools/ios-serve-sim/**/*.ts"
   ]
 }
