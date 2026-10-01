@@ -1,0 +1,161 @@
+#!/usr/bin/python3
+"""Workspace-owned bash receipts. Host disconnects never own the command lifetime."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import signal
+import subprocess
+import sys
+import time
+
+
+def save(path, value):
+    temporary = path.with_suffix(".tmp")
+    with temporary.open("w") as stream:
+        json.dump(value, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    sync_directory(path.parent)
+
+
+def sync_directory(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def load(path):
+    return json.loads(path.read_text())
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", choices=["ensure", "status", "stop", "run"])
+    parser.add_argument("request", help="Immutable operation identity, command and deadline as JSON")
+    parser.add_argument("--root", default="/home/atelier/.local/state/atelier/agent-bash")
+    parser.add_argument("--socket", help="tmux socket path (for isolated execution)")
+    parser.add_argument("--create", action="store_true")
+    args = parser.parse_args()
+    request = json.loads(args.request)
+    if not re.fullmatch(r"[a-f0-9-]{36}", request["id"]):
+        raise ValueError("Invalid operation ID")
+    if not isinstance(request["command"], str) or not isinstance(request["deadline"], (int, float)):
+        raise ValueError("Invalid command or deadline")
+    root = Path(args.root)
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    operation = root / request["id"]
+    session = "atelier-agent-" + request["id"]
+    tmux = ["tmux", "-N"] + (["-S", args.socket] if args.socket else [])
+
+    def tmux_call(*command, check=True):
+        result = subprocess.run(tmux + list(command), capture_output=True, text=True)
+        if check and result.returncode != 0:
+            raise RuntimeError(result.stderr.strip())
+        return result
+
+    def alive():
+        return tmux_call("has-session", "-t", session, check=False).returncode == 0
+
+    def result():
+        if (operation / "result.json").exists():
+            value = load(operation / "result.json")
+            if alive():
+                tmux_call("kill-session", "-t", session)
+            return value
+        if not (operation / "intent.json").exists():
+            return {"status": "uncertain", "message": f"Command receipt is missing; the command was not relaunched. Receipt directory: {operation}"}
+        if alive():
+            dead = tmux_call("display-message", "-p", "-t", session, "#{pane_dead}").stdout.strip()
+            if dead == "0":
+                return {"status": "running", "session": session}
+        return {"status": "uncertain", "message": f"Command supervisor disappeared before recording a result; the command was not relaunched. Receipt directory: {operation}"}
+
+    if args.action == "run":
+        # This invocation lives in the workspace's tmux pane, not in the host's
+        # connection. Only an explicit stop receipt, deadline, or pane teardown
+        # terminates the process group. Normal host shutdown writes none of these.
+        stopped = False
+
+        def stop_signal(_signum, _frame):
+            nonlocal stopped
+            stopped = True
+
+        for signum in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
+            signal.signal(signum, stop_signal)
+        tmux_call("set-window-option", "-t", session, "remain-on-exit", "on")
+        tmux_call("set-window-option", "-t", session, "remain-on-exit-format", "")
+        log = operation / "output.log"
+        tmux_call("pipe-pane", "-o", "-t", session, "umask 077; cat > " + shlex.quote(str(log)))
+        env = dict(os.environ)
+        env.pop("NO_COLOR", None)
+        env.update(request["env"])
+        expired = time.time() * 1000 >= request["deadline"]
+        aborted = (operation / "stop.json").exists() or stopped
+        exit_code = None
+        if not expired and not aborted:
+            child = subprocess.Popen(["bash", "-c", request["command"]], env=env, start_new_session=True)
+            while child.poll() is None:
+                expired = time.time() * 1000 >= request["deadline"]
+                aborted = (operation / "stop.json").exists() or stopped
+                if expired or aborted:
+                    # Kill the group even if the immediate shell exits on TERM.
+                    # Commands deliberately detached into another session are not owned.
+                    try:
+                        os.killpg(child.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass  # The command exited between poll and signal.
+                    time.sleep(0.1)
+                    try:
+                        os.killpg(child.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass  # The entire command group already exited.
+                    break
+                time.sleep(0.05)
+            exit_code = child.wait()
+        # Let tmux consume the PTY's final writes before retaining its rendered tail.
+        time.sleep(0.05)
+        pane = tmux_call("capture-pane", "-p", "-J", "-S", "-100000", "-t", session)
+        ansi = tmux_call("capture-pane", "-p", "-e", "-J", "-S", "-100000", "-t", session)
+        save(operation / "result.json", {"status": "done", "exitCode": exit_code, "aborted": aborted,
+             "timedOut": expired and not aborted, "output": pane.stdout, "displayAnsi": ansi.stdout,
+             "fullOutputPath": str(log)})
+        return
+
+    # Serialize admission and Stop on the workspace, including a response-lost
+    # retry. The intent is fsynced BEFORE tmux creation. A reserved-but-not-launched
+    # operation is uncertain, never a reason to run the command a second time.
+    with (root / (request["id"] + ".lock")).open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if (operation / "intent.json").exists() and load(operation / "intent.json") != request:
+            raise ValueError("Operation identity was reused with different input")
+        if args.action == "stop":
+            operation.mkdir(exist_ok=True, mode=0o700)
+            sync_directory(root)
+            save(operation / "stop.json", True)
+            if not (operation / "intent.json").exists():
+                save(operation / "intent.json", request)
+                save(operation / "result.json", {"status": "done", "exitCode": None, "aborted": True,
+                     "timedOut": False, "output": "", "displayAnsi": "", "fullOutputPath": str(operation / "output.log")})
+        elif args.action == "ensure" and not operation.exists() and args.create:
+            operation.mkdir(mode=0o700)
+            sync_directory(root)
+            save(operation / "intent.json", request)
+            command = [sys.executable, str(Path(__file__).resolve()), "run", args.request, "--root", str(root)]
+            if args.socket:
+                command += ["--socket", args.socket]
+            tmux_call("new-session", "-d", "-s", session, "-x", "120", "-y", "30", "-c", request["cwd"],
+                      "exec " + shlex.join(command), ";", "set-option", "-t", session, "window-size", "manual",
+                      ";", "set-option", "-t", session, "status", "off",
+                      ";", "set-option", "-t", session, "history-limit", "100000")
+        print(json.dumps(result()))
+
+
+if __name__ == "__main__":
+    main()

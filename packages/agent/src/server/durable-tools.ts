@@ -60,6 +60,7 @@ export function createDurableWorkspaceTools(workspaceId: string, options: Worksp
     durableWorkspaceTool(createEditTool(workspaceRoot, operations.edit)),
     ...createAtelierControlTools(workspaceId, { ...options, embeds: true }).map((tool) => durableWorkspaceTool(tool)),
     // Do not adapt legacy bash: its abort signal kills work on host suspension.
-    // Bash needs its own recoverable operation receipt before installation here.
+    // Install createDurableBashExtension alongside these tools; it owns the
+    // receipt-backed bash task as well as the tool registration.
   ];
 }

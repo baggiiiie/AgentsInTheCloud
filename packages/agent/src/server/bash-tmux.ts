@@ -96,18 +96,44 @@ export function stripTmuxPaneFraming(text: string): string {
   return stripObservablePaneFraming(text);
 }
 
+export function formatBashOutput(modelPane: string, displayPane: string, fullOutputPath: string) {
+  const modelLines = limitModelLines(plainModelOutput(stripTmuxPaneFraming(modelPane)));
+  const modelLimited = truncateTail(modelLines.text);
+  let output = modelLimited.content;
+  const modelTruncated = modelLimited.truncated || modelLines.linesTruncated > 0;
+  let truncationNotice = "";
+  if (modelTruncated) {
+    const reasons = [];
+    if (modelLimited.truncated) reasons.push(`showing the last ${formatSize(modelLimited.outputBytes)} of output`);
+    if (modelLines.linesTruncated > 0) reasons.push(`${modelLines.linesTruncated} line${modelLines.linesTruncated === 1 ? "" : "s"} shortened to ${maxModelLineChars} characters`);
+    truncationNotice = `[Output truncated: ${reasons.join("; ")}. Full output: ${fullOutputPath}]`;
+    output += `\n\n${truncationNotice}`;
+  }
+
+  const displayLimited = truncateTail(stripTmuxPaneFraming(displayPane), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
+  let displayAnsi = normalizeCarriageReturns(displayLimited.content).trimEnd();
+  if (displayLimited.truncated) displayAnsi = `… output truncated to last ${maxDisplayAnsiBytes} bytes\n${displayAnsi}`;
+  if (truncationNotice) displayAnsi += `\n\n${truncationNotice}`;
+
+  return { output, displayAnsi, modelTruncated };
+}
+
+export const bashToolDefinition = {
+  name: "bash",
+  label: "Bash",
+  description: `the bash toolcall will be executed inside of a tmux session for visibility. the visualizer supports ANSI colors; use them whenever possible, but colors are stripped before output is returned to the model. output shown to the model is limited to the last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB, and individual lines are shortened to ${maxModelLineChars} characters; truncated full output is saved to a temporary file. avoid redirecting output to nowhere. avoid the programs you're invoking from attempting to read from stdin, as that will hang the toolcall.`,
+  parameters: Type.Object({
+    command: Type.String({ description: "The bash command to execute" }),
+    timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default 600)" })),
+  }),
+};
+
 export function createTmuxBashTool(
   workspaceId: string,
   runWorkspaceShell: ExecWorkspaceShell = execWorkspaceShell,
 ): ToolDefinition<any, any> {
   return defineTool({
-    name: "bash",
-    label: "Bash",
-    description: `the bash toolcall will be executed inside of a tmux session for visibility. the visualizer supports ANSI colors; use them whenever possible, but colors are stripped before output is returned to the model. output shown to the model is limited to the last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB, and individual lines are shortened to ${maxModelLineChars} characters; truncated full output is saved to a temporary file. avoid redirecting output to nowhere. avoid the programs you're invoking from attempting to read from stdin, as that will hang the toolcall.`,
-    parameters: Type.Object({
-      command: Type.String({ description: "The bash command to execute" }),
-      timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default 600)" })),
-    }),
+    ...bashToolDefinition,
     execute: async (_toolCallId: string, params: { command: string; timeout?: number }, signal?: AbortSignal, onUpdate?: (partial: any) => void) => {
       const sessionName = `${agentTmuxPrefix}${crypto.randomUUID().slice(0, 8)}`;
       const exitFile = `/tmp/${sessionName}.exit`;
@@ -181,23 +207,7 @@ printf '%s\\n' "$status" > ${shellQuote(exitFile)}`;
       const modelPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit, ansi: false }));
       const displayPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit }));
 
-      const modelLines = limitModelLines(plainModelOutput(stripTmuxPaneFraming(modelPane.stdout)));
-      const modelLimited = truncateTail(modelLines.text);
-      let output = modelLimited.content;
-      const modelTruncated = modelLimited.truncated || modelLines.linesTruncated > 0;
-      let truncationNotice = "";
-      if (modelTruncated) {
-        const reasons = [];
-        if (modelLimited.truncated) reasons.push(`showing the last ${formatSize(modelLimited.outputBytes)} of output`);
-        if (modelLines.linesTruncated > 0) reasons.push(`${modelLines.linesTruncated} line${modelLines.linesTruncated === 1 ? "" : "s"} shortened to ${maxModelLineChars} characters`);
-        truncationNotice = `[Output truncated: ${reasons.join("; ")}. Full output: ${fullOutputPath}]`;
-        output += `\n\n${truncationNotice}`;
-      }
-
-      const displayLimited = truncateTail(stripTmuxPaneFraming(displayPane.stdout), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
-      let displayAnsi = normalizeCarriageReturns(displayLimited.content).trimEnd();
-      if (displayLimited.truncated) displayAnsi = `… output truncated to last ${maxDisplayAnsiBytes} bytes\n${displayAnsi}`;
-      if (truncationNotice) displayAnsi += `\n\n${truncationNotice}`;
+      const { output, displayAnsi, modelTruncated } = formatBashOutput(modelPane.stdout, displayPane.stdout, fullOutputPath);
 
       const removeFullOutput = modelTruncated ? "" : `rm -f ${shellQuote(fullOutputPath)}; `;
       await runWorkspaceShell(workspaceId, `${buildKillSessionCommand(sessionName)}; rm -f ${shellQuote(exitFile)}; ${removeFullOutput}true`);
