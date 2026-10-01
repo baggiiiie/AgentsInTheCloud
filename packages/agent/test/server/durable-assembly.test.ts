@@ -1,0 +1,87 @@
+import { afterEach, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
+import { AgentDoc } from "@earendil-works/pi-durable";
+import { createDurableWorkspaceRegistry, prepareDurableConversation } from "../../src/server/durable-assembly.ts";
+import { openDurableWorkspace, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
+import { workspaceSkillsFromFiles } from "../../src/server/skills.ts";
+import { registerWorkspaceAgentTool } from "../../src/server/tools.ts";
+import { defineWorkspaceTool } from "../../src/server/workspace-tool.ts";
+import { Type } from "typebox";
+
+const context = BACKGROUND_CONTEXT;
+const workspaces: DurableWorkspace[] = [];
+const paths: string[] = [];
+afterEach(async () => {
+  await Promise.all(workspaces.splice(0).map((workspace) => workspace.close()));
+  await Promise.all(paths.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
+
+const resources = {
+  agents: async () => [{ path: "/work/AGENTS.md", content: "Keep the important invariant." }],
+  skills: async () => workspaceSkillsFromFiles([{ path: "/work/.agents/skills/review/SKILL.md", content: "---\nname: review\ndescription: Review the implementation\n---\nPrivate skill body" }]),
+  model: async () => ({ provider: "faux", id: "faux-1" }),
+};
+
+test("native registry includes registered controls and receipt tasks, but no live delegation", () => {
+  const unregister = registerWorkspaceAgentTool("assembly-control", () => defineWorkspaceTool({
+    name: "assembly-control", label: "Control", description: "Test control", parameters: Type.Object({}),
+    async execute() { return { content: [{ type: "text", text: "done" }], details: undefined }; },
+  }));
+  try {
+    const registry = createDurableWorkspaceRegistry("assembly-workspace", {}, []);
+    const tools = registry.snapshot().tools().map(({ tool }) => tool);
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["assembly-control", "bash", "edit", "read", "write"]);
+    expect(tools.find((tool) => tool.name === "read")?.replay).toBe("safe");
+    expect(tools.find((tool) => tool.name === "assembly-control")?.replay).toBe("unsafe");
+    expect(registry.snapshot().task("atelier.bash-operation")).toBeDefined();
+  } finally { unregister(); }
+});
+
+test("prepares workspace instructions and skill discovery without loading skill bodies into the prompt", async () => {
+  const agent = await prepareDurableConversation("assembly-workspace", "tab", {}, {}, resources);
+  expect(agent.model).toEqual({ provider: "faux", modelId: "faux-1" });
+  expect(agent.cwd).toBe("/work");
+  expect(agent.instructions).toContain("online coding tool called Atelier");
+  expect(agent.instructions).toContain("Keep the important invariant.");
+  expect(agent.instructions).toContain("/work/.agents/skills/review/SKILL.md");
+  expect(agent.instructions).not.toContain("Private skill body");
+  const explicit = await prepareDurableConversation("assembly-workspace", "tab", {}, { model: null, thinkingLevel: "high" }, {
+    ...resources, model: async () => { throw new Error("Must not resolve the default when explicitly set"); },
+  });
+  expect(explicit.model).toBeNull();
+  expect(explicit.thinkingLevel).toBe("high");
+});
+
+test("assembled native Harness uses the committed prompt and model across reopen, not new host defaults", async () => {
+  const path = await mkdtemp(join(tmpdir(), "atelier-durable-assembly-"));
+  paths.push(path);
+  const models = createModels();
+  const faux = fauxProvider({ tokensPerSecond: 100_000 });
+  models.setProvider(faux.provider);
+  faux.setResponses([(request) => {
+    expect(JSON.stringify(request)).toContain("Keep the important invariant.");
+    expect(JSON.stringify(request)).not.toContain("Changed host instructions");
+    return fauxAssistantMessage("Native assembly works.");
+  }]);
+  const open = async () => {
+    const workspace = await openDurableWorkspace(path, "assembly-workspace", { models, registry: createDurableWorkspaceRegistry("assembly-workspace", {}, []) });
+    workspaces.push(workspace);
+    return workspace;
+  };
+  const record = { conversationId: "tab", title: "Assembly", label: "Agent 1" };
+  const first = await open();
+  const prepared = await prepareDurableConversation("assembly-workspace", "tab", {}, {}, resources);
+  const conversation = await first.conversation(record, prepared);
+  await first.close();
+  const second = await open();
+  const restored = await second.conversation(record, { model: { provider: "missing", modelId: "wrong" }, instructions: "Changed host instructions" });
+  expect(restored.id).toBe(conversation.id);
+  expect((await second.harness.snapshot(AgentDoc, restored.id, context))?.instructions).toBe(prepared.instructions!);
+  const submission = await restored.submit({ type: "input", content: "Check assembly", requestId: "assembly-request" }, context);
+  expect((await submission.wait(context)).status).toBe("done");
+  expect(faux.state.callCount).toBe(1);
+});
