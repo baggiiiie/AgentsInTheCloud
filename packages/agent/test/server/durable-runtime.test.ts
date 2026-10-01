@@ -33,6 +33,7 @@ async function setup() {
     harness: async () => ({ models, registry }),
     prepare: async (): Promise<AgentChange> => ({ model: { provider: "faux", modelId: "small" }, instructions: "Committed instructions", thinkingLevel: "off" }),
     expand: async (_workspace: string, text: string) => text,
+    ready: async (_workspace: string) => {},
   };
   const open = async () => {
     const runtime = await openDurableAgentRuntime(path, "native-workspace", {}, load);
@@ -136,7 +137,7 @@ test.each(["suspend", "stop"] as const)("native %s preserves or withdraws commit
   expect((await duplicate.status(context)).status).toBe(operation === "suspend" ? "queued" : "unanswered");
   expect(faux.state.callCount).toBe(1);
   if (operation === "suspend") {
-    reopened.resume();
+    await reopened.resume();
     expect((await duplicate.wait(context)).status).toBe("done");
     expect(faux.state.callCount).toBe(2);
   } else {
@@ -290,7 +291,7 @@ test.each(["close", "delete"] as const)("recovery after %s gate commit marks wor
   watch.start(async (value) => { if (!value.docs["pi.live"]?.run) idle.resolve(); });
   expect(executions).toBe(1);
   expect(faux.state.callCount).toBe(1);
-  reopened.resume();
+  await reopened.resume();
   await idle.promise;
   await watch.stop();
   expect(executions).toBe(1);
@@ -372,4 +373,139 @@ test("title changes serialize with commands and cannot cross a close fence", asy
   await expect(title).rejects.toThrow("closed");
   await close;
   expect((await runtime.catalog())[0]?.title).toBe(record.title);
+});
+
+test("reopened reads and known requests stay passive; new execution waits for workspace readiness", async () => {
+  const { runtime, faux, load, open } = await setup();
+  faux.setResponses([fauxAssistantMessage("Saved"), fauxAssistantMessage("New")]);
+  const agent = await runtime.conversation(record);
+  const saved = await agent.submit({ requestId: "saved", text: "Original" });
+  await saved.wait(context);
+  await runtime.suspend();
+  const entered = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  let probes = 0;
+  load.ready = async () => { probes++; entered.resolve(); await ready.promise; };
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  await reopened.catalog();
+  await restored.history({}, 100, undefined, context);
+  const watch = await restored.watch(context);
+  await watch.stop();
+  expect((await restored.submit({ requestId: "saved", text: "Retry" })).id).toBe(saved.id);
+  expect(probes).toBe(0);
+  const pending = restored.submit({ requestId: "new", text: "New input" });
+  await entered.promise;
+  expect(faux.state.callCount).toBe(1);
+  expect(JSON.stringify((await restored.history({}, 100, undefined, context)).items)).not.toContain("New input");
+  ready.resolve();
+  await (await pending).wait(context);
+  expect(probes).toBe(1);
+  expect(faux.state.callCount).toBe(2);
+});
+
+test("readiness failure rejects before prompt preparation and admission, and a later command can retry", async () => {
+  const { runtime, faux, load } = await setup();
+  load.ready = async () => { throw new Error("Workspace offline"); };
+  await expect(runtime.conversation(record)).rejects.toThrow("Workspace offline");
+  expect(await runtime.catalog()).toEqual([]);
+  load.ready = async () => {};
+  const agent = await runtime.conversation(record);
+  load.ready = async () => { throw new Error("Workspace offline again"); };
+  await expect(agent.submit({ requestId: "retryable", text: "Not admitted" })).rejects.toThrow("Workspace offline again");
+  await expect(agent.compact()).rejects.toThrow("Workspace offline again");
+  await expect(runtime.resume()).rejects.toThrow("Workspace offline again");
+  expect((await agent.history({}, 100, undefined, context)).items).toHaveLength(0);
+  expect(faux.state.callCount).toBe(0);
+  load.ready = async () => {};
+  faux.setResponses([fauxAssistantMessage("Recovered")]);
+  await (await agent.submit({ requestId: "retryable", text: "Now admitted" })).wait(context);
+  expect(faux.state.callCount).toBe(1);
+});
+
+test.each(["suspend", "close", "delete"] as const)("%s during readiness prevents late admission", async (operation) => {
+  const { runtime, faux, load } = await setup();
+  const agent = await runtime.conversation(record);
+  const entered = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  load.ready = async () => { entered.resolve(); await ready.promise; };
+  const pending = agent.submit({ requestId: "late", text: "Must not run" });
+  await entered.promise;
+  const ending = operation === "close" ? agent.close() : operation === "delete" ? runtime.delete() : runtime.suspend();
+  ready.resolve();
+  await expect(pending).rejects.toThrow(operation === "suspend" ? "suspended" : operation === "close" ? "closed" : "deleted");
+  await ending;
+  expect(faux.state.callCount).toBe(0);
+});
+
+test("recovery cannot replay a tool until the execution workspace is ready", async () => {
+  const { runtime, faux, load, registry, open } = await setup();
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "ready-probe", tools: [defineTool({
+    name: "probe", description: "Replay only after readiness", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, invocation) {
+      executions++;
+      if (executions > 1) return { content: [{ type: "text", text: "Recovered tool" }] };
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([
+    fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage("Recovered answer"),
+  ]);
+  const agent = await runtime.conversation(record);
+  await agent.submit({ requestId: "recover", text: "Begin" });
+  await started.promise;
+  await runtime.suspend();
+  const entered = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  load.ready = async () => { entered.resolve(); await ready.promise; };
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  const recovery = reopened.resume();
+  await entered.promise;
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  ready.resolve();
+  await recovery;
+  await (await restored.submit({ requestId: "recover", text: "Retry" })).wait(context);
+  expect(executions).toBe(2);
+  expect(faux.state.callCount).toBe(2);
+});
+
+test.each(["close", "delete"] as const)("%s persists its fence even if cleanup readiness fails, and cleanup can be retried", async (operation) => {
+  const { runtime, faux, load, registry, open } = await setup();
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "offline-close", tools: [defineTool({
+    name: "hold", description: "Must never replay", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, invocation) {
+      executions++;
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" })]);
+  const agent = await runtime.conversation(record);
+  await agent.submit({ requestId: "offline", text: "Begin" });
+  await started.promise;
+  await runtime.suspend();
+  load.ready = async () => { throw new Error("Cleanup workspace offline"); };
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  await expect(operation === "close" ? restored.close() : reopened.delete()).rejects.toThrow("Cleanup workspace offline");
+  await expect(restored.submit({ requestId: "offline", text: "Retry" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
+  load.ready = async () => {};
+  await (operation === "close" ? restored.close() : reopened.delete());
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  await reopened.suspend();
+  const retained = await (await open()).conversation(record);
+  await expect(retained.setTitle("Cannot reopen")).rejects.toThrow(operation === "close" ? "closed" : "deleted");
 });

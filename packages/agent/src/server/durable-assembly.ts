@@ -5,6 +5,7 @@ import { createPiModelRuntime } from "@atelier/llm/server";
 import { workspaceRoot } from "@atelier/workspace";
 import { createDurableWorkspaceTools } from "./durable-tools.ts";
 import { createDurableBashExtension } from "./durable-bash.ts";
+import { durableJournalInstructions } from "./durable-storage.ts";
 import { createRegisteredDurableOnboardingExtensions } from "./durable-onboarding.ts";
 import { loadWorkspaceAgentsFiles } from "./workspace-agents-files.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
@@ -63,6 +64,7 @@ export async function prepareDurableConversation(
     : (await load.thinking(selectedModel ? { provider: selectedModel.provider, id: selectedModel.modelId } : undefined)).selected;
   const instructions = [
     atelierSystemPrompt,
+    durableJournalInstructions(workspaceId, conversationId),
     ...appended,
     ...agents.map((file) => `# Project instructions: ${file.path}\n\n${file.content}`),
     formatSkillsForPrompt(skills.skills),

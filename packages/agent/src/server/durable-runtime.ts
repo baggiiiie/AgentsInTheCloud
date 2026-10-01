@@ -1,12 +1,14 @@
+import { checkWorkspaceReadiness } from "@atelier/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { LiveDoc, type AgentChange, type Conversation, type HarnessOptions } from "@earendil-works/pi-durable";
+import { LiveDoc, type AgentChange, type Conversation, type ConversationId, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
 import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
 import { expandWorkspaceSkillCommand } from "./skills.ts";
+import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -17,11 +19,12 @@ const dependencies = {
   harness: createDurableHarnessOptions,
   prepare: prepareDurableConversation,
   expand: expandWorkspaceSkillCommand,
+  ready: checkWorkspaceReadiness,
 };
 
 /**
  * Native execution owner, not an AgentSession adapter. One instance per workspace.
- * Reads/attachment are passive; resume requires the host to make the workspace ready.
+ * Reads/attachment are passive; execution checks workspace readiness first.
  * Close/delete gates are durable; production must persist them before removing
  * tabs or disposing execution workspaces.
  */
@@ -41,6 +44,33 @@ export async function openDurableAgentRuntime(
   let deleted = gates?.deleted ?? false;
   const closed = new Set(gates?.closed ?? []);
   let deleting: Promise<void> | undefined;
+  let readiness: Promise<void> | undefined;
+
+  // Share concurrent probes, not a permanent ready flag: a workspace can have
+  // stopped since the previous command. A failed probe rejects before admission
+  // and a later command can retry after the host repairs the workspace.
+  async function checkReady() {
+    assertOpen();
+    readiness ??= load.ready(workspaceId).finally(() => { readiness = undefined; });
+    await readiness;
+    assertOpen();
+  }
+
+  async function readyForExecution() {
+    await checkReady();
+    // A close/delete may have fenced another root while readiness was pending.
+    // Mark its work before any command enables this workspace-wide scheduler.
+    await persistGates();
+    assertOpen();
+  }
+
+  async function settleTasks(conversationId?: ConversationId) {
+    const inspection = await harness.inspect(context);
+    const tasks = inspection.tasks.filter(({ record }) => conversationId === undefined || record.conversationId === conversationId);
+    if (!tasks.length) return;
+    await readyForExecution();
+    await Promise.all(tasks.map(({ record }) => harness.waitForTask(record.id, context)));
+  }
 
   async function persistGates() {
     await harness.commit(async (tx) => {
@@ -84,8 +114,11 @@ export async function openDurableAgentRuntime(
         return closing ??= (async () => {
           await tail;
           await persistGates();
-          await conversation.abort(context, { background: true });
-        })();
+          await settleTasks(conversation.id);
+        })().catch((error) => {
+          closing = undefined;
+          throw error;
+        });
       },
       /** Canonical committed state, including partials and queued input. No scheduling. */
       watch: conversation.watch.bind(conversation),
@@ -111,6 +144,8 @@ export async function openDurableAgentRuntime(
           // The original admission wins even if the skill or model has gone
           // away, or a retry arrives with different text/attachments/settings.
           if (existing) return (await harness.submission(existing.id, context))!;
+          await readyForExecution();
+          assertAdmission();
           return submitDurableInput(conversation, workspaceId, harnessOptions.models, input, context, async (id, text) => {
             const expanded = await load.expand(id, text);
             assertAdmission();
@@ -132,10 +167,18 @@ export async function openDurableAgentRuntime(
       },
       /** Explicit Stop withdraws queued input and cancels owned work. */
       stop() {
-        return command(() => conversation.abort(context));
+        return command(async () => {
+          await readyForExecution();
+          assertAdmission();
+          await conversation.abort(context);
+        });
       },
       compact(instructions?: string) {
-        return command(() => conversation.compact(instructions, context));
+        return command(async () => {
+          await readyForExecution();
+          assertAdmission();
+          return conversation.compact(instructions, context);
+        });
       },
       /** Reset context, retaining searchable history and the current settings. */
       reset() {
@@ -164,6 +207,10 @@ export async function openDurableAgentRuntime(
           const catalog = await harness.snapshot(WorkspaceConversations, context);
           const existing = catalog?.conversations.find((item) => item.conversationId === record.conversationId);
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
+          if (!existing) {
+            await checkReady();
+            if (deleted) throw new Error("Durable workspace is deleted");
+          }
           const prepared = existing ? {} : await load.prepare(workspaceId, record.conversationId, options, initial);
           assertOpen();
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
@@ -186,13 +233,15 @@ export async function openDurableAgentRuntime(
         await Promise.allSettled([...agents.values()]);
         await Promise.all([...commandDrains].map((drain) => drain()));
         await persistGates();
-        const inspection = await harness.inspect(context);
-        await Promise.all(inspection.tasks.map(({ record }) => harness.waitForTask(record.id, context)));
-      })();
+        await settleTasks();
+      })().catch((error) => {
+        deleting = undefined;
+        throw error;
+      });
     },
     /** Host restart resumes durable tasks, never submits a synthetic user prompt. */
-    resume() {
-      assertOpen();
+    async resume() {
+      await readyForExecution();
       harness.resume();
     },
     /** Host shutdown/unload: stop observation and scheduling, not the task's effects. */
@@ -201,6 +250,15 @@ export async function openDurableAgentRuntime(
       return workspace.close();
     },
   };
+}
+
+/** Production opening path: retained, project-scoped storage on the existing read-only share. */
+export async function openRetainedDurableAgentRuntime(
+  workspaceId: string,
+  options: WorkspaceAgentToolOptions = {},
+  load: typeof dependencies = dependencies,
+) {
+  return openDurableAgentRuntime(await workspaceDurableJournalDirectory(workspaceId), workspaceId, options, load);
 }
 
 export type DurableAgentRuntime = Awaited<ReturnType<typeof openDurableAgentRuntime>>;
