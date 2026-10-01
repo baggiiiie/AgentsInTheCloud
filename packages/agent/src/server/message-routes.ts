@@ -1,3 +1,4 @@
+import { knownWorkspaceAgentRequest } from "./durable-owner.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { readJsonObject, requestAcceptsJson } from "@atelier/core";
@@ -60,6 +61,11 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
 
   const attachmentDraft = agentAttachmentDraftId(workspaceId, conversationId);
   if (form && String(form.get("attachmentDraft") ?? "") !== attachmentDraft) return turboStreamResponse("", { status: 422 });
+  // Admission wins even if the previous response was lost after attachment cleanup.
+  if (await (options.knownRequest ?? knownWorkspaceAgentRequest)(agent, requestId, { events: options.events })) {
+    const headers = { "x-atelier-attachment-draft-consumed": "true" };
+    return json ? Response.json({ agent: { conversationId, state: "accepted" } }, { status: 202, headers }) : turboStreamResponse("", { headers });
+  }
   const attachmentIds = form?.getAll("attachment").map(String) ?? [];
   const { images, attachmentNotes } = attachmentIds.length > 0
     ? await deliverAttachmentDraft(workspaceId, attachmentDraft, attachmentIds)
