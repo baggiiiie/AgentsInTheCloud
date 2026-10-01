@@ -195,7 +195,15 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   deps.events?.on("workspace_agent_view_invalidated", invalidatePresentation);
   deps.events?.on("workspace_agent_conversation_title_changed", invalidatePresentation);
 
-  onWorkspaceSshTrustChanged(invalidateWorkspace);
+  const pendingSshTrustIds = new Map<string, Set<string>>();
+  onWorkspaceSshTrustChanged((workspaceId) => {
+    const previous = pendingSshTrustIds.get(workspaceId);
+    const requests = workspaceSshTrustRequests(workspaceId);
+    if (requests.length) pendingSshTrustIds.set(workspaceId, new Set(requests.map(request => request.id)));
+    else pendingSshTrustIds.delete(workspaceId);
+    if (registry.get(workspaceId) && requests.some(request => !previous?.has(request.id))) registry.requestAttention(workspaceId);
+    invalidateWorkspace(workspaceId);
+  });
   const hostTrustPanels = new Map<string, Awaited<ReturnType<typeof scanSshHost>>>();
   deps.events?.on("workspace_deleted", ({ workspaceId }) => { cancelWorkspaceSshTrust(workspaceId); hostTrustPanels.delete(workspaceId); });
   const provisioningPrompts = new Map<string, string>();
