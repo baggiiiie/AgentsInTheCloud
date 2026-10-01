@@ -31,21 +31,21 @@ export class LiveTranscriptRenderer {
     });
   }
 
-  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean, status: string | undefined) {
+  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean, statuses: readonly string[]) {
     return [
       { id: `${ids.transcript(ctx)}_context`, html: renderModelContextEntries(ctx, modelContext) },
       ...this.rows(ctx, items, initial),
-      { id: `${ids.transcript(ctx)}_status`, html: status === undefined ? "" : `<div class="agent-noticeline info"><span role="status">${escapeHtml(status)}</span></div>` },
+      { id: `${ids.transcript(ctx)}_status`, html: statuses.map(status => `<div class="agent-noticeline info"><span role="status">${escapeHtml(status)}</span></div>`).join("") },
     ];
   }
 
-  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, status?: string): string {
-    return this.transcriptRows(ctx, items, modelContext, true, status)
+  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, statuses: readonly string[] = []): string {
+    return this.transcriptRows(ctx, items, modelContext, true, statuses)
       .map(row => `<div id="${escapeHtml(row.id)}" data-turbo-permanent>${row.html}</div>`).join("") + this.noticesMount(ctx);
   }
 
-  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, status?: string): LiveRegion {
-    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false, status));
+  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, statuses: readonly string[] = []): LiveRegion {
+    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false, statuses));
     // Notices are browser-owned ephemeral messages, never snapshot state.
     region.html += this.noticesMount(ctx);
     return region;

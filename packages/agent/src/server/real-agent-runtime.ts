@@ -435,22 +435,24 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         break;
       }
       case "auto_retry_end":
+        this.setTransientStatus("provider-retry", undefined);
+        if (event.success) this.notice("info", "Provider retry succeeded.");
         if (!event.success && this.turnTiming) {
           if (event.finalError) this.pendingAssistantError = event.finalError;
           this.terminalOutcome = "stopped";
         }
         break;
       case "auto_retry_start":
-        this.notice("info", `Provider error, retrying (attempt ${event.attempt}/${event.maxAttempts})…`);
+        this.setTransientStatus("provider-retry", `Provider error; retrying in ${Math.ceil(event.delayMs / 1000)}s · attempt ${event.attempt}/${event.maxAttempts}`);
         break;
       case "summarization_retry_scheduled":
-        this.setTransientStatus(`Summary failed; retrying in ${Math.ceil(event.delayMs / 1000)}s · attempt ${event.attempt}/${event.maxAttempts}`);
+        this.setTransientStatus("summary-retry", `Summary failed; retrying in ${Math.ceil(event.delayMs / 1000)}s · attempt ${event.attempt}/${event.maxAttempts}`);
         break;
       case "summarization_retry_attempt_start":
-        this.setTransientStatus(event.source === "branchSummary" ? "Retrying branch summary…" : "Retrying context summary…");
+        this.setTransientStatus("summary-retry", event.source === "branchSummary" ? "Retrying branch summary…" : "Retrying context summary…");
         break;
       case "summarization_retry_finished":
-        this.setTransientStatus(undefined);
+        this.setTransientStatus("summary-retry", undefined);
         break;
       case "thinking_level_changed": {
         const entries: SessionEntry[] = this.session.sessionManager.getBranch();
@@ -462,12 +464,20 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         }
         break;
       }
+      case "queue_update": {
+        const parts: string[] = [];
+        const steering = event.steering.length;
+        const followUp = event.followUp.length;
+        if (steering) parts.push(`${steering} steering instruction${steering === 1 ? "" : "s"} queued`);
+        if (followUp) parts.push(`${followUp} follow-up message${followUp === 1 ? "" : "s"} queued`);
+        this.setTransientStatus("queue", parts.length ? parts.join(" · ") : undefined);
+        break;
+      }
       // Internal lifecycle: the settled event, not these events, finishes our run.
       case "agent_end":
       case "turn_end":
         break;
       // Explicitly silent for now; review these one by one before adding statuses.
-      case "queue_update":
       case "session_info_changed":
       case "bash_execution_update":
         break;
