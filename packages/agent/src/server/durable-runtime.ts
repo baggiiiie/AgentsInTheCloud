@@ -186,6 +186,8 @@ export async function openDurableAgentRuntime(
           if ((await harness.snapshot(LiveDoc, conversation.id, context))?.run) {
             throw new Error("Stop the agent before starting a new session.");
           }
+          await readyForExecution();
+          assertAdmission();
           await conversation.reset(undefined, context);
         });
       },
