@@ -1,3 +1,8 @@
+import { shippedProviderModelIds } from "./shipped-provider-models.ts";
+
+const shippedModelIds = new Map(Object.entries(shippedProviderModelIds).map(([provider, ids]) => [provider, new Set(ids)]));
+const maxDefaultModelsPerProvider = 5;
+
 interface ProviderModelReference {
   id: string;
   label?: string;
@@ -12,17 +17,17 @@ interface ProviderKnowledgeRegistry {
 }
 
 const hardcodedPopularModels: readonly (ProviderModelReference & { provider: string })[] = [
+  { provider: "openai", id: "gpt-6.1-sol" },
   { provider: "openai", id: "gpt-6-astra" },
-  { provider: "openai", id: "gpt-5.6-terra" },
-  { provider: "openai", id: "gpt-5.6-luna" },
-  { provider: "anthropic", id: "claude-opus-5" },
-  { provider: "anthropic", id: "claude-fable-5" },
-  { provider: "anthropic", id: "claude-opus-4-8" },
+  { provider: "openai", id: "gpt-6-luna" },
+  { provider: "anthropic", id: "claude-opus-5-5" },
+  { provider: "anthropic", id: "claude-fable-5-1" },
+  { provider: "anthropic", id: "claude-sonnet-5-5" },
   { provider: "github-copilot", id: "gpt-6-astra" },
   { provider: "xai", id: "grok-4.6" },
+  { provider: "openai-codex", id: "gpt-6.1-sol" },
   { provider: "openai-codex", id: "gpt-6-astra" },
-  { provider: "openai-codex", id: "gpt-5.6-terra" },
-  { provider: "openai-codex", id: "gpt-5.6-luna" },
+  { provider: "openai-codex", id: "gpt-6-luna" },
 ];
 
 const hardcodedProviderKnowledge: ProviderKnowledgeRegistry = {
@@ -48,7 +53,9 @@ export function modelDisplayName(name: string): string {
 
 export function getPopularModelRank(provider: string, id: string): number | undefined {
   const rank = hardcodedPopularModels.findIndex((model) => model.provider === provider && model.id === id);
-  return rank < 0 ? undefined : rank;
+  if (rank >= 0) return rank;
+  const known = shippedModelIds.get(provider);
+  return known && !known.has(id) ? hardcodedPopularModels.length : undefined;
 }
 
 export function getPopularProviderRank(provider: string): number | undefined {
@@ -58,11 +65,11 @@ export function getPopularProviderRank(provider: string): number | undefined {
   return rank < 0 ? undefined : rank;
 }
 
-/** Curated defaults first; otherwise one model with the highest known input price. */
+/** Up to five defaults: curated first, then post-release IDs in ID order. Otherwise use the highest known input price. */
 export function defaultProviderModels<T extends { id: string; name?: string; cost?: { input?: number } }>(provider: string, models: readonly T[]): T[] {
-  const curated = models.filter((model) => getPopularModelRank(provider, model.id) !== undefined)
-    .sort((a, b) => getPopularModelRank(provider, a.id)! - getPopularModelRank(provider, b.id)!);
-  if (curated.length) return curated;
+  const popular = models.filter((model) => getPopularModelRank(provider, model.id) !== undefined)
+    .sort((a, b) => getPopularModelRank(provider, a.id)! - getPopularModelRank(provider, b.id)! || a.id.localeCompare(b.id));
+  if (popular.length) return popular.slice(0, maxDefaultModelsPerProvider);
   const priced = models.filter((model) => model.cost?.input !== undefined && Number.isFinite(model.cost.input))
     .sort((a, b) => b.cost!.input! - a.cost!.input! || (a.name ?? a.id).localeCompare(b.name ?? b.id) || a.id.localeCompare(b.id));
   return priced.slice(0, 1);
