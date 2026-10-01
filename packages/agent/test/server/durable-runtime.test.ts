@@ -509,3 +509,47 @@ test.each(["close", "delete"] as const)("%s persists its fence even if cleanup r
   const retained = await (await open()).conversation(record);
   await expect(retained.setTitle("Cannot reopen")).rejects.toThrow(operation === "close" ? "closed" : "deleted");
 });
+
+test("resetting an idle root cannot recover another root before readiness", async () => {
+  const { runtime, faux, load, registry, open } = await setup();
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "reset-ready", tools: [defineTool({
+    name: "probe", description: "Replay after readiness", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, invocation) {
+      executions++;
+      if (executions > 1) return { content: [{ type: "text", text: "Recovered" }] };
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true });
+      });
+    },
+  })] }));
+  faux.setResponses([
+    fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage("Finished"),
+  ]);
+  const busy = await runtime.conversation(record);
+  const idleRecord = { ...record, conversationId: "idle" };
+  await runtime.conversation(idleRecord);
+  await busy.submit({ requestId: "recover", text: "Begin" });
+  await started.promise;
+  await runtime.suspend();
+  const reopened = await open();
+  const idle = await reopened.conversation(idleRecord);
+  load.ready = async () => { throw new Error("Workspace offline"); };
+  await expect(idle.reset()).rejects.toThrow("Workspace offline");
+  expect(executions).toBe(1);
+  const entered = Promise.withResolvers<void>();
+  const ready = Promise.withResolvers<void>();
+  load.ready = async () => { entered.resolve(); await ready.promise; };
+  const resetting = idle.reset();
+  await entered.promise;
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  ready.resolve();
+  await resetting;
+  const restored = await reopened.conversation(record);
+  await (await restored.submit({ requestId: "recover", text: "Retry" })).wait(context);
+  expect(executions).toBe(2);
+});
