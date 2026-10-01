@@ -5,7 +5,8 @@ import { isGitProjectInit, projectWorkspaceInitWithSettings, projectWorkspaceSet
 import { getWorkspaceInit, type WorkspaceInitInstruction, type WorkspaceProvisionStep } from "@atelier/workspace";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { createTmuxBashTool } from "./bash-tmux.ts";
+import { defineWorkspaceTool } from "./workspace-tool.ts";
+import { bashToolDefinition, createTmuxBashTool } from "./bash-tmux.ts";
 
 type ToolUpdate = NonNullable<Parameters<ToolDefinition<any, any>["execute"]>[3]>;
 export interface SecretValueRequest {
@@ -44,8 +45,36 @@ function result<T>(value: T) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }], details: value };
 }
 
+export const onboardingToolDefinitions = {
+  readProjectSettings: {
+    name: "read_project_settings", label: "Read project settings",
+    description: "Read your workspace's project configuration and revision, including secret metadata and placeholders but never secret values. Repository identity is read-only. An empty Dockerfile uses the repository .atelier/Dockerfile if present, otherwise the default image. To bypass repository customization, supply a Dockerfile containing only FROM atelier-workspace.",
+    parameters: Type.Object({}, { additionalProperties: false }),
+  },
+  writeProjectSettings: {
+    name: "write_project_settings", label: "Write project settings",
+    description: "Replace your project's complete workspace settings. Present the differences to the user before calling. Changes apply to future workspaces only. Supply the latest settings revision; reread on conflict. Repository identity and secrets cannot be changed here. Use request_secret_value for credentials.",
+    parameters: Type.Object({ expectedRevision: Type.String(), settings: projectWorkspaceSettingsSchema }, { additionalProperties: false }),
+  },
+  requestSecretValue: {
+    name: "request_secret_value", label: "Request project secret",
+    description: "Ask the user to enter a secret in a focused secure dialog, never in chat. The value is saved to the project immediately and egress replacement is updated for new connections from running workspaces. Reconnect existing HTTP/HTTPS clients (or restart the relevant application) before using the placeholder: existing opaque CONNECT tunnels are not reconfigured. A workspace restart is not required. Waits for user input; stopping the call cancels the wait, not a saved secret. Use the returned placeholder as the environment variable's value for commands; existing processes do not receive new environment variables. Reread project settings afterward before writing settings. Host restrictions limit where the credential can be used. Requests that conflict with an existing secret’s hosts or placeholder are rejected; read the stored metadata first.",
+    parameters: Type.Object({ envName: Type.String(), purpose: Type.String(), hostPattern: Type.String(), placeholder: Type.Optional(Type.String()) }, { additionalProperties: false }),
+  },
+  deleteWorkspace: {
+    name: "delete_workspace", label: "Delete workspace",
+    description: "Delete another workspace created by this agent conversation for its own project. Cannot delete your current workspace. Supply workspace_id every time. Set force to false to run deletion safety checks; use force only when the user explicitly approves discarding unsaved changes. Deletion is permanent and runs asynchronously.",
+    parameters: Type.Object({ workspace_id: Type.String({ description: "ID of another workspace created by this agent conversation" }), force: Type.Boolean() }, { additionalProperties: false }),
+  },
+  createWorkspace: {
+    name: "create_workspace", label: "Create workspace",
+    description: "Create an ordinary visible workspace for your own project using complete settings without changing saved project settings. Repository and branch cannot be overridden. Project secrets are used. Streams provisioning progress and returns the workspace ID, URL, status and creation timings. The workspace survives tool cancellation. Use bash_in_other_workspace to investigate it afterward.",
+    parameters: Type.Object({ title: Type.String(), expectedRevision: Type.String(), settings: projectWorkspaceSettingsSchema }, { additionalProperties: false }),
+  },
+};
+
 /** Registered capabilities, intentionally separate from skill discovery and activation. */
-export function createOnboardingTools(workspaceId: string, conversationId: string, deps: OnboardingToolDependencies): ToolDefinition<any, any>[] {
+export function createOnboardingCapabilities(workspaceId: string, conversationId: string, deps: OnboardingToolDependencies) {
   const loadInit = deps.getWorkspaceInit ?? getWorkspaceInit;
   async function project() {
     const init = await loadInit(workspaceId);
@@ -59,55 +88,56 @@ export function createOnboardingTools(workspaceId: string, conversationId: strin
       throw new AtelierCoreError("workspace_access_denied", `You may only ${action} another workspace created by this agent conversation for its own project`);
     }
   }
-  const bashFactory = deps.createBashTool ?? createTmuxBashTool;
-  const bash = bashFactory(workspaceId);
-  return [
-    defineTool({
-      name: "read_project_settings", label: "Read project settings",
-      description: "Read your workspace's project configuration and revision, including secret metadata and placeholders but never secret values. Repository identity is read-only. An empty Dockerfile uses the repository .atelier/Dockerfile if present, otherwise the default image. To bypass repository customization, supply a Dockerfile containing only FROM atelier-workspace.",
-      parameters: Type.Object({}, { additionalProperties: false }),
+  return {
+    requireOwnedWorkspace,
+    readProjectSettings: defineWorkspaceTool({
+      ...onboardingToolDefinitions.readProjectSettings,
       execute: async () => result(await readProjectWorkspaceSettings((await project()).projectId)),
     }),
-    defineTool({
-      name: "write_project_settings", label: "Write project settings",
-      description: "Replace your project's complete workspace settings. Present the differences to the user before calling. Changes apply to future workspaces only. Supply the latest settings revision; reread on conflict. Repository identity and secrets cannot be changed here. Use request_secret_value for credentials.",
-      parameters: Type.Object({ expectedRevision: Type.String(), settings: projectWorkspaceSettingsSchema }, { additionalProperties: false }),
+    writeProjectSettings: defineWorkspaceTool({
+      ...onboardingToolDefinitions.writeProjectSettings,
       execute: async (_id, args) => result(await writeProjectWorkspaceSettings((await project()).projectId, args.expectedRevision, args.settings)),
     }),
-    defineTool({
-      name: "request_secret_value", label: "Request project secret",
-      description: "Ask the user to enter a secret in a focused secure dialog, never in chat. The value is saved to the project immediately and egress replacement is updated for new connections from running workspaces. Reconnect existing HTTP/HTTPS clients (or restart the relevant application) before using the placeholder: existing opaque CONNECT tunnels are not reconfigured. A workspace restart is not required. Waits for user input; stopping the call cancels the wait, not a saved secret. Use the returned placeholder as the environment variable's value for commands; existing processes do not receive new environment variables. Reread project settings afterward before writing settings. Host restrictions limit where the credential can be used. Requests that conflict with an existing secret’s hosts or placeholder are rejected; read the stored metadata first.",
-      parameters: Type.Object({ envName: Type.String(), purpose: Type.String(), hostPattern: Type.String(), placeholder: Type.Optional(Type.String()) }, { additionalProperties: false }),
+    requestSecretValue: defineWorkspaceTool({
+      ...onboardingToolDefinitions.requestSecretValue,
       execute: async (_id, args, signal, update) => result(await deps.requestSecretValue((await project()).projectId, args, signal, update)),
     }),
-    defineTool({
-      name: "bash_in_other_workspace", label: "Bash in other workspace",
-      description: "Execute bash in another workspace created by this agent conversation. Supply the destination workspace_id every time. For your current workspace, use normal bash. Output file paths belong to the destination workspace.\n\n" + bash.description,
-      parameters: Type.Object({ ...bash.parameters.properties, workspace_id: Type.String({ description: "ID of another workspace created by this agent conversation" }) }, { additionalProperties: false }),
-      execute: async (id, args: { workspace_id: string; command: string; timeout?: number }, signal, update, context) => {
-        await requireOwnedWorkspace(args.workspace_id, "execute bash in");
-        const remote = bashFactory(args.workspace_id);
-        return remote.execute(id, { command: args.command, timeout: args.timeout }, signal, update, context);
-      },
-    }),
-    defineTool({
-      name: "delete_workspace", label: "Delete workspace",
-      description: "Delete another workspace created by this agent conversation for its own project. Cannot delete your current workspace. Supply workspace_id every time. Set force to false to run deletion safety checks; use force only when the user explicitly approves discarding unsaved changes. Deletion is permanent and runs asynchronously.",
-      parameters: Type.Object({ workspace_id: Type.String({ description: "ID of another workspace created by this agent conversation" }), force: Type.Boolean() }, { additionalProperties: false }),
+    deleteWorkspace: defineWorkspaceTool({
+      ...onboardingToolDefinitions.deleteWorkspace,
       execute: async (_id, args) => {
         await requireOwnedWorkspace(args.workspace_id, "delete");
         return result(await deps.deleteWorkspace(args.workspace_id, args.force));
       },
     }),
-    defineTool({
-      name: "create_workspace", label: "Create workspace",
-      description: "Create an ordinary visible workspace for your own project using complete settings without changing saved project settings. Repository and branch cannot be overridden. Project secrets are used. Streams provisioning progress and returns the workspace ID, URL, status and creation timings. The workspace survives tool cancellation. Use bash_in_other_workspace to investigate it afterward.",
-      parameters: Type.Object({ title: Type.String(), expectedRevision: Type.String(), settings: projectWorkspaceSettingsSchema }, { additionalProperties: false }),
+    createWorkspace: defineWorkspaceTool({
+      ...onboardingToolDefinitions.createWorkspace,
       execute: async (_id, args, signal, update) => {
         const init = await projectWorkspaceInitWithSettings((await project()).projectId, args.expectedRevision, args.settings, { workspaceId, conversationId });
         return result(await deps.createWorkspace(init, args.title, signal, update));
       },
     }),
+  };
+}
+
+export const remoteBashToolDefinition = {
+  name: "bash_in_other_workspace", label: "Bash in other workspace",
+  description: "Execute bash in another workspace created by this agent conversation. Supply the destination workspace_id every time. For your current workspace, use normal bash. Output file paths belong to the destination workspace.\n\n" + bashToolDefinition.description,
+  parameters: Type.Object({ ...bashToolDefinition.parameters.properties, workspace_id: Type.String({ description: "ID of another workspace created by this agent conversation" }) }, { additionalProperties: false }),
+};
+
+export function createOnboardingTools(workspaceId: string, conversationId: string, deps: OnboardingToolDependencies): ToolDefinition<any, any>[] {
+  const capabilities = createOnboardingCapabilities(workspaceId, conversationId, deps);
+  const bashFactory = deps.createBashTool ?? createTmuxBashTool;
+  return [
+    capabilities.readProjectSettings, capabilities.writeProjectSettings, capabilities.requestSecretValue,
+    defineTool({
+      ...remoteBashToolDefinition,
+      execute: async (id, args, signal, update, context) => {
+        await capabilities.requireOwnedWorkspace(args.workspace_id, "execute bash in");
+        return bashFactory(args.workspace_id).execute(id, { command: args.command, timeout: args.timeout }, signal, update, context);
+      },
+    }),
+    capabilities.deleteWorkspace, capabilities.createWorkspace,
   ];
 }
 
@@ -118,6 +148,11 @@ export function configureOnboardingTools(deps: OnboardingToolDependencies | unde
   onboardingDependencies = deps;
 }
 
+export function registeredOnboardingDependencies(workspaceId: string): OnboardingToolDependencies | undefined {
+  return isProjectOnboardingWorkspace(workspaceId) ? onboardingDependencies : undefined;
+}
+
 export function createRegisteredOnboardingTools(workspaceId: string, conversationId: string): ToolDefinition<any, any>[] {
-  return onboardingDependencies && isProjectOnboardingWorkspace(workspaceId) ? createOnboardingTools(workspaceId, conversationId, onboardingDependencies) : [];
+  const deps = registeredOnboardingDependencies(workspaceId);
+  return deps ? createOnboardingTools(workspaceId, conversationId, deps) : [];
 }
