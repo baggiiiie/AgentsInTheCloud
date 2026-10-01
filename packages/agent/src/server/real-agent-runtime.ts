@@ -1,7 +1,7 @@
 import { AtelierCoreError, isJsonObject } from "@atelier/core";
 import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesProviderSubscription, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
-import type { CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
+import type { AgentSessionEvent, CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { BaseAgentRuntime } from "./base-agent-runtime.ts";
 import { collectCacheMisses, detectCacheMiss } from "./cache-miss.ts";
 import { configuredModelOptionViews, launchComposerThinkingSettings, resolveNewWorkspaceAgentModel } from "./model-state.ts";
@@ -14,7 +14,7 @@ import {
 import { contextUsagePercent, manualCompactionAvailable, terminalCompactionNotice } from "./runtime-status.ts";
 import type { RewindMode, SubmitOptions, WorkspaceAgentRuntime, WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
 import { AgentServiceTierState, supportsFastMode, type AgentServiceTier } from "./service-tier.ts";
-import { recordsFromSessionEntries, sessionContentImages } from "./session-records.ts";
+import { cacheWarmingNotice, recordsFromSessionEntries, sessionContentImages } from "./session-records.ts";
 import { replaceWorkspaceAgentSession, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 import { renderAgentSessionTree, updateAgentSessionTreeLabel, type TreeFilterMode } from "./session-tree.ts";
 import { expandWorkspaceSkillCommand } from "./skills.ts";
@@ -106,7 +106,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private subscribeToSession(): void {
-    this.unsubscribeSession = this.session.subscribe((event: any) => {
+    this.unsubscribeSession = this.session.subscribe((event: AgentSessionEvent) => {
       if (this.disposal) return;
       // Pi does not await subscribers; own their lifetime so disposal can join them.
       void this.trackTerminalSessionOperation(this.handleEvent(event)).catch((error) => {
@@ -284,7 +284,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     this.invalidatePresentation();
   }
 
-  private async handleEvent(event: any): Promise<void> {
+  private async handleEvent(event: AgentSessionEvent): Promise<void> {
     switch (event.type) {
       case "agent_start":
         if (this.live && this.pendingAssistantError) {
@@ -305,22 +305,21 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         this.turnTiming?.inferenceStart(performance.now());
         break;
       case "message_start":
-        if (event.message?.role === "assistant") {
+        if (event.message.role === "assistant") {
           this.liveAssistantMessageStart();
         }
         break;
       case "message_update": {
         const inner = event.assistantMessageEvent;
-        if (!inner) break;
         if (inner.type === "text_start") this.liveTextStart(inner.contentIndex, isFinalAssistantTextEvent(inner));
-        else if (inner.type === "text_delta") this.liveTextDelta(inner.delta ?? "", inner.contentIndex, isFinalAssistantTextEvent(inner));
+        else if (inner.type === "text_delta") this.liveTextDelta(inner.delta, inner.contentIndex, isFinalAssistantTextEvent(inner));
         else if (inner.type === "text_end") this.liveTextEnd(inner.contentIndex);
-        else if (inner.type === "thinking_delta") this.liveThinkingDelta(inner.delta ?? "");
+        else if (inner.type === "thinking_delta") this.liveThinkingDelta(inner.delta);
         else if (inner.type === "toolcall_start") {
           const part = inner.partial?.content?.[inner.contentIndex];
-          this.liveToolStreamStart(part?.name ?? "tool");
-        } else if (inner.type === "toolcall_delta") this.liveToolArgsDelta(inner.delta ?? "");
-        else if (inner.type === "toolcall_end" && inner.toolCall) {
+          this.liveToolStreamStart(part?.type === "toolCall" ? part.name : "tool");
+        } else if (inner.type === "toolcall_delta") this.liveToolArgsDelta(inner.delta);
+        else if (inner.type === "toolcall_end") {
           if (!isJsonObject(inner.toolCall.arguments)) throw new TypeError(`tool ${inner.toolCall.name} arguments must be a JSON object`);
           this.liveToolCallComplete({ callId: inner.toolCall.id, name: inner.toolCall.name, args: inner.toolCall.arguments });
         }
@@ -349,17 +348,17 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         const message = event.message;
         // Pi appends synchronously after listener dispatch. The microtask sees
         // its permanent entry ID before the next assistant event is dispatched.
-        if (message?.role === "user") {
+        if (message.role === "user") {
           await Promise.resolve();
           this.consumePersistedUser(message);
         }
-        if (message?.role === "custom") {
+        if (message.role === "custom") {
           await Promise.resolve();
           const start = recordsFromSessionEntries(this.session.sessionManager.getBranch()).at(-1);
           if (start?.kind === "taskStart" && this.turnTiming) this.beginPersistedRun(start.id);
         }
-        if (message?.role === "toolResult") setTimeout(() => this.syncLiveToolResult(message.toolCallId), 0);
-        if (message?.role === "assistant") {
+        if (message.role === "toolResult") setTimeout(() => this.syncLiveToolResult(message.toolCallId), 0);
+        if (message.role === "assistant") {
           if (message.stopReason !== "error" && message.stopReason !== "aborted" && message.provider === "openai") {
             const auth = await this.session.modelRuntime.getAuth("openai");
             if (auth?.source === "OAuth") recordSubscriptionInference("openai");
@@ -389,8 +388,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
       case "entry_appended": {
         const entry = event.entry;
         if (entry.type !== "usage" || entry.kind !== "cache_warm") break;
-        const record = recordsFromSessionEntries([entry])[0];
-        if (record?.kind === "note") this.livePersistedStatus(entry.id, record.text);
+        this.livePersistedStatus(entry.id, cacheWarmingNotice(entry));
         await this.refreshStats();
         break;
       }
@@ -416,7 +414,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         break;
       case "compaction_end": {
         const entry = event.result && this.latestCompactionEntry();
-        if (entry) this.postCompactionEstimate = { entryId: entry.id, tokens: event.result.estimatedTokensAfter };
+        if (entry && event.result?.estimatedTokensAfter !== undefined) this.postCompactionEstimate = { entryId: entry.id, tokens: event.result.estimatedTokensAfter };
         // Compaction may happen between loops or mid-loop. Keep the whole
         // prompt busy until agent_settled, independent of willRetry.
         if (!event.willRetry && !this.turnTiming) this.setBusy(false);
@@ -436,8 +434,30 @@ export class RealAgentRuntime extends BaseAgentRuntime {
       case "auto_retry_start":
         this.notice("info", `Provider error, retrying (attempt ${event.attempt}/${event.maxAttempts})…`);
         break;
-      default:
+      case "summarization_retry_scheduled":
+        this.setTransientStatus(`Summary failed; retrying in ${Math.ceil(event.delayMs / 1000)}s · attempt ${event.attempt}/${event.maxAttempts}`);
         break;
+      case "summarization_retry_attempt_start":
+        this.setTransientStatus(event.source === "branchSummary" ? "Retrying branch summary…" : "Retrying context summary…");
+        break;
+      case "summarization_retry_finished":
+        this.setTransientStatus(undefined);
+        break;
+      // Internal lifecycle: the settled event, not these events, finishes our run.
+      case "agent_end":
+      case "turn_end":
+        break;
+      // Explicitly silent for now; review these one by one before adding statuses.
+      case "queue_update":
+      case "session_info_changed":
+      case "thinking_level_changed":
+      case "bash_execution_update":
+        break;
+      default: {
+        // Upgrading Pi with a new session event must fail the TypeScript check.
+        const unhandled: never = event;
+        throw new Error(`Unhandled Pi session event: ${JSON.stringify(unhandled)}`);
+      }
     }
   }
 

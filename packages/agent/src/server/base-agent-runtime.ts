@@ -95,6 +95,7 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   );
   private footer: AgentStatsView = { contextPercent: null, compactAvailable: false, inputTokens: 0, outputTokens: 0, cost: 0, modelName: undefined, thinkingLevel: "", thinkingLevels: [], models: [] };
   private readonly transcriptRendering = new LiveTranscriptRenderer();
+  private transientStatus?: string;
   private readonly noticeListeners = new Set<AgentLivePresentationListener>();
   private readonly textRendering = new Map<string, { source: string; renderer: StreamingMarkdownRenderer; stableHtml: string; tailHtml: string }>();
   private readonly footerRefresh = createPublishedRefresh(() => this.statsView(), footer => {
@@ -102,7 +103,7 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
     this.livePresentation.invalidate();
   });
   private readonly livePresentation = createLivePresentation(() => [
-    this.transcriptRendering.renderTranscript(this.renderContext(), this.itemsForDisplay(), this.modelContext()),
+    this.transcriptRendering.renderTranscript(this.renderContext(), this.itemsForDisplay(), this.modelContext(), this.transientStatus),
     { target: notificationControlId(this.ctx), html: renderNotificationControl(this.ctx, this.isStreaming), action: "replace" },
     { target: ids.actions(this.ctx), html: renderPromptActions(this.ctx, this.isStreaming) },
     { target: ids.completionCatalog(this.ctx), html: this.completionCatalogHtml },
@@ -264,6 +265,12 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
     });
     this.invalidatePresentation();
     publishWorkspaceAgentBusy({ workspaceId: this.workspaceId, agentKey: `agent:${this.conversationId}`, busy });
+  }
+
+  /** Server-owned activity survives reconnects but is never persisted in history. */
+  protected setTransientStatus(message: string | undefined): void {
+    this.transientStatus = message;
+    this.invalidatePresentation();
   }
 
   protected notice(level: "info" | "error", message: string): void {
@@ -665,7 +672,7 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   async paneState(): Promise<AgentPaneState> {
     this.assertActive();
     void this.refreshStats().catch(error => console.error("Could not refresh agent footer", error));
-    return { transcriptHtml: this.transcriptRendering.renderInitialTranscript(this.renderContext(), this.itemsForDisplay(), this.modelContext()), busy: this.isStreaming, stats: this.footer };
+    return { transcriptHtml: this.transcriptRendering.renderInitialTranscript(this.renderContext(), this.itemsForDisplay(), this.modelContext(), this.transientStatus), busy: this.isStreaming, stats: this.footer };
   }
 
   async detailHtml(key: string, count = 100): Promise<string> {

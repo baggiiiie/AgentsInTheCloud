@@ -31,20 +31,21 @@ export class LiveTranscriptRenderer {
     });
   }
 
-  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean) {
+  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean, status: string | undefined) {
     return [
       { id: `${ids.transcript(ctx)}_context`, html: renderModelContextEntries(ctx, modelContext) },
       ...this.rows(ctx, items, initial),
+      { id: `${ids.transcript(ctx)}_status`, html: status === undefined ? "" : `<div class="agent-noticeline info"><span role="status">${escapeHtml(status)}</span></div>` },
     ];
   }
 
-  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView): string {
-    return this.transcriptRows(ctx, items, modelContext, true)
+  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, status?: string): string {
+    return this.transcriptRows(ctx, items, modelContext, true, status)
       .map(row => `<div id="${escapeHtml(row.id)}" data-turbo-permanent>${row.html}</div>`).join("") + this.noticesMount(ctx);
   }
 
-  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView): LiveRegion {
-    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false));
+  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, status?: string): LiveRegion {
+    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false, status));
     // Notices are browser-owned ephemeral messages, never snapshot state.
     region.html += this.noticesMount(ctx);
     return region;

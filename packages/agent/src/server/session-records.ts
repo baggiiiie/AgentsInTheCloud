@@ -1,5 +1,6 @@
 import { agentDelegation } from "./delegation.ts";
 import { contentText } from "@earendil-works/pi-ai";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { significantCacheMissNotice, type CacheMiss } from "./cache-miss.ts";
@@ -68,6 +69,13 @@ function entryTimestamp(entry: { timestamp?: string }): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" }>): string {
+  const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
+  const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
+  const note = entry.note ? ` (${entry.note})` : "";
+  return `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`;
+}
+
 export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<any, CacheMiss>()): TranscriptRecord[] {
   const records: TranscriptRecord[] = [];
   let lastModelChangeRecord: TranscriptRecord | undefined;
@@ -132,10 +140,7 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       continue;
     }
     if (entry.type === "usage" && entry.kind === "cache_warm") {
-      const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
-      const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
-      const note = entry.note ? ` (${entry.note})` : "";
-      records.push({ kind: "note", id: entry.id, text: `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`, tone: "system", timestamp: entryTimestamp(entry) });
+      records.push({ kind: "note", id: entry.id, text: cacheWarmingNotice(entry), tone: "system", timestamp: entryTimestamp(entry) });
       continue;
     }
     if (entry.type === "compaction") {
