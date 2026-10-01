@@ -1,4 +1,5 @@
 import { agentDelegation, type AgentSessionAttachment, type AgentDelegationTranscript } from "./delegation.ts";
+import { observeMcpServerChanges, type McpServerChange } from "./mcp-server-changes.ts";
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
@@ -20,6 +21,7 @@ import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import type { AgentToolDefinitionView } from "./render-transcript.ts";
 
 export interface AgentSessionDelegation {
+  subscribeMcpServerChanges?: (listener: (change: McpServerChange) => void) => () => void;
   attachment?: AgentSessionAttachment;
   transcript?: AgentDelegationTranscript;
   dispose(): Promise<void>;
@@ -114,6 +116,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
       session,
       serviceTiers,
       delegation: {
+        subscribeMcpServerChanges: listener => observeMcpServerChanges(session, listener),
         attachment,
         transcript: preparation?.transcript?.(session),
         dispose: disposeDelegation,

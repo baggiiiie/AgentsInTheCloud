@@ -71,6 +71,8 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private unsubscribeCosts?: () => void;
   private settledCost: number;
   private unsubscribeTranscript?: () => void;
+  private unsubscribeMcpServerChanges?: () => void;
+  private mcpStatusTimer?: ReturnType<typeof setTimeout>;
 
   constructor(agent: WorkspaceAgentConversationInfo, private session: any, private toolsForModel: AgentToolDefinitionView[], private serviceTiers: AgentServiceTierState, options: WorkspaceAgentRuntimeOptions = {}, private delegation: AgentSessionDelegation = { dispose: async () => {} }) {
     super(agent, options);
@@ -88,6 +90,18 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private attachContributions(): void {
+    this.unsubscribeMcpServerChanges = this.delegation.subscribeMcpServerChanges?.(change => {
+      const parts: string[] = [];
+      if (change.added.length) parts.push(`added: ${change.added.join(", ")}`);
+      if (change.removed.length) parts.push(`removed: ${change.removed.join(", ")}`);
+      parts.push(`${change.registered} registered`);
+      this.setTransientStatus("mcp-servers", `MCP servers updated · ${parts.join(" · ")}`);
+      clearTimeout(this.mcpStatusTimer);
+      this.mcpStatusTimer = setTimeout(() => {
+        this.mcpStatusTimer = undefined;
+        this.setTransientStatus("mcp-servers", undefined);
+      }, 8000);
+    });
     this.unsubscribeCosts = this.delegation.attachment?.costs?.subscribe(() => {
       void this.refreshStats().catch((error) => console.error("Could not refresh Agent costs", normalizedPromiseError(error)));
     });
@@ -96,6 +110,11 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   }
 
   private detachContributions(): void {
+    this.unsubscribeMcpServerChanges?.();
+    this.unsubscribeMcpServerChanges = undefined;
+    clearTimeout(this.mcpStatusTimer);
+    this.mcpStatusTimer = undefined;
+    this.setTransientStatus("mcp-servers", undefined);
     this.unsubscribeCosts?.();
     this.unsubscribeCosts = undefined;
     const unsubscribe = this.unsubscribeTranscript;

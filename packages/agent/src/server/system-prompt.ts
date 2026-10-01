@@ -68,8 +68,9 @@ export function createAtelierResourceLoader(
   appendSystemPrompt: () => string[] = () => [],
   skillResources: { skills: Skill[]; diagnostics: ResourceDiagnostic[] } = { skills: [], diagnostics: [] },
 ): ResourceLoader {
+  const extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() };
   return {
-    getExtensions: () => ({ extensions: [], errors: [], runtime: createExtensionRuntime() }),
+    getExtensions: () => extensions,
     getSkills: () => skillResources,
     getPrompts: () => ({ prompts: [], diagnostics: [] }),
     getThemes: () => ({ themes: [], diagnostics: [] }),
