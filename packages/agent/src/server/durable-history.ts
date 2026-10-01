@@ -14,6 +14,8 @@ import type { DurableAgentRuntime } from "./durable-runtime.ts";
 
 /** Enumerate the viewer's existing share, including journals whose workspace was deleted. */
 export async function retainedDurableHistories(workspaceId: string) {
+  // Validate the external workspace identifier before reading its share metadata.
+  durableJournalDirectory("projectless", workspaceId);
   const share = await workspaceSessionShareKey(workspaceId);
   const directory = join(sessionShareDir(share), "builtin-durable");
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
@@ -30,15 +32,18 @@ export async function retainedDurableHistories(workspaceId: string) {
   return histories;
 }
 
-function page(title: string, content: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="/design-system.css"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/agent.css"><script type="module" src="/workspace.js"></script></head><body><main><h1>${escapeHtml(title)}</h1>${content}</main></body></html>`;
-}
 function html(content: string, status = 200) { return new Response(content, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }); }
 
 /** Read-only HTTP surface: never mounts a live runtime, probes readiness, or resumes a scheduler. */
-export const handleDurableHistoryRequest: AgentRouteHandler = async (request, url) => {
+export const handleDurableHistoryRequest: AgentRouteHandler = async (request, url, options) => {
   const match = url.pathname.match(/^\/workspaces\/([^/]+)\/agent-history(?:\/([^/]+)\/([^/]+)(?:\/(session-images|transcript-items)\/([^/]+)(?:\/(\d+))?)?)?$/);
   if (!match || request.method !== "GET") return undefined;
+  function page(title: string, content: string) {
+    if (!options.renderPage) throw new Error("Native history requires the host page renderer");
+    const response = options.renderPage(`<div class="app no-sidebar"><div class="main"><header class="header"><h1>${escapeHtml(title)}</h1></header><main class="body">${content}</main></div></div>`);
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
   const viewer = decodeURIComponent(match[1]!);
   const [source = "", conversationId = "", operation = "", item = "", index = ""] = match.slice(2).map(value => value === undefined ? "" : decodeURIComponent(value));
   const base = `/workspaces/${encodeURIComponent(viewer)}/agent-history`;
@@ -52,7 +57,7 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
         rows.push(actionItemHtml({ kind: "single", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.conversationId)}"` } }));
       }
     }
-    return html(page("Agent history", `<p>Read-only history from this project's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`));
+    return page("Agent history", `<p>Read-only history from this project's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`);
   }
   const history = histories.find(history => history.workspaceId === source);
   const record = history && (await history.owner.catalog()).find(record => record.conversationId === conversationId);
@@ -70,5 +75,5 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
     return selected ? html(renderTranscriptItemDetailFrame(ctx, selected, { count })) : html("Not found", 404);
   }
   const branches = (record.branches ?? [record.durableId]).map(id => actionLinkHtml({ href: `${ctx.transcriptBasePath}?branch=${id}`, variant: "secondary", content: { kind: "caption", caption: `Branch ${id}${id === record.durableId ? " (current)" : ""}` } })).join(" ");
-  return html(page(record.title, `${actionLinkHtml({ href: base, variant: "secondary", content: { kind: "caption", caption: "All history" } })}<nav>${branches}</nav><p>Full branch history, including earlier sessions. This view is read-only.</p><div class="agent-transcript"><div class="agent-transcript-content">${items.map(item => renderTranscriptItem(ctx, item)).join("")}</div></div>`));
+  return page(record.title, `${actionLinkHtml({ href: base, variant: "secondary", content: { kind: "caption", caption: "All history" } })}<nav>${branches}</nav><p>Full branch history, including earlier sessions. This view is read-only.</p><div class="agent-transcript"><div class="agent-transcript-content">${items.map(item => renderTranscriptItem(ctx, item)).join("")}</div></div>`);
 };
