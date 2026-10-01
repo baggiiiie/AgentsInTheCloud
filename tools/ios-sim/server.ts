@@ -7,11 +7,14 @@ const mac = new Mac();
 await mac.start();
 void mac.anchor!.exited.then(code=>{ console.error(`iOS simulator SSH anchor exited (${code})`); process.exit(1); });
 const lastUrls = new Map<string,string>();
+// Neither simctl nor AXe reports rotation; simulators boot in portrait and only rotate here.
+const orientations = new Map<string,string>();
 const inspectors = new Map<string, { inspector: WebInspector; process: Bun.Subprocess }>();
 const streams = new Map<string,{process:Bun.Subprocess; clients:Set<ReadableStreamDefaultController<Uint8Array>>}>();
 function releaseSimulator(s:Sim) {
   inspectors.get(s.udid)?.process.kill(); inspectors.delete(s.udid);
   streams.get(s.udid)?.process.kill(); streams.delete(s.udid);
+  orientations.delete(s.udid);
 }
 process.on('SIGTERM',()=>{ mac.close(); process.exit(); });
 process.on('SIGINT',()=>{ mac.close(); process.exit(); });
@@ -78,6 +81,7 @@ async function run(command:string, args:string[]):Promise<string | Uint8Array> {
   if(command==='type') return native.typeText(remote,s.udid,args.slice(1).join(' '));
   if(command==='button') return native.button(remote,s.udid,args[1]);
   if(command==='screenshot') return native.screenshot(remote,s.udid);
+  if(command==='rotate') { const result=await native.rotate(remote,s.udid,args[1]); orientations.set(s.udid,args[1]); return result; }
   if(command==='install-pwa') {
     const destination = await open(s,args[1]);
     const title = await (await inspector(s)).eval('document.querySelector("meta[name=apple-mobile-web-app-title]")?.content || document.title',destination);
@@ -102,10 +106,14 @@ async function run(command:string, args:string[]):Promise<string | Uint8Array> {
     if(sub==='click'||sub==='fill') {
       if(touch) {
         const {rect,viewport}=await web.touchRect(params[0],target);
-        // iOS viewport coordinates begin below the Dynamic Island/status region;
-        // WebKit's visual viewport supplies the zoom and scroll transform.
-        const topInset=viewport.screenHeight * (62/874);
-        const x=(rect.x+rect.width/2-viewport.visualOffsetLeft)*viewport.visualScale;
+        // AXe taps in the rotated screen's points, while WebKit's screen size stays
+        // portrait. The page is centred horizontally. In portrait it begins below the
+        // Dynamic Island/status region; in landscape Safari's toolbar sits above it
+        // and it reaches the bottom edge. The visual viewport supplies zoom and scroll.
+        const screen=await native.screenDimensions(remote,s.udid);
+        const leftInset=(screen.width-viewport.width)/2;
+        const topInset=screen.width>screen.height ? screen.height-viewport.height : viewport.screenHeight * (62/874);
+        const x=(rect.x+rect.width/2-viewport.visualOffsetLeft)*viewport.visualScale+leftInset;
         const y=(rect.y+rect.height/2-viewport.visualOffsetTop)*viewport.visualScale+topInset;
         await native.tap(remote,s.udid,x,y);
         if(sub==='fill') return native.typeText(remote,s.udid,params.slice(1).join(' '));
@@ -157,7 +165,7 @@ const server = Bun.serve({port:4100,hostname:'0.0.0.0',idleTimeout:255,async fet
       return result instanceof Uint8Array ? new Response(result,{headers:{'content-type':'image/png'}}) : new Response(result);
     }
     return await handleViewerRequest(request,{
-      list:async()=> (await mac.devices()).map(s=>({...s,lastUrl:lastUrls.get(s.handle)})),
+      list:async()=> (await mac.devices()).map(s=>({...s,lastUrl:lastUrls.get(s.handle),orientation:orientations.get(s.udid)})),
       models:async()=> (await mac.models()).map(m=>m.name),
       stream:async handle=>stream(await sim(handle)),
       action:async(handle,action,data)=>mac.serial(async()=>{

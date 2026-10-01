@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { quote } from './core';
 
 // Native simulator interactions. The caller owns the SSH connection and ensures
@@ -33,6 +35,20 @@ export function typeText(remote: NativeRemote, udid: string, text: string): Prom
 export function button(remote: NativeRemote, udid: string, name: string): Promise<string> {
   if (!["apple-pay", "home", "lock", "side-button", "siri"].includes(name)) throw new Error(`Unknown simulator button: ${name}`);
   return remote(axe(udid, `button ${name}`));
+}
+
+const orientations = new Map([["portrait", 1], ["landscape-left", 3], ["landscape-right", 4]]);
+const orientationSource = readFileSync(`${import.meta.dir}/orientation.m`, "utf8");
+const orientationHelper = `~/.ios-sim/orientation-${createHash("sha256").update(orientationSource).digest("hex").slice(0, 12)}`;
+
+// iPhones with Face ID ignore portrait-upside-down, so it is not offered.
+// Neither simctl nor AXe rotates, so a small helper is compiled on the Mac on first use.
+export async function rotate(remote: NativeRemote, udid: string, name: string): Promise<string> {
+  const orientation = orientations.get(name);
+  if (orientation === undefined) throw new Error(`Unknown orientation: ${name}. Use one of: ${[...orientations.keys()].join(", ")}`);
+  await remote(`test -x ${orientationHelper} || { mkdir -p ~/.ios-sim && f=$(mktemp /tmp/ios-sim-orientation.XXXXXXXX) && printf %s ${quote(orientationSource)} > "$f.m" && clang -x objective-c -fobjc-arc -framework Foundation -o ${orientationHelper} "$f.m"; r=$?; rm -f "$f" "$f.m"; exit $r; }`);
+  await remote(`${orientationHelper} ${quote(udid)} ${orientation}`);
+  return `Rotated to ${name}`;
 }
 
 export async function screenshot(remote: NativeRemote, udid: string): Promise<Uint8Array> {

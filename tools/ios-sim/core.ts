@@ -12,7 +12,7 @@ export const portCandidate = (id: string, local: number) => {
   return 20000 + (hash >>> 0) % 10000;
 };
 export const rewriteUrl = (raw: string, port: number) => { const url = new URL(raw); url.port = String(port); return url.toString(); };
-export type Sim = { handle: string; name: string; udid: string; model: string; state: string; lastUrl?: string };
+export type Sim = { handle: string; name: string; udid: string; model: string; state: string; lastUrl?: string; orientation?: string };
 export function ownDevices(raw: string, id: string): Sim[] {
   // SAFETY: simctl list devices -j owns this JSON schema.
   const devices = Object.values((JSON.parse(raw) as {devices:Record<string, Array<{name:string;udid:string;state:string;deviceTypeIdentifier:string}>>}).devices).flat();

@@ -18,6 +18,7 @@ Commands:
   tap <sim> <x> <y> | swipe <sim> <x1> <y1> <x2> <y2>
   type <sim> <text> | button <sim> <name> | describe <sim>
   screenshot <sim> [file]     Save simulator PNG
+  rotate <sim> <orientation>  portrait | landscape-left | landscape-right
   web <sim> targets | eval <js> | query <selector> | wait-for <selector>
   web <sim> click <selector> | fill <selector> <text> | logs
        [--target pwa|<url-substring>] [--touch for click/fill]
