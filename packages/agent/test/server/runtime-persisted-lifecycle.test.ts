@@ -26,7 +26,7 @@ function harness() {
   let listener!: (event: any) => void;
   const session = {
     sessionManager: manager, isStreaming: false, systemPrompt: "", model: undefined,
-    modelRuntime: { getModel: () => undefined },
+    modelRuntime: { getModel: () => undefined, getAuth: async () => undefined },
     subscribe(next: (event: any) => void) { listener = next; return () => {}; },
     async abort() { session.isStreaming = false; },
   };
