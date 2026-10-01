@@ -177,6 +177,15 @@ async function listWorkspaceAgentConversationsUnlocked(workspaceId: string): Pro
     workspaceId, conversationId: info.conversationId, label: info.label, title: info.title, storage: info.storage,
     path: info.storage === "durable" ? journal : conversationSessionPath(workspaceId, info.conversationId),
   }));
+  // The journal catalog wins after a crash between the title commit and tab metadata.
+  if (local.some(agent => agent.storage === "durable") && await Bun.file(join(journal, "main.jsonl")).exists()) {
+    const { durableWorkspaceOwner } = await import("./durable-owner.ts");
+    const catalog = await (await durableWorkspaceOwner(workspaceId)).catalog();
+    for (const agent of local) {
+      const committed = agent.storage === "durable" && catalog.find(record => record.conversationId === agent.conversationId);
+      if (committed) agent.title = committed.title;
+    }
+  }
   // Existing pre-change sessions are still discoverable; new sessions do not use sidecars.
   const directory = sessionShareDir(await workspaceSessionShareKey(workspaceId));
   const sharedEntries = await readdir(directory).catch((error: NodeJS.ErrnoException) => {

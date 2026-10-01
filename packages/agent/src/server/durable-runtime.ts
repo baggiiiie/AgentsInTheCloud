@@ -1,7 +1,7 @@
 import { checkWorkspaceReadiness } from "@atelier/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { LiveDoc, type AgentChange, type Conversation, type ConversationId, type HarnessOptions } from "@earendil-works/pi-durable";
+import { LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
 import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { DurableConversationPresentation } from "./durable-presentation.ts";
@@ -13,6 +13,9 @@ import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 const context = BACKGROUND_CONTEXT;
+export const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
+  kind: "atelier.history-labels", version: 1, scope: "session", initial: () => ({ labels: {} }),
+});
 type ConversationIdentity = Omit<DurableConversationRecord, "durableId">;
 type SettingsChange = Pick<AgentChange, "model" | "thinkingLevel">;
 
@@ -92,6 +95,60 @@ export async function openDurableAgentRuntime(
     // and skill expansion for this root's next admission.
     let tail: Promise<void> = Promise.resolve();
     let closing: Promise<void> | undefined;
+    async function record() {
+      return (await harness.snapshot(WorkspaceConversations, context))!.conversations.find(item => item.conversationId === identity.conversationId)!;
+    }
+    async function branches() {
+      const current = await record();
+      return current.branches ?? [current.durableId];
+    }
+    async function tree() {
+      assertOpen();
+      const nodes = new Map<EntryId, { entry: EntryRecord; parentId?: EntryId; branch: ConversationId }>();
+      for (const id of await branches()) {
+        const branch = (await harness.conversation(id, context))!;
+        const entries: EntryRecord[] = [];
+        let cursor: Cursor | undefined;
+        do {
+          const page = await branch.entries({}, 500, cursor, context);
+          entries.push(...page.items);
+          cursor = page.next;
+        } while (cursor);
+        entries.reverse();
+        entries.forEach((entry, index) => {
+          if (!nodes.has(entry.id)) nodes.set(entry.id, { entry, parentId: entries[index - 1]?.id, branch: id });
+        });
+      }
+      const active = (await conversation.entries({}, 1, undefined, context)).items[0]?.id;
+      const labels = (await harness.snapshot(DurableHistoryLabels, context))?.labels ?? {};
+      return { nodes: [...nodes.values()].sort((a, b) => a.entry.id - b.entry.id), active, labels: Object.fromEntries([...nodes.keys()].flatMap(id => labels[String(id)] ? [[String(id), labels[String(id)]!]] : [])) };
+    }
+    async function assertIdle() {
+      const live = await harness.snapshot(LiveDoc, conversation.id, context);
+      const inbox = await harness.snapshot(InboxDoc, conversation.id, context);
+      const tasks = (await harness.inspect(context)).tasks;
+      if (live?.run || live?.compactions?.length || inbox?.items.length || tasks.some(item => item.record.conversationId === conversation.id)) {
+        throw new Error("Stop the agent and wait for its work to finish before navigating history.");
+      }
+    }
+    async function navigate(entryId: string, before: boolean) {
+      await assertIdle();
+      const history = await tree();
+      const selected = history.nodes.find(node => String(node.entry.id) === entryId);
+      if (!selected) throw new Error("History entry no longer exists.");
+      const target = before ? history.nodes.find(node => node.entry.id === selected.parentId) : selected;
+      if (!target) throw new Error("Cannot rewind past the first history entry.");
+      const next = await harness.commit(async tx => {
+        assertAdmission();
+        const catalog = await tx.doc(WorkspaceConversations);
+        const current = catalog.conversations.find(item => item.conversationId === identity.conversationId)!;
+        const fork = await tx.forkConversation(target.branch, target.entry.id, { ownership: { kind: "ownerless" } });
+        current.branches = [...(current.branches ?? [current.durableId]), fork.id];
+        current.durableId = fork.id;
+        return fork.id;
+      }, context);
+      conversation = (await harness.conversation(next, context))!;
+    }
     function assertAdmission() {
       assertOpen();
       if (deleted) throw new Error("Durable workspace is deleted");
@@ -105,34 +162,87 @@ export async function openDurableAgentRuntime(
       return result;
     }
 
+    async function known(requestId: string) {
+      for (const id of await branches()) {
+        const found = await harness.commit(tx => tx.submissionByRequest(id, requestId), context);
+        if (found) return found;
+      }
+      return undefined;
+    }
     commandDrains.add(() => tail);
     return {
-      id: conversation.id,
+      get id() { return conversation.id; },
+      tree,
+      async historyView(branchId?: string) {
+        const ids = await branches();
+        const id = branchId === undefined ? conversation.id : ids.find(id => String(id) === branchId);
+        if (id === undefined) throw new Error("History branch no longer exists.");
+        return harness.commit(async tx => {
+          const entries: EntryRecord[] = [];
+          let cursor: Cursor | undefined;
+          do {
+            const page = await tx.scanEntries({ conversationId: id }, 500, cursor);
+            entries.push(...page.items);
+            cursor = page.next;
+          } while (cursor);
+          // SAFETY: These native JSON documents are typed by Harness. Detach transaction
+          // overlays before commit settles; returning their proxies would invalidate the view.
+          return JSON.parse(JSON.stringify({
+            conversation: (await tx.conversation(id))!, entries: entries.reverse(),
+            docs: {
+              [AgentDoc.definition.kind]: await tx.doc(AgentDoc, id),
+              [LiveDoc.definition.kind]: await tx.doc(LiveDoc, id),
+              [InboxDoc.definition.kind]: await tx.doc(InboxDoc, id),
+              [UsageDoc.definition.kind]: await tx.doc(UsageDoc, id),
+            },
+          })) as ConversationView;
+        }, context);
+      },
+      navigate(entryId: string, before = false) { return command(() => navigate(entryId, before)); },
+      label(entryId: string, label: string, operation: "add" | "remove") {
+        return command(async () => {
+          const node = (await tree()).nodes.find(node => String(node.entry.id) === entryId);
+          if (!node) throw new Error("History entry no longer exists.");
+          await harness.commit(async tx => {
+            const doc = await tx.doc(DurableHistoryLabels);
+            const existing = doc.labels[entryId] ?? [];
+            doc.labels[entryId] = operation === "add" ? [...new Set([...existing, label.trim()])] : existing.filter(value => value !== label.trim());
+          }, context);
+        });
+      },
       /** Fence immediately, persist before cancellation, retain passive history. */
       close() {
         assertOpen();
         closed.add(conversation.id);
         return closing ??= (async () => {
           await tail;
+          for (const id of await branches()) closed.add(id);
           await persistGates();
-          await settleTasks(conversation.id);
+          for (const id of await branches()) await settleTasks(id);
         })().catch((error) => {
           closing = undefined;
           throw error;
         });
       },
       /** Canonical committed state, including partials and queued input. No scheduling. */
-      watch: conversation.watch.bind(conversation),
+      watch: (...args: Parameters<Conversation["watch"]>) => conversation.watch(...args),
       /** Host-owned mount; disposal detaches observation, not execution. */
       presentation: (onCommit?: Parameters<typeof DurableConversationPresentation.attach>[3]) => {
         assertOpen();
         return DurableConversationPresentation.attach(conversation, { workspaceId, conversationId: identity.conversationId }, context, onCommit);
       },
-      history: conversation.entries.bind(conversation),
-      context: conversation.context.bind(conversation),
-      agent: conversation.agent.bind(conversation),
+      history: (...args: Parameters<Conversation["entries"]>) => conversation.entries(...args),
+      context: (...args: Parameters<Conversation["context"]>) => conversation.context(...args),
+      agent: (...args: Parameters<Conversation["agent"]>) => conversation.agent(...args),
       image(entryId: string, contentIndex: number) {
-        return durableImageEndpoint(conversation, entryId, contentIndex, context);
+        return (async () => {
+          if (entryId.startsWith("queued-")) return durableImageEndpoint(conversation, entryId, contentIndex, context);
+          for (const id of await branches()) {
+            const response = await durableImageEndpoint((await harness.conversation(id, context))!, entryId, contentIndex, context);
+            if (response.status !== 404) return response;
+          }
+          return new Response("not found", { status: 404 });
+        })();
       },
       /** Commit searchable metadata without creating a second history file. */
       setTitle(title: string) {
@@ -140,16 +250,16 @@ export async function openDurableAgentRuntime(
           const catalog = await tx.doc(WorkspaceConversations);
           const record = catalog.conversations.find((item) => item.durableId === conversation.id)!;
           record.title = title;
-          return { ...record };
+          return { ...record, ...(record.branches ? { branches: [...record.branches] } : {}) };
         }, context));
       },
       knownRequest(requestId: string) {
-        return command(async () => Boolean(await harness.commit((tx) => tx.submissionByRequest(conversation.id, requestId), context)));
+        return command(async () => Boolean(await known(requestId)));
       },
       submit(input: DurableInput) {
         return command(async () => {
           if (!input.requestId.trim()) throw new Error("A request ID is required for durable input");
-          const existing = await harness.commit((tx) => tx.submissionByRequest(conversation.id, input.requestId), context);
+          const existing = await known(input.requestId);
           // The original admission wins even if the skill or model has gone
           // away, or a retry arrives with different text/attachments/settings.
           if (existing) return (await harness.submission(existing.id, context))!;
@@ -192,9 +302,7 @@ export async function openDurableAgentRuntime(
       /** Reset context, retaining searchable history and the current settings. */
       reset() {
         return command(async () => {
-          if ((await harness.snapshot(LiveDoc, conversation.id, context))?.run) {
-            throw new Error("Stop the agent before starting a new session.");
-          }
+          await assertIdle();
           await readyForExecution();
           assertAdmission();
           await conversation.reset(undefined, context);
@@ -204,6 +312,7 @@ export async function openDurableAgentRuntime(
   }
 
   return {
+    async admission() { assertOpen(); return harness.snapshot(WorkspaceAdmission, context); },
     /** Discover retained histories without preparing prompts or starting work. */
     async catalog() {
       assertOpen();

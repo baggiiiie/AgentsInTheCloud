@@ -1,3 +1,4 @@
+import { existingDurableController } from "./durable-owner.ts";
 import { requestAcceptsJson } from "@atelier/core";
 import { turboStreamResponse } from "@atelier/shared";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
@@ -21,8 +22,8 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
     const agent = await resolveAgentConversation(params[0], params[1], options.events);
     if (agent.storage === "durable") {
-      const runtime = await requireAgentRuntime(params[0], params[1], options);
-      return await runtime.image!(params[2], Number(params[3]));
+      const controller = await existingDurableController(agent, options);
+      return controller ? await controller.image(params[2], Number(params[3])) : new Response("not found", { status: 404 });
     }
     return await sessionImageEndpoint(agent.path, params[2], Number(params[3]));
   }

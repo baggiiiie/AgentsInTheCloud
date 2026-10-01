@@ -1,3 +1,5 @@
+import { renderDurableTree } from "./durable-tree.ts";
+import type { TreeFilterMode } from "./session-tree.ts";
 import { AtelierCoreError } from "@atelier/core";
 import { createPiModelRuntime, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { createLivePresentation } from "@atelier/shared";
@@ -26,6 +28,9 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   readonly label: string;
   readonly sessionFile: string;
   private presentation!: DurableConversationPresentation;
+  private readonly transcriptListeners = new Map<AgentLivePresentationListener, { unsubscribe(): void }>();
+  readonly treeSummaryAvailable = false;
+  private selectionTail: Promise<void> = Promise.resolve();
   model?: { provider: string; id: string };
   private thinking = "off";
   private models: AgentStatsView["models"] = [];
@@ -54,13 +59,32 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     runtime.presentation = await controller.presentation(() => runtime.committed());
     await runtime.committed();
     await runtime.refreshModelConfiguration();
-    void runtime.presentation.closed.then(result => {
-      if (runtime.disposed) return;
+    runtime.observePresentation();
+    return runtime;
+  }
+  private observePresentation() {
+    const runtime = this;
+    const observed = this.presentation;
+    void observed.closed.then(result => {
+      if (runtime.disposed || runtime.presentation !== observed) return;
       runtime.failure = new Error(`Native conversation observation ended: ${JSON.stringify(result)}`);
       console.error(runtime.failure);
       runtime.publishBusy(false);
     });
-    return runtime;
+  }
+  private async attachSelectedBranch() {
+    const previous = this.presentation;
+    const next = await this.controller.presentation(() => this.committed());
+    if (this.disposed) { await next.dispose(); throw new Error("Agent view is detached"); }
+    this.presentation = next;
+    this.observePresentation();
+    for (const [listener, subscription] of this.transcriptListeners) {
+      subscription.unsubscribe();
+      this.transcriptListeners.set(listener, this.presentation.subscribeLivePresentation(listener));
+    }
+    await previous.dispose();
+    await this.committed();
+    await this.refreshModelConfiguration();
   }
   private assertOpen() {
     if (this.failure) throw this.failure;
@@ -105,9 +129,9 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   }
   subscribeLivePresentation(listener: AgentLivePresentationListener) {
     this.assertOpen();
-    const transcript = this.presentation.subscribeLivePresentation(listener);
+    this.transcriptListeners.set(listener, this.presentation.subscribeLivePresentation(listener));
     const chrome = this.chrome.subscribe(listener);
-    return { unsubscribe() { transcript.unsubscribe(); chrome.unsubscribe(); } };
+    return { unsubscribe: () => { this.transcriptListeners.get(listener)?.unsubscribe(); this.transcriptListeners.delete(listener); chrome.unsubscribe(); } };
   }
   subscribeTurnPresentation(turn: string, branch: string, listener: AgentLivePresentationListener) { this.assertOpen(); return this.presentation.subscribeTurnPresentation(turn, branch, listener); }
   async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, stats: this.stats() }; }
@@ -154,10 +178,28 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     this.chrome.invalidate();
   }
   async detailHtml(key: string, count?: number) { return this.presentation.detailHtml(key, count); }
-  treeHtml() { return '<p>History navigation is not available for this conversation yet.</p>'; }
-  labelTreeEntry(): never { throw new AtelierCoreError("invalid_arguments", "Native history labels are not available yet"); }
-  async navigateTree(): Promise<string> { throw new AtelierCoreError("invalid_arguments", "Native history navigation is not available yet"); }
-  async rewind(): Promise<void> { throw new AtelierCoreError("invalid_arguments", "Native rewind is not available yet"); }
+  async treeHtml(options: { filter: TreeFilterMode; query: string }) { this.assertOpen(); return renderDurableTree(await this.controller.tree(), { ...options, historyPath: `/workspaces/${encodeURIComponent(this.workspaceId)}/agent-history` }); }
+  async labelTreeEntry(entryId: string, label: string, operation: "add" | "remove") { this.assertOpen(); await this.controller.label(entryId, label, operation); }
+  private selectBranch(entryId: string, before = false) {
+    const selected = this.selectionTail.then(async () => {
+      this.assertOpen();
+      await this.controller.navigate(entryId, before);
+      await this.attachSelectedBranch();
+    });
+    this.selectionTail = selected.then(() => {}, () => {});
+    return selected;
+  }
+  async navigateTree(entryId: string, options: { summarize: boolean }): Promise<string> {
+    this.assertOpen();
+    if (options.summarize) throw new AtelierCoreError("invalid_arguments", "Continue without a summary for native history.");
+    await this.selectBranch(entryId);
+    return "";
+  }
+  async rewind(entryId: string, mode: "discard" | "summary"): Promise<void> {
+    this.assertOpen();
+    if (mode === "summary") throw new AtelierCoreError("invalid_arguments", "Continue without a summary for native history.");
+    await this.selectBranch(entryId, true);
+  }
   async dispose() {
     if (this.disposed) return;
     this.disposed = true;

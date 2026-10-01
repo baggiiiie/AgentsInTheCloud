@@ -217,7 +217,7 @@ function treeSummaryOptionHtml(mode: "none" | "summary" | "custom", title: strin
   });
 }
 
-export function renderAgentTreeSummaryMenu(entryId: string): string {
+export function renderAgentTreeSummaryMenu(entryId: string, summaryAvailable = true): string {
   const backButton = buttonHtml({
     type: "button",
     variant: "secondary",
@@ -233,9 +233,9 @@ export function renderAgentTreeSummaryMenu(entryId: string): string {
   return `<div class="agent-completion-menu agent-tree-summary-menu" role="listbox" aria-label="Branch summary choice" data-tree-entry="${escapeHtml(entryId)}">
     <header class="agent-tree-header"><span class="agent-tree-heading"><b>Continue from this point</b><span>What should happen to the branch you’re leaving?</span></span></header>
     <div class="agent-tree-summary-choices action-list">
-      ${treeSummaryOptionHtml("none", "No summary", "Switch state without carrying anything forward.", true)}
-      ${treeSummaryOptionHtml("summary", "Summarize", "Ask the agent to preserve useful context from the branch.")}
-      ${treeSummaryOptionHtml("custom", "Summarize with additional instructions", "Add guidance for what the summary should retain.")}
+      ${treeSummaryOptionHtml("none", summaryAvailable ? "No summary" : "Continue on a new branch", summaryAvailable ? "Switch state without carrying anything forward." : "Keep earlier branches in history without adding a summary.", true)}
+      ${summaryAvailable ? treeSummaryOptionHtml("summary", "Summarize", "Ask the agent to preserve useful context from the branch.") : ""}
+      ${summaryAvailable ? treeSummaryOptionHtml("custom", "Summarize with additional instructions", "Add guidance for what the summary should retain.") : ""}
     </div>
     <div class="agent-tree-custom" hidden>
       <label for="agent-tree-custom-instructions">Additional summary instructions</label>
@@ -246,8 +246,9 @@ export function renderAgentTreeSummaryMenu(entryId: string): string {
 }
 
 interface AgentTreeRuntime {
-  treeHtml(options: { filter: TreeFilterMode; query: string }): string;
-  labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void;
+  readonly treeSummaryAvailable?: boolean;
+  treeHtml(options: { filter: TreeFilterMode; query: string }): string | Promise<string>;
+  labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void | Promise<void>;
   navigateTree(entryId: string, options: { summarize: boolean; customInstructions?: string }): Promise<string>;
 }
 
@@ -255,7 +256,7 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
   if (suffix === "/summary" && request.method === "GET") {
     const entry = url.searchParams.get("entry") ?? "";
     if (!entry) throw new AtelierCoreError("invalid_arguments", "tree entry is required");
-    return new Response(renderAgentTreeSummaryMenu(entry), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return new Response(renderAgentTreeSummaryMenu(entry, (await runtime()).treeSummaryAvailable !== false), { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (suffix === "/label" && request.method === "POST") {
     const form = await request.formData();
@@ -263,11 +264,11 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
     const label = String(form.get("label") ?? "");
     const operation = form.get("operation");
     if (!entry || !label.trim() || (operation !== "add" && operation !== "remove")) throw new AtelierCoreError("invalid_arguments", "tree entry, label, and valid operation are required");
-    (await runtime()).labelTreeEntry(entry, label, operation);
+    await (await runtime()).labelTreeEntry(entry, label, operation);
     return new Response(null, { status: 204 });
   }
   if (suffix === "" && request.method === "GET") {
-    const html = (await runtime()).treeHtml({ filter: parseTreeFilterMode(url.searchParams.get("filter")), query: url.searchParams.get("q") ?? "" });
+    const html = await (await runtime()).treeHtml({ filter: parseTreeFilterMode(url.searchParams.get("filter")), query: url.searchParams.get("q") ?? "" });
     return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (suffix === "" && request.method === "POST") {

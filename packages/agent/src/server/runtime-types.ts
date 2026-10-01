@@ -50,8 +50,9 @@ export interface WorkspaceAgentRuntime {
   setModel(provider: string, modelId: string): Promise<void>;
   setThinkingLevel(level: string): Promise<void>;
   rewind(entryId: string, mode: RewindMode, customInstructions?: string): Promise<void>;
-  treeHtml(options: { filter: TreeFilterMode; query: string }): string;
-  labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void;
+  readonly treeSummaryAvailable?: boolean;
+  treeHtml(options: { filter: TreeFilterMode; query: string }): string | Promise<string>;
+  labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void | Promise<void>;
   navigateTree(entryId: string, options: { summarize: boolean; customInstructions?: string }): Promise<string>;
   newSession(): Promise<void>;
   detailHtml(key: string, count?: number): Promise<string>;
