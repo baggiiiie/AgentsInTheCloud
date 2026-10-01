@@ -2,6 +2,7 @@ import { createStyleElement, createThemeStyleElement, DiffHunksRenderer, parsePa
 import { renderHTML } from "@pierre/diffs/ssr";
 import { escapeHtml } from "@atelier/shared";
 import { toolDiffOptions } from "./pierre.ts";
+import { wordDiffCSS } from "./diff-options.ts";
 import { HighlightCache } from "./highlight-cache.ts";
 
 // Markdown rendering is synchronous. Load the neutral diff theme up front;
@@ -26,12 +27,12 @@ export function renderMarkdownDiff(code: string, provisional = false): string {
   const html = patches.map((patch) => {
     const metadata = patch.patchMetadata ? renderSnippet(patch.patchMetadata) : "";
     return metadata + patch.files.map((file) => {
-      const renderer = new DiffHunksRenderer({ ...toolDiffOptions, diffIndicators: "classic", hunkSeparators: "metadata", lineDiffType: "none" });
+      const renderer = new DiffHunksRenderer({ ...toolDiffOptions, overflow: "wrap", diffIndicators: "classic", hunkSeparators: "metadata", lineDiffType: "word-alt" });
       const result = renderer.renderDiff({ ...file, lang: "text" })!;
       const rendered = renderHTML([
         createStyleElement(result.css, true),
         createThemeStyleElement(wrapThemeCSS(result.themeStyles, result.baseThemeType ?? "dark")),
-        createStyleElement(toolDiffOptions.unsafeCSS),
+        createStyleElement(`${toolDiffOptions.unsafeCSS} ${wordDiffCSS}`),
         renderer.renderFullAST(result),
       ]);
       renderer.cleanUp();

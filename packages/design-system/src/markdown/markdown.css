@@ -17,6 +17,8 @@
 .markdown hr { margin: 24px 0; border: 0; border-top: 1px solid var(--line-strong); }
 .markdown pre { background: color-mix(in srgb, var(--bg) 45%, #000 14%); border: 1px solid var(--line); color: var(--text-bright); border-radius: var(--radius-control); padding: 12px; overflow-x: auto; margin: 6px 0 12px; }
 .markdown pre code { display: block; background: transparent; border: 0; border-radius: 0; padding: 0; color: inherit; font-size: var(--text-code); line-height: var(--leading-standard); }
+/* Enhanced fences also appear outside .markdown in the fullscreen viewer. */
+.markdown pre code, .agent-code-block pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown blockquote { border-left: 1px solid var(--line-strong); padding-left: 8px; color: var(--text-muted); }
 .markdown a { color: var(--accent); text-decoration: none; }
 .markdown a:hover { text-decoration: underline; }
@@ -34,8 +36,8 @@
 .markdown-diff-file + .markdown-diff-file { border-top: 1px solid var(--line); }
 .markdown-diff-filename { padding: 8px 42px 8px 12px; font: var(--text-code) var(--font-mono); color: var(--text-muted); background: var(--panel); overflow-wrap: anywhere; border-bottom: 1px solid var(--line); }
 .markdown-diff pre.markdown-diff-snippet { border: 0; border-radius: 0; padding: 10px 0; margin: 0; background: var(--panel); }
-.markdown-diff pre.markdown-diff-snippet code { min-width: 100%; width: max-content; }
-.markdown-diff-line { display: inline-block; min-width: 100%; box-sizing: border-box; padding: 0 12px; min-height: 1lh; }
+.markdown-diff pre.markdown-diff-snippet code { width: 100%; }
+.markdown-diff-line { display: inline-block; width: 100%; box-sizing: border-box; padding: 0 12px; min-height: 1lh; }
 .markdown-diff-line--addition { background: color-mix(in srgb, var(--success) 13%, transparent); }
 .markdown-diff-line--deletion { background: color-mix(in srgb, var(--danger) 13%, transparent); }
 .markdown-diff-line--hunk { color: var(--accent); background: var(--accent-soft); }
