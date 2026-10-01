@@ -1,6 +1,6 @@
-import { defineDoc, defineExtension, defineTask, defineTool, type TaskId } from "@earendil-works/pi-durable";
+import { defineDoc, defineExtension, defineTask, defineTool, type TaskId, type Tx, type ConversationId } from "@earendil-works/pi-durable";
 import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
-import { Type, type Static } from "typebox";
+import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { bashToolDefinition, forcedColorEnvironment, formatBashOutput } from "./bash-tmux.ts";
 
@@ -44,14 +44,32 @@ const BashChild = defineDoc<{ id: TaskId<BashOperationReceipt> | null }>({
 
 /** Install the tool AND its owned task together. The task's abort protocol owns Stop. */
 export function createDurableBashExtension(workspaceId: string, operations: BashOperations = workspaceBashOperations(workspaceId)) {
-  const operation = defineTask<BashInput, BashCheckpoint, BashOperationReceipt>({
-    name: "atelier.bash-operation", version: 1,
+  return createReceiptBashExtension({
+    name: "atelier.bash", taskName: "atelier.bash-operation", tool: bashToolDefinition,
+    prepare: async (args) => ({ command: args.command, timeout: args.timeout, target: {} }),
+    workspaceId: () => workspaceId, operations: () => operations,
+  });
+}
+
+/** Shared receipt protocol; target fields are committed with the child, never recovered from model context. */
+export function createReceiptBashExtension<TParams extends TSchema, TTarget extends object>(options: {
+  name: string;
+  taskName: string;
+  tool: { name: string; description: string; parameters: TParams };
+  prepare(args: Static<TParams>, tx: Tx, conversationId: ConversationId): Promise<{ command: string; timeout?: number; target: TTarget }>;
+  workspaceId(input: TTarget): string;
+  operations(input: TTarget): BashOperations;
+}) {
+  type Input = BashInput & TTarget;
+  const operation = defineTask<Input, BashCheckpoint, BashOperationReceipt>({
+    name: options.taskName, version: 1,
     initial: () => ({ phase: "execute" }),
     phases: {
       async execute(task, runtime, context) {
         // Only this first invocation can create a missing workspace receipt.
         // If it dies before admission, a retry reports uncertainty rather than
         // guessing whether a missing receipt means a command never ran.
+        const operations = options.operations(task.input);
         const invocation = crypto.randomUUID();
         const first = await runtime.memo("launch-invocation", invocation, context);
         let receipt = await operations("ensure", task.input.request, first === invocation);
@@ -65,6 +83,7 @@ export function createDurableBashExtension(workspaceId: string, operations: Bash
     async abort(task, runtime, context) {
       // Host close cancels a run invocation, but never invokes this protocol.
       // A durable abort mark does: Stop is retried after restart until acknowledged.
+      const operations = options.operations(task.input);
       let receipt = await operations("stop", task.input.request);
       while (receipt.status === "running") {
         await runtime.sleep(runtime.now() + 100, context);
@@ -74,28 +93,30 @@ export function createDurableBashExtension(workspaceId: string, operations: Bash
     },
   });
   const bash = defineTool({
-    name: "bash", description: bashToolDefinition.description, parameters: bashToolDefinition.parameters,
+    ...options.tool,
     // Safe means reattach to our receipt, NOT execute an arbitrary command again.
     replay: "safe",
-    async execute(args: { command: string; timeout?: number }, api, context) {
+    async execute(args, api, context) {
       const child = await api.commit(async (tx) => {
         const binding = await tx.doc(BashChild, api.taskId);
         if (binding.id !== null) return binding.id;
-        const timeout = Math.max(1, args.timeout ?? 600);
+        const prepared = await options.prepare(args, tx, api.conversationId);
+        const timeout = Math.max(1, prepared.timeout ?? 600);
         const request: BashOperationRequest = {
-          id: crypto.randomUUID(), command: args.command, deadline: Date.now() + timeout * 1000, cwd: workspaceRoot,
+          id: crypto.randomUUID(), command: prepared.command, deadline: Date.now() + timeout * 1000, cwd: workspaceRoot,
           env: Object.fromEntries(Object.entries({
             ...forcedColorEnvironment, COLUMNS: 120, LINES: 30,
             EDITOR: "true", GIT_EDITOR: "true", VISUAL: "true", GIT_PAGER: "cat", PAGER: "cat", GIT_TERMINAL_PROMPT: 0,
           }).map(([key, value]) => [key, String(value)])),
         };
-        binding.id = await tx.createTask(operation, { request, timeout }, { ownership: { kind: "task", taskId: api.taskId } });
+        binding.id = await tx.createTask(operation, { ...prepared.target, request, timeout }, { ownership: { kind: "task", taskId: api.taskId } });
         return binding.id;
       }, context);
       const record = (await api.getTask(child, context))!;
       // SAFETY: this ID is atomically bound above to our version-1 operation task and its BashInput.
-      const input = record.input as BashInput;
-      await api.details({ workspaceId, tmuxSession: `atelier-agent-${input.request.id}`, command: args.command }, context);
+      const input = record.input as Input;
+      const workspaceId = options.workspaceId(input);
+      await api.details({ workspaceId, tmuxSession: `atelier-agent-${input.request.id}`, command: input.request.command }, context);
       const settled = await api.waitForTask(child, context);
       if (settled.state.outcome.status === "faulted" || settled.state.outcome.status === "failed") throw new Error(settled.state.outcome.error.message);
       if (settled.state.outcome.status !== "completed") throw new Error(`Command operation ${settled.state.outcome.status}`);
@@ -114,5 +135,5 @@ export function createDurableBashExtension(workspaceId: string, operations: Bash
       };
     },
   });
-  return defineExtension({ name: "atelier.bash", tools: [bash], tasks: [operation] });
+  return defineExtension({ name: options.name, tools: [bash], tasks: [operation] });
 }

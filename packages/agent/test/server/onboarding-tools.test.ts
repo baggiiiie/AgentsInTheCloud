@@ -56,7 +56,7 @@ describe("onboarding tool capabilities", () => {
       markProjectOnboardingWorkspace("parent");
       const group = createRegisteredOnboardingTools("parent", "conversation");
       expect(group.map((tool) => tool.name)).toEqual(["read_project_settings", "write_project_settings", "request_secret_value", "bash_in_other_workspace", "delete_workspace", "create_workspace"]);
-      expect(createBashTool).toHaveBeenCalledTimes(1);
+      expect(createBashTool).not.toHaveBeenCalled();
       expect(createRegisteredOnboardingTools("parent", "sibling").map((tool) => tool.name)).toEqual(group.map((tool) => tool.name));
       expect(createRegisteredOnboardingTools("ordinary", "conversation")).toEqual([]);
       const defaults = createWorkspaceAgentTools("parent").map((tool) => tool.name);
