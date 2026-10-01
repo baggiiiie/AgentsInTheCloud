@@ -562,6 +562,17 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
     this.publishLiveItem(item);
   }
 
+  /** Background usage must not close or interrupt the current streaming item. */
+  protected livePersistedStatus(id: string, text: string): void {
+    if (!this.live) {
+      this.invalidatePresentation();
+      return;
+    }
+    const item: TranscriptItem = { type: "note", key: id, text, tone: "system" };
+    this.live.items.push(item);
+    this.publishLiveItem(item);
+  }
+
   protected liveAssistantFailure(): void {
     const live = this.live;
     if (!live) return;

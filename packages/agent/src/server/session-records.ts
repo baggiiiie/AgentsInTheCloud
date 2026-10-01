@@ -131,6 +131,13 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       records.push({ kind: "note", id: entry.id, text: `**Rewound** — summary of the abandoned branch:\n\n${entry.summary ?? ""}`, tone: "summary", timestamp: entryTimestamp(entry) });
       continue;
     }
+    if (entry.type === "usage" && entry.kind === "cache_warm") {
+      const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
+      const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
+      const note = entry.note ? ` (${entry.note})` : "";
+      records.push({ kind: "note", id: entry.id, text: `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`, tone: "system", timestamp: entryTimestamp(entry) });
+      continue;
+    }
     if (entry.type === "compaction") {
       records.push({ kind: "note", id: entry.id, text: "Context compacted", tone: "system", timestamp: entryTimestamp(entry) });
       continue;

@@ -386,6 +386,14 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         }
         break;
       }
+      case "entry_appended": {
+        const entry = event.entry;
+        if (entry.type !== "usage" || entry.kind !== "cache_warm") break;
+        const record = recordsFromSessionEntries([entry])[0];
+        if (record?.kind === "note") this.livePersistedStatus(entry.id, record.text);
+        await this.refreshStats();
+        break;
+      }
       case "agent_settled":
         this.settledCost = this.session.getSessionStats?.().cost ?? 0;
         // agent_end only ends an agent-core loop. Pi may still compact and
