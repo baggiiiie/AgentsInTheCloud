@@ -32,7 +32,7 @@ function githubConnectionForm(surface: SettingsSurface, error: string): string {
   const rowClass = surface === "settings" ? " github-connect-form--row" : "";
   const connectButton = surface === "onboarding" ? "" : renderGitHubConnectButton(surface);
   return `<form id="${domId(surface, "github-connect-form")}" class="github-connect-form${rowClass} form-stack" method="post" action="${action}" data-turbo="true">
-    <p>On your machine, sign in with GitHub CLI if needed, then print your token:</p>
+    <p>Run these commands on your own computer:</p>
     <pre class="settings-command">gh auth login
 gh auth token</pre>
     <p>Paste the token output below. Atelier stores and encrypts it outside of the agent sandbox so the agent never sees it, but can still read and write from your github repo’s.</p>
