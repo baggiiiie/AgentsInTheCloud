@@ -12,6 +12,7 @@ import { renderAgentPane, renderMobileAgentAttention, type AgentPaneContribution
 import { atelierEasterEggHtml } from "./atelier-easter-egg.ts";
 import { renderPwaReminder } from "./pwa-reminder.ts";
 import type { WorkspaceDeletionState } from "./workspace-registry.ts";
+import type { WorkspaceWorkViewState } from "@atelier/workspace";
 import { barButton, behaviorTurboStream, busyAttentionIndicator, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
 
 export type WorkViewAvailability =
@@ -424,13 +425,20 @@ export function workspacePaneCollectionsRegions(presentation: WorkspacePanePrese
   ];
 }
 
-export function renderWorkspaceParkConfirmation(id: string, title: string): string {
+export function renderWorkspaceParkConfirmation(id: string, title: string, workViews: readonly WorkspaceWorkViewState[]): string {
+  const terminals = workViews.filter(({ reference }) => reference.type === "terminal").length;
+  const editors = workViews.filter(({ reference }) => reference.type === "vscode").length;
+  const openViews = [
+    ...(terminals ? [`${terminals} terminal ${terminals === 1 ? "session" : "sessions"}`] : []),
+    ...(editors ? [`${editors} VS Code ${editors === 1 ? "editor" : "editors"}`] : []),
+  ].join(" and ");
+  const singular = terminals + editors === 1;
   return dialogHtml({
     element: { id: domId("workspace_park_confirmation", id), attributesHtml: "data-dialog-auto-show" },
     iconHtml: Icons.Park,
     titleCaption: `Park “${title}”?`,
-    bodyHtml: "<p>This workspace has terminal or VS Code views open. Their sessions cannot recover after parking. Force park will close these views before parking. Other views will be kept.</p>",
-    footerHtml: `<form method="dialog">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Cancel" } })}</form><form method="post" action="/workspaces/${encodeURIComponent(id)}/park?force=1" data-action="submit->workspace-navigation#parkWorkspace">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Force park" } })}</form>`,
+    bodyHtml: `<p>You have ${openViews} open in this workspace.</p><p>Parking will close ${singular ? "it" : "them"}. ${singular ? "It" : "They"} won’t reopen when you unpark.</p>`,
+    footerHtml: `<form method="dialog">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Cancel" } })}</form><form method="post" action="/workspaces/${encodeURIComponent(id)}/park?force=1" data-action="submit->workspace-navigation#parkWorkspace">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Force park" } })}</form>`,
   });
 }
 

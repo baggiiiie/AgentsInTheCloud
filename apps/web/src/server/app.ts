@@ -855,11 +855,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const server = port === 22 ? host : `${host}:${port}`;
     const keys = records.map(({ line, fingerprint }) => `<p><label><input type="checkbox" name="key" value="${escapeHtml(line)}" checked> <strong>${escapeHtml(line.split(" ")[1] ?? "SSH key")}</strong> <code>${escapeHtml(fingerprint)}</code></label></p>`).join("");
     const warning = changed
-      ? `<p><strong>Warning: this server's identity has changed.</strong> This can mean a server migration, but it can also mean someone is intercepting your connection. Do not approve this until you have confirmed the new fingerprint with your administrator through a separate, trusted channel.</p>`
+      ? `<p>Your workspace is trying to SSH into <strong>${escapeHtml(server)}</strong>.</p><p>We have ssh'd into this address in the past, but the fingerprint the remote machine reports now is different from what it reported previously.</p><p>If you updated the machine, this is expected.</p><p>If you didn't update the machine, it might mean someone may be trying to impersonate it.</p>`
       : `<p>Atelier received these public keys from <strong>${escapeHtml(server)}</strong>. A network scan does not prove this is the real server. Compare the fingerprints with a trusted source or your administrator before continuing.</p>`;
     const formId = domId("ssh_trust_form", workspaceId);
     const body = `${warning}<form id="${formId}" method="post" action="${escapeHtml(action)}" data-turbo="true">${keys}${changed ? `<p><label>Type <strong>${escapeHtml(server)}</strong> to confirm: <input class="text-field" name="confirmation" autocomplete="off" required></label></p>` : ""}</form>`;
-    const footer = `<form method="post" action="${escapeHtml(action)}/reject" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Do not trust" } })}</form>${buttonHtml({ type: "submit", variant: changed ? "danger" : "primary", content: { kind: "caption", caption: changed ? "Trust changed identity" : "Trust verified keys" }, attributesHtml: `form="${formId}"` })}`;
+    const footer = `<form method="post" action="${escapeHtml(action)}/reject" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Don't trust" } })}</form>${buttonHtml({ type: "submit", variant: changed ? "secondary" : "primary", content: { kind: "caption", caption: changed ? "Trust changed identity" : "Trust verified keys" }, attributesHtml: `form="${formId}"` })}`;
     return `<div class="workspace-ssh-trust-overlay" role="presentation" data-controller="workspace-ssh-trust">${panelHtml({ element: { tag: "section", attributesHtml: `role="dialog" aria-label="${escapeHtml(changed ? `SSH identity changed: ${server}` : `Trust SSH server ${server}?`)}"` }, headerHtml: `<h2 class="panel__title">${escapeHtml(changed ? `SSH identity changed: ${server}` : `Trust SSH server ${server}?`)}</h2>`, bodyHtml: body, bodyLayout: "padded", bodyOverflow: "scroll", footerHtml: footer })}</div>`;
   }
 
@@ -970,7 +970,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const result = await requestWorkspaceParkedState(id, parked, force);
     if (result.kind === "confirmation") {
       if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal and VS Code sessions cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
-      const confirmation = renderWorkspaceParkConfirmation(id, workspaceTitle(entry));
+      const confirmation = renderWorkspaceParkConfirmation(id, workspaceTitle(entry), result.workViews);
       return wantsStream(request)
         ? turboStreamResponse(update(workspaceModuleModalFrameId, confirmation))
         : await surfacePage({ kind: "module-modal", dialogHtml: confirmation });
