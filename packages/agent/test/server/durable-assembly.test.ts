@@ -24,6 +24,7 @@ const resources = {
   agents: async () => [{ path: "/work/AGENTS.md", content: "Keep the important invariant." }],
   skills: async () => workspaceSkillsFromFiles([{ path: "/work/.agents/skills/review/SKILL.md", content: "---\nname: review\ndescription: Review the implementation\n---\nPrivate skill body" }]),
   model: async () => ({ provider: "faux", id: "faux-1" }),
+  thinking: async () => ({ levels: ["off" as const, "medium" as const, "high" as const], selected: "medium" as const }),
 };
 
 test("native registry includes registered controls and receipt tasks, but no live delegation", () => {
@@ -45,12 +46,14 @@ test("prepares workspace instructions and skill discovery without loading skill 
   const agent = await prepareDurableConversation("assembly-workspace", "tab", {}, {}, resources);
   expect(agent.model).toEqual({ provider: "faux", modelId: "faux-1" });
   expect(agent.cwd).toBe("/work");
+  expect(agent.thinkingLevel).toBe("medium");
   expect(agent.instructions).toContain("online coding tool called Atelier");
   expect(agent.instructions).toContain("Keep the important invariant.");
   expect(agent.instructions).toContain("/work/.agents/skills/review/SKILL.md");
   expect(agent.instructions).not.toContain("Private skill body");
   const explicit = await prepareDurableConversation("assembly-workspace", "tab", {}, { model: null, thinkingLevel: "high" }, {
     ...resources, model: async () => { throw new Error("Must not resolve the default when explicitly set"); },
+    thinking: async () => { throw new Error("Must not resolve remembered thinking when explicitly set"); },
   });
   expect(explicit.model).toBeNull();
   expect(explicit.thinkingLevel).toBe("high");
@@ -78,9 +81,10 @@ test("assembled native Harness uses the committed prompt and model across reopen
   const conversation = await first.conversation(record, prepared);
   await first.close();
   const second = await open();
-  const restored = await second.conversation(record, { model: { provider: "missing", modelId: "wrong" }, instructions: "Changed host instructions" });
+  const restored = await second.conversation(record, { model: { provider: "missing", modelId: "wrong" }, instructions: "Changed host instructions", thinkingLevel: "off" });
   expect(restored.id).toBe(conversation.id);
   expect((await second.harness.snapshot(AgentDoc, restored.id, context))?.instructions).toBe(prepared.instructions!);
+  expect((await second.harness.snapshot(AgentDoc, restored.id, context))?.thinkingLevel).toBe("medium");
   const submission = await restored.submit({ type: "input", content: "Check assembly", requestId: "assembly-request" }, context);
   expect((await submission.wait(context)).status).toBe("done");
   expect(faux.state.callCount).toBe(1);

@@ -1,3 +1,4 @@
+import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { getConfiguredAgentModels } from "./model-preferences.ts";
 import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@atelier/llm/server";
 
@@ -52,9 +53,9 @@ export async function configuredModelOptionViews(current?: ModelRef | null, runt
   });
 }
 
-export async function launchComposerThinkingSettings(model: ModelRef | undefined): Promise<{ levels: string[]; selected?: string }> {
+export async function launchComposerThinkingSettings(model: ModelRef | undefined): Promise<{ levels: string[]; selected?: ModelThinkingLevel }> {
   if (!model) return { levels: [] };
-  const levels: string[] = await modelThinkingLevels(model);
+  const levels = await modelThinkingLevels(model);
   const remembered = await getAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.id });
-  return { levels, selected: remembered && levels.includes(remembered) ? remembered : levels.includes("medium") ? "medium" : levels[0] };
+  return { levels, selected: levels.find((level) => level === remembered) ?? (levels.includes("medium") ? "medium" : levels[0]) };
 }
