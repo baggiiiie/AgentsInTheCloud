@@ -1,50 +1,19 @@
-import { dirname, posix } from "node:path";
-import { shellQuote, type AtelierEventBus } from "@atelier/core";
+import type { AtelierEventBus } from "@atelier/core";
 import type { DeleteCurrentWorkspaceResult, WorkspaceWorkViewReference } from "@atelier/shared";
-import { execWorkspaceCommand, execWorkspaceCommandBuffer, execWorkspaceShell, workspaceRoot } from "@atelier/workspace";
+import { workspaceRoot } from "@atelier/workspace";
 import {
   createEditToolDefinition,
   createReadToolDefinition,
   createWriteToolDefinition,
-  defineTool,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
 import { createTmuxBashTool } from "./bash-tmux.ts";
+import { defineWorkspaceTool, type WorkspaceTool } from "./workspace-tool.ts";
+import { workspaceFileToolOptions } from "./workspace-file-tools.ts";
+export { normalizeWorkspacePath } from "./workspace-file-tools.ts";
 
-export function normalizeWorkspacePath(path: string): string {
-  if (!path || path.includes("\0")) throw new Error("path is required");
-  const absolute = path.startsWith("/") ? posix.normalize(path) : posix.normalize(posix.join(workspaceRoot, path));
-  return absolute;
-}
-
-const supportedImageMimeTypes = new Set(["image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"]);
-
-async function detectWorkspaceImageMimeType(workspaceId: string, absolutePath: string): Promise<string | null> {
-  const result = await execWorkspaceCommand(workspaceId, ["file", "--brief", "--mime-type", absolutePath]);
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `could not inspect ${absolutePath}`);
-  const mimeType = result.stdout.trim().toLowerCase();
-  return supportedImageMimeTypes.has(mimeType) ? mimeType : null;
-}
-
-async function readFileBuffer(workspaceId: string, absolutePath: string): Promise<Buffer> {
-  const result = await execWorkspaceCommandBuffer(workspaceId, ["cat", absolutePath]);
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `could not read ${absolutePath}`);
-  return result.stdout;
-}
-
-async function writeFile(workspaceId: string, absolutePath: string, content: string): Promise<void> {
-  const dir = dirname(absolutePath);
-  const result = await execWorkspaceShell(workspaceId, `mkdir -p ${shellQuote(dir)} && cat > ${shellQuote(absolutePath)}`, { stdin: content });
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `could not write ${absolutePath}`);
-}
-
-async function accessFile(workspaceId: string, absolutePath: string): Promise<void> {
-  const result = await execWorkspaceCommand(workspaceId, ["test", "-r", absolutePath]);
-  if (result.exitCode !== 0) throw new Error(`file is not readable: ${absolutePath}`);
-}
-
-interface WorkspaceAgentToolOptions {
+export interface WorkspaceAgentToolOptions {
   events?: AtelierEventBus;
   /** Only Atelier's own transcript renders artifact-preview: URLs. */
   embeds?: boolean;
@@ -55,7 +24,7 @@ export interface WorkspacePresenterDeps {
   presentWorkView(reference: WorkspaceWorkViewReference): Promise<void>;
 }
 
-type WorkspaceAgentToolFactory = (workspaceId: string, options: WorkspaceAgentToolOptions) => ToolDefinition<any, any>;
+type WorkspaceAgentToolFactory = (workspaceId: string, options: WorkspaceAgentToolOptions) => WorkspaceTool<any, any>;
 
 export interface WorkspacePresenterDefinition<Params extends { kind: string } = { kind: string }> {
   kind: Params["kind"];
@@ -85,14 +54,14 @@ export function registerWorkspacePresenter(kind: string, factory: WorkspacePrese
 
 const presentEmbedHint = " Images, videos, SVGs, and HTML files are already automatically visible to the user when you reference them with an Atelier embed URL in Markdown image syntax, for example: ![](artifact-preview:/work/app/screenshot.png) or ![](artifact-preview:/work/app/demo.html).";
 
-function createPresentTool(workspaceId: string, options: WorkspaceAgentToolOptions): ToolDefinition<any, any> | undefined {
+function createPresentTool(workspaceId: string, options: WorkspaceAgentToolOptions): WorkspaceTool<any, any> | undefined {
   const presenters = [...registeredWorkspacePresenters.values()].map((factory) => factory(workspaceId, options));
   if (!presenters.length) return undefined;
   const kinds = presenters.map((presenter) => presenter.kind);
   const presenterParameters = Object.fromEntries(presenters.flatMap((presenter) =>
     Object.entries(presenter.parameters).map(([name, schema]) => [name, Type.Optional(schema)]),
   ));
-  return defineTool({
+  return defineWorkspaceTool({
     name: "present",
     label: "Present",
     description: "Present one primary interactive surface to the user in Atelier. Use this when the user should look at or interact with while evaluating your work. Atelier will place the chosen surface in the preview area. Calling this again should update or replace the primary presentation rather than adding multiple competing presentations. Do not use this tool for static or inline artifacts." + (options.embeds ? presentEmbedHint : "") + presenters.map((presenter) => `${presenter.kind}: ${presenter.description}`).join(" "),
@@ -127,8 +96,8 @@ export async function executeDeleteCurrentWorkspace(
   };
 }
 
-export function createDeleteCurrentWorkspaceTool(workspaceId: string, deleteCurrentWorkspace: (force: boolean) => Promise<DeleteCurrentWorkspaceResult>): ToolDefinition<any, any> {
-  return defineTool({
+export function createDeleteCurrentWorkspaceTool(workspaceId: string, deleteCurrentWorkspace: (force: boolean) => Promise<DeleteCurrentWorkspaceResult>): WorkspaceTool<any, any> {
+  return defineWorkspaceTool({
     name: "delete_current_workspace",
     label: "Delete Current Workspace",
     description: "Permanently delete this agent's current Atelier workspace. This tears down the execution context the agent has been doing all of its work in, including the workspace container and local files/changes that have not been preserved elsewhere. The agent cannot choose another workspace; this tool always deletes only its own current workspace. Execute this only when the user has explicitly requested deletion of this workspace.",
@@ -142,34 +111,15 @@ export function createDeleteCurrentWorkspaceTool(workspaceId: string, deleteCurr
 }
 
 export function createWorkspaceAgentTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): ToolDefinition<any, any>[] {
-  const read = createReadToolDefinition(workspaceRoot, {
-    operations: {
-      readFile: (path) => readFileBuffer(workspaceId, normalizeWorkspacePath(path)),
-      access: (path) => accessFile(workspaceId, normalizeWorkspacePath(path)),
-      detectImageMimeType: (path) => detectWorkspaceImageMimeType(workspaceId, normalizeWorkspacePath(path)),
-    },
-  });
-  const write = createWriteToolDefinition(workspaceRoot, {
-    operations: {
-      writeFile: (path, content) => writeFile(workspaceId, normalizeWorkspacePath(path), content),
-      mkdir: async (path) => {
-        const result = await execWorkspaceCommand(workspaceId, ["mkdir", "-p", normalizeWorkspacePath(path)]);
-        if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `could not create ${path}`);
-      },
-    },
-  });
-  const edit = createEditToolDefinition(workspaceRoot, {
-    operations: {
-      readFile: (path) => readFileBuffer(workspaceId, normalizeWorkspacePath(path)),
-      writeFile: (path, content) => writeFile(workspaceId, normalizeWorkspacePath(path), content),
-      access: (path) => accessFile(workspaceId, normalizeWorkspacePath(path)),
-    },
-  });
+  const operations = workspaceFileToolOptions(workspaceId);
+  const read = createReadToolDefinition(workspaceRoot, operations.read);
+  const write = createWriteToolDefinition(workspaceRoot, operations.write);
+  const edit = createEditToolDefinition(workspaceRoot, operations.edit);
   const bash = createTmuxBashTool(workspaceId);
   return [read, write, edit, bash, ...createAtelierControlTools(workspaceId, { ...options, embeds: true })];
 }
 
-export function createAtelierControlTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): ToolDefinition<any, any>[] {
+export function createAtelierControlTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): WorkspaceTool<any, any>[] {
   const present = createPresentTool(workspaceId, options);
   const external = [...registeredWorkspaceAgentTools.values()].map((factory) => factory(workspaceId, options));
   return [...(present ? [present] : []), ...external];
