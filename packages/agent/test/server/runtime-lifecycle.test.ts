@@ -2,7 +2,6 @@ import { createAtelierEventBus } from "@atelier/core";
 import { expect, spyOn, test } from "bun:test";
 import { RealAgentRuntime } from "../../src/server/real-agent-runtime.ts";
 import type { AgentStatsView } from "../../src/server/render-composer.ts";
-import { AgentServiceTierState } from "../../src/server/service-tier.ts";
 import { buildTranscript, type TranscriptItem } from "../../src/server/transcript.ts";
 import { currentNotificationTurn, setTurnNotification } from "../../src/server/turn-notifications.ts";
 import { turnTimingEntryType } from "../../src/server/turn-timing.ts";
@@ -155,7 +154,6 @@ function runtimeFor(session: any, events = createAtelierEventBus()): Inspectable
     },
     session,
     [],
-    new AgentServiceTierState(session.sessionManager),
     { events },
   );
 }

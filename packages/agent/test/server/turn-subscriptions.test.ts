@@ -52,7 +52,6 @@ class Runtime extends BaseAgentRuntime {
   availableThinkingLevels() { return []; }
   async setModel() {}
   async setThinkingLevel() {}
-  async setServiceTier() {}
   async rewind() {}
   treeHtml() { return ""; }
   labelTreeEntry() {}

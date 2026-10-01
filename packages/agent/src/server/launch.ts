@@ -20,7 +20,6 @@ function stringParameter(parameters: JsonObject, name: string): string {
 }
 
 export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{ agent: AgentWorkspaceParameters } | undefined> {
-  const serviceTier = stringParameter(parameters, "serviceTier");
   const initialPromptMode = stringParameter(parameters, "initialPromptMode");
   if (initialPromptMode && initialPromptMode !== "composer") throw invalidArguments("agent.initialPromptMode must be composer");
   const agent: AgentWorkspaceParameters = {
@@ -30,7 +29,6 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
     attachmentDraft: stringParameter(parameters, "attachmentDraft"),
   };
   if (initialPromptMode) agent.initialPromptMode = "composer";
-  if (serviceTier) agent.serviceTier = serviceTier === "priority" ? "priority" : "default";
   if (!Object.values(agent).some(Boolean)) return undefined;
   if (!agent.initialPromptMode && (agent.initialPrompt || agent.attachmentDraft)) {
     const model = await resolveNewWorkspaceAgentModel(agent.model);
@@ -38,7 +36,6 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
       agent.initialPromptMode = "composer";
       agent.model = "";
       agent.thinkingLevel = "";
-      delete agent.serviceTier;
     } else if (agent.model) agent.model = modelRefValue(model);
   }
   return { agent };

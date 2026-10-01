@@ -2,7 +2,6 @@ import { createAtelierEventBus } from "@atelier/core";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { expect, test } from "bun:test";
 import { RealAgentRuntime } from "../../src/server/real-agent-runtime.ts";
-import { AgentServiceTierState } from "../../src/server/service-tier.ts";
 import { findTranscriptItem } from "../../src/server/transcript.ts";
 import { currentNotificationTurn } from "../../src/server/turn-notifications.ts";
 import { turnTimingEntryType } from "../../src/server/turn-timing.ts";
@@ -34,7 +33,7 @@ function harness() {
   let finished = 0;
   events.on("workspace_agent_turn_finished", () => { finished++; });
   const runtime = new PersistedRuntime({ workspaceId: "persisted-lifecycle", conversationId: crypto.randomUUID(),
-    label: "Agent", title: "Persisted", path: "/unused.jsonl" }, session, [], new AgentServiceTierState(manager), { events });
+    label: "Agent", title: "Persisted", path: "/unused.jsonl" }, session, [], { events });
   return {
     manager, runtime, finished: () => finished,
     async start() {

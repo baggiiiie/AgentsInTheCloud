@@ -14,7 +14,6 @@ import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { createPiModelRuntime } from "@atelier/llm/server";
 import type { WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
 import { compactionKeepRecentTokens } from "./runtime-status.ts";
-import { AgentServiceTierState, modelRuntimeWithServiceTiers, supportsFastMode, type AgentServiceTier } from "./service-tier.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
 import { createAtelierResourceLoader, prepareAppendedAtelierInstructions } from "./system-prompt.ts";
@@ -34,7 +33,6 @@ export interface AgentSessionDelegation {
 interface InitialSessionSettings {
   model?: NonNullable<Parameters<typeof createAgentSession>[0]>["model"];
   thinkingLevel?: NonNullable<Parameters<typeof createAgentSession>[0]>["thinkingLevel"];
-  serviceTier?: AgentServiceTier;
 }
 
 const bootstrapOnlySessionEntryTypes = new Set(["model_change", "thinking_level_change"]);
@@ -48,7 +46,7 @@ export async function discardBootstrapOnlySession(path: string): Promise<void> {
   if (entries.every((entry) => bootstrapOnlySessionEntryTypes.has(entry.type))) await writeFile(path, "");
 }
 
-export async function createPiSession(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions, initial: InitialSessionSettings = {}): Promise<{ session: any; toolViews: AgentToolDefinitionView[]; serviceTiers: AgentServiceTierState; delegation: AgentSessionDelegation }> {
+export async function createPiSession(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions, initial: InitialSessionSettings = {}): Promise<{ session: any; toolViews: AgentToolDefinitionView[]; delegation: AgentSessionDelegation }> {
   await ensureSessionFile(agent.path);
   await discardBootstrapOnlySession(agent.path);
   const [modelRuntime, defaultModel] = await Promise.all([
@@ -65,7 +63,6 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
   if (defaultModel) Object.assign(sessionSettings, { defaultProvider: defaultModel.provider, defaultModel: defaultModel.id });
   const sessionManager = SessionManager.open(agent.path, dirname(agent.path), workspaceRoot);
   preparation?.seedHistory?.(sessionManager);
-  const serviceTiers = new AgentServiceTierState(sessionManager);
   const customTools = [
     ...createWorkspaceAgentTools(agent.workspaceId, { events: options.events }),
     ...(preparation?.tools ?? []),
@@ -76,7 +73,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
   const { session } = await createAgentSession({
     cwd: workspaceRoot,
     agentDir: dirname(agent.path),
-    modelRuntime: modelRuntimeWithServiceTiers(modelRuntime, serviceTiers),
+    modelRuntime,
     model: initial.model ?? (inheritedModel ? modelRuntime.getModel(inheritedModel.provider, inheritedModel.id) : undefined),
     thinkingLevel: initial.thinkingLevel ?? preparation?.thinkingLevel,
     resourceLoader: createAtelierResourceLoader(agentsFiles, () => [
@@ -98,14 +95,11 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
     await owned?.dispose();
   };
   try {
-    const provider = session.model?.provider;
-    if (provider && initial.serviceTier && supportsFastMode(provider)) await serviceTiers.set(provider, initial.serviceTier);
     attachment = preparation?.attach?.(session);
     const createRequest = attachment?.createModelRequest?.bind(attachment);
     if (createRequest) detachPipeline = attachModelRequestPipeline(session, createRequest);
     return {
       session,
-      serviceTiers,
       delegation: {
         subscribeProviderLimits: listener => observeProviderLimits(session, listener),
         subscribeCacheWarmingDecisions: listener => observeCacheWarmingDecisions(session, listener),

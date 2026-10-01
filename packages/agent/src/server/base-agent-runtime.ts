@@ -23,7 +23,6 @@ import type {
   WorkspaceAgentRuntime,
   WorkspaceAgentRuntimeOptions,
 } from "./runtime-types.ts";
-import type { AgentServiceTier } from "./service-tier.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
 import {
@@ -706,7 +705,6 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   async refreshModelConfiguration(): Promise<void> { await this.refreshStats(); }
   abstract setModel(provider: string, modelId: string): Promise<void>;
   abstract setThinkingLevel(level: string): Promise<void>;
-  abstract setServiceTier(serviceTier: AgentServiceTier): Promise<void>;
   abstract rewind(entryId: string, mode: RewindMode, customInstructions?: string): Promise<void>;
   abstract treeHtml(options: { filter: TreeFilterMode; query: string }): string;
   abstract labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void;
