@@ -64,7 +64,7 @@ test("assembly opts only the observational read into replay and excludes legacy 
     execute: async () => ({ content: [{ type: "text", text: "Presented" }], details: {} }),
   }));
   try {
-    const tools = createDurableWorkspaceTools("workspace");
+    const tools = createDurableWorkspaceTools("workspace", createModels());
     expect(tools.map((tool) => [tool.name, tool.replay])).toEqual([
       ["read", "safe"], ["write", "unsafe"], ["edit", "unsafe"], ["present", "unsafe"],
     ]);

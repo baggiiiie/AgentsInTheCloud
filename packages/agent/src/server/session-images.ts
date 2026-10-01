@@ -1,3 +1,4 @@
+import type { ImageContent } from "@earendil-works/pi-ai";
 import { readFile } from "node:fs/promises";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -25,7 +26,11 @@ export async function sessionImageEndpoint(sessionFile: string, entryId: string,
   if (!entry) return new Response("not found", { status: 404 });
 
   const part = entry.message.content[contentIndex];
-  if (!Value.Check(imagePartSchema, part) || !allowedMimeTypes.has(part.mimeType)) return new Response("not found", { status: 404 });
+  return sessionImageResponse(Value.Check(imagePartSchema, part) ? part : undefined);
+}
+
+export function sessionImageResponse(part: ImageContent | undefined): Response {
+  if (!part || !allowedMimeTypes.has(part.mimeType)) return new Response("not found", { status: 404 });
 
   const data = Buffer.from(part.data, "base64");
   return new Response(data, { headers: {
