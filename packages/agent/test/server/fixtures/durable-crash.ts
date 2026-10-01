@@ -2,8 +2,10 @@ import { appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
+import { durableWorkspaceTool } from "../../../src/server/durable-tools.ts";
+import { defineWorkspaceTool } from "../../../src/server/workspace-tool.ts";
 import { openDurableWorkspace } from "../../../src/server/durable-workspace.ts";
 
 const [directory, replay] = process.argv.slice(2);
@@ -15,21 +17,21 @@ faux.setResponses([fauxAssistantMessage([fauxToolCall("effect", {})], { stopReas
 const registry = createRegistry();
 registry.install(defineExtension({
   name: "crash-test",
-  tools: [defineTool({
+  tools: [durableWorkspaceTool(defineWorkspaceTool({
     name: "effect",
+    label: "Effect",
     description: "Exercise recovery after execution started",
     parameters: Type.Object({}),
-    replay,
-    async execute(_args, api, context) {
+    async execute(_callId, _args, signal, update) {
       await appendFile(join(directory, "executions.txt"), "executed\n");
-      await api.details({ started: true }, context);
+      update?.({ content: [], details: { started: true } });
       process.stdout.write("effect-started\n");
       // The parent kills this process without running any shutdown handlers.
       return await new Promise<never>((_resolve, reject) => {
-        context.abortSignal!.addEventListener("abort", () => reject(context.abortSignal!.reason), { once: true });
+        signal!.addEventListener("abort", () => reject(signal!.reason), { once: true });
       });
     },
-  })],
+  }), replay)],
 }));
 const workspace = await openDurableWorkspace(directory, "crash-workspace", { models, registry });
 const conversation = await workspace.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" }, {
