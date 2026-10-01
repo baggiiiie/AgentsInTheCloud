@@ -355,16 +355,17 @@ export function createWorkspacePresentationController(
       this.persist();
     }
 
-    private selectPhoneDestinationOnWorkspaceEntry(): void {
-      if (!this.isPhone) return;
+    private selectDestinationOnWorkspaceEntry(): void {
       const oldestAttention = (selector: string) => [...this.element.querySelectorAll<HTMLElement>(selector)]
         .sort((a, b) => Number(a.dataset.attentionSequence) - Number(b.dataset.attentionSequence))[0];
       const agentAttention = oldestAttention("[data-agent-attention-id][data-attention-sequence]");
-      const workAttention = oldestAttention("[data-work-view-key][data-attention-sequence]");
       if (agentAttention) {
         this.state.activeAgentId = agentAttention.dataset.agentAttentionId!;
         this.state.phoneDestination = "agents";
-      } else if (workAttention) this.selectWorkViewState(workAttention.dataset.workViewKey!, workAttention.dataset.workViewKind === "contextual");
+      }
+      if (!this.isPhone || agentAttention) return;
+      const workAttention = oldestAttention("[data-work-view-key][data-attention-sequence]");
+      if (workAttention) this.selectWorkViewState(workAttention.dataset.workViewKey!, workAttention.dataset.workViewKind === "contextual");
       else this.state.phoneDestination = "agents";
     }
 
@@ -592,7 +593,7 @@ export function createWorkspacePresentationController(
     private structureChanged = (): void => { this.presentationChanged(); };
     private viewportChanged = (): void => { this.applyState({ emit: true }); };
     private residencyVisible = (event: Event): void => {
-      if (event instanceof CustomEvent && event.detail.selectedFromList) this.selectPhoneDestinationOnWorkspaceEntry();
+      if (event instanceof CustomEvent && event.detail.selectedFromList) this.selectDestinationOnWorkspaceEntry();
       else this.applyDeepLink();
       this.persist();
       this.applyState({ emit: true });
