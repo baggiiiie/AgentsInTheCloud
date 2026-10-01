@@ -55,13 +55,13 @@ test("agent launch owns validation of its parameters", async () => {
   await expect(prepareAgentLaunch({ initialPromptMode: "run-anything" })).rejects.toMatchObject({ code: "invalid_arguments" });
 });
 
-test("explicit composer drafts preserve native settings without starting inference", async () => {
+test("explicit composer drafts preserve native settings but ignore removed service tiers", async () => {
   expect(await prepareAgentLaunch({
     initialPrompt: "  Investigate later  ", initialPromptMode: "composer",
     model: "openai::gpt-5.4", thinkingLevel: "high", serviceTier: "priority", attachmentDraft: "draft-1",
   })).toEqual({ agent: {
     initialPrompt: "Investigate later", initialPromptMode: "composer",
-    model: "openai::gpt-5.4", thinkingLevel: "high", serviceTier: "priority", attachmentDraft: "draft-1",
+    model: "openai::gpt-5.4", thinkingLevel: "high", attachmentDraft: "draft-1",
   } });
 });
 

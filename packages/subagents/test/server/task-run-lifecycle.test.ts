@@ -6,7 +6,6 @@ import { createAssistantMessageEventStream, type AssistantMessage } from "@earen
 import { createAgentSession, ModelRuntime, SessionManager, SettingsManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { configureAgentDelegation } from "../../../agent/src/server/delegation.ts";
 import { RealAgentRuntime } from "../../../agent/src/server/real-agent-runtime.ts";
-import { AgentServiceTierState } from "../../../agent/src/server/service-tier.ts";
 import { createAtelierResourceLoader } from "../../../agent/src/server/system-prompt.ts";
 import { turnStartEntryType, turnTimingEntryType } from "../../../agent/src/server/turn-timing.ts";
 import { subagentsDelegation } from "../../src/server/delegation.ts";
@@ -44,7 +43,7 @@ for (const context of ["inherited", "unfinished-local", "empty"] as const) {
         resourceLoader: createAtelierResourceLoader(), tools: [],
       }));
       runtime = new TaskRuntime({ workspaceId: "task-run", conversationId: crypto.randomUUID(),
-        label: "Task", title: "Task", path: join(dir, "session.jsonl") }, session, [], new AgentServiceTierState(manager));
+        label: "Task", title: "Task", path: join(dir, "session.jsonl") }, session, []);
       const markers = (type: string) => manager.getBranch().filter((entry) => entry.type === "custom").filter((entry) => entry.customType === type);
       const startsAtLoopStartup: number[] = [];
       session.subscribe((event) => {

@@ -31,7 +31,6 @@ async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorks
   if (modelRef) await runtime.setModel(modelRef.provider, modelRef.id);
   const thinkingLevel = context.thinkingLevel || (modelRef ? await getAgentModelThinkingLevel("builtin", modelRef) : undefined);
   if (thinkingLevel) await runtime.setThinkingLevel(thinkingLevel);
-  if (context.serviceTier) await runtime.setServiceTier(context.serviceTier);
 
   const input = context.input!;
   if (context.initialPromptMode === "composer") {

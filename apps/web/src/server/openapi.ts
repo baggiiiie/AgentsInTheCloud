@@ -139,7 +139,6 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
       "/workspaces/{id}/agents/{conversationId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
       "/workspaces/{id}/agents/{conversationId}/model": { post: { summary: "Select an agent model", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["model"], properties: { model: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Model selected", { $ref: "#/components/schemas/AgentModelEnvelope" }) } },
       "/workspaces/{id}/agents/{conversationId}/thinking": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["level"], properties: { level: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingEnvelope" }) } },
-      "/workspaces/{id}/agents/{conversationId}/service-tier": { post: { summary: "Select an agent inference service tier", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["serviceTier"], properties: { serviceTier: { type: "string", enum: ["default", "priority"] } }, additionalProperties: false }), responses: jsonResponse("Service tier selected", { $ref: "#/components/schemas/AgentServiceTierEnvelope" }) } },
       "/workspaces/{id}/agents/{conversationId}/abort": { post: { summary: "Abort the active agent turn", parameters: [workspaceId, agentConversationId], responses: jsonResponse("Agent aborted", { $ref: "#/components/schemas/AgentStateEnvelope" }) } },
     },
     components: {
@@ -249,12 +248,6 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
           type: "object",
           required: ["agent"],
           properties: { agent: { type: "object", required: ["conversationId", "thinkingLevel"], properties: { conversationId: { type: "string", format: "uuid" }, thinkingLevel: { type: "string" } }, additionalProperties: false } },
-          additionalProperties: false,
-        },
-        AgentServiceTierEnvelope: {
-          type: "object",
-          required: ["agent"],
-          properties: { agent: { type: "object", required: ["conversationId", "serviceTier"], properties: { conversationId: { type: "string", format: "uuid" }, serviceTier: { type: "string", enum: ["default", "priority"] } }, additionalProperties: false } },
           additionalProperties: false,
         },
         WorkViewReference: workViewReferenceSchema,

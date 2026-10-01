@@ -13,7 +13,6 @@ import {
 } from "./render-transcript.ts";
 import { contextUsagePercent, manualCompactionAvailable, terminalCompactionNotice } from "./runtime-status.ts";
 import type { RewindMode, SubmitOptions, WorkspaceAgentRuntime, WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
-import { AgentServiceTierState, supportsFastMode, type AgentServiceTier } from "./service-tier.ts";
 import { cacheWarmingNotice, recordsFromSessionEntries, sessionContentImages } from "./session-records.ts";
 import { replaceWorkspaceAgentSession, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 import { renderAgentSessionTree, updateAgentSessionTreeLabel, type TreeFilterMode } from "./session-tree.ts";
@@ -65,7 +64,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
   private settledCost: number;
   private unsubscribeTranscript?: () => void;
 
-  constructor(agent: WorkspaceAgentConversationInfo, private session: any, private toolsForModel: AgentToolDefinitionView[], private serviceTiers: AgentServiceTierState, options: WorkspaceAgentRuntimeOptions = {}, private delegation: AgentSessionDelegation = { dispose: async () => {} }) {
+  constructor(agent: WorkspaceAgentConversationInfo, private session: any, private toolsForModel: AgentToolDefinitionView[], options: WorkspaceAgentRuntimeOptions = {}, private delegation: AgentSessionDelegation = { dispose: async () => {} }) {
     super(agent, options);
     this.settledCost = this.session.getSessionStats?.().cost ?? 0;
     this.ctx.model = this.currentModel();
@@ -152,11 +151,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
 
   availableThinkingLevels(): string[] {
     return this.session.supportsThinking?.() ? this.session.getAvailableThinkingLevels() : [];
-  }
-
-  private async currentServiceTier(): Promise<AgentServiceTier | undefined> {
-    const provider = this.currentModel()?.provider;
-    return provider && supportsFastMode(provider) ? await this.serviceTiers.get(provider) : undefined;
   }
 
   userMessages(): string[] {
@@ -628,22 +622,13 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     await this.refreshStats();
   }
 
-  async setServiceTier(serviceTier: AgentServiceTier): Promise<void> {
-    this.assertActive();
-    const provider = this.currentModel()?.provider;
-    if (!provider || !supportsFastMode(provider)) return;
-    await this.serviceTiers.set(provider, serviceTier);
-    await this.refreshStats();
-  }
-
   async newSession(): Promise<void> {
     this.assertActive();
     if (this.isStreaming) throw new Error("Stop the agent before starting a new session.");
     const model = this.session.model;
     const thinkingLevel = this.session.thinkingLevel;
-    const serviceTier = await this.currentServiceTier();
     const agent = await replaceWorkspaceAgentSession({ workspaceId: this.workspaceId, conversationId: this.conversationId, label: this.label, title: this.title, path: this.sessionFile });
-    const created = await createPiSession(agent, this.options, { model, thinkingLevel, serviceTier });
+    const created = await createPiSession(agent, this.options, { model, thinkingLevel });
     try {
       this.assertActive();
     } catch (error) {
@@ -662,7 +647,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     this.session = created.session;
     this.settledCost = this.session.getSessionStats?.().cost ?? 0;
     this.toolsForModel = created.toolViews;
-    this.serviceTiers = created.serviceTiers;
     this.sessionFile = agent.path;
     this.selectBranch();
     try {
@@ -695,7 +679,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         customInstructions: options.customInstructions?.trim() || undefined,
       });
       this.selectBranch();
-      this.serviceTiers.reload();
       if (options.summarize) {
         await this.finishBranchSummary();
         this.invalidatePresentation();
@@ -740,12 +723,8 @@ export class RealAgentRuntime extends BaseAgentRuntime {
         if (!started) rejectStarted(normalized);
         else this.notice("error", normalized.message);
       } finally {
-        try {
-          this.serviceTiers.reload();
-        } finally {
-          this.finishLivePresentation();
-          await this.finishBranchSummary();
-        }
+        this.finishLivePresentation();
+        await this.finishBranchSummary();
         this.invalidatePresentation();
         void this.refreshStats().catch((error) => {
           console.error("Could not refresh Agent after rewind summarization", normalizedPromiseError(error));
@@ -772,7 +751,6 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     await this.trackTerminalSessionOperation((async () => {
       await this.session.navigateTree(target, { summarize: false });
       this.selectBranch();
-      this.serviceTiers.reload();
       this.invalidatePresentation();
       await this.refreshStats();
     })());
@@ -794,7 +772,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
 export async function createRealRuntime(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions = {}): Promise<WorkspaceAgentRuntime> {
   const created = await createPiSession(agent, options);
   try {
-    return new RealAgentRuntime(agent, created.session, created.toolViews, created.serviceTiers, options, created.delegation);
+    return new RealAgentRuntime(agent, created.session, created.toolViews, options, created.delegation);
   } catch (error) {
     try { await created.session.abort(); } finally { await created.delegation.dispose(); }
     throw error;

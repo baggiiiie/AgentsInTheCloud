@@ -1,6 +1,5 @@
 import type { AtelierEventBus } from "@atelier/core";
 import type { AgentPaneState } from "./render-composer.ts";
-import type { AgentServiceTier } from "./service-tier.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
 import type { ImageRef } from "./transcript.ts";
 
@@ -46,7 +45,6 @@ export interface WorkspaceAgentRuntime {
   refreshModelConfiguration(): Promise<void>;
   setModel(provider: string, modelId: string): Promise<void>;
   setThinkingLevel(level: string): Promise<void>;
-  setServiceTier(serviceTier: AgentServiceTier): Promise<void>;
   rewind(entryId: string, mode: RewindMode, customInstructions?: string): Promise<void>;
   treeHtml(options: { filter: TreeFilterMode; query: string }): string;
   labelTreeEntry(entryId: string, label: string, operation: "add" | "remove"): void;
