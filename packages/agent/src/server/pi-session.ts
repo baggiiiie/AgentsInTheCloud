@@ -1,3 +1,4 @@
+import { loadWorkspaceAgentsFiles } from "./workspace-agents-files.ts";
 import { agentDelegation, type AgentSessionAttachment, type AgentDelegationTranscript } from "./delegation.ts";
 import { observeProviderLimits, type ProviderLimit } from "./provider-limits.ts";
 import { observeCacheWarmingDecisions, type CacheWarmingDecisionOutcome } from "./cache-warming-decisions.ts";
@@ -5,8 +6,7 @@ import { observeExtensionStatusEvents, type ExtensionStatusEvent } from "./exten
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { shellQuote } from "@atelier/core";
-import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
+import { workspaceRoot } from "@atelier/workspace";
 import { createAgentSession, SessionManager, SettingsManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -35,19 +35,6 @@ interface InitialSessionSettings {
   model?: NonNullable<Parameters<typeof createAgentSession>[0]>["model"];
   thinkingLevel?: NonNullable<Parameters<typeof createAgentSession>[0]>["thinkingLevel"];
   serviceTier?: AgentServiceTier;
-}
-
-async function loadWorkspaceAgentsFiles(workspaceId: string): Promise<Array<{ path: string; content: string }>> {
-  const agentsPaths = [`${workspaceRoot}/AGENTS.md`, `${workspaceRoot}/.atelier/AGENTS.md`];
-  const agentsFiles: Array<{ path: string; content: string }> = [];
-
-  for (const path of agentsPaths) {
-    const result = await execWorkspaceCommand(workspaceId, ["sh", "-c", `if test -s ${shellQuote(path)}; then cat ${shellQuote(path)}; fi`], { workdir: workspaceRoot });
-    if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `could not read ${path}`);
-    if (result.stdout.trim()) agentsFiles.push({ path, content: result.stdout });
-  }
-
-  return agentsFiles;
 }
 
 const bootstrapOnlySessionEntryTypes = new Set(["model_change", "thinking_level_change"]);
