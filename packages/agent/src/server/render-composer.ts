@@ -13,6 +13,7 @@ import { formatCost, formatTokens } from "./transcript.ts";
 
 export interface AgentStatsView {
   contextPercent: number | null;
+  nativeBranchUsage?: boolean;
   compactAvailable: boolean;
   inputTokens: number;
   outputTokens: number;
@@ -168,7 +169,7 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
   const percent = stats.contextPercent;
   const meter = percent === null
     ? ""
-    : `<span class="agent-stat" title="Context window used"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
+    : `<span class="agent-stat" title="${stats.nativeBranchUsage ? "Estimated context window used" : "Context window used"}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
   const models = stats.models.length > 0 ? stats.models : [{ provider: "", id: "", name: stats.modelName ?? "no model", selected: true, available: false }];
   const formPrefix = `${ids.stats(ctx)}_selection`;
   const modelFormId = `${formPrefix}_model`;
@@ -177,9 +178,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
 ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
-<span class="agent-stat" title="Tokens up (input)">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
-<span class="agent-stat" title="Tokens down (output)">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" title="${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end."><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+<span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
+<span class="agent-stat" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
+<span class="agent-stat" title="${stats.nativeBranchUsage ? "This branch cost, including compaction and recorded attempts. Updated when usage commits." : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

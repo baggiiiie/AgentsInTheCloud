@@ -1,3 +1,4 @@
+import { durableSubscriptionActivity } from "./durable-accounting.ts";
 import type { Models } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, type AgentChange, type Extension, type HarnessOptions } from "@earendil-works/pi-durable";
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
@@ -26,9 +27,11 @@ export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick
 /** No AgentSession, delegation coordinator, or host-local filesystem environment. */
 export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions = {}): Promise<HarnessOptions> {
   const models = await createPiModelRuntime();
+  const registry = createDurableWorkspaceRegistry(workspaceId, models, options);
+  registry.install(durableSubscriptionActivity(models));
   return {
     models,
-    registry: createDurableWorkspaceRegistry(workspaceId, models, options),
+    registry,
     settings: { compaction: { enabled: true, keepRecentTokens: compactionKeepRecentTokens } },
   };
 }

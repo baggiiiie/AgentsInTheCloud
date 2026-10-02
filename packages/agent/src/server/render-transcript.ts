@@ -101,11 +101,13 @@ export function renderWorkingSummary(ctx: AgentRenderContext, section: WorkingTr
   const endedAt = section.completedAt ?? section.stoppedAt;
   const active = endedAt === undefined;
   const duration = formatDuration(active ? ctx.readOnly ? Date.now() - section.startedAt : 0 : section.timing?.elapsedMs ?? (endedAt! - section.startedAt));
-  const activityLabel = `${active ? "Working for" : section.completedAt !== undefined ? "Worked for" : "Stopped after"} ${duration}`;
+  const activityLabel = section.durationUnavailable
+    ? active ? "Working" : section.completedAt !== undefined ? "Completed" : "Stopped"
+    : `${active ? "Working for" : section.completedAt !== undefined ? "Worked for" : "Stopped after"} ${duration}`;
   const status = active ? `<i class="status-dot running${ctx.readOnly ? " static" : ""} action-item__status" aria-label="In progress"></i>` : "";
   return transcriptActionItemHtml({ kind: "text", text: activityLabel,
-    attributesHtml: active && !ctx.readOnly ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working for "` : undefined,
-    textAttributesHtml: active && !ctx.readOnly ? 'data-agent-elapsed-target="time"' : undefined,
+    attributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working for "` : undefined,
+    textAttributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? 'data-agent-elapsed-target="time"' : undefined,
   }, {
     disclosure: true, leadingHtml: status, trailingHtml: `${steeringCount ? `<span class="agent-working-timing">${steeringCount} steering ${steeringCount === 1 ? "message" : "messages"}</span>` : ""}${active ? "" : renderWorkingTiming(section)}${section.unreadQueueCount ? `<span class="agent-working-timing">${section.unreadQueueCount} unread ${section.unreadQueueCount === 1 ? "message" : "messages"} in queue</span>` : ""}`,
     summaryId: ids.itemSummaryContent(ctx, section.key),
