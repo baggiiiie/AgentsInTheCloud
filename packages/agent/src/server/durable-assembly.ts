@@ -13,7 +13,6 @@ import { loadWorkspaceAgentsFiles } from "./workspace-agents-files.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
 import { agentsInTheCloudSystemPrompt, prepareAppendedAgentsInTheCloudInstructions } from "./system-prompt.ts";
 import { launchComposerThinkingSettings, resolveNewWorkspaceAgentModel } from "./model-state.ts";
-import { compactionKeepRecentTokens } from "./runtime-status.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 /** Workspace-scoped code, including the task definitions needed to recover bash. */
@@ -34,7 +33,7 @@ export async function createDurableHarnessOptions(workspaceId: string, options: 
   return {
     models,
     registry,
-    settings: { compaction: { enabled: true, keepRecentTokens: compactionKeepRecentTokens } },
+    settings: { compaction: { enabled: true, keepRecentTokens: 6000 } },
   };
 }
 
