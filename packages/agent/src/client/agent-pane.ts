@@ -1,5 +1,5 @@
 import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { CableTopics, changeLayout, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
@@ -49,8 +49,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private hasBeenReady = false;
     private composerMutationObserver?: MutationObserver;
     private connected = false;
-    private composerRevision = 0;
-    private submittedComposer?: { revision: number; attachmentIds: string[] };
+    private submittedComposer?: { text: string; attachmentIds: string[] };
     private readonly promptHistory = new PromptHistoryNavigator();
     private readonly turnRevealed = (event: Event): void => {
       // SAFETY: The agent-turn controller produces this event with the loaded target element.
@@ -77,17 +76,10 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     };
     private readonly submitting = (event: SubmitEvent): void => {
       if (event.defaultPrevented) return;
-      const submittedText = this.inputTarget.value;
-      const submittedRevision = this.composerRevision;
       this.submittedComposer = {
-        revision: submittedRevision,
+        text: this.inputTarget.value,
         attachmentIds: new FormData(this.formTarget).getAll("attachment").map(String),
       };
-      if (/^\/compact(?:\s|$)/.test(submittedText.trim())) {
-        queueMicrotask(() => {
-          if (this.composerRevision === submittedRevision) this.setInputValue("");
-        });
-      }
       this.scrollToTranscriptEnd();
     };
     connect(): void {
@@ -120,7 +112,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
 
     inputTargetConnected(input: HTMLTextAreaElement): void {
       if (this.connected) {
-        this.composerRevision += 1;
         this.promptHistory.inputChanged();
         localStorage.setItem(this.composerTextStorageKey, input.value);
       }
@@ -256,7 +247,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     }
 
     promptChanged(): void {
-      this.composerRevision += 1;
       this.promptHistory.inputChanged();
       localStorage.setItem(this.composerTextStorageKey, this.inputTarget.value);
       this.updateSendStopButton();
@@ -300,22 +290,27 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.scrollToTranscriptEnd();
     }
 
-    /** Turbo accepted the submission: guards and dictation have had their say. */
+    /**
+     * Turbo accepted the submission (guards and dictation have had their say) and
+     * holds its form data: the composer empties, or closes on mobile, right away.
+     */
     submitStarted(): void {
-      this.element.dispatchEvent(new Event("agent-composer:sending"));
+      changeLayout(() => {
+        this.setInputValue("");
+        this.element.dispatchEvent(new Event("agent-composer:sending"));
+      });
     }
 
     submitted(event: TurboSubmitEndEvent): void {
       const submission = this.submittedComposer;
       this.submittedComposer = undefined;
       if (!event.detail.success) {
+        // Sending never discards the draft.
+        if (submission && !this.inputTarget.value) this.setInputValue(submission.text);
         this.element.dispatchEvent(new Event("agent-composer:failed"));
         return;
       }
-      if (submission && this.composerRevision === submission.revision) {
-        this.setInputValue("");
-        localStorage.removeItem(this.composerTextStorageKey);
-      }
+      if (!this.inputTarget.value) localStorage.removeItem(this.composerTextStorageKey);
       if (event.detail.fetchResponse?.response.headers.get("x-atelier-attachment-draft-consumed") === "true") {
         const consumed = new Set(submission?.attachmentIds ?? []);
         this.formTarget.querySelectorAll<HTMLInputElement>('input[name="attachment"]').forEach((input) => {

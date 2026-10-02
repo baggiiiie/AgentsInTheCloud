@@ -9,7 +9,7 @@ import {
   createTerminalKeyBarController,
   type ObservableTerminalViewer,
 } from "@atelier/observable-terminal/client";
-import { focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
+import { focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
 import { terminalViewKey } from "../shared.ts";
 
 function createTerminalSessionPickerController(Controller: WorkspaceClientControllerConstructor) {
@@ -73,7 +73,8 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
         this.viewer.reconnect();
         this.viewer.refresh();
       }
-      if (document.hasFocus() && !focusLikelyOpensSoftwareKeyboard()) this.viewer.focus();
+      // Never take focus from a text field, such as an Agent composer shown beside it.
+      if (document.hasFocus() && !focusLikelyOpensSoftwareKeyboard() && !isTextEntry(document.activeElement)) this.viewer.focus();
     }
 
     stop(): void {

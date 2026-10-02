@@ -241,22 +241,18 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!this.connected || !this.viewer) { showError("Terminal disconnected. Reconnect and try again."); return; }
         const form = this.formTarget;
         const data = new FormData(form);
-        this.startSending();
+        const draftText = this.inputTarget.value;
+        this.startSending(true);
         if (!String(data.get("text") ?? "").trim() && !data.has("attachment")) {
           status.hidden = true;
           this.viewer.pressEnter();
-          setTextInputValue(this.inputTarget, "");
           this.sent();
           return;
         }
-        const draftText = this.inputTarget.value;
         this.sending = true;
         status.hidden = true;
         try {
           const delivered = await this.deliver(data);
-          if (this.inputTarget.value === draftText) {
-            setTextInputValue(this.inputTarget, "");
-          }
           const sentIds = data.getAll("attachment").map(String);
           if (delivered && sentIds.length) {
             const consumed = await fetch(`${form.action}/consumed`, { method: "POST", body: data });
@@ -266,7 +262,12 @@ export const atelierClientModule: WorkspaceClientModule = {
             }
           }
           this.sent();
-        } catch (error) { this.failed(); showError(error instanceof Error ? error.message : String(error)); }
+        } catch (error) {
+          // Sending never discards the draft.
+          if (!this.inputTarget.value) setTextInputValue(this.inputTarget, draftText);
+          this.failed();
+          showError(error instanceof Error ? error.message : String(error));
+        }
         finally { this.sending = false; }
       }
       async sendPrompt(event: CustomEvent<AgentComposerSendPromptDetail>): Promise<void> {
@@ -277,7 +278,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         data.set("attachmentDraft", String(new FormData(this.formTarget).get("attachmentDraft")));
         this.sending = true;
         status.hidden = true;
-        this.startSending();
+        this.startSending(false);
         try {
           await this.deliver(data);
           this.sent();
@@ -285,10 +286,11 @@ export const atelierClientModule: WorkspaceClientModule = {
         catch (error) { this.failed(); status.textContent = error instanceof Error ? error.message : String(error); status.hidden = false; }
         finally { this.sending = false; }
       }
-      /** The terminal replaces the frozen transcript before anything else moves. */
-      private startSending(): void {
+      /** The terminal replaces the frozen transcript before anything else moves; the composer empties at once. */
+      private startSending(fromComposer: boolean): void {
         changeLayout(() => {
           this.showTerminal();
+          if (fromComposer) setTextInputValue(this.inputTarget, "");
           this.element.dispatchEvent(new Event("agent-composer:sending"));
         });
       }
