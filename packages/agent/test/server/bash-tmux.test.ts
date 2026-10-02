@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { formatBashOutput, stripTmuxPaneFraming } from "../../src/server/bash-tmux.ts";
+import { formatBashOutput } from "../../src/server/bash-tmux.ts";
 
 test("returns plain model output from rendered pane while storing colored pane output", () => {
   const pane = "\u001b[31mred\u001b[0m\nPane is dead\n";
@@ -35,12 +35,6 @@ test("uses tmux rendered pane output for dotnet-style terminal UI output", () =>
   expect(result.output).toBe(paneText);
   expect(result.displayAnsi).toContain("\u001b[32mRestore succeeded");
   expect(result.displayAnsi).not.toContain("Pane is dea");
-});
-
-test("removes full and partial tmux dead-pane markers from captured display output", () => {
-  expect(stripTmuxPaneFraming("ok\nPane is dead\n")).toBe("ok");
-  expect(stripTmuxPaneFraming("ok\n\u001b[2mPane is dead\u001b[0m\r\n")).toBe("ok");
-  expect(stripTmuxPaneFraming("ok\nPane is dea")).toBe("ok");
 });
 
 test("uses rendered tmux capture for carriage-return progress output", () => {

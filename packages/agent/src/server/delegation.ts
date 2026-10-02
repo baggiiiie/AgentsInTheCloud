@@ -1,7 +1,7 @@
 import type { Models } from "@earendil-works/pi-ai";
 import type { Extension, Harness, ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import type { AgentTranscriptSnapshot } from "./transcript-contributions.ts";
-import { AtelierCoreError, type AtelierEventBus } from "@atelier/core";
+import { AtelierCoreError } from "@atelier/core";
 import type { AgentRenderContext } from "./render-context.ts";
 import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 import type { ToolView } from "./transcript.ts";
@@ -15,7 +15,7 @@ export interface AgentDelegation {
   create(models: Models, harness: () => Harness): { extension: Extension; models: Models };
   transcript(view: ConversationView): AgentTranscriptSnapshot;
   attributed(entry: EntryRecord): "task" | "message" | undefined;
-  resolveConversation(workspaceId: string, conversationId: string, events?: AtelierEventBus): Promise<WorkspaceAgentConversationInfo | undefined>;
+  resolveConversation(workspaceId: string, conversationId: string): Promise<WorkspaceAgentConversationInfo | undefined>;
   toolPresentations?: ReadonlyMap<string, AgentToolPresentation>;
 }
 
@@ -26,10 +26,10 @@ export function configureAgentDelegation(delegation: AgentDelegation | undefined
   agentDelegation = delegation;
 }
 
-export async function resolveAgentConversation(workspaceId: string, conversationId: string, events?: AtelierEventBus): Promise<WorkspaceAgentConversationInfo> {
+export async function resolveAgentConversation(workspaceId: string, conversationId: string): Promise<WorkspaceAgentConversationInfo> {
   const root = (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === conversationId);
   if (root) return root;
-  const child = await agentDelegation?.resolveConversation(workspaceId, conversationId, events);
+  const child = await agentDelegation?.resolveConversation(workspaceId, conversationId);
   if (child) return child;
   throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
 }

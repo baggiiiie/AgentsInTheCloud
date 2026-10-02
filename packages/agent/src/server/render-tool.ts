@@ -1,14 +1,14 @@
 import { agentDelegation } from "./delegation.ts";
 import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { toggleHtml } from "@atelier/design-system/toggle";
-import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
+import { isJsonObject, type JsonObject } from "@atelier/core";
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { parseDiffFromFile, processPatch, type FileDiffMetadata } from "@pierre/diffs";
 import { diffStats, type DiffOperation } from "./diff.ts";
 import { embeddedBashCommand, formatBashCommandForDisplay, highlightedBashCommandHtml } from "./embedded-code.ts";
 import { domId, escapeHtml } from "@atelier/shared";
-import { isBashTool, formatDuration, formatTokens, type ToolView, type ToolViewDetails } from "./transcript.ts";
+import { isBashTool, formatDuration, type ToolView } from "./transcript.ts";
 import { ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptActionItemHtml } from "./render-markup.ts";
 
@@ -26,21 +26,17 @@ export function statusHtml(status: ToolView["status"], readOnly = false): string
   return `<span class="status-dot ${state}${state === "running" && readOnly ? " static" : ""}" aria-label="${state === "running" ? "In progress" : state === "danger" ? "Failed" : "Complete"}"></span>`;
 }
 
-function tokenSummary(tool: ToolView, direction: "up" | "down"): string {
-  return tool.tokenCount === undefined ? "" : `${formatTokens(tool.tokenCount)} tok ${direction === "up" ? "↑" : "↓"}`;
-}
-
 function summaryHtml(parts: Array<string | undefined>): string {
   return parts.filter(Boolean).join(" · ");
 }
 
 function bashSummary(tool: ToolView): string {
-  const details = toolDetails(tool);
-  const timeout = tool.timeoutSeconds ?? numberArg(toolArgs(tool), "timeout") ?? 600;
+  const details = tool.details;
+  const timeout = numberArg(toolArgs(tool), "timeout") ?? 600;
   if (tool.status === "running") return "";
   const duration = tool.durationMs === undefined ? "" : `${formatDuration(tool.durationMs)} / ${formatDuration(timeout * 1000)}`;
   const outcome = details?.timedOut === true ? "timed out" : details?.aborted === true ? "aborted" : details?.exitCode !== undefined && details.exitCode !== 0 ? `exitcode ${details.exitCode}` : "";
-  return [summaryHtml([duration, outcome]), tokenSummary(tool, "up")].filter(Boolean).join(" · ");
+  return summaryHtml([duration, outcome]);
 }
 
 function toolSummaryHtml(tool: ToolView): string {
@@ -48,34 +44,21 @@ function toolSummaryHtml(tool: ToolView): string {
   if (tool.name === "read") {
     const image = tool.resultImages?.[0];
     const imageMeta = image ? [image.width && image.height ? `${image.width}×${image.height}` : "", image.mimeType ?? ""].filter(Boolean).join(" · ") : "";
-    return [summaryHtml([pathSummary(tool, formatReadRange(toolArgs(tool))), imageMeta]), image ? "" : tokenSummary(tool, "up")].filter(Boolean).join(" · ");
+    return summaryHtml([pathSummary(tool, formatReadRange(toolArgs(tool))), imageMeta]);
   }
-  if (tool.name === "write") return [summaryHtml([pathSummary(tool)]), tokenSummary(tool, "down")].filter(Boolean).join(" · ");
+  if (tool.name === "write") return pathSummary(tool);
   if (tool.name === "edit") {
     const operations = getEditOperations(toolArgs(tool));
     const stats = diffStats(operations);
     const editCount = operations.length ? `${operations.length} ${operations.length === 1 ? "edit" : "edits"}` : "";
     const changes = operations.length ? `+${stats.added} −${stats.deleted}` : "";
-    return [summaryHtml([pathSummary(tool), editCount, changes]), tokenSummary(tool, "down")].filter(Boolean).join(" · ");
+    return summaryHtml([pathSummary(tool), editCount, changes]);
   }
   return genericToolSummary(tool);
 }
 
-function toolForRender(original: ToolView): ToolView {
-  return original.status === "streaming" && original.argsStream
-    ? { ...original, args: parseKnownStreamedArgs(original.name, original.argsStream) }
-    : original;
-}
-
 function toolSummaryText(tool: ToolView): string {
   return [tool.name || "tool", toolSummaryHtml(tool)].filter(Boolean).join(" · ");
-}
-
-function toolSummaryMetadataHtml(tool: ToolView, readOnly = false): string {
-  if (!isBashTool(tool.name) || tool.status !== "running" || tool.startedAt === undefined) return "";
-  const timeout = tool.timeoutSeconds ?? numberArg(toolArgs(tool), "timeout") ?? 600;
-  const attributes = readOnly ? "" : ` data-controller="agent-elapsed" data-agent-elapsed-since-value="${tool.startedAt}" data-agent-elapsed-max-value="${timeout}"`;
-  return `<span class="agent-tool-elapsed agent-duration-slot"${attributes}><span${readOnly ? "" : ' data-agent-elapsed-target="time"'}>${formatDuration(Date.now() - tool.startedAt)} / ${formatDuration(timeout * 1000)}</span></span>`;
 }
 
 export interface ToolPresentation {
@@ -97,13 +80,11 @@ function lazyTranscriptItemFrame(ctx: AgentRenderContext, key: string): string {
   return `<turbo-frame ${tailFrameAttributes(ctx, key)} data-turbo-permanent data-agent-lazy-detail-target="frame" data-src="${escapeHtml(transcriptItemPath(ctx, key))}"></turbo-frame>`;
 }
 
-export function renderToolCard(ctx: AgentRenderContext, key: string, original: ToolView, options: { open?: boolean; live?: boolean } = {}): string {
-  const tool = toolForRender(original);
+export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolView, options: { open?: boolean; live?: boolean } = {}): string {
   const label = { kind: "text" as const, text: toolSummaryText(tool) };
   const labelOptions = {
     leadingHtml: `<span id="${ids.itemSummaryStatus(ctx, key)}" class="agent-tool-status">${statusHtml(tool.status, ctx.readOnly)}</span>`,
     labelId: ids.itemSummaryContent(ctx, key),
-    trailingHtml: `<span id="${ids.itemSummaryMetadata(ctx, key)}">${toolSummaryMetadataHtml(tool, ctx.readOnly)}</span>`,
   };
   const active = tool.status === "streaming" || tool.status === "running";
   if (!toolPresentation(tool).showsDetail) {
@@ -152,7 +133,7 @@ interface BashViews {
 }
 
 function bashViews(tool: ToolView, count: number): BashViews {
-  const details = toolDetails(tool);
+  const details = tool.details;
   const display = details?.displayAnsi?.trimEnd() ?? "";
   const model = trimResult(tool);
   return { display, model, same: !display || display === model, resultWindow: textWindow(display || model || "(no output)", "last", count), modelWindow: textWindow(model || "(no output)", "last", count) };
@@ -214,7 +195,7 @@ function renderBashDetail(ctx: AgentRenderContext, key: string, tool: ToolView, 
   if (tool.status === "streaming") return `<div class="agent-tool-detail">${commandHtml}</div>`;
   if (tool.status === "running") {
     // The viewer owns its generated DOM and the awaiting-output visibility state.
-    const terminal = tool.tmuxSession && tool.terminalVisible ? `<section id="${domId(ids.item(ctx, key), "terminal", ctx.workspaceId, tool.tmuxSession)}" data-turbo-permanent class="agent-tool-region agent-bash-output agent-terminal-awaiting-output"><div class="agent-region-header">Live terminal</div><div class="agent-terminal-viewport"><div class="agent-tool-term observable-terminal-host" data-controller="agent-term" data-agent-term-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-term-session-value="${escapeHtml(tool.tmuxSession)}"></div></div></section>` : "";
+    const terminal = tool.tmuxSession ? `<section id="${domId(ids.item(ctx, key), "terminal", ctx.workspaceId, tool.tmuxSession)}" data-turbo-permanent class="agent-tool-region agent-bash-output agent-terminal-awaiting-output"><div class="agent-region-header">Live terminal</div><div class="agent-terminal-viewport"><div class="agent-tool-term observable-terminal-host" data-controller="agent-term" data-agent-term-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-term-session-value="${escapeHtml(tool.tmuxSession)}"></div></div></section>` : "";
     return `<div class="agent-tool-detail agent-bash-detail">${commandHtml}${terminal}</div>`;
   }
   return `<div class="agent-tool-detail agent-bash-detail">${commandHtml}${renderBashResultViews(ctx, key, tool, count)}</div>`;
@@ -255,7 +236,7 @@ function renderWriteDetail(ctx: AgentRenderContext, key: string, tool: ToolView,
 }
 
 function editDiffs(tool: ToolView, contextual: boolean): FileDiffMetadata[] {
-  const patch = toolDetails(tool)?.patch;
+  const patch = tool.details?.patch;
   if (patch) return processPatch(patch).files;
   const path = stringArg(toolArgs(tool), "path", "file_path") ?? "edited-file.txt";
   return getEditOperations(toolArgs(tool)).map((operation) => parseDiffFromFile(
@@ -292,7 +273,6 @@ export function renderToolDetail(ctx: AgentRenderContext, key: string, tool: Too
   if (tool.name === "read") return renderReadDetail(ctx, key, tool, count);
   if (tool.name === "write") return renderWriteDetail(ctx, key, tool, count);
   if (tool.name === "edit") return renderEditDetail(tool);
-  if (tool.status === "streaming" && tool.argsStream !== undefined) return `<div class="agent-tool-detail">${codeBlockHtml(tool.argsStream, "arguments.json", "agent-tool-code")}</div>`;
   return renderGenericDetail(ctx, tool);
 }
 
@@ -490,10 +470,6 @@ function ansiToHtml(text: string): string {
   return html;
 }
 
-function toolDetails(tool: ToolView): ToolViewDetails | undefined {
-  return tool.details;
-}
-
 function hasAnsiSgr(text: string): boolean {
   return /\x1b\[[0-9;?]*m/.test(text);
 }
@@ -552,50 +528,4 @@ function genericResultHtml(ctx: AgentRenderContext, tool: ToolView): string {
   const result = trimResult(tool);
   const images = toolResultImagesHtml(ctx, tool);
   return `${resultPreHtml(result)}${images}`;
-}
-
-function partialStringField(stream: string, key: string): string | undefined {
-  const marker = new RegExp(`"${key}"\\s*:\\s*"`).exec(stream);
-  if (!marker) return undefined;
-  const start = marker.index + marker[0].length;
-  let escaped = false;
-  let raw = "";
-  for (let index = start; index < stream.length; index++) {
-    const char = stream[index]!;
-    if (!escaped && char === '"') break;
-    raw += char;
-    if (escaped) escaped = false;
-    else if (char === "\\\\") escaped = true;
-  }
-  if (raw.endsWith("\\\\")) raw = raw.slice(0, -1);
-  try {
-    // SAFETY: Wrapping raw in JSON string quotes makes a successful parse a string.
-    return JSON.parse(`"${raw}"`) as string;
-  } catch {
-    return raw.replaceAll("\\n", "\n").replaceAll('\\"', '"');
-  }
-}
-
-type StreamedToolArgs = JsonValue | { command: string } | { path?: string; content?: string };
-
-function parseKnownStreamedArgs(name: string, stream: string): StreamedToolArgs | undefined {
-  const parsed = parseStreamedArgs(stream);
-  if (parsed) return parsed;
-  if (isBashTool(name)) {
-    const command = partialStringField(stream, "command") ?? "";
-    return { command };
-  }
-  if (name === "write") return { path: partialStringField(stream, "path"), content: partialStringField(stream, "content") ?? "" };
-  if (name === "read" || name === "edit") return { path: partialStringField(stream, "path") };
-  return undefined;
-}
-
-function parseStreamedArgs(argsStream: string): JsonValue | undefined {
-  if (!argsStream.trim()) return undefined;
-  try {
-    // SAFETY: JSON.parse returns only values representable by the recursive JsonValue contract.
-    return JSON.parse(argsStream) as JsonValue;
-  } catch {
-    return undefined;
-  }
 }

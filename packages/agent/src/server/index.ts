@@ -44,7 +44,7 @@ export {
 export { configureAgentDelegation, resolveAgentConversation, type AgentDelegation, type AgentToolPresentation } from "./delegation.ts";
 export { ids, type AgentRenderContext } from "./render-context.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
-export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
+export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, finalAssistantTextIndexes, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
 export { type AgentRouteHandler, requireAgentPresentation } from "./route-support.ts";
 export { type AgentTranscriptSnapshot, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
 

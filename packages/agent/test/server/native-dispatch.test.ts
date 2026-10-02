@@ -41,8 +41,8 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   const [runtime, same] = await Promise.all([getWorkspaceAgentPresentation(agent), getWorkspaceAgentPresentation(agent)]);
   expect(runtime).toBeInstanceOf(ConversationPresentation);
   expect(runtime).toBe(same);
-  expect(runtime.userMessages()).toEqual(["Persisted request"]);
   const commands = await getWorkspaceAgentController(agent);
+  expect(await commands.userMessages()).toEqual(["Persisted request"]);
   expect(await commands.knownRequest("admitted")).toBe(true);
   // No container or available Faux auth exists. A duplicate still succeeds.
   await commands.submit({ text: "Different retry", requestId: "admitted" });
@@ -64,7 +64,7 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   dispose.mockRestore();
   const reopened = await mounting;
   expect(reopened).not.toBe(runtime);
-  expect(reopened.userMessages()).toEqual(["Persisted request"]);
+  expect(await (await getWorkspaceAgentController(named)).userMessages()).toEqual(["Persisted request"]);
   // Park and close overlap: closure must reopen passively after disposal and
   // persist its fence rather than operating on a just-suspended owner.
   const parking = suspendWorkspaceAgentRuntimes(workspaceId);

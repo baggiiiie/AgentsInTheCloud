@@ -102,23 +102,6 @@ describe("transcript rendering", () => {
     expect(detail).toContain('data-controller="atelier-fullscreen"');
   });
 
-  test("streaming write renders decoded content", () => {
-    const item: TranscriptItem = { type: "tool", key: "stream-write", tool: tool({ name: "write", status: "streaming", argsStream: '{"path":"a.ts","content":"x\\ny"}' }) };
-    const html = renderTranscriptItem(ctx, item, { live: true, open: true });
-    expect(renderedText(html)).toContain("x\ny");
-    expect(html).not.toContain("\\n");
-  });
-
-  test("streaming tools isolate changing content from their status spinner", () => {
-    const item: TranscriptItem = { type: "tool", key: "stream-write", tool: tool({ name: "write", status: "streaming", argsStream: '{"path":"a.ts","content":"x"' }) };
-    const html = renderTranscriptItem(ctx, item, { live: true, open: true });
-    const status = html.indexOf('aria-label="In progress"');
-    const summaryContent = html.indexOf(`id="${ctxPrefix}_summary_content_stream-write"`);
-    expect(status).toBeGreaterThan(-1);
-    expect(summaryContent).toBeGreaterThan(status);
-    expect(html).toContain("agent-tool-detail-host");
-  });
-
   test("live write pagination targets its detail frame", () => {
     const content = Array.from({ length: 700 }, (_, index) => `line ${index + 1}`).join("\n");
     const item: TranscriptItem = { type: "tool", key: "live-write", tool: tool({ name: "write", args: { path: "a.ts", content } }) };
@@ -151,15 +134,6 @@ describe("transcript rendering", () => {
     expect(bashWindow).toBeGreaterThan(-1);
     expect(bash.indexOf('class="agent-more-lines"', bashWindow)).toBeGreaterThan(bashWindow);
     expect(bash.indexOf('class="agent-tool-result', bashWindow)).toBeGreaterThan(bash.indexOf('class="agent-more-lines"', bashWindow));
-  });
-
-  test("streaming edits remain a summary until an edit is available", () => {
-    const item: TranscriptItem = { type: "tool", key: "edit-stream", tool: tool({ name: "edit", status: "streaming", args: undefined, argsStream: '{"path":"a.ts"' }) };
-    const html = renderTranscriptItem(ctx, item, { live: true });
-    expect(html).toContain("agent-tool-summary-only");
-    expect(html).not.toContain("agent-tool-detail");
-    expect(html).not.toContain("copy-button");
-    expect(html).not.toContain("disclosure-icon");
   });
 
   test("running edits wait for the authoritative result before rendering a diff", () => {
@@ -216,7 +190,7 @@ describe("transcript rendering", () => {
   });
 
   test("running bash starts its live terminal hidden until output is visible", () => {
-    const html = renderBash("sleep 5", { status: "running", tmuxSession: "bash-session", terminalVisible: true });
+    const html = renderBash("sleep 5", { status: "running", tmuxSession: "bash-session" });
     expect(html).toContain("agent-bash-output agent-terminal-awaiting-output");
   });
 

@@ -229,9 +229,6 @@
 .agent-tool-summary-only > .action-item > .action-item__icon::before { content: ""; width: 16px; flex: 0 0 auto; }
 .agent-tool-status { display: inline-flex; width: 8px; flex: 0 0 auto; align-items: center; justify-content: center; }
 .agent-tool-detail-host { display: contents; }
-.agent-tool-args, .agent-tool-elapsed { margin-inline-start: 8px; }
-.agent-tool-args { color: var(--text-muted); }
-.agent-tool-args.error { color: var(--danger); }
 .agent-token-arrow { color: var(--text-muted); }
 .agent-duration-slot { white-space: nowrap; }
 

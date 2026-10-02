@@ -1,6 +1,6 @@
 import { AtelierCoreError } from "@atelier/core";
 import { ConversationPresentation } from "./conversation-presentation.ts";
-import { openDurableAgentRuntime, type DurableAgentRuntime } from "./durable-runtime.ts";
+import { openDurableAgentRuntime, type DurableAgentRuntime, type DurableAgentController } from "./durable-runtime.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
@@ -14,7 +14,7 @@ export { subscribeWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 const presentations = new Map<string, Promise<ConversationPresentation>>();
 // First attachment can prepare a root before it exists in the catalog. Lifecycle
 // fences must join that acquisition even when no presentation was ever mounted.
-const controllerAcquisitions = new Map<string, Promise<Awaited<ReturnType<DurableAgentRuntime["conversation"]>>>>();
+const controllerAcquisitions = new Map<string, Promise<DurableAgentController>>();
 const removedWorkspaceIds = new Set<string>();
 const closedConversationKeys = new Set<string>();
 const nativeClosedConversationKeys = new Set<string>();
@@ -143,7 +143,10 @@ export function allowWorkspaceAgentResume(workspaceId: string): void {
 }
 export async function stopWorkspaceAgentRuntimes(): Promise<void> {
   stopping = true;
-  const workspaces = new Set([...presentations.keys(), ...controllerAcquisitions.keys(), ...ownerWorkspaces.values()].map(key => key.split("\u0000")[0]!));
+  const workspaces = new Set([
+    ...[...presentations.keys(), ...controllerAcquisitions.keys()].map(key => key.split("\u0000")[0]!),
+    ...[...owners.values()].map(owner => owner.workspaceId),
+  ]);
   for (const workspaceId of workspaces) await suspendWorkspaceAgentRuntimes(workspaceId);
   await suspendAllDurableWorkspaceOwners();
 }
@@ -155,7 +158,7 @@ function assertWorkspaceAgentAvailable(agent: WorkspaceAgentConversationInfo): v
 }
 
 /** Execution does not require a mounted transcript or composer. */
-export function getWorkspaceAgentController(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}): Promise<Awaited<ReturnType<DurableAgentRuntime["conversation"]>>> {
+export function getWorkspaceAgentController(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}): Promise<DurableAgentController> {
   assertWorkspaceAgentAvailable(agent);
   const pending = lifecycle.get(agent.workspaceId);
   if (pending) return pending.then(() => getWorkspaceAgentController(agent, options));
@@ -180,45 +183,42 @@ async function drainControllerAcquisitions(workspaceId: string): Promise<void> {
 let ownerEvents: WorkspaceAgentOptions["events"];
 export function configureDurableOwnerEvents(events: NonNullable<WorkspaceAgentOptions["events"]>) { ownerEvents = events; }
 
-const owners = new Map<string, Promise<DurableAgentRuntime>>();
+const owners = new Map<string, { workspaceId: string; runtime: Promise<DurableAgentRuntime> }>();
 const suspensions = new Map<string, Promise<void>>();
 export async function durableWorkspaceOwner(workspaceId: string, options: WorkspaceAgentOptions = {}): Promise<DurableAgentRuntime> {
   return retainedDurableWorkspaceOwner(await workspaceDurableJournalDirectory(workspaceId), workspaceId, options);
 }
-const ownerWorkspaces = new Map<string, string>();
 /** The directory is resolved by the scoped history service, never accepted from HTTP. */
 export function retainedDurableWorkspaceOwner(directory: string, workspaceId: string, options: WorkspaceAgentOptions = {}, load?: Parameters<typeof openDurableAgentRuntime>[3]): Promise<DurableAgentRuntime> {
   const suspension = suspensions.get(workspaceId);
   if (suspension) return suspension.then(() => retainedDurableWorkspaceOwner(directory, workspaceId, options, load));
   let owner = owners.get(directory);
   if (!owner) {
-    owner = openDurableAgentRuntime(directory, workspaceId, { events: options.events ?? ownerEvents }, load).catch(error => {
+    const runtime = openDurableAgentRuntime(directory, workspaceId, { events: options.events ?? ownerEvents }, load).catch(error => {
       owners.delete(directory);
-      ownerWorkspaces.delete(directory);
       throw error;
     });
+    owner = { workspaceId, runtime };
     owners.set(directory, owner);
-    ownerWorkspaces.set(directory, workspaceId);
   }
-  return owner;
+  return owner.runtime;
 }
 function suspendDurableWorkspaceOwner(workspaceId: string): Promise<void> {
   const pending = suspensions.get(workspaceId);
   if (pending) return pending;
-  const selected = [...owners].filter(([directory]) => ownerWorkspaces.get(directory) === workspaceId);
+  const selected = [...owners].filter(([, owner]) => owner.workspaceId === workspaceId);
   if (!selected.length) return Promise.resolve();
   const closing = (async () => {
     await Promise.all(selected.map(async ([directory, owner]) => {
-      await (await owner).suspend();
+      await (await owner.runtime).suspend();
       owners.delete(directory);
-      ownerWorkspaces.delete(directory);
     }));
   })().finally(() => { suspensions.delete(workspaceId); });
   suspensions.set(workspaceId, closing);
   return closing;
 }
 export async function suspendAllDurableWorkspaceOwners() {
-  await Promise.all([...new Set(ownerWorkspaces.values())].map(suspendDurableWorkspaceOwner));
+  await Promise.all([...new Set([...owners.values()].map(owner => owner.workspaceId))].map(suspendDurableWorkspaceOwner));
 }
 
 /** Lookup must not create a new root or prepare prompts just to reject bad input. */

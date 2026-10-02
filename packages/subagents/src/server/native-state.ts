@@ -1,4 +1,4 @@
-import { assistantTextPhase, finalAssistantText, isFinalAssistantMessage } from "@atelier/agent/server";
+import { finalAssistantTextIndexes, finalAssistantText, isFinalAssistantMessage } from "@atelier/agent/server";
 import { defineDoc, defineEntry, type ConversationId, type EntryRecord, type Tx } from "@earendil-works/pi-durable";
 import { type Message, type TextContent } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
@@ -73,8 +73,7 @@ export function selectNativeForkHistory(messages: readonly Message[], mode = "al
     if (attribution(message)) return [];
     if (message.role === "user") return [structuredClone(message)];
     if (message.role !== "assistant" || !isFinalAssistantMessage(message.content, message.stopReason)) return [];
-    const phased = message.content.some(part => part.type === "text" && assistantTextPhase(part.textSignature) !== undefined);
-    const content = message.content.filter(part => part.type === "text" && (!phased || assistantTextPhase(part.textSignature) === "final_answer"));
+    const content = finalAssistantTextIndexes(message.content).map(index => message.content[index]!);
     return content.length ? [structuredClone({ ...message, content })] : [];
   });
 }

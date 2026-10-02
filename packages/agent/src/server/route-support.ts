@@ -29,7 +29,7 @@ export async function resolveAgentPresentation(agent: WorkspaceAgentConversation
 }
 
 export async function requireAgentPresentation(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentPresentation> {
-  return await resolveAgentPresentation(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
+  return await resolveAgentPresentation(await resolveAgentConversation(workspaceId, conversationId), options);
 }
 
 export async function resolveAgentController(agent: WorkspaceAgentConversationInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentController> {
@@ -37,5 +37,5 @@ export async function resolveAgentController(agent: WorkspaceAgentConversationIn
 }
 
 export async function requireAgentController(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentController> {
-  return resolveAgentController(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
+  return resolveAgentController(await resolveAgentConversation(workspaceId, conversationId), options);
 }

@@ -54,10 +54,7 @@ switch (path) {
     run = path === "write"
       ? (text) => { renderToolCard(ctx, "repro", {
         name: "write", callId: "repro", status: chunkSize ? "streaming" : "running",
-        // Actual accumulated JSON prefixes exercise the production partial-JSON parser.
-        ...(chunkSize
-          ? { args: undefined, argsStream: text }
-          : { args: { path: fixture, content: text } }),
+        args: { path: fixture, content: text },
       }); }
       : (text) => { renderToolCard(ctx, "repro", {
         name: "read", callId: "repro", status: "ok", args: { path: fixture }, resultText: text,
@@ -93,8 +90,7 @@ switch (path) {
 
 console.log(JSON.stringify({ ready: true, bun: Bun.version, path, fixture, chunkSize }));
 let step = 0;
-const streamedSource = path === "write" ? JSON.stringify({ path: fixture, content: code }) : code;
-for (const text of chunkSize ? prefixes(streamedSource, chunkSize) : [code, code, code]) {
+for (const text of chunkSize ? prefixes(code, chunkSize) : [code, code, code]) {
   calls = 0; characters = 0; maxHighlightMs = 0;
   const start = performance.now();
   await run(text);

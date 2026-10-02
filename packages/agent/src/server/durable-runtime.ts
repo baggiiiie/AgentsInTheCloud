@@ -204,7 +204,7 @@ export async function openDurableAgentRuntime(
       const live = await harness.snapshot(LiveDoc, conversation.id, context);
       const inbox = await harness.snapshot(InboxDoc, conversation.id, context);
       const records = (await harness.snapshot(WorkspaceConversations, context))!.conversations;
-      const scope = new Set([conversation.id, ...records.filter(record => record.rootId === identity.conversationId).map(record => record.durableId)]);
+      const scope = new Set(durableStopScope(records, conversation.id, !identity.parentId));
       const tasks = (await harness.inspect(context)).tasks;
       if (live?.run || live?.compactions?.length || inbox?.items.length || tasks.some(item => scope.has(item.record.conversationId) && item.record.kind !== "atelier.delegation-anchor")) {
         throw new Error("Stop the agent and wait for its work to finish before navigating history.");
@@ -531,3 +531,4 @@ export async function openDurableAgentRuntime(
 }
 
 export type DurableAgentRuntime = Awaited<ReturnType<typeof openDurableAgentRuntime>>;
+export type DurableAgentController = Awaited<ReturnType<DurableAgentRuntime["conversation"]>>;

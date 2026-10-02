@@ -125,7 +125,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     name: "agent",
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent") throw new Error("Invalid Agent channel identifier");
-      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId, events);
+      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId);
       const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeLivePresentation(listener);
     },
@@ -133,7 +133,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     name: "agent-turn",
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent-turn") throw new Error("Invalid Agent turn channel identifier");
-      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId, events);
+      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId);
       const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeTurnPresentation(identifier.turnId, identifier.branchId, listener);
     },

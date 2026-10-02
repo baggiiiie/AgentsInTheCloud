@@ -20,7 +20,7 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     return new Response(html || "not found", { status: html ? 200 : 404, headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
-    const agent = await resolveAgentConversation(params[0], params[1], options.events);
+    const agent = await resolveAgentConversation(params[0], params[1]);
     const controller = await existingDurableController(agent, options);
     return controller ? await controller.image(params[2], Number(params[3])) : new Response("not found", { status: 404 });
   }
@@ -31,7 +31,7 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     return response;
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
-    const agent = await resolveAgentConversation(params[0], params[1], options.events);
+    const agent = await resolveAgentConversation(params[0], params[1]);
     await stopDurableWorkspaceAgentConversation(agent, options);
     await invalidateAgentView(options, params[0], params[1]);
     return requestAcceptsJson(request) ? Response.json({ agent: { conversationId: params[1], state: "idle", aborted: true } }) : turboStreamResponse("");

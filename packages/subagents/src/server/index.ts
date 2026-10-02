@@ -32,10 +32,10 @@ export const atelierServerModule: WorkspaceModule = {
   commands: [{ id: "subagents.open", execute: () => ({ createdWorkView: { type: "subagents" } }) }],
   cableChannels: [{
     name: "subagents",
-    subscribe(identifier, listener, events) {
+    subscribe(identifier, listener) {
       if (identifier.channel !== "module" || identifier.name !== "subagents") throw new Error("Invalid Subagents channel");
       const params = Value.Parse(Type.Object({ conversationId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), identifier.params);
-      return subscribeSubagentTree(identifier.workspaceId, params.conversationId, listener, events);
+      return subscribeSubagentTree(identifier.workspaceId, params.conversationId, listener);
     },
   }],
   attachToWorkspace() {

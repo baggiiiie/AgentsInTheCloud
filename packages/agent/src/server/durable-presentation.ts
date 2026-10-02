@@ -1,7 +1,6 @@
-import { contentText } from "@earendil-works/pi-ai";
 import type { Context } from "@earendil-works/chord";
 import { getCurrentSystemPrompt, getCurrentTools } from "@earendil-works/pi-ai/utils/transcript";
-import { UserEntry, type Conversation, type ConversationView, type WatchHandle } from "@earendil-works/pi-durable";
+import { type Conversation, type ConversationView, type WatchHandle } from "@earendil-works/pi-durable";
 import { StreamingMarkdownRenderer } from "@atelier/markdown";
 import { createLivePresentation } from "@atelier/shared";
 import type { AgentRenderContext } from "./render-context.ts";
@@ -63,7 +62,6 @@ export class DurableConversationPresentation {
   }
 
   /** Same exact frame used for transcript, busy state, settings, inbox and usage. */
-  get value(): ConversationView { return this.frame; }
   get state() { return durableViewState(this.frame); }
   get busy(): boolean { return Boolean(this.state.live.run || this.state.live.compactions?.length); }
   get branchId(): string { return this.ctx.branchId!; }
@@ -150,12 +148,6 @@ export class DurableConversationPresentation {
   revealTurn(target: string): string | undefined {
     this.assertOpen();
     return this.items.find(item => item.type === "working" && item.items.some(child => child.key === target || child.anchor === target))?.key;
-  }
-
-  userMessages(): string[] {
-    this.assertOpen();
-    return this.frame.entries.filter(entry => UserEntry.is(entry)).flatMap(entry => (entry.model ?? []).flatMap(message => message.role === "user"
-      ? [contentText(message.content)] : []));
   }
 
   private clearTurns() {

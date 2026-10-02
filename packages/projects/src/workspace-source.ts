@@ -33,11 +33,6 @@ export interface PreparedWorkspaceSource {
   templateKey: string;
 }
 
-export interface GitWorkspaceSourceRequest {
-  gitUrl: string;
-  branch: string | null;
-}
-
 const workspaceSourceMetadataSchema = Type.Object({
   workspaceId: Type.String(),
   gitUrl: Type.String(),
