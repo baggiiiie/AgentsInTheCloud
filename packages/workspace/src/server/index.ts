@@ -1,5 +1,6 @@
 import { ensureSharedHome } from "../home.ts";
 import { fileURLToPath } from "node:url";
+import { prepareWorkspaceToolsMount } from "./workspace-tools.ts";
 import { syncWorkspaceDocs } from "./workspace-docs.ts";
 import {
   atelierDataPath,
@@ -17,7 +18,9 @@ export const atelierServerModule: WorkspaceModule = {
     await ensureSharedHome();
     const runtime = getAtelierRuntimeContext();
     await syncWorkspaceDocs(repositoryRoot, atelierDataPath(runtime, "docs"));
+    const toolsMount = await prepareWorkspaceToolsMount(runtime);
     events.on("workspace_plan_prepare", ({ plan }) => {
+      plan.mounts.push(toolsMount);
       if (plan.mounts.some((mount) => mount.target === docsMountPath)) return;
       plan.mounts.push({
         type: "bind",

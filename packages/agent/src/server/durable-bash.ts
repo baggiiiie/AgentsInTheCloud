@@ -26,7 +26,7 @@ export type BashOperations = (action: BashOperationAction, request: BashOperatio
 
 export function workspaceBashOperations(workspaceId: string): BashOperations {
   return async (action, request, create = false) => {
-    const command = ["atelier-agent-bash", action, JSON.stringify(request)];
+    const command = ["/opt/atelier/bin/atelier-agent-bash", action, JSON.stringify(request)];
     if (create) command.push("--create");
     // Do not pass the host's invocation signal: it must not own the workspace
     // command lifetime. These are short receipt operations, not command waits.
