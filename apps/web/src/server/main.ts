@@ -1,4 +1,4 @@
-import { configureAgentDelegation, configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@agents-in-the-cloud/agent/server";
+import { configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@agents-in-the-cloud/agent/server";
 import { createAgentsInTheCloudEventBus, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { designSystemCatalogueHtml } from "@agents-in-the-cloud/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@agents-in-the-cloud/observable-terminal/server";
@@ -14,7 +14,6 @@ import {
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
 import { agentsInTheCloudName, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
-import { subagentsDelegation } from "@agents-in-the-cloud/subagents/server";
 import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
 import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { ServerWebSocket } from "bun";
@@ -32,9 +31,6 @@ import { legacyStaticFiles } from "./static-files.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
 import { createFileWorkspaceActivityStore, createFileWorkspaceAttentionStore, createFileWorkspaceDeletionStore, createWorkspaceRegistry } from "./workspace-registry.ts";
-
-// Explicit feature assembly; workspace-module discovery still owns routes, views and assets.
-configureAgentDelegation(workspaceModules.some((module) => module.id === "subagents") ? subagentsDelegation : undefined);
 
 const requestedPort = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? "0.0.0.0";
@@ -245,6 +241,7 @@ app = createWebApp({
     if (draft && validDraftId(draft)) await removeAttachmentDraft(draft);
   },
   async persistWorkspaceParked(id, parked) {
+    if (parked) await agentsInTheCloudEvents.emit("workspace_suspending", { workspaceId: id });
     await setWorkspaceParked(id, parked);
     if (!parked && registry.get(id)!.phase.kind === "runningPhase") {
       registry.startProvisioning(id);
@@ -573,3 +570,14 @@ function resumeWorkspace(id: string): void {
     if (registry.get(id) === entry && !entry.phase.deletion && !entry.parked) registry.startRunning(id);
   }).catch((error) => console.error(`Workspace startup failed for ${id}`, error));
 }
+
+// Release durable writer leases without turning host shutdown into user Stop.
+let hostStopping = false;
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => {
+  if (hostStopping) return;
+  hostStopping = true;
+  void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_stopping", {}).then(() => process.exit(0), error => {
+    console.error("AgentsInTheCloud shutdown failed", error);
+    process.exit(1);
+  });
+});

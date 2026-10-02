@@ -59,6 +59,8 @@ export interface HostObservableTerminalAttachOptions {
   session: string;
   /** Optional isolated tmux server, for System-owned host sessions. */
   socketName?: string;
+  /** Attach only; never start a replacement server for a missing execution. */
+  requireExistingServer?: boolean;
   cols: number;
   rows: number;
   readonly?: boolean;
@@ -73,7 +75,8 @@ export interface ObservableTerminalAttachOptions extends HostObservableTerminalA
 }
 
 function tmuxAttachArgs(options: HostObservableTerminalAttachOptions): string[] {
-  const args: string[] = options.socketName ? ["-L", options.socketName] : [];
+  const args: string[] = options.requireExistingServer ? ["-N"] : [];
+  if (options.socketName) args.push("-L", options.socketName);
   if (!options.readonly) {
     // History belongs to tmux, not the browser terminal. Configure each attachment
     // so new and existing sessions work without caller-specific preparation.
@@ -86,7 +89,7 @@ function tmuxAttachArgs(options: HostObservableTerminalAttachOptions): string[] 
     );
   }
   if (options.fixedSize) {
-    args.push("set-option", "-t", options.session, "window-size", "manual", ";", "resize-window", "-t", options.session, "-x", String(options.cols), "-y", String(options.rows), ";");
+    args.push("set-option", "-t", `${options.session}:`, "window-size", "manual", ";", "resize-window", "-t", `${options.session}:`, "-x", String(options.cols), "-y", String(options.rows), ";");
   }
   // Tell tmux that the Gespenst client accepts OSC 8. Pi probes this client
   // feature before emitting file:// hyperlinks; RGB alone is not enough.

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { getWorkspaceAgentRuntime } from "@agents-in-the-cloud/agent/server";
+import { getWorkspaceAgentController } from "@agents-in-the-cloud/agent/server";
 import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "@agents-in-the-cloud/agent/server";
 import { SubagentRuntime, type SubagentPeer, type SubagentRecord, type SubagentState } from "./subagent-runtime.ts";
 
@@ -107,7 +107,7 @@ export function getSubagents(workspaceId: string, events?: AgentsInTheCloudEvent
             const child = state.agents.find((agent) => agent.id === id);
             const conversation = child ? await subagentConversation(workspaceId, child) : (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === id);
             if (!conversation) throw new Error(`Agent conversation not found: ${id}`);
-            await getWorkspaceAgentRuntime(conversation, { events });
+            await getWorkspaceAgentController(conversation, { events });
           }
           const peer = peers.get(key);
           if (!peer) throw new Error(`Agent session not bound: ${id}`);

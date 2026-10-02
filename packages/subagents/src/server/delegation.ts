@@ -4,7 +4,7 @@ import { contentText } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { unloadWorkspaceAgentRuntime, type AgentDelegation, type AgentToolPresentation } from "@agents-in-the-cloud/agent/server";
+import { unloadWorkspaceAgentPresentation, type AgentDelegation, type AgentToolPresentation } from "@agents-in-the-cloud/agent/server";
 import { agentPath } from "./subagent-protocol.ts";
 import { bindSubagentSession, forkSubagentHistory, getSubagents, shutdownSubagents, subagentConversation, subagentSnapshot } from "./subagents.ts";
 import { createSubagentTools } from "./subagent-tools.ts";
@@ -61,7 +61,7 @@ export const subagentsDelegation: AgentDelegation = {
   async closingConversation(workspaceId, conversationId) {
     const coordinator = await getSubagents(workspaceId);
     for (const child of coordinator.state.agents.filter((agent) => agent.parentId === conversationId && agent.status !== "closed")) await coordinator.control(conversationId, child.id, "close");
-    for (const child of coordinator.list(conversationId)) await unloadWorkspaceAgentRuntime(workspaceId, child.id);
+    for (const child of coordinator.list(conversationId)) await unloadWorkspaceAgentPresentation(workspaceId, child.id);
   },
   removingWorkspace: shutdownSubagents,
   projectSessionEntry(entry) {

@@ -10,6 +10,7 @@ export interface AgentsInTheCloudHostStartedEvent {
 
 export interface AgentsInTheCloudEventMap {
   agent_system_prompt_prepare: AgentSystemPromptPrepareEvent;
+  agents_in_the_cloud_host_stopping: Record<string, never>;
   agents_in_the_cloud_host_started: AgentsInTheCloudHostStartedEvent;
 }
 

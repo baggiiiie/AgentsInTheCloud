@@ -8,7 +8,7 @@ import { addProject, projectWorkspaceInit, readProjectWorkspaceSettings, type Gi
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createOnboardingTools, createRegisteredOnboardingTools, configureOnboardingTools, type OnboardingToolDependencies } from "../../src/server/onboarding-tools.ts";
 import { createTmuxBashTool } from "../../src/server/bash-tmux.ts";
-import { createWorkspaceAgentTools } from "../../src/server/tools.ts";
+import { createAgentsInTheCloudControlTools } from "../../src/server/tools.ts";
 
 async function execute(tool: ToolDefinition<any, any>, args: any, update?: (result: any) => void) {
   // SAFETY: These tools and the concrete tmux executor do not inspect Pi's ExtensionContext.
@@ -56,12 +56,11 @@ describe("onboarding tool capabilities", () => {
       markProjectOnboardingWorkspace("parent");
       const group = createRegisteredOnboardingTools("parent", "conversation");
       expect(group.map((tool) => tool.name)).toEqual(["read_project_settings", "write_project_settings", "request_secret_value", "bash_in_other_workspace", "delete_workspace", "create_workspace"]);
-      expect(createBashTool).toHaveBeenCalledTimes(1);
+      expect(createBashTool).not.toHaveBeenCalled();
       expect(createRegisteredOnboardingTools("parent", "sibling").map((tool) => tool.name)).toEqual(group.map((tool) => tool.name));
       expect(createRegisteredOnboardingTools("ordinary", "conversation")).toEqual([]);
-      const defaults = createWorkspaceAgentTools("parent").map((tool) => tool.name);
+      const defaults = createAgentsInTheCloudControlTools("parent").map((tool) => tool.name);
       for (const tool of group) expect(defaults).not.toContain(tool.name);
-      expect(defaults).toContain("bash");
     } finally { configureOnboardingTools(undefined); }
     expect(createRegisteredOnboardingTools("parent", "conversation")).toEqual([]);
   });
@@ -146,10 +145,12 @@ describe("onboarding tool capabilities", () => {
   });
 
   test("secret input is delegated to the secure project flow and never accepts a value", async () => {
-    const request = { envName: "TOKEN", hostPattern: "api.example.com", purpose: "Run integration checks" };
+    const request = { envName: "TOKEN", hostPattern: "api.example.com", purpose: "Run integration checks", allowInPath: true };
     const result = await execute(tool("request_secret_value"), request);
     expect(secret.mock.calls[0]?.slice(0, 2)).toEqual([source.projectId, request]);
     expect(result.details.status).toBe("cancelled");
+    expect(Value.Check(tool("request_secret_value").parameters, request)).toBe(true);
+    expect(Value.Check(tool("request_secret_value").parameters, { ...request, allowInPath: "yes" })).toBe(false);
     expect(Value.Check(tool("request_secret_value").parameters, { ...request, secretValue: "oops" })).toBe(false);
   });
 

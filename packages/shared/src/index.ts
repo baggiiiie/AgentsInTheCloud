@@ -192,6 +192,8 @@ export interface WorkspaceModuleCommandHandler<Input = unknown> {
 export const workspaceModuleModalFrameId = "workspace_module_modal_host";
 
 export interface WorkspaceModuleRouteContext {
+  /** Full themed page with the host's fingerprinted assets. */
+  renderPage?(body: string): Response;
   events?: AgentsInTheCloudEventBus;
   /** Refresh server-owned Work-view presentation, opening the view if needed. */
   openWorkView(workspaceId: string, reference: WorkspaceWorkViewReference, options?: { select?: boolean }): Promise<Response>;

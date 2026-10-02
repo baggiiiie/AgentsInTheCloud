@@ -261,30 +261,30 @@ describe("Workspace Agent-tab provider", () => {
     const draftId = agentAttachmentDraftId("workspace-1", conversation.conversationId);
     const attachment = await stageAttachment(draftId, new File(["image"], "reference.png", { type: "image/png" }));
     await stageInitialPrompt("workspace-1", conversation.conversationId, "Draft task");
-    const submissions: Array<{ text: string; imageCount: number }> = [];
+    const submissions: Array<{ text: string; imageCount: number; requestId?: string }> = [];
     const runtime = {
-      async submit(text: string, options: { images?: unknown[] }): Promise<void> {
-        submissions.push({ text, imageCount: options.images?.length ?? 0 });
+      async submit(input: { text: string; images?: unknown[]; requestId?: string }): Promise<void> {
+        submissions.push({ text: input.text, imageCount: input.images?.length ?? 0, requestId: input.requestId });
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
       headers: { accept: "text/vnd.turbo-stream.html" },
-      body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id }),
+      body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id, requestId: "image-request" }),
     });
 
     const response = await handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised by message acceptance.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
     });
     const html = await response?.text();
 
     expect(response?.status).toBe(200);
     expect(response?.headers.get("x-agents-in-the-cloud-attachment-draft-consumed")).toBe("true");
     expect(html).toBe("");
-    expect(submissions).toEqual([{ text: "", imageCount: 1 }]);
+    expect(submissions).toEqual([{ text: "", imageCount: 1, requestId: "image-request" }]);
     expect(await readInitialPromptDraft("workspace-1", conversation.conversationId)).toBeUndefined();
     expect(await findStagedAttachment(draftId, attachment.id)).toBeUndefined();
   });
@@ -301,7 +301,7 @@ describe("Workspace Agent-tab provider", () => {
         throw new Error("model authentication unavailable");
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
@@ -311,7 +311,7 @@ describe("Workspace Agent-tab provider", () => {
 
     await expect(handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised before preflight rejection.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
       suggestTitleFromPrompt: () => { suggestedTitle = true; },
     })).rejects.toThrow("model authentication unavailable");
 
@@ -351,11 +351,11 @@ describe("Workspace Agent-tab provider", () => {
     const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
     const submissions: string[] = [];
     const runtime = {
-      async submit(text: string): Promise<void> {
-        submissions.push(text);
+      async submit(input: { text: string }): Promise<void> {
+        submissions.push(input.text);
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
@@ -365,7 +365,7 @@ describe("Workspace Agent-tab provider", () => {
 
     const response = await handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised by message acceptance.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
       suggestTitleFromPrompt: () => {},
     });
 
@@ -373,4 +373,28 @@ describe("Workspace Agent-tab provider", () => {
     expect(await response?.json()).toEqual({ agent: { conversationId: conversation.conversationId, state: "running" } });
     expect(submissions).toEqual(["Keep going"]);
   });
+  test("message request identities are forwarded unchanged and invalid identities reject before runtime admission", async () => {
+    await dataDir();
+    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const admissions: string[] = [];
+    const runtime = {
+      async submit(input: { requestId: string }) { admissions.push(input.requestId); },
+      userMessages: () => [],
+      settings: async () => ({}),
+    };
+    for (const requestId of ["browser_retry-123", "browser_retry-123", "", "has spaces", "x".repeat(129), 42]) {
+      const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+        method: "POST", headers: { accept: "application/json", "content-type": "application/json" },
+        body: JSON.stringify({ text: "Hello", requestId }),
+      });
+      const response = await handleAgentRequest(request, new URL(request.url), {
+        // SAFETY: This route fixture supplies only the operations message admission uses.
+        getController: async () => runtime as never,
+        suggestTitleFromPrompt: () => {},
+      });
+      expect(response?.status).toBe(requestId === "browser_retry-123" ? 202 : 422);
+    }
+    expect(admissions).toEqual(["browser_retry-123", "browser_retry-123"]);
+  });
+
 });

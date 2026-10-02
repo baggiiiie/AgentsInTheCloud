@@ -1,12 +1,15 @@
 import { type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { maybeNameAgentFromPrompt } from "./agent-title-suggestion.ts";
 import { resolveAgentConversation } from "./delegation.ts";
-import { getWorkspaceAgentRuntime } from "./runtime.ts";
+import { getWorkspaceAgentPresentation, getWorkspaceAgentController } from "./runtime.ts";
 import { type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 export interface AgentRouteOptions {
+  renderPage?: (body: string) => Response;
   events?: AgentsInTheCloudEventBus;
-  getRuntime?: typeof getWorkspaceAgentRuntime;
+  getController?: typeof getWorkspaceAgentController;
+  getPresentation?: typeof getWorkspaceAgentPresentation;
+  knownRequest?: typeof import("./runtime.ts").knownWorkspaceAgentRequest;
   suggestTitleFromPrompt?: typeof maybeNameAgentFromPrompt;
 }
 
@@ -21,10 +24,18 @@ export async function invalidateAgentView(options: AgentRouteOptions, workspaceI
   await options.events?.emit("workspace_agent_view_invalidated", { workspaceId, conversationId });
 }
 
-export async function resolveAgentRuntime(agent: WorkspaceAgentConversationInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentRuntime> {
-  return await (options.getRuntime ?? getWorkspaceAgentRuntime)(agent, { events: options.events });
+export async function resolveAgentPresentation(agent: WorkspaceAgentConversationInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentPresentation> {
+  return await (options.getPresentation ?? getWorkspaceAgentPresentation)(agent, { events: options.events });
 }
 
-export async function requireAgentRuntime(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentRuntime> {
-  return await resolveAgentRuntime(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
+export async function requireAgentPresentation(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentPresentation> {
+  return await resolveAgentPresentation(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
+}
+
+export async function resolveAgentController(agent: WorkspaceAgentConversationInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentController> {
+  return (options.getController ?? getWorkspaceAgentController)(agent, { events: options.events });
+}
+
+export async function requireAgentController(workspaceId: string, conversationId: string, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentController> {
+  return resolveAgentController(await resolveAgentConversation(workspaceId, conversationId, options.events), options);
 }

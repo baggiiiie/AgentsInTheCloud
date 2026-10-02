@@ -110,6 +110,8 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
   completedAt?: number;
   stoppedAt?: number;
   timing?: TurnTimingSummary;
+  /** Native message timestamps do not measure execution duration. */
+  durationUnavailable?: boolean;
   live?: boolean;
   items: TranscriptItem[];
 };

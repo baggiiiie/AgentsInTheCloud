@@ -3,7 +3,6 @@ import { contentText } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { significantCacheMissNotice, type CacheMiss } from "./cache-miss.ts";
 import { isToolViewDetails, type SessionImageRef, type TranscriptRecord } from "./transcript.ts";
 
 import { turnStartEntryType, turnStartSchema, turnTimingEntryType, turnTimingRecordSchema } from "./turn-timing.ts";
@@ -76,10 +75,9 @@ export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" 
   return `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`;
 }
 
-export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<any, CacheMiss>()): TranscriptRecord[] {
+export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
   const records: TranscriptRecord[] = [];
   let lastSettingChange: { type: "model_change" | "thinking_level_change"; record: TranscriptRecord } | undefined;
-  let cacheNoticeInsertIndex: number | undefined;
   for (const entry of entries) {
     if (entry.type === "custom" && entry.customType === turnStartEntryType && Value.Check(turnStartSchema, entry.data)) {
       records.push({ kind: "runStart", ...entry.data, timestamp: entryTimestamp(entry) });
@@ -97,7 +95,6 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       if (!message) continue;
       if (message.role === "user") {
         records.push({ kind: "user", id: entry.id, text: contentText(message.content), images: sessionContentImages(entry), timestamp: entryTimestamp(entry), rewindable: entry.parentId !== null && entry.parentId !== undefined });
-        cacheNoticeInsertIndex = records.length;
       } else if (message.role === "assistant") {
         const parts: any[] = [];
         for (const part of message.content ?? []) {
@@ -117,12 +114,6 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
           errorMessage: message.errorMessage,
           timestamp: entryTimestamp(entry),
         });
-        const notice = significantCacheMissNotice(cacheMisses.get(message));
-        if (notice && message.stopReason !== "aborted" && message.stopReason !== "error") {
-          const record: TranscriptRecord = { kind: "note", text: notice, tone: "warning", timestamp: entryTimestamp(entry) };
-          if (cacheNoticeInsertIndex === undefined) records.push(record);
-          else records.splice(cacheNoticeInsertIndex++, 0, record);
-        }
       } else if (message.role === "toolResult") {
         const details = isToolViewDetails(message.details) ? message.details : undefined;
         records.push({ kind: "toolResult", callId: message.toolCallId, text: contentText(message.content), images: sessionContentImages(entry), isError: Boolean(message.isError), timestamp: entryTimestamp(entry), details });
