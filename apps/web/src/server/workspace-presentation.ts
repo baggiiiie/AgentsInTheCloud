@@ -174,7 +174,7 @@ function renderProjectsPane(presentation: WorkspacePanePresentation): string {
   });
   return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane" data-action="scroll->projects-pane#scrolled:capture:passive">${panelHtml({
     element: { tag: "section", attributesHtml: 'aria-label="Projects"' },
-    headerHtml: `<span class="panel__title">Projects</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${collapseProjects}${addProject}` })}`,
+    headerHtml: `<span class="panel__title">${Icons.Projects}Projects</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${collapseProjects}${addProject}` })}`,
     bodyOverflow: "scroll",
     bodyHtml: `<div id="workspace_projects_list" class="fixed-shell-projects-list action-list" data-projects-pane-target="list">${presentation.projects.length ? "" : '<p class="fixed-shell-projects-empty">No projects yet, make one!<svg class="fixed-shell-projects-empty-arrow" width="40" height="36" viewBox="0 0 40 36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 30 Q30 30 30 3 M24 9 L30 3 L36 9" /></svg></p>'}${paneProjects.map(({ project }) => renderProjectHeading(project, needsFirstWorkspace && project === firstProject ? "first-workspace" : undefined)).join("")}</div>`,
   })}</div>`;
@@ -192,7 +192,7 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
   });
   return `<div class="fixed-shell-workspace-pane"><div class="fixed-shell-workspace-main">${panelHtml({
     element: { tag: "aside",  attributesHtml: 'aria-label="Workspaces"' },
-    headerHtml: `<span class="panel__title">Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}`,
+    headerHtml: `<span class="panel__title">${Icons.Cloud}Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}`,
     bodyHtml: `<div class="fixed-shell-pane-collections" data-workspace-pane-collections>
       <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${workspaceRows(presentation).map((row) => row.html).join("")}</div>
       <section id="global_sidebar_contributions">${sidebarContributionsHtml}</section>
