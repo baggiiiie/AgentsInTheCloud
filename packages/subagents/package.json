@@ -12,7 +12,6 @@
     "@agents-in-the-cloud/design-system": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
-    "@earendil-works/pi-coding-agent": "catalog:",
     "typebox": "^1.0.57",
     "@earendil-works/pi-durable": "catalog:",
     "@earendil-works/chord": "catalog:"
