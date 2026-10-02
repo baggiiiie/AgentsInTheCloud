@@ -8,6 +8,9 @@ import { layoutAfterEvent, softwareKeyboardArranged } from "@atelier/shared";
  */
 const settleMs = 1000;
 
+/** Rows kept visible below the cursor while typing with a soft keyboard. */
+const contextRows = 3;
+
 export interface TerminalFrameOptions {
   /** Clips the terminal; the composer and key row shrink it. */
   stage: HTMLElement;
@@ -77,7 +80,7 @@ export class TerminalFrame {
     this.options.resized();
   }
 
-  /** While typing with a soft keyboard, offset the terminal so its cursor sits above the keyboard and key row. */
+  /** While typing with a soft keyboard, offset the terminal so its cursor, plus a few rows of context, sits above the keyboard and key row. */
   frameCursor(): void {
     const { host, stage } = this.options;
     const input = host.querySelector<HTMLTextAreaElement>(".gespenst__input");
@@ -87,8 +90,10 @@ export class TerminalFrame {
       return;
     }
     const visible = stage.clientHeight;
-    const cursorBottom = Number.parseFloat(input.style.top) + Number.parseFloat(input.style.lineHeight);
-    const top = Math.max(visible - this.size.height, Math.min(0, Math.round(visible - cursorBottom - 8)));
+    const lineHeight = Number.parseFloat(input.style.lineHeight);
+    const cursorBottom = Number.parseFloat(input.style.top) + lineHeight;
+    // Keep a few rows below the cursor in view for context (a TUI's footer, the next lines).
+    const top = Math.max(visible - this.size.height, Math.min(0, Math.round(visible - cursorBottom - contextRows * lineHeight)));
     host.style.top = `${top}px`;
     host.style.bottom = "auto";
   }
