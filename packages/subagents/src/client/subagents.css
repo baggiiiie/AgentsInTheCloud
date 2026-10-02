@@ -2,9 +2,10 @@
 .subagents-scroll { height: 100%; overflow: auto; padding: 12px; }
 .subagent-branch > summary { font-size: var(--text-body); font-weight: 400; line-height: var(--leading-standard); }
 .subagent-state { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: var(--text-code); color: var(--text-muted); }
-.subagent-branch-body { padding: 0 8px 12px 18px; }
+.subagent-branch-body { margin-inline-start: 10px; border-inline-start: 1px solid var(--line-strong); padding: 0 8px 12px 12px; }
 .subagent-branch-body > .subagent-list:empty { display: none; }
-.subagent-branch .agent-transcript { height: auto; overflow: visible; }
+.subagent-branch .agent-transcript { height: auto; overflow: visible; padding: 0; scrollbar-gutter: auto; }
+.subagent-branch .agent-row:has(> .agent-lazy-detail) + .agent-row:has(> .agent-lazy-detail) { margin-top: 0; }
 .subagents-empty { padding: 24px; color: var(--text-muted); }
 .agent-communication > summary { font: inherit; }
 .agent-trace-link { text-decoration: none; appearance: none; background: none; border: 0; padding: 4px 0; color: var(--text-muted); font: inherit; cursor: pointer; text-align: left; }
