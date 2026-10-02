@@ -15,7 +15,7 @@ export function nativeDelegationTranscript(view: ConversationView): AgentTranscr
     if (communicationStateEntry.is(entry) && incoming.has(entry.data.id)) Object.assign(incoming.get(entry.data.id)!, entry.data.change);
   }
   const inherited = view.entries.find(inheritedBoundaryEntry.is);
-  return { inheritedContext: inherited ? { boundaryEntryId: String(inherited.id), source: inherited.data.source } : undefined, anchors: sent.flatMap<AgentTranscriptAnchor>(receipt => receipt.callId ? [{ anchor: receipt.id, target: { toolCallId: receipt.callId } }]  : receipt.sourceEntry === undefined ? [] : [{ anchor: receipt.id, target: { entryId: String(receipt.sourceEntry) } }]), rows: [...incoming.values()].map(receipt => ({ item: {
+  return { inheritedContext: inherited ? { boundaryEntryId: String(inherited.id), source: inherited.data.source } : undefined, anchors: sent.flatMap<AgentTranscriptAnchor>(receipt => receipt.callId ? [{ anchor: receipt.id, target: { toolCallId: receipt.callId } }]  : receipt.sourceEntry === undefined ? [] : [{ anchor: receipt.id, target: { entryId: String(receipt.sourceEntry) } }]), rows: [...incoming.values()].map(receipt => ({
     type: "extension", key: receipt.id, anchor: receipt.id, timestamp: receipt.timestamp,
     render(ctx) {
       const state = receipt.prepared ? `Prepared as ${receipt.prepared.format} · not a read receipt` : receipt.context === "failed" ? receipt.error! : "Pending model context";
@@ -28,5 +28,5 @@ export function nativeDelegationTranscript(view: ConversationView): AgentTranscr
       ]);
       return transcriptRow(`<details class="agent-communication" data-transcript-anchor="${escapeHtml(receipt.id)}" data-controller="agent-communication" data-agent-communication-key-value="${escapeHtml(receipt.id)}" data-action="toggle->agent-communication#remember" open>${transcriptActionItemHtml({ kind: "text", text: `Incoming ${receipt.kind} from ${receipt.author}` }, { disclosure: true })}${body}</details>`);
     },
-  } })) };
+  })) };
 }

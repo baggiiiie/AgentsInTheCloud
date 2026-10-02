@@ -210,20 +210,6 @@ describe("persisted run boundaries", () => {
   });
 });
 
-test("run membership includes steering entries for contributed activity placement", async () => {
-  const { applyTranscriptContributions } = await import("../../src/server/transcript-contributions.ts");
-  const records: TranscriptRecord[] = [
-    { kind: "user", id: "first", text: "Start", images: [], timestamp: 1000 },
-    { kind: "runStart", turnEntryId: "first", startedAt: 1000, timestamp: 1001 },
-    { kind: "user", id: "steer", text: "Continue here", images: [], timestamp: 2000 },
-  ];
-  const items = applyTranscriptContributions(buildTranscript(records), {
-    rows: [{ item: { type: "extension", key: "delivered", render: () => "", timestamp: 2100 }, placement: { turnEntryId: "steer", relation: "during-turn" } }], anchors: [],
-  });
-  expect(items.map((item) => item.type)).toEqual(["user", "working"]);
-  expect(items[1]).toMatchObject({ inputEntryIds: ["first", "steer"], items: [{ type: "user", key: "steer", steering: true }, { type: "extension", key: "delivered" }] });
-});
-
 test("a new persisted run after an interrupted run is not mistaken for steering", () => {
   const items = buildTranscript([
     { kind: "user", id: "old", text: "Interrupted request", images: [], timestamp: 1000 },

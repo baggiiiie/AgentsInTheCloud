@@ -358,7 +358,6 @@
         "@atelier/shared": "workspace:*",
         "@earendil-works/chord": "catalog:",
         "@earendil-works/pi-ai": "catalog:",
-        "@earendil-works/pi-coding-agent": "catalog:",
         "@earendil-works/pi-durable": "catalog:",
         "typebox": "^1.0.57",
       },

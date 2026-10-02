@@ -105,7 +105,6 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
   /** Initiating and steering entries whose activity belongs to this run. */
   inputEntryIds?: string[];
   /** Messages that arrived in this run and are still unread. */
-  unreadQueueCount?: number;
   startedAt: number;
   completedAt?: number;
   stoppedAt?: number;

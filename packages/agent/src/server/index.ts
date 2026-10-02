@@ -6,7 +6,6 @@ export {
   publishSessionSnapshot,
   sessionShareDir,
   workspaceSessionShareKey,
-  sessionShareKeySlug,
   sessionShareMountPath,
   setWorkspaceAgentConversationTitle,
   untitledAgentConversationTitle,
@@ -45,12 +44,11 @@ export {
 export { configureAgentDelegation, resolveAgentConversation, type AgentDelegation, type AgentToolPresentation } from "./delegation.ts";
 export { ids, type AgentRenderContext } from "./render-context.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
-export { statusHtml } from "./render-tool.ts";
 export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
 export { type AgentRouteHandler, requireAgentPresentation } from "./route-support.ts";
-export { type AgentTranscriptSnapshot, type AgentTranscriptAddition, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
+export { type AgentTranscriptSnapshot, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
 
-export { configureOnboardingTools, createOnboardingTools, type OnboardingToolDependencies, type SecretValueRequest } from "./onboarding-tools.ts";
+export { configureOnboardingTools, type OnboardingToolDependencies, type SecretValueRequest } from "./onboarding-tools.ts";
 
 export { projectOnboardingInitialPrompt } from "./project-onboarding.ts";
 

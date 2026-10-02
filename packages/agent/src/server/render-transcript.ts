@@ -108,7 +108,7 @@ export function renderWorkingSummary(ctx: AgentRenderContext, section: WorkingTr
     attributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working · "` : undefined,
     textAttributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? 'data-agent-elapsed-target="time"' : undefined,
   }, {
-    disclosure: true, leadingHtml: status, trailingHtml: `${steeringCount ? `<span class="agent-working-timing">${steeringCount} steering ${steeringCount === 1 ? "message" : "messages"}</span>` : ""}${active ? "" : renderWorkingTiming(section)}${section.unreadQueueCount ? `<span class="agent-working-timing">${section.unreadQueueCount} unread ${section.unreadQueueCount === 1 ? "message" : "messages"} in queue</span>` : ""}`,
+    disclosure: true, leadingHtml: status, trailingHtml: `${steeringCount ? `<span class="agent-working-timing">${steeringCount} steering ${steeringCount === 1 ? "message" : "messages"}</span>` : ""}${active ? "" : renderWorkingTiming(section)}`,
     summaryId: ids.itemSummaryContent(ctx, section.key),
   });
 }

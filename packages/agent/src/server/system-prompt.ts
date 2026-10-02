@@ -1,9 +1,3 @@
-import {
-  createExtensionRuntime,
-  type ResourceDiagnostic,
-  type ResourceLoader,
-  type Skill,
-} from "@earendil-works/pi-coding-agent";
 import type { AtelierEventBus } from "@atelier/core";
 import { projectOnboardingInstructions } from "./project-onboarding.ts";
 import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
@@ -56,30 +50,4 @@ export async function prepareAppendedAtelierInstructions(events: AtelierEventBus
   const appended = [...lines, ...(isProjectOnboardingWorkspace(workspaceId) ? [projectOnboardingInstructions] : [])];
   await events?.emit("agent_system_prompt_prepare", { workspaceId, conversationId, lines: appended });
   return appended;
-}
-
-interface AtelierAgentsFile {
-  path: string;
-  content: string;
-}
-
-export function createAtelierResourceLoader(
-  agentsFiles: AtelierAgentsFile[] = [],
-  appendSystemPrompt: () => string[] = () => [],
-  skillResources: { skills: Skill[]; diagnostics: ResourceDiagnostic[] } = { skills: [], diagnostics: [] },
-): ResourceLoader {
-  const extensions = { extensions: [], errors: [], runtime: createExtensionRuntime() };
-  return {
-    getExtensions: () => extensions,
-    getSkills: () => skillResources,
-    getPrompts: () => ({ prompts: [], diagnostics: [] }),
-    getThemes: () => ({ themes: [], diagnostics: [] }),
-    getAgentsFiles: () => ({ agentsFiles }),
-    getSystemPrompt: () => atelierSystemPrompt,
-    getSystemPromptSource: () => undefined,
-    getAppendSystemPrompt: appendSystemPrompt,
-    getAppendSystemPromptSources: () => [],
-    extendResources: () => {},
-    reload: async () => {},
-  };
 }
