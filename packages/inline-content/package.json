@@ -1,0 +1,17 @@
+{
+  "name": "@atelier/inline-content",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts"
+  },
+  "dependencies": {
+    "@atelier/design-system": "workspace:*",
+    "@atelier/markdown": "workspace:*",
+    "@atelier/shared": "workspace:*",
+    "@atelier/workspace": "workspace:*",
+    "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
+    "typebox": "^1.0.57"
+  }
+}

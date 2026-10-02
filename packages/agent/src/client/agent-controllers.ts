@@ -7,10 +7,8 @@ import { createAgentEditDiffController } from "./edit-diff-controller.ts";
 import { createAgentTurnController } from "./turn-controller.ts";
 import { createAgentElapsedController } from "./elapsed-controller.ts";
 import { createAgentNoticeController } from "./notice-controller.ts";
-import { createAgentHtmlPreviewController } from "./html-preview-controller.ts";
 import { registerLaunchComposerCommand } from "./launch-composer-command.ts";
 import { createAgentMermaidController } from "./mermaid-controller.ts";
-import { createAgentProxyController } from "./proxy-controller.ts";
 import { createAgentTermController } from "./terminal-controller.ts";
 import { createAgentThinkingController } from "./thinking-controller.ts";
 import { createAgentStreamingTextController } from "./streaming-text-controller.ts";
@@ -21,7 +19,6 @@ export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePrompt
 export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
 export { promptTemplateHotkeyConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
-export { fitHtmlPreview } from "./html-preview-controller.ts";
 export { forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "./terminal-controller.ts";
 
 export const agentClientModule: WorkspaceClientModule = {
@@ -33,7 +30,6 @@ export const agentClientModule: WorkspaceClientModule = {
     application.register("agent-turn", createAgentTurnController(Controller));
     application.register("agent-elapsed", createAgentElapsedController(Controller));
     application.register("agent-edit-diff", createAgentEditDiffController(Controller));
-    application.register("agent-html-preview", createAgentHtmlPreviewController(Controller));
     application.register("agent-thinking", createAgentThinkingController(Controller));
     application.register("agent-streaming-text", createAgentStreamingTextController(Controller));
     application.register("agent-tail-frame", createAgentTailFrameController(Controller));
@@ -41,7 +37,6 @@ export const agentClientModule: WorkspaceClientModule = {
     application.register("agent-mermaid", createAgentMermaidController(Controller));
     application.register("agent-notice", createAgentNoticeController(Controller));
     application.register("agent-completions", createAgentCompletionsController(Controller, hooks));
-    application.register("agent-proxy", createAgentProxyController(Controller));
     application.register("agent-term", createAgentTermController(Controller));
 
     registerAgentPaneVisibilityHooks(application, hooks);

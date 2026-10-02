@@ -1,12 +1,12 @@
-# Rich responses
+# Inline content
 
 Choose the simplest format that explains the answer well:
 
 - Use Markdown for prose, lists, code, and ordinary tables.
 - Use a normal fenced `mermaid` block when labeled nodes and connections adequately explain a static structure or process. Do not make an HTML file for that diagram.
-- Use a rich HTML fragment for charts, spatial illustrations, meaningful visual layouts, adjustable inputs, and other interaction.
+- Use an HTML fragment for charts, spatial illustrations, meaningful visual layouts, adjustable inputs, and other interaction.
 - Do not decorate ordinary prose, recreate a Markdown table, or wrap a Mermaid diagram in HTML. Split oversized diagrams instead of relying on fullscreen.
-- A rich response is part of your answer, not a website. Preview independently styled deliverables with `atelier-embed:` and applications with a Browser Work view instead.
+- Inline content is part of your answer, not a website. Preview independently styled deliverables with `artifact-preview:` and applications with a Browser Work view instead.
 
 ## File-only output
 
@@ -17,12 +17,12 @@ Place this reference on its own line wherever the visual belongs in your reply:
 ```markdown
 The two approaches put the waiting in different places:
 
-![Queue placement](atelier-rich:/work/explanations/queue.html)
+![Queue placement](inline-content:/work/explanations/queue.html)
 
 I recommend queuing before processing so overload stays bounded.
 ```
 
-The optional image description is the accessible frame title. Never use an HTML code fence to display a rich response. No publishing tool or dev server is needed. Write the file **before** sending the reference. Atelier reads it when the visual loads; edits appear when earlier replies are reloaded, and deleting the file breaks their references. Use a new filename for each revision when earlier versions should stay intact.
+The optional image description is the accessible frame title. Never use an HTML code fence to display inline content. No publishing tool or dev server is needed. Write the file **before** sending the reference. Atelier reads it when the visual loads; edits appear when earlier replies are reloaded, and deleting the file breaks their references. Use a new filename for each revision when earlier versions should stay intact.
 
 Use prose outside the fragment unless its arrangement helps explain the idea. Do not repeat the same explanation inside and outside. Do not announce the file, HTML, or rendering mechanism.
 
@@ -30,26 +30,26 @@ Use prose outside the fragment unless its arrangement helps explain the idea. Do
 
 Atelier supplies its font, current theme, typography, native controls, and automatic height sizing. Do not add your own stylesheet dependency, page background, app header, navigation, fullscreen button, or download toolbar. Keep the top-level surface transparent and unframed. Use as little chrome as possible; don't nest cards.
 
-Semantic HTML gets default styling: `p`, `h2`, `h3`, lists, `dl`, links, code, tables, `details`/`summary`, labels, buttons, inputs, selects, textareas, and outputs. Use native controls. Buttons default to secondary; add `ar-primary` for the main action or `ar-quiet` for a low-emphasis action. Do not override standard control geometry, colors, or focus styles.
+Semantic HTML gets default styling: `p`, `h2`, `h3`, lists, `dl`, links, code, tables, `details`/`summary`, labels, buttons, inputs, selects, textareas, and outputs. Use native controls. Buttons default to secondary; add `ic-primary` for the main action or `ic-quiet` for a low-emphasis action. Do not override standard control geometry, colors, or focus styles.
 
 ### Guaranteed classes
 
 | Class | Meaning |
 | --- | --- |
-| `ar-stack` | Vertical flow with standard spacing |
-| `ar-row` | Wrapping horizontal group |
-| `ar-grid` | Equal-width peers that automatically stack when narrow |
-| `ar-surface` | Restrained bounded surface, only when grouping needs it |
-| `ar-controls` | Wrapping group of related labeled controls |
-| `ar-table-scroll` | Local horizontal scrolling for a genuinely wide table |
-| `ar-muted` | Secondary text |
-| `ar-small` | Host-scaled secondary annotations, not essential labels |
-| `ar-number` | Tabular numerals |
-| `ar-sr-only` | Visually hidden accessible text |
+| `ic-stack` | Vertical flow with standard spacing |
+| `ic-row` | Wrapping horizontal group |
+| `ic-grid` | Equal-width peers that automatically stack when narrow |
+| `ic-surface` | Restrained bounded surface, only when grouping needs it |
+| `ic-controls` | Wrapping group of related labeled controls |
+| `ic-table-scroll` | Local horizontal scrolling for a genuinely wide table |
+| `ic-muted` | Secondary text |
+| `ic-small` | Host-scaled secondary annotations, not essential labels |
+| `ic-number` | Tabular numerals |
+| `ic-sr-only` | Visually hidden accessible text |
 
 ### Guaranteed colors
 
-Use `--ar-text`, `--ar-text-muted`, `--ar-surface`, `--ar-border`, `--ar-accent`, `--ar-on-accent`, `--ar-danger`, and `--ar-series-1` through `--ar-series-6`. They follow the user's theme. Use `currentColor` for SVG where appropriate. Series colors are for meaningful data categories, not decorating every item. Pair color with labels or shapes.
+Use `--ic-text`, `--ic-text-muted`, `--ic-surface`, `--ic-border`, `--ic-accent`, `--ic-on-accent`, `--ic-danger`, and `--ic-series-1` through `--ic-series-6`. They follow the user's theme. Use `currentColor` for SVG where appropriate. Series colors are for meaningful data categories, not decorating every item. Pair color with labels or shapes.
 
 Custom CSS is allowed for diagrams and content-specific layout. Scope every rule below your unique root ID. Inherit type rather than inventing a font or type scale. Never style the host's outer document or rely on undocumented classes.
 
@@ -65,10 +65,10 @@ Use visible labels, keyboard-accessible controls, semantic headings, and accessi
 
 `details`/`summary` needs no JavaScript.
 
-For tabs, place a tablist and its panels inside `data-ar-tabs`. Use buttons with `role="tab"`, unique IDs, `aria-controls`, and `aria-selected`. Panels have matching IDs, `role="tabpanel"`, `aria-labelledby`, and `hidden` when inactive. Atelier implements clicks and arrow/Home/End keyboard navigation. Don't hide comparison data behind tabs when users need to compare it simultaneously.
+For tabs, place a tablist and its panels inside `data-ic-tabs`. Use buttons with `role="tab"`, unique IDs, `aria-controls`, and `aria-selected`. Panels have matching IDs, `role="tabpanel"`, `aria-labelledby`, and `hidden` when inactive. Atelier implements clicks and arrow/Home/End keyboard navigation. Don't hide comparison data behind tabs when users need to compare it simultaneously.
 
 ```html
-<section id="platforms" data-ar-tabs>
+<section id="platforms" data-ic-tabs>
   <div role="tablist" aria-label="Platform">
     <button id="phone-tab" role="tab" aria-controls="phone-panel" aria-selected="true">Phone</button>
     <button id="desktop-tab" role="tab" aria-controls="desktop-panel" aria-selected="false">Desktop</button>
@@ -78,23 +78,23 @@ For tabs, place a tablist and its panels inside `data-ar-tabs`. Use buttons with
 </section>
 ```
 
-Use `data-ar-tooltip="Short supplementary help"` on a labeled native control. Atelier handles focus, hover, and tap; essential information stays visible.
+Use `data-ic-tooltip="Short supplementary help"` on a labeled native control. Atelier handles focus, hover, and tap; essential information stays visible.
 
 ## Custom interaction
 
-Only add JavaScript when the explanation needs custom behavior. Use a small Stimulus controller. The sandbox provides the module `@atelier/response`, exporting `Controller`, `registerController`, and `colors`. Do not load Stimulus yourself. Use unique controller names. Keep markup in HTML rather than generating an entire UI in JavaScript.
+Only add JavaScript when the explanation needs custom behavior. Use a small Stimulus controller. The sandbox provides the module `@atelier/inline-content`, exporting `Controller`, `registerController`, and `colors`. Do not load Stimulus yourself. Use unique controller names. Keep markup in HTML rather than generating an entire UI in JavaScript.
 
 ```html
-<section id="capacity" class="ar-stack" data-controller="capacity-example">
+<section id="capacity" class="ic-stack" data-controller="capacity-example">
   <label>Workers
     <input type="range" min="1" max="8" value="2"
       data-capacity-example-target="workers"
       data-action="input->capacity-example#update">
   </label>
-  <output class="ar-number" aria-live="polite" data-capacity-example-target="result">20 requests / second</output>
+  <output class="ic-number" aria-live="polite" data-capacity-example-target="result">20 requests / second</output>
 </section>
 <script type="module">
-import { Controller, registerController } from "@atelier/response";
+import { Controller, registerController } from "@atelier/inline-content";
 registerController("capacity-example", class extends Controller {
   static targets = ["workers", "result"];
   connect() { this.update(); }
@@ -118,7 +118,7 @@ change to the SVG's own size. Skip unchanged widths and schedule redraws with
 `disconnect()`. Input handlers can redraw immediately. This avoids resize feedback
 loops when the host fits the frame's height.
 
-For canvas rendering, `colors()` returns resolved semantic colors keyed by `text`, `accent`, `series-1`, etc. Listen to `atelier:theme` on `document` in your controller and redraw when it changes; remove listeners/observers in `disconnect()`.
+For canvas rendering, `colors()` returns resolved semantic colors keyed by `text`, `accent`, `series-1`, etc. Listen to `inline-content:theme` on `document` in your controller and redraw when it changes; remove listeners/observers in `disconnect()`.
 
 Interactions are local and temporary. Reloading resets them. There is no saved-state API, tool execution, prompt submission, parent-document access, network/API access, external library loading, or application credential access. External HTTP(S) links go through host confirmation. Use a real application preview when the task needs those capabilities.
 

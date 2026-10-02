@@ -1,7 +1,7 @@
 import { workspaceProxyUrl, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
 
-export function createAgentProxyController(Controller: StimulusControllerConstructor) {
-  return class AgentProxyController extends Controller {
+export function createArtifactPreviewProxyController(Controller: StimulusControllerConstructor) {
+  return class ArtifactPreviewProxyController extends Controller {
     static values = { workspaceId: String, appKey: String, path: String };
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;

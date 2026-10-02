@@ -27,7 +27,7 @@ describe("streaming Markdown", () => {
       "> quote\n> continued\n\nnext\n\n",
       "| A | B |\n|---|---|\n| 1 | 2 |\n\nnext\n\n",
       "```ts\nconst x = 1;\n\nnext\n\n",
-      "![preview](atelier-embed:/work/preview",
+      "![preview](artifact-preview:/work/preview",
       "[file](atelier://file/work/a.ts",
     ]) {
       expect(streamingMarkdownStableBoundary(prefix + tail)).toBe(prefix.length);
@@ -55,14 +55,11 @@ describe("streaming Markdown", () => {
       "<script>alert(1)</script>",
       "",
       "[web](https://example.com) [file](atelier://file/work/a.ts)",
-      "",
-      "![](atelier-embed:/work/preview.html)",
     ].join("\n");
     const snapshot = renderStreamingMarkdownSnapshot(workspaceId, source);
     const html = snapshot.stableHtml + snapshot.tailHtml;
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
     expect(html).toContain('target="_blank"');
-    expect(html).toContain("data-agent-proxy-path-value");
   });
 });

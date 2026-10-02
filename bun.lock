@@ -25,6 +25,7 @@
         "@atelier/core": "workspace:*",
         "@atelier/design-system": "workspace:*",
         "@atelier/desktop": "workspace:*",
+        "@atelier/artifact-preview": "workspace:*",
         "@atelier/files": "workspace:*",
         "@atelier/host": "workspace:*",
         "@atelier/keypress-probe": "workspace:*",
@@ -34,7 +35,7 @@
         "@atelier/prompt": "workspace:*",
         "@atelier/proxy-egress": "workspace:*",
         "@atelier/proxy-ingress": "workspace:*",
-        "@atelier/rich-response": "workspace:*",
+        "@atelier/inline-content": "workspace:*",
         "@atelier/shared": "workspace:*",
         "@atelier/subagents": "workspace:*",
         "@atelier/transcription": "workspace:*",
@@ -154,6 +155,14 @@
         "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
         "@novnc/novnc": "1.7.0",
         "typebox": "^1.0.57",
+      },
+    },
+    "packages/artifact-preview": {
+      "name": "@atelier/artifact-preview",
+      "dependencies": {
+        "@atelier/design-system": "workspace:*",
+        "@atelier/markdown": "workspace:*",
+        "@atelier/shared": "workspace:*",
       },
     },
     "packages/files": {
@@ -308,8 +317,8 @@
         "typebox": "^1.0.57",
       },
     },
-    "packages/rich-response": {
-      "name": "@atelier/rich-response",
+    "packages/inline-content": {
+      "name": "@atelier/inline-content",
       "dependencies": {
         "@atelier/design-system": "workspace:*",
         "@atelier/markdown": "workspace:*",
@@ -446,6 +455,8 @@
 
     "@atelier/desktop": ["@atelier/desktop@workspace:packages/desktop"],
 
+    "@atelier/artifact-preview": ["@atelier/artifact-preview@workspace:packages/artifact-preview"],
+
     "@atelier/files": ["@atelier/files@workspace:packages/files"],
 
     "@atelier/host": ["@atelier/host@workspace:packages/host"],
@@ -470,7 +481,7 @@
 
     "@atelier/review": ["@atelier/review@workspace:packages/review"],
 
-    "@atelier/rich-response": ["@atelier/rich-response@workspace:packages/rich-response"],
+    "@atelier/inline-content": ["@atelier/inline-content@workspace:packages/inline-content"],
 
     "@atelier/shared": ["@atelier/shared@workspace:packages/shared"],
 

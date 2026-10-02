@@ -33,5 +33,4 @@ test("scheme registration rejects invalid names and duplicate ownership", () => 
   expect(() => registerMarkdownEmbed("invalid:", () => "")).toThrow("Invalid Markdown embed scheme");
   registerMarkdownEmbed("test-exclusive", () => "");
   expect(() => registerMarkdownEmbed("test-exclusive", () => "")).toThrow("already registered");
-  expect(() => registerMarkdownEmbed("atelier-embed", () => "")).toThrow("already registered");
 });

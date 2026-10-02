@@ -1,0 +1,17 @@
+import type { MarkdownEmbedContext } from "@atelier/markdown";
+import { escapeHtml } from "@atelier/shared";
+
+export function renderInlineContentReference({ workspaceId, target, title, provisional }: MarkdownEmbedContext): string {
+  let path: string;
+  try {
+    path = decodeURI(target);
+  } catch {
+    return escapeHtml(`inline-content:${target}`);
+  }
+  if (!path.startsWith("/") || path.includes("\0")) return escapeHtml(`inline-content:${target}`);
+  if (provisional) return '<span role="status">Preparing visual explanation…</span>';
+
+  const url = `/workspaces/${encodeURIComponent(workspaceId)}/inline-content?path=${encodeURIComponent(path)}`;
+  const label = title || "Visual explanation";
+  return `<span role="group" aria-label="${escapeHtml(label)}" class="inline-content" data-controller="inline-content" data-inline-content-url-value="${escapeHtml(url)}"><span data-inline-content-target="status" role="status">Loading visual explanation…</span><iframe title="${escapeHtml(label)}" sandbox="allow-scripts" referrerpolicy="no-referrer" data-inline-content-target="frame" data-action="load->inline-content#loaded" hidden></iframe></span>`;
+}

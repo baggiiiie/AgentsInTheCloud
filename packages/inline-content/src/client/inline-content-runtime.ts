@@ -1,5 +1,5 @@
 import { Value } from "typebox/value";
-import { richConnectMessage, richThemeMessage } from "../shared/rich-response-protocol.ts";
+import { inlineContentConnectMessage, inlineContentThemeMessage } from "../shared/inline-content-protocol.ts";
 import { Application, Controller } from "@hotwired/stimulus";
 
 export { Controller };
@@ -7,7 +7,7 @@ const application = new Application();
 let pendingError: string | undefined;
 function reportInteractionError(message: string): void {
   pendingError = message.slice(0, 1000);
-  document.dispatchEvent(new Event("atelier:interaction-error"));
+  document.dispatchEvent(new Event("inline-content:interaction-error"));
 }
 application.handleError = (error, message) => {
   console.error(message, error);
@@ -18,7 +18,7 @@ export function colors(): Record<string, string> {
   const probe = document.createElement("span");
   probe.hidden = true; document.body.append(probe);
   const result = Object.fromEntries(["text", "text-muted", "surface", "border", "accent", "on-accent", "danger", ...Array.from({ length: 6 }, (_, i) => `series-${i + 1}`)].map(name => {
-    probe.style.color = `var(--ar-${name})`;
+    probe.style.color = `var(--ic-${name})`;
     return [name, getComputedStyle(probe).color];
   }));
   probe.remove();
@@ -35,22 +35,22 @@ class RuntimeController extends Controller {
     document.addEventListener("click", this.link);
     window.addEventListener("error", this.error);
     window.addEventListener("unhandledrejection", this.rejection);
-    document.addEventListener("atelier:interaction-error", this.sendError);
+    document.addEventListener("inline-content:interaction-error", this.sendError);
     document.addEventListener("securitypolicyviolation", this.policyViolation);
     this.observe();
-    this.mutations.observe(document.getElementById("ar-content")!, { childList: true, subtree: true });
+    this.mutations.observe(document.getElementById("ic-content")!, { childList: true, subtree: true });
   }
   disconnect(): void {
     window.removeEventListener("message", this.handshake);
     document.removeEventListener("click", this.link);
     window.removeEventListener("error", this.error);
     window.removeEventListener("unhandledrejection", this.rejection);
-    document.removeEventListener("atelier:interaction-error", this.sendError);
+    document.removeEventListener("inline-content:interaction-error", this.sendError);
     document.removeEventListener("securitypolicyviolation", this.policyViolation);
     this.resize.disconnect(); this.mutations.disconnect(); this.port?.close(); cancelAnimationFrame(this.scheduled);
   }
   private observe(): void {
-    const root = document.getElementById("ar-content")!;
+    const root = document.getElementById("ic-content")!;
     this.resize.observe(root);
     for (const child of root.children) this.resize.observe(child);
     this.report();
@@ -58,18 +58,18 @@ class RuntimeController extends Controller {
   private report(): void {
     cancelAnimationFrame(this.scheduled);
     this.scheduled = requestAnimationFrame(() => {
-      const root = document.getElementById("ar-content")!;
+      const root = document.getElementById("ic-content")!;
       this.port?.postMessage({ type: "size", height: Math.ceil(root.getBoundingClientRect().height), overflow: root.scrollWidth > root.clientWidth + 2 });
     });
   }
   private handshake = (event: MessageEvent): void => {
-    if (event.source !== parent || !Value.Check(richConnectMessage, event.data) || !event.ports[0] || this.port) return;
+    if (event.source !== parent || !Value.Check(inlineContentConnectMessage, event.data) || !event.ports[0] || this.port) return;
     this.port = event.ports[0];
     this.port.onmessage = (message: MessageEvent) => {
-      if (!Value.Check(richThemeMessage, message.data)) return;
+      if (!Value.Check(inlineContentThemeMessage, message.data)) return;
       document.documentElement.dataset.theme = message.data.theme;
       document.documentElement.style.setProperty("--text-body", message.data.fontSize);
-      document.dispatchEvent(new CustomEvent("atelier:theme"));
+      document.dispatchEvent(new CustomEvent("inline-content:theme"));
       this.report();
     };
     this.port.postMessage({ type: "ready" });
@@ -152,8 +152,8 @@ class TooltipController extends Controller<HTMLElement> {
   private toggle = (): void => { if (this.tooltip) this.hide(); else this.show(); };
   private show = (): void => {
     this.hide();
-    const tooltip = document.createElement("span"); tooltip.className = "ar-tooltip-content"; tooltip.role = "tooltip";
-    tooltip.id = `ar-tooltip-${crypto.randomUUID()}`; tooltip.textContent = this.element.dataset.arTooltip!;
+    const tooltip = document.createElement("span"); tooltip.className = "ic-tooltip-content"; tooltip.role = "tooltip";
+    tooltip.id = `ic-tooltip-${crypto.randomUUID()}`; tooltip.textContent = this.element.dataset.icTooltip!;
     document.body.append(tooltip); this.tooltip = tooltip;
     this.element.setAttribute("aria-describedby", `${this.element.getAttribute("aria-describedby") ?? ""} ${tooltip.id}`.trim());
     const rect = this.element.getBoundingClientRect();
@@ -166,9 +166,9 @@ class TooltipController extends Controller<HTMLElement> {
     this.tooltip.remove(); this.tooltip = undefined;
   };
 }
-application.register("ar-runtime", RuntimeController);
-application.register("ar-tabs", TabsController);
-application.register("ar-tooltip", TooltipController);
+application.register("ic-runtime", RuntimeController);
+application.register("ic-tabs", TabsController);
+application.register("ic-tooltip", TooltipController);
 
 // Imported author controllers start only after the host controller is listening.
 await application.start();

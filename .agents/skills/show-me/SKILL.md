@@ -129,12 +129,12 @@ Escalate to one focused HTML artifact when spatial layout, grouping, color, comp
 5. Present the file inline in the response with exactly this Markdown shape:
 
 ```markdown
-![](atelier-embed:/work/artifacts/show-me-{short-description}.html)
+![](artifact-preview:/work/artifacts/show-me-{short-description}.html)
 ```
 
 Atelier automatically renders referenced HTML in an inline iframe, so do not use `open`, start a server, or call the presentation tool for a static artifact. If the explanation genuinely requires live interaction or a running application, use the available Atelier browser presentation instead: run the server in tmux on any available TCP port except `2999` (reserved for the workspace gateway), bind to `127.0.0.1` or `0.0.0.0`, allow any preview hostname, and present its localhost URL.
 
-Use screenshots or video only when the point is actual rendered behavior that an explanatory HTML diagram would misrepresent. Reference those files with `atelier-embed:` too. Link editable source with an `atelier://file/...` URL when the user will benefit from inspecting it.
+Use screenshots or video only when the point is actual rendered behavior that an explanatory HTML diagram would misrepresent. Reference those files with `artifact-preview:` too. Link editable source with an `atelier://file/...` URL when the user will benefit from inspecting it.
 
 If the task is to compare several UI directions or validate a state model rather than explain the current topic, use the `prototype` skill instead of turning this artifact into a miniature prototype.
 

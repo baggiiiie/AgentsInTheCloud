@@ -39,6 +39,7 @@
     "@atelier/claude-agent": "workspace:*",
     "@atelier/cli-agent": "workspace:*",
     "@atelier/pi-agent": "workspace:*",
-    "@atelier/rich-response": "workspace:*"
+    "@atelier/inline-content": "workspace:*",
+    "@atelier/artifact-preview": "workspace:*"
   }
 }

@@ -22,13 +22,13 @@ async function source(path: string, content: string): Promise<void> {
 
 test("deploys shared and package documentation with relative paths and read-only files", async () => {
   await source("docs/deploy-in-workspace/atelier.md", "Shared guide");
-  await source("packages/rich-response/deploy-in-workspace/rich-responses.md", "Rich guide");
+  await source("packages/inline-content/deploy-in-workspace/inline-content.md", "Rich guide");
   await source("packages/example/deploy-in-workspace/examples/usage.md", "Nested guide");
   await syncWorkspaceDocs(root, destination);
   expect(await readFile(join(destination, "atelier.md"), "utf8")).toBe("Shared guide");
-  expect(await readFile(join(destination, "rich-responses.md"), "utf8")).toBe("Rich guide");
+  expect(await readFile(join(destination, "inline-content.md"), "utf8")).toBe("Rich guide");
   expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Nested guide");
-  expect((await stat(join(destination, "rich-responses.md"))).mode & 0o777).toBe(0o444);
+  expect((await stat(join(destination, "inline-content.md"))).mode & 0o777).toBe(0o444);
 });
 
 test("updates and removes docs without replacing mounted directories", async () => {

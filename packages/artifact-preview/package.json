@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/rich-response",
+  "name": "@atelier/artifact-preview",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,9 +9,6 @@
   "dependencies": {
     "@atelier/design-system": "workspace:*",
     "@atelier/markdown": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/workspace": "workspace:*",
-    "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
-    "typebox": "^1.0.57"
+    "@atelier/shared": "workspace:*"
   }
 }

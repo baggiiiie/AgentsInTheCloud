@@ -1,5 +1,3 @@
-import { renderAtelierEmbed } from "./atelier-markdown.ts";
-
 export interface MarkdownEmbedContext {
   workspaceId: string;
   /** Markdown-normalized target after the scheme; decoding belongs to the handler. */
@@ -12,9 +10,7 @@ export interface MarkdownEmbedContext {
 /** Return trusted server-rendered HTML; escape any untrusted values. */
 export type MarkdownEmbedHandler = (context: MarkdownEmbedContext) => string;
 
-const handlers = new Map<string, MarkdownEmbedHandler>([
-  ["atelier-embed", ({ workspaceId, target }) => renderAtelierEmbed(workspaceId, target)],
-]);
+const handlers = new Map<string, MarkdownEmbedHandler>();
 
 /** Register once during server startup, before rendering requests. */
 export function registerMarkdownEmbed(scheme: string, handler: MarkdownEmbedHandler): void {

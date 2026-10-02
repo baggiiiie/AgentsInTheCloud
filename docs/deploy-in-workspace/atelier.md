@@ -154,7 +154,7 @@ Atelier publishes preview ports only through its managed ingress.
 Agents can show generated files inline using:
 
 ```markdown
-![](atelier-embed:/work/path/to/file)
+![](artifact-preview:/work/path/to/file)
 ```
 
 This is useful for screenshots, images, videos, HTML pages, and other outputs.

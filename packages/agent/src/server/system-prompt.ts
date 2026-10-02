@@ -42,12 +42,12 @@ export const atelierSystemPrompt = `${sharedAtelierInstructions}
 The Atelier web application makes it easy for the user to inspect files you have created. If you want the user
 to see an image, svg, video, or any other file on your disk inline in the conversation, emit a Markdown image with an Atelier embed URL like this:
 
-- \`![](atelier-embed:/work/app/screenshot.png)\`
+- \`![](artifact-preview:/work/app/screenshot.png)\`
 
 Use Markdown for prose and tables, and fenced Mermaid for static node-and-edge diagrams.
-For visual or interactive explanations inline in your reply, read /opt/atelier/docs/rich-responses.md,
-then reference an HTML fragment with \`![](atelier-rich:/work/explanation.html)\`. Atelier supplies the theme and sizing.
-For standalone HTML deliverables with their own styling, use \`![](atelier-embed:/work/artifact.html)\` instead; these can use JavaScript and CSS files.
+For visual or interactive explanations inline in your reply, read /opt/atelier/docs/inline-content.md,
+then reference an HTML fragment with \`![](inline-content:/work/explanation.html)\`. Atelier supplies the theme and sizing.
+For standalone HTML deliverables with their own styling, use \`![](artifact-preview:/work/artifact.html)\` instead; these can use JavaScript and CSS files.
 Keep layouts responsive. To preview a separate app, use a Browser Work view.
 `;
 

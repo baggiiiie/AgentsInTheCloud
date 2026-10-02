@@ -1,8 +1,8 @@
 import { Value } from "typebox/value";
-import { richFrameMessage } from "../shared/rich-response-protocol.ts";
+import { inlineContentFrameMessage } from "../shared/inline-content-protocol.ts";
 import type { WorkspaceClientControllerConstructor } from "@atelier/shared";
 
-export function createRichResponseController(Controller: WorkspaceClientControllerConstructor) {
+export function createInlineContentController(Controller: WorkspaceClientControllerConstructor) {
   return class extends Controller {
     static targets = ["frame", "status"];
     static values = { url: String };
@@ -43,7 +43,7 @@ export function createRichResponseController(Controller: WorkspaceClientControll
       const channel = new MessageChannel(); this.port = channel.port1;
       this.port.onmessage = (event: MessageEvent) => {
         const data = event.data;
-        if (!Value.Check(richFrameMessage, data)) return;
+        if (!Value.Check(inlineContentFrameMessage, data)) return;
         if (data.type === "ready") { clearTimeout(this.handshakeTimer); this.sendTheme(); this.frameTarget.hidden = false; this.statusTarget.hidden = true; }
         if (data.type === "size") {
           this.frameTarget.style.height = `${Math.max(1, Math.min(30000, data.height))}px`;
@@ -55,7 +55,7 @@ export function createRichResponseController(Controller: WorkspaceClientControll
           if (confirm(`Open this external link?\n${data.href}`)) window.open(data.href, "_blank", "noopener,noreferrer");
         }
       };
-      this.frameTarget.contentWindow!.postMessage({ type: "atelier-rich-connect" }, "*", [channel.port2]);
+      this.frameTarget.contentWindow!.postMessage({ type: "inline-content-connect" }, "*", [channel.port2]);
       this.handshakeTimer = setTimeout(() => this.fail("This visual did not finish loading. Ask the agent to fix it."), 10000);
     }
     private sendTheme(): void {

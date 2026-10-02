@@ -104,45 +104,6 @@ describe("renderMarkdown", () => {
     expect(renderMarkdown("work 1", "[x](javascript:alert(1))")).not.toContain("href");
   });
 
-  test("accepts 0.0.0.0 as an explicit local preview embed alias", () => {
-    const html = renderMarkdown("work-1", "![](atelier-embed:http://0.0.0.0:3000/demo)");
-    expect(html).toContain(`data-agent-proxy-app-key-value="port-3000"`);
-    expect(html).toContain(`data-agent-proxy-path-value="/demo"`);
-  });
-
-  test("renders Atelier embeds from the custom image URL anywhere in text", () => {
-    const html = renderMarkdown("work 1", "before ![](atelier-embed:/tmp/shot.png) after");
-    expect(html).toContain(`data-agent-proxy-app-key-value="file"`);
-    expect(html).toContain(`data-agent-proxy-path-value="/tmp/shot.png"`);
-    expect(html).toContain(`<img class="agent-media-img"`);
-    expect(html).not.toContain(`<a class="agent-media-link"`);
-    expect(html).not.toContain(`target="_blank"`);
-    expect(html).toContain("before ");
-    expect(html).toContain(" after");
-  });
-
-  test("renders video, local application, and remote URL embeds", () => {
-    const video = renderMarkdown("work 1", "![](atelier-embed:/work/demo.mp4)");
-    expect(video).toContain("<video");
-    expect(video).toContain("controls");
-
-    const local = renderMarkdown("work 1", "![](atelier-embed:http://localhost:3000/app?x=1&y=2)");
-    expect(local).toContain(`data-agent-proxy-app-key-value="port-3000"`);
-    expect(local).toContain(`data-agent-proxy-path-value="/app?x=1&amp;y=2"`);
-    expect(local).toContain(`<iframe data-controller="agent-proxy agent-html-preview"`);
-
-    const remote = renderMarkdown("work 1", "![](atelier-embed:https://example.com/app)");
-    expect(remote).toContain(`<iframe src="https://example.com/app"`);
-  });
-
-  test("does not render embed syntax inside code", () => {
-    const inline = renderMarkdown("work 1", "`![](atelier-embed:/tmp/a.png)`");
-    const fenced = renderMarkdown("work 1", "```markdown\n![](atelier-embed:/tmp/a.png)\n```");
-    expect(inline).not.toContain("agent-media-img");
-    expect(fenced).not.toContain("agent-media-img");
-  });
-
-
   test("ordinary Markdown images retain their normal behavior", () => {
     expect(renderMarkdown("work 1", "![alt](https://example.com/a.png)")).toContain('<img src="https://example.com/a.png" alt="alt">');
   });

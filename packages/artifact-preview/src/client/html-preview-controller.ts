@@ -12,8 +12,8 @@ export function fitHtmlPreview(frame: HtmlPreviewFrame, doc: HtmlPreviewDocument
   frame.style.height = `${Math.max(htmlPreviewBaselineHeight, doc.documentElement.scrollHeight, doc.body.scrollHeight)}px`;
 }
 
-export function createAgentHtmlPreviewController(Controller: StimulusControllerConstructor) {
-  return class AgentHtmlPreviewController extends Controller {
+export function createArtifactPreviewHtmlController(Controller: StimulusControllerConstructor) {
+  return class ArtifactPreviewHtmlController extends Controller {
     declare readonly element: HTMLIFrameElement;
     private document?: Document;
     private resourceGraceTimer?: ReturnType<typeof setTimeout>;

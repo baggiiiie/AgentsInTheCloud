@@ -46,7 +46,7 @@ async function accessFile(workspaceId: string, absolutePath: string): Promise<vo
 
 interface WorkspaceAgentToolOptions {
   events?: AtelierEventBus;
-  /** Only Atelier's own transcript renders atelier-embed: URLs. */
+  /** Only Atelier's own transcript renders artifact-preview: URLs. */
   embeds?: boolean;
 }
 
@@ -83,7 +83,7 @@ export function registerWorkspacePresenter(kind: string, factory: WorkspacePrese
   };
 }
 
-const presentEmbedHint = " Images, videos, SVGs, and HTML files are already automatically visible to the user when you reference them with an Atelier embed URL in Markdown image syntax, for example: ![](atelier-embed:/work/app/screenshot.png) or ![](atelier-embed:/work/app/demo.html).";
+const presentEmbedHint = " Images, videos, SVGs, and HTML files are already automatically visible to the user when you reference them with an Atelier embed URL in Markdown image syntax, for example: ![](artifact-preview:/work/app/screenshot.png) or ![](artifact-preview:/work/app/demo.html).";
 
 function createPresentTool(workspaceId: string, options: WorkspaceAgentToolOptions): ToolDefinition<any, any> | undefined {
   const presenters = [...registeredWorkspacePresenters.values()].map((factory) => factory(workspaceId, options));

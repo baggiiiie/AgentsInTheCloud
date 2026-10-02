@@ -30,8 +30,8 @@ describe("workspace agent tools", () => {
     }));
 
     try {
-      expect(createWorkspaceAgentTools("abc").find((tool) => tool.name === "present")?.description).toContain("atelier-embed:");
-      expect(createAtelierControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("atelier-embed:");
+      expect(createWorkspaceAgentTools("abc").find((tool) => tool.name === "present")?.description).toContain("artifact-preview:");
+      expect(createAtelierControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("artifact-preview:");
     } finally {
       unregister();
     }
