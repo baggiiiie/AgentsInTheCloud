@@ -45,7 +45,7 @@ export class UpdateManager {
   private percent: number | undefined;
   private error: string | undefined;
   private target: ImageMetadata | undefined;
-  private releaseChannel: ReleaseChannel = "beta";
+  private releaseChannel: ReleaseChannel = "latest";
   private pullPromise: Promise<void> | undefined;
   private prepared: PreparedUpdate | undefined;
   private progressMessage: string | undefined;
@@ -58,7 +58,7 @@ export class UpdateManager {
   async initialize(context: WorkspaceServerModuleContext): Promise<void> {
     this.context = context;
     this.runtime = await (this.deps.detectRuntime ?? detectSelfUpdateRuntime)();
-    this.releaseChannel = await this.deps.readChannel?.() ?? "beta";
+    this.releaseChannel = await this.deps.readChannel?.() ?? "latest";
     this.updateSidebar();
     if (!this.runtime) return;
     await this.checkNow().catch((error) => console.error("Update check failed", error));
@@ -266,13 +266,12 @@ function renderUpdateSettings(updateManager: UpdateManager, checked = false): st
     value: snapshot.releaseChannel,
     form: { action: "/settings/update-channel" },
     options: [
-      { value: "beta", label: "Beta", disabled },
-      { value: "stable", label: "Stable", disabled: true },
-      { value: "latest", label: "Latest", disabled: true },
+      { value: "stable", label: "Stable", disabled },
+      { value: "latest", label: "Latest", disabled },
     ],
   });
   const description = snapshot.selfUpdatable
-    ? "This beta installation follows the Beta channel."
+    ? "Latest follows the newest builds; Stable follows tested releases."
     : "Updates are available when AgentsInTheCloud runs inside AgentsInTheCloud System.";
   return `<section class="settings-sec update-settings-control" id="settings-sec-update"><div><h2>Updates</h2><p class="settings-sub">${description}</p></div><div class="update-settings-actions">${control}${channel}</div>${renderError(snapshot)}</section>`;
 }

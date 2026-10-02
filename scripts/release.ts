@@ -8,12 +8,13 @@ import { acquireReleaseLock } from "./release-lock.ts";
 
 const image = "ghcr.io/lucasmeijer/agents-in-the-cloud";
 const root = resolve(import.meta.dir, "..");
-export const usage = `Release AgentsInTheCloud beta from the current origin/rename-agents-in-the-cloud commit.
+export const usage = `Release AgentsInTheCloud from the current origin/rename-agents-in-the-cloud commit.
 
-  bun run release             Publish beta only
+  bun run release             Publish latest
+  bun run release --stable    Publish latest and stable
   bun run release --check     Check Git, local/SSH Docker builders and both architectures; publish nothing
 
-Stable/latest publishing is disabled until cutover. Working files are never released or reset.
+--check may be combined with --stable. Working files are never released or reset.
 Requires ATELIER_RELEASE_HELPER=[user@]hostname with noninteractive SSH and Docker access.
 Uses the existing GH_PACKAGE_TOKEN for publishing. Logs/status live under Git's
 common directory in agents-in-the-cloud-releases/<run-id>/. See docs/releases.md.
@@ -21,10 +22,9 @@ common directory in agents-in-the-cloud-releases/<run-id>/. See docs/releases.md
 
 export function parseReleaseArgs(args: string[]) {
   for (const arg of args) {
-    if (arg === "--stable") throw new Error("Stable publishing is disabled on the AgentsInTheCloud beta branch");
-    if (!["--check", "--help", "-h"].includes(arg)) throw new Error(`Unknown release option: ${arg}`);
+    if (!["--stable", "--check", "--help", "-h"].includes(arg)) throw new Error(`Unknown release option: ${arg}`);
   }
-  return { check: args.includes("--check"), help: args.includes("--help") || args.includes("-h") };
+  return { stable: args.includes("--stable"), check: args.includes("--check"), help: args.includes("--help") || args.includes("-h") };
 }
 
 type ChannelState = "pending" | "promoting" | "published" | "failed";
@@ -38,7 +38,7 @@ export interface ReleaseStatus {
   commit?: string;
   builder?: string;
   digest?: string;
-  channels: Partial<Record<"beta", ChannelState>>;
+  channels: Partial<Record<"latest" | "stable", ChannelState>>;
   error?: string;
 }
 const preloadSchema = Type.Array(Type.String({ pattern: "@sha256:[a-f0-9]{64}$" }), { minItems: 1 });
@@ -60,7 +60,7 @@ export async function verifyRevision(run: Run, ref: string, commit: string): Pro
 }
 
 export async function promoteChannels(run: Run, status: ReleaseStatus, save: () => void): Promise<void> {
-  for (const channel of ["beta"] as const) {
+  for (const channel of ["latest", "stable"] as const) {
     if (status.channels[channel] === undefined) continue;
     status.phase = `Promote ${channel}`;
     status.channels[channel] = "promoting";
@@ -131,7 +131,7 @@ async function main(options: ReturnType<typeof parseReleaseArgs>, common: string
   const started = Date.now();
   const status: ReleaseStatus = {
     state: "running", phase: "Starting", startedAt: new Date(started).toISOString(), updatedAt: new Date(started).toISOString(), elapsedSeconds: 0,
-    check: options.check, channels: { beta: "pending" },
+    check: options.check, channels: options.stable ? { latest: "pending", stable: "pending" } : { latest: "pending" },
   };
   const output = (text: string) => { process.stdout.write(text); appendFileSync(logPath, text); };
   let lastPhase = "";

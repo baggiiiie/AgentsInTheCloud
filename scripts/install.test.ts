@@ -2,10 +2,12 @@ import { expect, test } from "bun:test";
 
 const installer = await Bun.file(new URL("./install.sh", import.meta.url)).text();
 
-function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; legacyAtelier?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean; uninstallAnswer?: string; uninstallFails?: boolean; uninstallRequestFails?: boolean; inventoryFails?: boolean; volumeOnly?: boolean; volumeRemovalFails?: boolean; initiallyStopped?: boolean } = {}, args: string[] = []) {
+function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; legacyAtelier?: boolean; legacyVolumeOnly?: boolean; legacyPreSystem?: boolean; legacyDownloadFails?: boolean; legacyDelegateFails?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean; uninstallAnswer?: string; uninstallFails?: boolean; uninstallRequestFails?: boolean; inventoryFails?: boolean; volumeOnly?: boolean; volumeRemovalFails?: boolean; initiallyStopped?: boolean } = {}, args: string[] = []) {
   const logPath = `/tmp/agents-in-the-cloud-install-test-${crypto.randomUUID()}.log`;
   const mock = `
-mktemp() { echo "${logPath}"; }
+mktemp() { if [[ "$*" == *atelier-legacy-uninstall* ]]; then echo "${logPath}.legacy"; else echo "${logPath}"; fi; }
+curl() { printf 'CURL %s\\n' "$*" >&2; return ${options.legacyDownloadFails ? 22 : 0}; }
+bash() { printf 'LEGACY BASH %s\\n' "$*" >&2; return ${options.legacyDelegateFails ? 1 : 0}; }
 sleep() { command sleep 0.01; }
 uname() { echo ${options.mac ? "Darwin" : "Linux"}; }
 id() { echo ${options.mac || options.nonRoot ? 501 : 0}; }
@@ -31,10 +33,11 @@ docker() {
       case "$3" in
         agents-in-the-cloud-system) return ${options.installed ? 0 : 1} ;;
         agents-in-the-cloud) return ${options.old ? 0 : 1} ;;
-        atelier-system|atelier) return ${options.legacyAtelier ? 0 : 1} ;;
+        atelier-system) return ${options.legacyAtelier ? 0 : 1} ;;
+        atelier) return ${options.legacyPreSystem ? 0 : 1} ;;
       esac ;;
     'pull '*) return ${options.pullFails ? 1 : 0} ;;
-    'volume ls') if [ "$volume_present" -eq 1 ] && [ ! -e "${logPath}.volume-removed" ]; then echo agents-in-the-cloud-system; fi; return 0 ;;
+    'volume ls') if [[ "$*" == *'name=^atelier-system$'* ]]; then if [ "${options.legacyVolumeOnly ? 1 : 0}" -eq 1 ]; then echo atelier-system; fi; return 0; fi; if [ "$volume_present" -eq 1 ] && [ ! -e "${logPath}.volume-removed" ]; then echo agents-in-the-cloud-system; fi; return 0 ;;
     'volume rm')
       if [ "${options.volumeRemovalFails ? 1 : 0}" -eq 1 ]; then return 1; fi
       touch "${logPath}.volume-removed"; return 0 ;;
@@ -359,18 +362,77 @@ test("uninstall is a no-op when no System container or volume remains", () => {
 });
 
 
-test("beta installer refuses Atelier without adopting or deleting its resources", () => {
+test("installer refuses Atelier without adopting or deleting its resources", () => {
   const result = run({ legacyAtelier: true }, ["--action", "install"]);
   expect(result.status).not.toBe(0);
-  expect(result.output).toContain("Use the Atelier installer with --uninstall first");
+  expect(result.output).toContain("Run this installer with --uninstall first");
   expect(result.output).not.toContain("DOCKER run");
   expect(result.output).not.toContain("DOCKER rm");
   expect(result.output).not.toContain("DOCKER volume rm");
 });
 
-test("new-product uninstall does not remove a legacy Atelier installation", () => {
+test("uninstall delegates Atelier System cleanup to the frozen legacy installer", () => {
   const result = run({ legacyAtelier: true }, ["--uninstall"]);
   expect(result.status).toBe(0);
+  expect(result.output).toContain("DELETE ATELIER");
+  expect(result.output).toContain("CURL -fsSL https://raw.githubusercontent.com/lucasmeijer/atelier/34cea8ec/scripts/install.sh -o");
+  expect(result.output).toMatch(/LEGACY BASH .*\.legacy --uninstall/);
+  expect(result.output).not.toContain("DOCKER rm");
+  expect(result.output).not.toContain("DOCKER pull");
+});
+
+test("legacy uninstaller download failure is explicit and never invokes cleanup", () => {
+  const result = run({ legacyAtelier: true, legacyDownloadFails: true }, ["--uninstall"]);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain("Could not download the legacy Atelier uninstaller. Nothing has been deleted");
+  expect(result.output).not.toContain("LEGACY BASH");
+  expect(result.output).not.toContain("DOCKER rm");
+});
+
+test("legacy uninstaller failure propagates without removing resources itself", () => {
+  const result = run({ legacyAtelier: true, legacyDelegateFails: true }, ["--uninstall"]);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain("LEGACY BASH");
+  expect(result.output).not.toContain("DOCKER rm");
+});
+
+test("when both products exist, uninstall removes only the new product and explains the next step", () => {
+  const result = run({ installed: true, legacyAtelier: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("Atelier will remain; run --uninstall again to inspect it");
+  expect(result.output).toContain("DOCKER rm agents-in-the-cloud-system");
+  expect(result.output).not.toContain("LEGACY BASH");
   expect(result.output).not.toContain("DOCKER rm atelier");
-  expect(result.output).not.toContain("DOCKER volume rm atelier");
+});
+
+test("a remaining new-product volume takes precedence over legacy delegation", () => {
+  const result = run({ volumeOnly: true, legacyAtelier: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD" }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER volume rm agents-in-the-cloud-system");
+  expect(result.output).not.toContain("LEGACY BASH");
+});
+
+test("pre-System Atelier uninstall fails explicitly rather than claiming nothing is installed", () => {
+  const result = run({ legacyPreSystem: true }, ["--uninstall"]);
+  expect(result.status).toBe(1);
+  expect(result.output).toContain("Automatic uninstall is not supported for that layout");
+  expect(result.output).not.toContain("Nothing to uninstall");
+  expect(result.output).not.toContain("DOCKER rm");
+  expect(result.output).not.toContain("LEGACY BASH");
+});
+
+test("fresh installer uses latest in the separate renamed repositories", () => {
+  const result = run({});
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER pull ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest");
+  expect(result.output).toContain("--app-image ghcr.io/lucasmeijer/agents-in-the-cloud:latest");
+  expect(result.output).not.toContain(":beta");
+});
+
+test("legacy installation storage remaining after container removal still delegates to Atelier cleanup", () => {
+  const result = run({ legacyVolumeOnly: true }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("LEGACY BASH");
+  expect(result.output).toContain("DELETE ATELIER");
+  expect(result.output).not.toContain("Nothing to uninstall");
 });

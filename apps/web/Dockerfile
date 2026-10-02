@@ -1,4 +1,4 @@
-ARG ATELIER_RUNTIME_IMAGE=ghcr.io/lucasmeijer/agents-in-the-cloud-docker@sha256:978097dea150b4e9c4a17b82ca9422337eb2d68a98bfa7503c1e8c842eb31fba
+ARG ATELIER_RUNTIME_IMAGE=ghcr.io/lucasmeijer/agents-in-the-cloud-docker@sha256:144a54ae19731c822e750b1020bdfc5e2098348b4092e76e42b7f0cc576ca232
 FROM oven/bun:1.4.0 AS bun-dist
 
 FROM ubuntu:26.04 AS transcription-runtime

@@ -23,16 +23,15 @@ function imageOperations() {
   };
 }
 
-test("missing update settings selects beta", async () => {
+test("missing update settings selects latest", async () => {
   const images = imageOperations();
   expect(await prepareChannelUpdate(settingsPath, images)).toBe("sha256:resolved-app");
-  expect(images.pull).toHaveBeenCalledWith("ghcr.io/lucasmeijer/agents-in-the-cloud:beta");
-  expect(images.inspect).toHaveBeenCalledWith("ghcr.io/lucasmeijer/agents-in-the-cloud:beta");
+  expect(images.pull).toHaveBeenCalledWith("ghcr.io/lucasmeijer/agents-in-the-cloud:latest");
+  expect(images.inspect).toHaveBeenCalledWith("ghcr.io/lucasmeijer/agents-in-the-cloud:latest");
 });
 
 test.each([
-  ["{}", "beta"],
-  ['{"releaseChannel":"beta"}', "beta"],
+  ["{}", "latest"],
   ['{"releaseChannel":"stable"}', "stable"],
   ['{"releaseChannel":"latest"}', "latest"],
   ['{"releaseChannel":"latest","ignoredSetting":true}', "latest"],
@@ -62,6 +61,7 @@ test.each([
   "[]",
   '"stable"',
   '{"releaseChannel":"nightly"}',
+  '{"releaseChannel":"beta"}',
   '{"releaseChannel":null}',
   '{"releaseChannel":7}',
 ])("invalid settings %s fail without pulling or inspecting", async (settings) => {
@@ -105,12 +105,12 @@ test("always completes a fresh pull before inspecting and returns the exact imag
   expect(await prepareChannelUpdate(settingsPath, images)).toBe("sha256:revision-1");
   expect(await prepareChannelUpdate(settingsPath, images)).toBe("sha256:revision-2");
   expect(events).toEqual([
-    "pull:ghcr.io/lucasmeijer/agents-in-the-cloud:beta",
+    "pull:ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
     "pulled:1",
-    "inspect:ghcr.io/lucasmeijer/agents-in-the-cloud:beta",
-    "pull:ghcr.io/lucasmeijer/agents-in-the-cloud:beta",
+    "inspect:ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
+    "pull:ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
     "pulled:2",
-    "inspect:ghcr.io/lucasmeijer/agents-in-the-cloud:beta",
+    "inspect:ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
   ]);
 });
 

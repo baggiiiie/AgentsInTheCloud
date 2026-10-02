@@ -1,35 +1,32 @@
-# AgentsInTheCloud beta releases
+# AgentsInTheCloud releases
 
 ```sh
-bun run release             # beta only
+bun run release             # latest
+bun run release --stable    # latest and stable
 bun run release --check     # validate the builder without publishing
 ```
 
-This branch publishes only `ghcr.io/lucasmeijer/agents-in-the-cloud:beta` and
-immutable commit/staging tags. `--stable` is rejected; neither `latest` nor
-`stable` is advanced before cutover. Atelier hotfix releases remain on `main`
-and use their original image repositories and release command. These two lanes
-have separate log directories, locks and builder context names.
+This branch publishes `ghcr.io/lucasmeijer/agents-in-the-cloud:latest` and
+immutable commit/staging tags. `--stable` also advances its `stable` tag after
+VM acceptance. Atelier hotfix releases remain on `main` and use their original
+image repositories and release command. These two lanes have separate log
+directories, locks and builder context names. `--check` may be combined with
+`--stable` and never publishes.
 
-Before the first beta, publish the renamed Docker runtime with
-`images/patched-docker/publish.sh`. Replace the inherited runtime digest in
-`apps/web/Dockerfile`, `images/system/Dockerfile`, and
-`packages/workspace-image/runtime-image` with the resulting multi-platform
-`ghcr.io/lucasmeijer/agents-in-the-cloud-docker@sha256:...` reference and commit
-those pins on the rename branch. The current inherited digest is not a published
-renamed runtime; do not release app/System/workspace images until this is done.
-This runtime rebuild is necessary because the runtime's executable names changed.
+The renamed runtime is published separately with `images/patched-docker/publish.sh`.
+App, System and workspace images pin its multi-platform digest; commit updated
+pins before releasing.
 
-For the VM beta test, publish this branch's app and separately publish its
-System image as `ghcr.io/lucasmeijer/agents-in-the-cloud-system:beta`; this
-release command publishes only the app and its workspace dependency. Use the
-branch's installer (which defaults to these beta images) and record both tested
-image digests. The new installation starts empty: do not mount Atelier storage
-or import its settings. Test installation, workspace creation/parking, updates,
-restart and uninstall before final cutover. Publishing a beta does not replace
-the public Atelier installer or advance Atelier's update tags.
-The legacy uninstaller remains available from Atelier `main` during the beta;
-for a frozen copy, use `scripts/install.sh` at commit `34cea8ec` with `--uninstall`.
+For the VM test, publish this branch's app and separately publish its System image
+as `ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest`; this release command
+publishes only the app and its workspace dependency. Use the branch's installer
+(which defaults to latest images) and record both tested image digests. The new
+installation starts empty: do not mount Atelier storage or import its settings.
+Test installation, workspace creation/parking, updates, restart and uninstall
+before promoting to stable. Publishing to the renamed repositories does not
+replace the public Atelier installer or advance Atelier's update tags.
+The installer supports removing a legacy Atelier installation with `--uninstall`.
+
 Existing `ATELIER_*` environment/build-argument names remain unchanged; defaults,
 storage names, labels and runtime protocols do not adopt Atelier state.
 
@@ -74,7 +71,7 @@ Rerunning after a completed upload therefore skips the application rebuild.
 
 Before promotion, the command verifies the rename branch has not moved. If it has, the command
 fails without updating channels; rerun to release the new branch head. Otherwise it
-promotes the verified digest to beta and checks its registry digest.
+promotes the verified digest to latest (and stable with `--stable`) and checks its registry digest.
 Channel updates are **not atomic**. Status records each channel separately. A
 failed promotion may have reached the registry even if its response was lost;
 there is no automatic rollback. Inspect the tag/digest or rerun the same release.

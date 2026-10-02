@@ -11,7 +11,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: publish-workspace-image-beta
+  group: publish-workspace-image-latest
   cancel-in-progress: false
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
           {
             echo "context=$context"
             echo "ref=$repository:$tag"
-            echo "alias=$repository:beta"
+            echo "alias=$repository:latest"
           } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
@@ -84,7 +84,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Point latest-main at the signature without rebuilding
+      - name: Point latest at the signature without rebuilding
         env:
           IMAGE: ${{ steps.image.outputs.ref }}
           ALIAS: ${{ steps.image.outputs.alias }}

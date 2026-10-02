@@ -142,6 +142,7 @@ test("channel changes persist, discard prior prepared images, and survive manage
   const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-update-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   try {
+    await writeStoredReleaseChannel("stable");
     const dependencies = { readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel };
     const instance = manager(dependencies);
     await instance.initialize(context().ctx); await instance.startPull();
@@ -158,7 +159,7 @@ test("channel changes persist, discard prior prepared images, and survive manage
 test("a superseded channel check cannot publish success or failure", async () => {
   for (const fail of [false, true]) {
     const pending = deferred<{ digest: string }>();
-    const instance = manager({ fetchMetadata: async (channel) => channel === "latest" ? pending.promise : { digest: newDigest } });
+    const instance = manager({ readChannel: async () => "stable", fetchMetadata: async (channel) => channel === "latest" ? pending.promise : { digest: newDigest } });
     await instance.initialize(context().ctx);
     const stale = instance.setReleaseChannel("latest");
     await Bun.sleep(0);
@@ -179,24 +180,24 @@ test("supervisor protocol sends only immutable image ID and requires acceptance"
   await expect(requestSupervisorUpdate("sha256:prepared", async () => new Response("busy", { status: 409 }))).rejects.toThrow("busy");
 });
 
-test("new installations discover beta updates and pin their immutable image", async () => {
+test("new installations discover latest updates and pin their immutable image", async () => {
   const channels: string[] = [];
   const prepared: string[] = [];
   const instance = manager({
     readChannel: async () => undefined,
     fetchMetadata: async (channel) => { channels.push(channel); return { digest: newDigest }; },
-    prepareUpdate: async (reference) => { prepared.push(reference); return { reference, imageId: "sha256:beta-image" }; },
+    prepareUpdate: async (reference) => { prepared.push(reference); return { reference, imageId: "sha256:latest-image" }; },
   });
-  expect(instance.snapshot().releaseChannel).toBe("beta");
+  expect(instance.snapshot().releaseChannel).toBe("latest");
   await instance.initialize(context().ctx);
-  expect(instance.snapshot()).toMatchObject({ releaseChannel: "beta", state: "available" });
-  expect(channels).toEqual(["beta"]);
+  expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available" });
+  expect(channels).toEqual(["latest"]);
   await instance.startPull();
   expect(prepared).toEqual([exact]);
   expect(instance.snapshot().state).toBe("ready_to_restart");
 });
 
-test.each(["beta", "stable", "latest"] as const)("stored %s channel overrides the beta default", async (channel) => {
+test.each(["stable", "latest"] as const)("stored %s channel overrides the latest default", async (channel) => {
   const channels: string[] = [];
   const instance = manager({
     readChannel: async () => channel,
@@ -207,9 +208,9 @@ test.each(["beta", "stable", "latest"] as const)("stored %s channel overrides th
   expect(channels).toEqual([channel]);
 });
 
-test("switching from stable to beta persists the channel and refreshes the target", async () => {
+test("switching from stable to latest persists the channel and refreshes the target", async () => {
   const previous = process.env.ATELIER_DATA_DIR;
-  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-beta-settings-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-latest-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   try {
     await writeStoredReleaseChannel("stable");
@@ -217,22 +218,22 @@ test("switching from stable to beta persists the channel and refreshes the targe
     const dependencies = {
       readChannel: readStoredReleaseChannel,
       writeChannel: writeStoredReleaseChannel,
-      fetchMetadata: async (channel: "beta" | "stable" | "latest") => {
+      fetchMetadata: async (channel: "stable" | "latest") => {
         channels.push(channel);
-        return { digest: channel === "beta" ? newerDigest : newDigest };
+        return { digest: channel === "latest" ? newerDigest : newDigest };
       },
     };
     const instance = manager(dependencies);
     await instance.initialize(context().ctx);
     await instance.startPull();
-    await instance.setReleaseChannel("beta");
-    expect(channels).toEqual(["stable", "beta"]);
-    expect(instance.snapshot()).toMatchObject({ releaseChannel: "beta", state: "available", target: { digest: newerDigest } });
+    await instance.setReleaseChannel("latest");
+    expect(channels).toEqual(["stable", "latest"]);
+    expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available", target: { digest: newerDigest } });
     await expect(instance.restart()).rejects.toThrow("No prepared update");
-    expect(await readStoredReleaseChannel()).toBe("beta");
+    expect(await readStoredReleaseChannel()).toBe("latest");
     const restarted = manager(dependencies);
     await restarted.initialize(context().ctx);
-    expect(restarted.snapshot().releaseChannel).toBe("beta");
+    expect(restarted.snapshot().releaseChannel).toBe("latest");
   } finally {
     if (previous === undefined) delete process.env.ATELIER_DATA_DIR; else process.env.ATELIER_DATA_DIR = previous;
     await rm(directory, { recursive: true, force: true });

@@ -13,16 +13,14 @@ const manifest = {
   manifests: architectures.map((architecture, index) => ({ digest: `sha256:${String(index + 1).repeat(64)}`, platform: { os: "linux", architecture } })),
 };
 const ok = (stdout = "") => ({ code: 0, stdout, stderr: "" });
-function status(): ReleaseStatus {
-  return { state: "running", phase: "Starting", startedAt: "", updatedAt: "", elapsedSeconds: 0, check: false, commit, digest, channels: { beta: "pending" } };
+function status(stable = false): ReleaseStatus {
+  return { state: "running", phase: "Starting", startedAt: "", updatedAt: "", elapsedSeconds: 0, check: false, commit, digest, channels: stable ? { latest: "pending", stable: "pending" } : { latest: "pending" } };
 }
 
-test("release supports beta only and non-publishing checks", () => {
-  expect(parseReleaseArgs([])).toEqual({ check: false, help: false });
-  expect(parseReleaseArgs(["--check"])).toEqual({ check: true, help: false });
-  expect(() => parseReleaseArgs(["--stable"])).toThrow("Stable publishing is disabled");
-  expect(() => parseReleaseArgs(["--stable", "--check"])).toThrow("Stable publishing is disabled");
-  expect(() => parseReleaseArgs(["--channel", "latest"])).toThrow("Unknown release option");
+test("release only supports latest or both, plus non-publishing checks", () => {
+  expect(parseReleaseArgs([])).toEqual({ stable: false, check: false, help: false });
+  expect(parseReleaseArgs(["--stable", "--check"])).toEqual({ stable: true, check: true, help: false });
+  expect(() => parseReleaseArgs(["--channel", "stable"])).toThrow("Unknown release option");
 });
 
 test("registry absence is distinct from authentication or network failure", async () => {
@@ -43,37 +41,35 @@ test("verification requires both architectures and matching revision labels", as
   await expect(verifyRevision(run, "ref", "wrong-sha")).rejects.toThrow("does not match revision");
 });
 
-test("failed beta promotion records failure without claiming rollback", async () => {
-  const current = status();
+test("promotion uses the verified digest and reports partial success", async () => {
+  const current = status(true);
   const calls: string[][] = [];
   const saves: string[] = [];
   await expect(promoteChannels(async (args) => {
     calls.push(args);
-    throw new Error("push failed");
+    if (args.includes("create") && args.some((arg) => arg.endsWith(":stable"))) throw new Error("push failed");
+    return ok(JSON.stringify(manifest));
   }, current, () => saves.push(JSON.stringify(current.channels)))).rejects.toThrow("push failed");
-  expect(current.channels).toEqual({ beta: "failed" });
-  expect(calls[0]!.at(-1)).toBe(`ghcr.io/lucasmeijer/agents-in-the-cloud@${digest}`);
-  expect(saves.length).toBe(2);
+  expect(current.channels).toEqual({ latest: "published", stable: "failed" });
+  expect(calls.filter((args) => args.includes("create")).every((args) => args.at(-1) === `ghcr.io/lucasmeijer/agents-in-the-cloud@${digest}`)).toBe(true);
+  expect(saves.length).toBe(4);
 });
 
-test("only beta is promoted using the verified digest", async () => {
-  const current = status();
+test("both channels are promoted in order on success", async () => {
+  const current = status(true);
   const channels: string[] = [];
   await promoteChannels(async (args) => {
-    if (args.includes("create")) {
-      channels.push(args[args.indexOf("--tag") + 1]!);
-      expect(args.at(-1)).toBe(`ghcr.io/lucasmeijer/agents-in-the-cloud@${digest}`);
-    }
+    if (args.includes("create")) channels.push(args[args.indexOf("--tag") + 1]!);
     return ok(JSON.stringify(manifest));
   }, current, () => {});
-  expect(channels).toEqual(["ghcr.io/lucasmeijer/agents-in-the-cloud:beta"]);
-  expect(current.channels).toEqual({ beta: "published" });
+  expect(channels).toEqual(["ghcr.io/lucasmeijer/agents-in-the-cloud:latest", "ghcr.io/lucasmeijer/agents-in-the-cloud:stable"]);
+  expect(current.channels).toEqual({ latest: "published", stable: "published" });
 });
 
 test("promotion fails if registry readback differs", async () => {
   const current = status();
   await expect(promoteChannels(async () => ok(JSON.stringify({ ...manifest, digest: `sha256:${"c".repeat(64)}` })), current, () => {})).rejects.toThrow("digest differs");
-  expect(current.channels.beta).toBe("failed");
+  expect(current.channels.latest).toBe("failed");
 });
 
 async function scenario(options: { check?: boolean; exists?: boolean; moved?: boolean; buildFailure?: boolean; sameArch?: boolean; localArm?: boolean; badDriver?: boolean; missingHelper?: boolean }) {
@@ -115,7 +111,7 @@ async function scenario(options: { check?: boolean; exists?: boolean; moved?: bo
       return ok();
     };
     let error: unknown;
-    try { await release({ check: current.check, help: false }, run, current, () => {}, directory); }
+    try { await release({ check: current.check, stable: false, help: false }, run, current, () => {}, directory); }
     catch (caught) { error = caught; }
     return { calls, current, error };
   } finally {
@@ -153,14 +149,14 @@ test("new commit is built in an isolated checkout with no latest tag before veri
   expect(error).toBeUndefined();
   expect(current.state).toBe("published");
   expect(calls.find(({ args }) => args.includes("ls-remote"))!.args).toEqual(["git", "ls-remote", "origin", "refs/heads/rename-agents-in-the-cloud"]);
-  expect(calls.flatMap(({ args }) => args).some(arg => arg === "ghcr.io/lucasmeijer/atelier:latest" || arg === "ghcr.io/lucasmeijer/agents-in-the-cloud:latest" || arg === "ghcr.io/lucasmeijer/agents-in-the-cloud:stable")).toBe(false);
+  expect(calls.flatMap(({ args }) => args).some(arg => /^ghcr\.io\/lucasmeijer\/atelier(?=[:@])/.test(arg) || arg === "ghcr.io/lucasmeijer/agents-in-the-cloud:stable")).toBe(false);
   const build = calls.find(({ args }) => args[0] === "bun")!;
   expect(build.cwd).toEndWith("/source");
   expect(build.args).toContain("--no-latest");
   expect(build.args).toContain(`sha-${commit}`);
   expect(build.args).toContain("--builder");
   expect(calls.some(({ args }) => args.includes("--stable"))).toBe(false);
-  expect(calls.findIndex(({ args }) => args.includes("{{json .Image}}"))).toBeLessThan(calls.findIndex(({ args }) => args.includes("--tag") && args.includes("ghcr.io/lucasmeijer/agents-in-the-cloud:beta")));
+  expect(calls.findIndex(({ args }) => args.includes("{{json .Image}}"))).toBeLessThan(calls.findIndex(({ args }) => args.includes("--tag") && args.includes("ghcr.io/lucasmeijer/agents-in-the-cloud:latest")));
 });
 
 test("retry reuses uploaded commit instead of rebuilding", async () => {

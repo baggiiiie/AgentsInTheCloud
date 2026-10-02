@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-system_image=ghcr.io/lucasmeijer/agents-in-the-cloud-system:beta
-app_image=ghcr.io/lucasmeijer/agents-in-the-cloud:beta
+system_image=ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest
+app_image=ghcr.io/lucasmeijer/agents-in-the-cloud:latest
 action=""
 uninstall_requested=0
 access_mode=""
@@ -10,6 +10,7 @@ system_name=agents-in-the-cloud-system
 
 # Keep subprocess output available without turning the welcome into a log tail.
 log_file=""
+legacy_installer=""
 interactive=0
 violet="" cyan="" green="" amber="" dim="" reset=""
 if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
@@ -86,6 +87,7 @@ run_quiet() {
 cleanup() {
   local code=$?
   trap - ERR
+  if [ -n "$legacy_installer" ]; then rm -f "$legacy_installer"; fi
   finish_line
   if [ -n "$active_pid" ] && kill -0 "$active_pid" 2>/dev/null; then
     kill "$active_pid"
@@ -114,11 +116,11 @@ Installs AgentsInTheCloud System, or offers actions for an existing installation
 System replacements preserve the agents-in-the-cloud-system volume and interrupt workspaces.
 Update also installs the newest AgentsInTheCloud app on the installation's selected channel.
 
-  --system-image REF   System image (default: ghcr.io/lucasmeijer/agents-in-the-cloud-system:beta)
-  --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/agents-in-the-cloud:beta)
+  --system-image REF   System image (default: ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest)
+  --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/agents-in-the-cloud:latest)
   --access-mode MODE  localhost or tailscale (default selected for this machine)
   --action ACTION     install, update, connect, or open
-  --uninstall         Permanently delete all workspaces, settings, and installation storage
+  --uninstall         Permanently delete installation data (also supports Atelier System)
   -h, --help          Show help
 
 The app image is only used when System has no persisted app selection.
@@ -227,8 +229,36 @@ fi
 
 installed=0
 if docker container inspect "$system_name" >/dev/null 2>&1; then installed=1; fi
+# Keep the legacy cleanup implementation frozen: it knows Atelier's names,
+# socket, storage, inventory contract, and DELETE ATELIER confirmation.
+if [ "$action" = uninstall ]; then
+  new_volume="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
+  legacy_system=0
+  if docker container inspect atelier-system >/dev/null 2>&1; then legacy_system=1; fi
+  legacy_volume="$(docker volume ls --format '{{.Name}}' --filter 'name=^atelier-system$')"
+  legacy_container=0
+  if docker container inspect atelier >/dev/null 2>&1; then legacy_container=1; fi
+  if [ "$installed" -eq 1 ] || [ -n "$new_volume" ]; then
+    if [ "$legacy_system" -eq 1 ] || [ -n "$legacy_volume" ] || [ "$legacy_container" -eq 1 ]; then
+      printf '\n  Removing AgentsInTheCloud only. Atelier will remain; run --uninstall again to inspect it.\n'
+    fi
+  elif [ "$legacy_system" -eq 1 ] || [ -n "$legacy_volume" ]; then
+    finish_line
+    printf '\n  Atelier System found. Its legacy uninstaller will count workspaces and ask you to type DELETE ATELIER.\n'
+    printf '  Older System images may need an Atelier System update before uninstall is available. No update will be performed here.\n'
+    legacy_installer="$(mktemp /tmp/atelier-legacy-uninstall.XXXXXX)"
+    if ! curl -fsSL https://raw.githubusercontent.com/lucasmeijer/atelier/34cea8ec/scripts/install.sh -o "$legacy_installer"; then
+      fail "Could not download the legacy Atelier uninstaller. Nothing has been deleted."
+    fi
+    legacy_code=0
+    run_root bash "$legacy_installer" --uninstall || legacy_code=$?
+    exit "$legacy_code"
+  elif [ "$legacy_container" -eq 1 ]; then
+    fail "The old atelier container predates Atelier System. Automatic uninstall is not supported for that layout; its container and data have been retained."
+  fi
+fi
 if [ "$action" != uninstall ] && { docker container inspect atelier-system >/dev/null 2>&1 || docker container inspect atelier >/dev/null 2>&1; }; then
-  fail "Atelier is installed. Use the Atelier installer with --uninstall first; AgentsInTheCloud starts fresh and does not import Atelier data."
+  fail "Atelier is installed. Run this installer with --uninstall first; AgentsInTheCloud starts fresh and does not import Atelier data."
 fi
 if [ "$installed" -eq 0 ] && docker container inspect agents-in-the-cloud >/dev/null 2>&1; then
   fail "an old AgentsInTheCloud container exists; this installer does not migrate old installations"

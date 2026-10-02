@@ -132,19 +132,19 @@ test("tag plus digest references use the repository path and preserve the pinned
   expect(result.reference).toBe(`ghcr.io/example/workspace@${index}`);
 });
 
-test("beta discovery only requests the new product's beta tag", async () => {
+test("latest discovery only requests the new product's latest tag", async () => {
   const calls: string[] = [];
   const fetcher = async (input: URL | RequestInfo) => {
     const url = String(input);
     calls.push(url);
-    if (url === "https://ghcr.io/v2/lucasmeijer/agents-in-the-cloud/manifests/beta") {
-      return Response.json({ config: { digest: "sha256:beta-config" }, layers: [] }, { headers: { "docker-content-digest": "sha256:beta-manifest" } });
+    if (url === "https://ghcr.io/v2/lucasmeijer/agents-in-the-cloud/manifests/latest") {
+      return Response.json({ config: { digest: "sha256:latest-config" }, layers: [] }, { headers: { "docker-content-digest": "sha256:latest-manifest" } });
     }
-    if (url === "https://ghcr.io/v2/lucasmeijer/agents-in-the-cloud/blobs/sha256:beta-config") {
-      return Response.json({ os: "linux", architecture: process.arch === "arm64" ? "arm64" : "amd64", config: { Labels: { "org.opencontainers.image.revision": "beta-revision" } } });
+    if (url === "https://ghcr.io/v2/lucasmeijer/agents-in-the-cloud/blobs/sha256:latest-config") {
+      return Response.json({ os: "linux", architecture: process.arch === "arm64" ? "arm64" : "amd64", config: { Labels: { "org.opencontainers.image.revision": "latest-revision" } } });
     }
     throw new Error(`unexpected fetch ${url}`);
   };
-  await expect(fetchChannelImageMetadata("beta", fetcher)).resolves.toEqual({ digest: "sha256:beta-manifest", revision: "beta-revision" });
+  await expect(fetchChannelImageMetadata("latest", fetcher)).resolves.toEqual({ digest: "sha256:latest-manifest", revision: "latest-revision" });
   expect(calls).toHaveLength(2);
 });

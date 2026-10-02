@@ -27,7 +27,7 @@ const { values } = parseArgs({
     "access-mode": { type: "string", default: "tailscale" },
     "app-image": {
       type: "string",
-      default: "ghcr.io/lucasmeijer/agents-in-the-cloud:beta",
+      default: "ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
     },
   },
   strict: true,
