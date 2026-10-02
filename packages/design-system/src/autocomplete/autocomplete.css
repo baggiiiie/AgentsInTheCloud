@@ -1,9 +1,9 @@
 .autocomplete { position: static; width: 100%; max-width: none; max-height: min(360px, 48vh); }
 .autocomplete-empty { display: flex; min-height: 58px; align-items: center; justify-content: center; color: var(--text-muted); text-align: center; }
 
-/* The top-layer host owns scrolling and chrome; fetched results own the list. */
+/* The host owns scrolling. Nested results must not keep their own scrollport, or the desktop wheel is swallowed. */
 .autocomplete-popover { padding: 0; }
-.autocomplete-popover > .autocomplete { max-height: none; border: 0; box-shadow: none; }
+.autocomplete-popover > .autocomplete { max-height: none; overflow: visible; overscroll-behavior: auto; border: 0; box-shadow: none; }
 
 @media (prefers-reduced-motion: no-preference) {
   .autocomplete,
