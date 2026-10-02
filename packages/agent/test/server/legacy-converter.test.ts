@@ -6,9 +6,9 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { fauxAssistantMessage, fauxToolCall, type Message } from "@earendil-works/pi-ai";
 import { convertLegacyConversations } from "@atelier/legacy-converter";
 import { archiveWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle } from "../../src/server/session-store.ts";
-import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
-import { getWorkspaceAgentRuntime, unloadWorkspaceAgentRuntime, closeWorkspaceAgentConversation } from "../../src/server/runtime.ts";
-import { NativeAgentRuntime } from "../../src/server/native-agent-runtime.ts";
+import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
+import { getWorkspaceAgentPresentation, unloadWorkspaceAgentPresentation, closeWorkspaceAgentConversation } from "../../src/server/runtime.ts";
+import { ConversationPresentation } from "../../src/server/conversation-presentation.ts";
 import { historyNote } from "@atelier/legacy-converter/entries";
 
 let root: string;
@@ -69,12 +69,12 @@ test("selected legacy branch becomes passive native history with scoped images, 
   expect((await controller.image(String(user.id), 0)).status).toBe(404);
   expect(await readFile(path, "utf8")).toBe(before);
   // No Docker workspace, available model, or prompt preparation exists for this ID.
-  const runtime = await getWorkspaceAgentRuntime(agent!);
-  expect(runtime).toBeInstanceOf(NativeAgentRuntime);
+  const runtime = await getWorkspaceAgentPresentation(agent!);
+  expect(runtime).toBeInstanceOf(ConversationPresentation);
   expect(runtime.currentModel()).toBeUndefined();
   expect(runtime.isStreaming).toBe(false);
   expect(runtime.userMessages()).toEqual(["Original input"]);
-  await unloadWorkspaceAgentRuntime(workspace, record.conversationId);
+  await unloadWorkspaceAgentPresentation(workspace, record.conversationId);
   const reopened = await durableWorkspaceOwner(workspace);
   // Unload released the pooled owner. Reopening retains the same native entries.
   expect((await (await reopened.conversation(record)).historyView()).entries).toEqual(view.entries);

@@ -56,6 +56,7 @@ test("workspace journal retains the original searchable journal and deletion gat
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => ({ model: { provider: "faux", modelId: "faux-1" } }),
     expand: async (_workspace: string, text: string) => text,
+    validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {},
   };
   const runtime = await openDurableAgentRuntime(await workspaceDurableJournalDirectory("retained"), "retained", {}, load);

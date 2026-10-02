@@ -1,11 +1,11 @@
-import { configureDurableOwnerEvents } from "./durable-owner.ts";
+import { configureDurableOwnerEvents } from "./runtime.ts";
 import type { AtelierEventBus } from "@atelier/core";
 import type { AgentWorkspaceParameters } from "@atelier/shared";
 import { agentAttachmentDraftId, moveAttachmentDraft, validDraftId } from "@atelier/prompt/server";
 import { stageInitialPrompt } from "./initial-prompt-draft.ts";
 import { parseModelRef, getAgentModelThinkingLevel } from "@atelier/llm/server";
 import { expandPromptTemplate } from "./prompt-templates.ts";
-import { getWorkspaceAgentRuntime, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, stopWorkspaceAgentRuntimes } from "./runtime.ts";
+import { getWorkspaceAgentController, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, stopWorkspaceAgentRuntimes } from "./runtime.ts";
 import { resumeInterruptedAgentSessions } from "./restart-recovery.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";
 
@@ -31,11 +31,11 @@ export function registerAgentEvents(events: AtelierEventBus): void {
 
 async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorkspaceParameters, events: AtelierEventBus): Promise<void> {
   const agent = await ensureDefaultWorkspaceAgentConversation(workspaceId);
-  const runtime = await getWorkspaceAgentRuntime(agent, { events });
+  const runtime = await getWorkspaceAgentController(agent, { events });
   const modelRef = context.model ? parseModelRef(context.model) : undefined;
-  if (modelRef) await runtime.setModel(modelRef.provider, modelRef.id);
+  if (modelRef) await runtime.configure({ model: { provider: modelRef.provider, modelId: modelRef.id } });
   const thinkingLevel = context.thinkingLevel || (modelRef ? await getAgentModelThinkingLevel("builtin", modelRef) : undefined);
-  if (thinkingLevel) await runtime.setThinkingLevel(thinkingLevel);
+  if (thinkingLevel) await runtime.configure({ thinkingLevel });
 
   const input = context.input!;
   if (context.initialPromptMode === "composer") {
@@ -51,5 +51,5 @@ async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorks
   if (!prompt.trim() && images.length === 0 && attachmentNotes.length === 0) return;
 
   await events.emit("workspace_user_activity", { workspaceId });
-  await runtime.submit(prompt, { images, attachmentNotes });
+  await runtime.submit({ text: prompt, requestId: crypto.randomUUID(), images: images.map(image => ({ type: "image", data: image.data, mimeType: image.mimeType })), attachmentNotes });
 }

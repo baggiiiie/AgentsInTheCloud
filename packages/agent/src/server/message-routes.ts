@@ -1,4 +1,4 @@
-import { knownWorkspaceAgentRequest } from "./durable-owner.ts";
+import { knownWorkspaceAgentRequest } from "./runtime.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { readJsonObject, requestAcceptsJson } from "@atelier/core";
@@ -8,7 +8,7 @@ import { turboStreamResponse } from "@atelier/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { expandPromptTemplate, parseCompactCommand } from "./prompt-templates.ts";
 import { runAgentSessionNameCommand } from "./session-name-command.ts";
-import { matchRoute, resolveAgentRuntime, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
+import { matchRoute, resolveAgentController, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 
 export const handleMessageRequest: AgentRouteHandler = async (request, url, options) => {
@@ -29,8 +29,8 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   }
   const text = String(json?.text ?? form?.get("text") ?? "");
   if (text.trim() === "/new") {
-    const runtime = await resolveAgentRuntime(agent, options);
-    await runtime.newSession();
+    const runtime = await resolveAgentController(agent, options);
+    await runtime.reset();
     await removeInitialPromptDraft(workspaceId, conversationId);
     return json ? Response.json({ agent: { conversationId, state: "idle" } }) : turboStreamResponse("");
   }
@@ -40,7 +40,7 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   }
   const compactCommand = parseCompactCommand(text);
   if (compactCommand) {
-    const runtime = await resolveAgentRuntime(agent, options);
+    const runtime = await resolveAgentController(agent, options);
     await options.events?.emit("workspace_user_activity", { workspaceId });
     await runtime.compact(compactCommand.customInstructions);
     await removeInitialPromptDraft(workspaceId, conversationId);
@@ -48,8 +48,9 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   }
   const nameResult = await runAgentSessionNameCommand(text, {
     suggest: async () => {
-      const runtime = await resolveAgentRuntime(agent, options);
-      return suggestSessionSlug(runtime.userMessages().join("\n\n"), runtime.currentModel());
+      const runtime = await resolveAgentController(agent, options);
+      const model = (await runtime.settings()).model;
+      return suggestSessionSlug((await runtime.userMessages()).join("\n\n"), model && { provider: model.provider, id: model.modelId });
     },
     setTitle: async (title) => { await setAgentSessionTitle(agent, title, { events: options.events }); },
   });
@@ -79,9 +80,10 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
     const message = "A prompt or completed attachment is required";
     return json ? Response.json({ error: { code: "invalid_arguments", message } }, { status: 422 }) : turboStreamResponse("", { status: 422 });
   }
-  const runtime = await resolveAgentRuntime(agent, options);
-  const namingContext = trimmed ? { messages: [...runtime.userMessages(), trimmed], agentModel: runtime.currentModel() } : undefined;
-  await runtime.submit(expandedText, { requestId, images, attachmentNotes });
+  const runtime = await resolveAgentController(agent, options);
+  const model = (await runtime.settings()).model;
+  const namingContext = trimmed ? { messages: [...await runtime.userMessages(), trimmed], agentModel: model && { provider: model.provider, id: model.modelId } } : undefined;
+  await runtime.submit({ text: expandedText, requestId, images: images.map(image => ({ type: "image", data: image.data, mimeType: image.mimeType })), attachmentNotes });
   if (namingContext) {
     await options.events?.emit("workspace_user_activity", { workspaceId });
     (options.suggestTitleFromPrompt ?? maybeNameAgentFromPrompt)(agent, namingContext.messages, { events: options.events, agentModel: namingContext.agentModel });

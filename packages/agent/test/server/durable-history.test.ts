@@ -6,7 +6,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { createRegistry } from "@earendil-works/pi-durable";
 import { retainedDurableHistories } from "../../src/server/durable-history.ts";
-import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
+import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
 import { durableJournalDirectory } from "../../src/server/durable-storage.ts";
 import { ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
 
@@ -28,6 +28,7 @@ async function setup() {
   const load = {
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => ({ model: { provider: "faux", modelId: "faux-1" } }),
+    validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {}, expand: async (_workspace: string, text: string) => text,
   };
   async function project(id: string, share: string) {

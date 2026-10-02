@@ -263,11 +263,11 @@ describe("Workspace Agent-tab provider", () => {
     await stageInitialPrompt("workspace-1", conversation.conversationId, "Draft task");
     const submissions: Array<{ text: string; imageCount: number; requestId?: string }> = [];
     const runtime = {
-      async submit(text: string, options: { images?: unknown[]; requestId?: string }): Promise<void> {
-        submissions.push({ text, imageCount: options.images?.length ?? 0, requestId: options.requestId });
+      async submit(input: { text: string; images?: unknown[]; requestId?: string }): Promise<void> {
+        submissions.push({ text: input.text, imageCount: input.images?.length ?? 0, requestId: input.requestId });
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
@@ -277,7 +277,7 @@ describe("Workspace Agent-tab provider", () => {
 
     const response = await handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised by message acceptance.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
     });
     const html = await response?.text();
 
@@ -301,7 +301,7 @@ describe("Workspace Agent-tab provider", () => {
         throw new Error("model authentication unavailable");
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
@@ -311,7 +311,7 @@ describe("Workspace Agent-tab provider", () => {
 
     await expect(handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised before preflight rejection.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
       suggestTitleFromPrompt: () => { suggestedTitle = true; },
     })).rejects.toThrow("model authentication unavailable");
 
@@ -351,11 +351,11 @@ describe("Workspace Agent-tab provider", () => {
     const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
     const submissions: string[] = [];
     const runtime = {
-      async submit(text: string): Promise<void> {
-        submissions.push(text);
+      async submit(input: { text: string }): Promise<void> {
+        submissions.push(input.text);
       },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
       method: "POST",
@@ -365,7 +365,7 @@ describe("Workspace Agent-tab provider", () => {
 
     const response = await handleAgentRequest(request, new URL(request.url), {
       // SAFETY: This focused route test supplies exactly the runtime methods exercised by message acceptance.
-      getRuntime: async () => runtime as never,
+      getController: async () => runtime as never,
       suggestTitleFromPrompt: () => {},
     });
 
@@ -378,9 +378,9 @@ describe("Workspace Agent-tab provider", () => {
     const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
     const admissions: string[] = [];
     const runtime = {
-      async submit(_text: string, options: { requestId: string }) { admissions.push(options.requestId); },
+      async submit(input: { requestId: string }) { admissions.push(input.requestId); },
       userMessages: () => [],
-      currentModel: () => undefined,
+      settings: async () => ({}),
     };
     for (const requestId of ["browser_retry-123", "browser_retry-123", "", "has spaces", "x".repeat(129), 42]) {
       const request = new Request(`http://atelier.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
@@ -389,7 +389,7 @@ describe("Workspace Agent-tab provider", () => {
       });
       const response = await handleAgentRequest(request, new URL(request.url), {
         // SAFETY: This route fixture supplies only the operations message admission uses.
-        getRuntime: async () => runtime as never,
+        getController: async () => runtime as never,
         suggestTitleFromPrompt: () => {},
       });
       expect(response?.status).toBe(requestId === "browser_retry-123" ? 202 : 422);

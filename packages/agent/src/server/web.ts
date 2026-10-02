@@ -14,7 +14,7 @@ import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { renderAgentPane } from "./render-composer.ts";
 import { agentConversationKey } from "./render-context.ts";
 import { handleAgentRequest } from "./routes.ts";
-import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgentConversation, getWorkspaceAgentRuntime, restoreWorkspaceAgentRuntime, subscribeWorkspaceAgentBusy } from "./runtime.ts";
+import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgentConversation, getWorkspaceAgentController, getWorkspaceAgentPresentation, restoreWorkspaceAgentRuntime, subscribeWorkspaceAgentBusy } from "./runtime.ts";
 import { archiveWorkspaceAgentConversation, createNextWorkspaceAgentConversation, listWorkspaceAgentConversations, sessionShareDir, sessionShareKeyForInit, sessionShareMountPath, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 import {
   createDeleteCurrentWorkspaceTool,
@@ -66,7 +66,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
 export const workspaceAgentTabProvider = createWorkspaceAgentTabProvider({
   list: listWorkspaceAgentConversations,
   async render(conversation) {
-    const runtime = await getWorkspaceAgentRuntime(conversation, { events: agentEvents });
+    const runtime = await getWorkspaceAgentPresentation(conversation, { events: agentEvents });
     const [state, completionCatalog] = await Promise.all([
       runtime.paneState(),
       runtime.refreshCompletionCatalog(),
@@ -110,11 +110,12 @@ function registerSessionShareMountEvents(events: AtelierEventBus): void {
 
 async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, source: WorkspaceAgentConversationInfo | undefined, events?: AtelierEventBus): Promise<void> {
   const runtimeOptions = { events };
-  const sourceRuntime = source ? await getWorkspaceAgentRuntime(source, runtimeOptions) : undefined;
-  const model = sourceRuntime?.currentModel() ?? await resolveNewWorkspaceAgentModel();
-  const targetRuntime = await getWorkspaceAgentRuntime(agent, runtimeOptions);
-  if (model) await targetRuntime.setModel(model.provider, model.id);
-  if (sourceRuntime) await targetRuntime.setThinkingLevel(sourceRuntime.currentThinkingLevel());
+  const sourceController = source ? await getWorkspaceAgentController(source, runtimeOptions) : undefined;
+  const sourceSettings = await sourceController?.settings();
+  const model = sourceSettings?.model ?? await resolveNewWorkspaceAgentModel().then(model => model && { provider: model.provider, modelId: model.id });
+  const target = await getWorkspaceAgentController(agent, runtimeOptions);
+  if (model) await target.configure({ model });
+  if (sourceSettings?.thinkingLevel) await target.configure({ thinkingLevel: sourceSettings.thinkingLevel });
   await events?.emit("workspace_agent_view_invalidated", { workspaceId: agent.workspaceId, conversationId: agent.conversationId });
 }
 
@@ -125,7 +126,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent") throw new Error("Invalid Agent channel identifier");
       const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId, events);
-      const runtime = await getWorkspaceAgentRuntime(agent, { events });
+      const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeLivePresentation(listener);
     },
   }, {
@@ -133,7 +134,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent-turn") throw new Error("Invalid Agent turn channel identifier");
       const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId, events);
-      const runtime = await getWorkspaceAgentRuntime(agent, { events });
+      const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeTurnPresentation(identifier.turnId, identifier.branchId, listener);
     },
   }],

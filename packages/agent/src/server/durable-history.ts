@@ -6,7 +6,7 @@ import { escapeHtml } from "@atelier/shared";
 import { AtelierCoreError, getAtelierRuntimeContext } from "@atelier/core";
 import { sessionShareDir, workspaceSessionShareKey } from "./session-store.ts";
 import { durableJournalDirectory } from "./durable-storage.ts";
-import { retainedDurableWorkspaceOwner } from "./durable-owner.ts";
+import { retainedDurableWorkspaceOwner } from "./runtime.ts";
 import { projectDurableTranscript } from "./durable-transcript.ts";
 import { findTranscriptItem } from "./transcript.ts";
 import { renderTranscriptItem, renderTranscriptItemDetailFrame } from "./render-transcript.ts";

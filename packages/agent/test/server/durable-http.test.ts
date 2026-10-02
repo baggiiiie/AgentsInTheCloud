@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
+import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -12,7 +12,6 @@ import { createRegistry, defineExtension, defineTool } from "@earendil-works/pi-
 import { type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "../../src/server/session-store.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
-import type { WorkspaceAgentRuntime } from "../../src/server/runtime-types.ts";
 
 let directory: string;
 let owner: DurableAgentRuntime | undefined;
@@ -37,6 +36,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => ({ model: { provider: "faux", modelId: "test" } }),
     expand: async (_workspace, text) => text,
+    validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {},
   });
   const controller = await owner.conversation(agent);
@@ -49,11 +49,12 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   const events = createAtelierEventBus();
   events.on("workspace_agent_prompt_preparing", () => { preparations++; });
   // The route boundary uses an actual native execution controller. No HTML or UI assertions.
-  const runtime: Pick<WorkspaceAgentRuntime, "submit" | "userMessages" | "currentModel"> = {
-    userMessages: () => [], currentModel: () => undefined,
-    async submit(text, options) {
+  const countedController = {
+    ...controller,
+    async submit(input: Parameters<typeof controller.submit>[0]) {
       admissions++;
-      accepted = await controller.submit({ text, requestId: options!.requestId!, images: options?.images?.map(image => ({ type: "image", data: image.data, mimeType: image.mimeType })) });
+      accepted = await controller.submit(input);
+      return accepted;
     },
   };
   const request = () => new Request(`http://atelier.test/workspaces/${agent.workspaceId}/agents/${agent.conversationId}/messages`, {
@@ -62,8 +63,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   const first = request();
   const response = await handleAgentRequest(first, new URL(first.url), {
     events, knownRequest: (_agent, id) => controller.knownRequest(id),
-    // SAFETY: This protocol test exercises only the message route's runtime methods above.
-    getRuntime: async () => runtime as WorkspaceAgentRuntime,
+    getController: async () => countedController,
     suggestTitleFromPrompt: () => {},
   });
   expect(response?.headers.get("x-atelier-attachment-draft-consumed")).toBe("true");
@@ -75,13 +75,14 @@ test("lost HTTP response retries admitted input after attachment staging is cons
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => { throw new Error("Must not prepare prompts on retry"); },
     expand: async () => { throw new Error("Must not expand on retry"); },
+    validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => { throw new Error("Workspace is offline"); },
   });
   const reopened = await owner.conversation(agent);
   const retry = request();
   const retried = await handleAgentRequest(retry, new URL(retry.url), {
     events, knownRequest: (_agent, id) => reopened.knownRequest(id),
-    getRuntime: async () => { throw new Error("Must not acquire execution on retry"); },
+    getController: async () => { throw new Error("Must not acquire execution on retry"); },
   });
   expect(retried?.status).toBe(200);
   expect(retried?.headers.get("x-atelier-attachment-draft-consumed")).toBe("true");
@@ -110,7 +111,8 @@ test("offline HTTP Stop bypasses model/UI preparation and commits intent before 
   faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "hold", name: "hold", arguments: {} }], { stopReason: "toolUse" })]);
   owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
     harness: async () => ({ models, registry }), prepare: async () => ({ model: { provider: "faux", modelId: "faux-1" } }),
-    expand: async (_workspace, text) => text, ready: async () => {},
+    expand: async (_workspace, text) => text, validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
+    ready: async () => {},
   });
   const controller = await owner.conversation(agent);
   await controller.submit({ requestId: "initial", text: "Start" });
@@ -120,11 +122,12 @@ test("offline HTTP Stop bypasses model/UI preparation and commits intent before 
   owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
     harness: async () => ({ models: createModels(), registry }),
     prepare: async () => { throw new Error("No model providers"); },
-    expand: async () => { throw new Error("No workspace"); }, ready: async () => { throw new Error("Offline"); },
+    expand: async () => { throw new Error("No workspace"); }, validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
+    ready: async () => { throw new Error("Offline"); },
   });
   const request = new Request(`http://atelier.test/workspaces/${agent.workspaceId}/agents/${agent.conversationId}/abort`, { method: "POST" });
   await expect(handleAgentRequest(request, new URL(request.url), {
-    getRuntime: async () => { throw new Error("Must not mount UI for Stop"); },
+    getPresentation: async () => { throw new Error("Must not mount UI for Stop"); },
   })).rejects.toThrow("Stop saved");
   const restored = await owner.conversation(agent);
   const queued = await restored.submit({ requestId: "queued", text: "Retry" });

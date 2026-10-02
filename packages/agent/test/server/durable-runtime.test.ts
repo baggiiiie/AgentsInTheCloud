@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,10 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool, type AgentChange } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
+import { AtelierCoreError, createAtelierEventBus } from "@atelier/core";
+import type { WorkspaceAgentToolOptions } from "../../src/server/tools.ts";
+import { subscribeWorkspaceAgentBusy } from "../../src/server/workspace-agent-busy.ts";
+import { currentNotificationTurn } from "../../src/server/turn-notifications.ts";
 import { openDurableAgentRuntime, type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { durableEntryContent } from "../../src/server/durable-images.ts";
 
@@ -19,7 +23,7 @@ afterEach(async () => {
   await Promise.all(paths.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
-async function setup() {
+async function setup(options: WorkspaceAgentToolOptions = {}) {
   const path = await mkdtemp(join(tmpdir(), "atelier-durable-runtime-"));
   paths.push(path);
   const models = createModels();
@@ -33,10 +37,11 @@ async function setup() {
     harness: async () => ({ models, registry }),
     prepare: async (): Promise<AgentChange> => ({ model: { provider: "faux", modelId: "small" }, instructions: "Committed instructions", thinkingLevel: "off" }),
     expand: async (_workspace: string, text: string) => text,
+    validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async (_workspace: string) => {},
   };
   const open = async () => {
-    const runtime = await openDurableAgentRuntime(path, "native-workspace", {}, load);
+    const runtime = await openDurableAgentRuntime(path, "native-workspace", options, load);
     runtimes.push(runtime);
     return runtime;
   };
@@ -86,17 +91,17 @@ test("settings serialize with image preparation without blocking another convers
   const configure = one.configure({ model: { provider: "faux", modelId: "large" } });
   const independent = await two.submit({ requestId: "slow", text: "Independent root" });
   expect((await independent.wait(context)).status).toBe("done");
-  expect((await one.agent(context)).model?.modelId).toBe("small");
+  expect((await one.settings()).model?.modelId).toBe("small");
   release.resolve();
   const submission = await admitted;
   await configure;
   expect((await submission.wait(context)).status).toBe("done");
   const user = (await one.history({}, 100, undefined, context)).items.find((entry) => entry.model?.some((message) => message.role === "user"))!;
   expect(JSON.stringify(durableEntryContent(user))).toContain("4x4");
-  expect((await one.agent(context)).model?.modelId).toBe("large");
-  expect((await two.agent(context)).model?.modelId).toBe("small");
+  expect((await one.settings()).model?.modelId).toBe("large");
+  expect((await two.settings()).model?.modelId).toBe("small");
   await expect(one.configure({ model: { provider: "faux", modelId: "missing" } })).rejects.toThrow("Model not found");
-  expect((await one.agent(context)).model?.modelId).toBe("large");
+  expect((await one.settings()).model?.modelId).toBe("large");
 });
 
 test.each(["suspend", "stop"] as const)("native %s preserves or withdraws committed steering, and passive reopen does not run it", async (operation) => {
@@ -158,12 +163,12 @@ test("reset changes active context but retains journal history and settings", as
   const active = await agent.context(context);
   expect(JSON.stringify(active.messages)).not.toContain("Old input");
   expect(JSON.stringify((await agent.history({}, 100, undefined, context)).items)).toContain("Old input");
-  expect((await agent.agent(context)).model?.modelId).toBe("small");
+  expect((await agent.settings()).model?.modelId).toBe("small");
   await runtime.suspend();
   const reopened = await open();
   const restored = await reopened.conversation(record);
   expect(JSON.stringify((await restored.context(context)).messages)).not.toContain("Old input");
-  expect((await restored.agent(context)).instructions).toBe("Committed instructions");
+  expect((await restored.settings()).instructions).toBe("Committed instructions");
 });
 
 test("committed watches reconnect with complete state; disconnecting a viewer does not stop work", async () => {
@@ -568,7 +573,7 @@ test("native navigation atomically selects immutable forks, preserves settings/h
   load.ready = async () => { throw new Error("Navigation must be passive"); };
   await agent.navigate(String(target.id));
   expect(agent.id).not.toBe(firstBranch);
-  expect((await agent.agent(context)).model?.modelId).toBe("small");
+  expect((await agent.settings()).model?.modelId).toBe("small");
   expect(JSON.stringify((await agent.context(context)).messages)).not.toContain("Abandoned");
   expect((await agent.tree()).labels[String(target.id)]).toEqual(["Decision"]);
   expect((await agent.tree()).nodes).toHaveLength(before.length);
@@ -743,4 +748,193 @@ test("Stop does not signal another root's active tool", async () => {
   expect((await first.status(context)).status).toBe("unanswered");
   release.resolve();
   expect((await second.wait(context)).status).toBe("done");
+});
+
+
+test("execution owner publishes busy and finished turns without a presentation mount", async () => {
+  const events = createAtelierEventBus();
+  const finished: Array<{ workspaceId: string; conversationId: string }> = [];
+  const completed = Promise.withResolvers<void>();
+  events.on("workspace_agent_turn_finished", async event => { finished.push(event); completed.resolve(); });
+  const busy: boolean[] = [];
+  const unsubscribe = subscribeWorkspaceAgentBusy(event => {
+    if (event.workspaceId === "native-workspace" && event.agentKey === "agent:tab") busy.push(event.busy);
+  });
+  const release = Promise.withResolvers<void>();
+  try {
+    const { runtime, faux } = await setup({ events });
+    const entered = Promise.withResolvers<void>();
+    faux.setResponses([async () => { entered.resolve(); await release.promise; return fauxAssistantMessage("Finished without a viewer"); }]);
+    const agent = await runtime.conversation(record);
+    const turn = await agent.submit({ requestId: "headless", text: "Run without a viewer" });
+    await entered.promise;
+    // No presentation or viewer watch was created.
+    expect(busy).toEqual([true]);
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeDefined();
+    expect(finished).toEqual([]);
+    release.resolve();
+    await turn.wait(context);
+    await completed.promise;
+    expect(busy).toEqual([true, false]);
+    expect(finished).toEqual([{ workspaceId: "native-workspace", conversationId: record.conversationId }]);
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeUndefined();
+    await runtime.suspend();
+    expect(finished).toHaveLength(1);
+  } finally {
+    release.resolve();
+    unsubscribe();
+  }
+});
+
+test("selection listeners observe committed branch switches and can detach", async () => {
+  const { runtime, faux } = await setup();
+  faux.setResponses([fauxAssistantMessage("First answer"), fauxAssistantMessage("Later answer")]);
+  const agent = await runtime.conversation(record);
+  await (await agent.submit({ requestId: "first", text: "First input" })).wait(context);
+  const target = (await agent.history({}, 1, undefined, context)).items[0]!;
+  await (await agent.submit({ requestId: "later", text: "Later input" })).wait(context);
+  const previous = agent.id;
+  const selections: Array<{ id: typeof agent.id; catalogId: typeof agent.id; messages: string }> = [];
+  const unsubscribe = agent.subscribeSelection(async () => {
+    selections.push({ id: agent.id, catalogId: (await runtime.catalog())[0]!.durableId, messages: JSON.stringify((await agent.context(context)).messages) });
+  });
+  await expect(agent.navigate("-1")).rejects.toThrow("no longer exists");
+  expect(selections).toEqual([]);
+  await agent.navigate(String(target.id));
+  expect(selections).toHaveLength(1);
+  expect(selections[0]!.id).not.toBe(previous);
+  expect(selections[0]!.id).toBe(agent.id);
+  expect(selections[0]!.catalogId).toBe(agent.id);
+  expect(selections[0]!.messages).toContain("First answer");
+  expect(selections[0]!.messages).not.toContain("Later answer");
+  unsubscribe();
+  await agent.navigate(String(target.id));
+  expect(selections).toHaveLength(1);
+});
+
+test("model availability is validated by commands after request deduplication", async () => {
+  const { runtime, faux, load } = await setup();
+  faux.setResponses([fauxAssistantMessage("Admitted while available")]);
+  const agent = await runtime.conversation(record);
+  const original = await agent.submit({ requestId: "available", text: "Original input" });
+  await original.wait(context);
+  const validated: Array<{ provider: string; modelId: string } | undefined> = [];
+  load.validateModel = async ref => { validated.push(ref); throw new Error("Model disconnected"); };
+  expect((await agent.submit({ requestId: "available", text: "Retry while disconnected" })).id).toBe(original.id);
+  expect(validated).toEqual([]);
+  await expect(agent.submit({ requestId: "new", text: "Not admitted" })).rejects.toThrow("Model disconnected");
+  await expect(agent.compact()).rejects.toThrow("Model disconnected");
+  await expect(agent.configure({ model: { provider: "faux", modelId: "large" } })).rejects.toThrow("Model disconnected");
+  expect(validated).toEqual([
+    { provider: "faux", modelId: "small" },
+    { provider: "faux", modelId: "small" },
+    { provider: "faux", modelId: "large" },
+  ]);
+  expect((await agent.settings()).model?.modelId).toBe("small");
+  expect(await agent.knownRequest("new")).toBe(false);
+  expect(faux.state.callCount).toBe(1);
+});
+
+test("owner resumes retained work and emits completion without callers acquiring a controller", async () => {
+  const events = createAtelierEventBus();
+  const finished = Promise.withResolvers<{ workspaceId: string; conversationId: string }>();
+  events.on("workspace_agent_turn_finished", event => { finished.resolve(event); });
+  const { runtime, faux, registry, open } = await setup({ events });
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "unmounted-recovery", tools: [defineTool({
+    name: "recover", description: "Resume retained execution", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, invocation) {
+      if (++executions > 1) return { content: [{ type: "text", text: "Recovered" }] };
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true }));
+    },
+  })] }));
+  faux.setResponses([
+    fauxAssistantMessage([fauxToolCall("recover", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage("Recovered without a viewer"),
+  ]);
+  const agent = await runtime.conversation(record);
+  await agent.submit({ requestId: "recover-unmounted", text: "Begin" });
+  await started.promise;
+  await runtime.suspend();
+  const reopened = await open();
+  expect(executions).toBe(1);
+  // No caller acquires a controller, watch, or presentation in the new owner.
+  await reopened.resume();
+  expect(await finished.promise).toEqual({ workspaceId: "native-workspace", conversationId: record.conversationId });
+  expect(executions).toBe(2);
+  expect(faux.state.callCount).toBe(2);
+});
+
+
+test("completion-handler failure is reported without disabling execution observation", async () => {
+  const events = createAtelierEventBus();
+  const failure = new Error("Completion consumer failed");
+  const reported = Promise.withResolvers<void>();
+  const completed = Promise.withResolvers<void>();
+  let completions = 0;
+  events.on("workspace_agent_turn_finished", async () => {
+    if (++completions === 1) throw failure;
+    completed.resolve();
+  });
+  const log = spyOn(console, "error").mockImplementation((message, error) => {
+    if (message === "Could not publish Agent turn completion" && error === failure) reported.resolve();
+  });
+  const busy: boolean[] = [];
+  const unsubscribe = subscribeWorkspaceAgentBusy(event => {
+    if (event.workspaceId === "native-workspace" && event.agentKey === "agent:tab") busy.push(event.busy);
+  });
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  try {
+    const { runtime, faux } = await setup({ events });
+    faux.setResponses([fauxAssistantMessage("First answer"), async () => {
+      entered.resolve();
+      await release.promise;
+      return fauxAssistantMessage("Second answer");
+    }]);
+    const agent = await runtime.conversation(record);
+    await (await agent.submit({ requestId: "first", text: "First task" })).wait(context);
+    await reported.promise;
+    const second = await agent.submit({ requestId: "second", text: "Second task" });
+    await entered.promise;
+    expect(busy).toEqual([true, false, true]);
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeDefined();
+    release.resolve();
+    await second.wait(context);
+    await completed.promise;
+    expect(busy).toEqual([true, false, true, false]);
+    expect(completions).toBe(2);
+    expect(log).toHaveBeenCalledWith("Could not publish Agent turn completion", failure);
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeUndefined();
+    await runtime.suspend();
+  } finally { release.resolve(); unsubscribe(); log.mockRestore(); }
+});
+
+test("user messages exclude retained history before a reset and follow branch selection", async () => {
+  const { runtime, faux } = await setup();
+  faux.setResponses([fauxAssistantMessage("Old answer"), fauxAssistantMessage("Current answer")]);
+  const agent = await runtime.conversation(record);
+  await (await agent.submit({ requestId: "old", text: "Old unrelated task" })).wait(context);
+  const target = (await agent.history({}, 1, undefined, context)).items[0]!;
+  await agent.reset();
+  expect(await agent.userMessages()).toEqual([]);
+  await (await agent.submit({ requestId: "current", text: "Current task" })).wait(context);
+  expect(await agent.userMessages()).toEqual(["Current task"]);
+  expect(JSON.stringify((await agent.history({}, 100, undefined, context)).items)).toContain("Old unrelated task");
+  await agent.navigate(String(target.id));
+  expect(await agent.userMessages()).toEqual(["Old unrelated task"]);
+});
+
+test("unknown model selection rejects with invalid_arguments and leaves settings unchanged", async () => {
+  const { runtime } = await setup();
+  const agent = await runtime.conversation(record);
+  const before = (await agent.settings()).model;
+  const result = agent.configure({ model: { provider: "faux", modelId: "missing" } });
+  await expect(result).rejects.toBeInstanceOf(AtelierCoreError);
+  await expect(result).rejects.toMatchObject({ code: "invalid_arguments" });
+  expect((await agent.settings()).model).toEqual(before);
+  await agent.configure({ model: { provider: "faux", modelId: "large" } });
+  expect((await agent.settings()).model?.modelId).toBe("large");
 });
