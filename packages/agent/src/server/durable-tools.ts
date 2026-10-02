@@ -1,3 +1,4 @@
+import { awaitWithContext } from "@earendil-works/chord/context";
 import { copyJson } from "@earendil-works/chord";
 import { createReadTool, createWriteTool, createEditTool, type ReadToolOptions } from "@earendil-works/pi-coding-agent";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
@@ -29,14 +30,23 @@ export function durableWorkspaceTool<TParams extends TSchema>(
       let updates = Promise.resolve();
       const failures: unknown[] = [];
       try {
-        const result = await tool.execute(api.callId, args, context.abortSignal, (partial) => {
+        const operation = Promise.resolve(tool.execute(api.callId, args, context.abortSignal, (partial) => {
+          if (context.abortSignal?.aborted) return;
           const snapshot = copyJson(partial, { omitUndefinedProperties: true });
           updates = updates.then(() => api.details(snapshot, context)).catch((error) => {
             // The SDK callback cannot await writes. Observe rejection now and
             // propagate it before returning the tool result, never fire-and-forget.
             failures.push(error);
           });
+        }));
+        // A capability may itself await workspace deletion, which joins this
+        // invocation. Cancel the waiter, not the external effect, to break that
+        // cycle. Unsafe effects retain native interrupted/uncertain semantics.
+        const observed = operation.catch(error => {
+          if (context.abortSignal?.aborted) console.error(`[durable tool ${tool.name}] operation failed after cancellation`, error);
+          throw error;
         });
+        const result = await awaitWithContext(observed, context);
         await updates;
         if (failures.length) throw failures[0];
         return {

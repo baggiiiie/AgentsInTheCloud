@@ -9,11 +9,11 @@ import { defineWorkspaceTool } from "../../../src/server/workspace-tool.ts";
 import { openDurableWorkspace } from "../../../src/server/durable-workspace.ts";
 
 const [directory, replay] = process.argv.slice(2);
-if (!directory || (replay !== "safe" && replay !== "unsafe")) throw new Error("Expected directory and replay policy");
+if (!directory || (replay !== "safe" && replay !== "unsafe" && replay !== "generation")) throw new Error("Expected directory and replay policy");
 const models = createModels();
-const faux = fauxProvider({ tokensPerSecond: 100_000 });
+const faux = fauxProvider({ tokensPerSecond: replay === "generation" ? 10 : 100_000 });
 models.setProvider(faux.provider);
-faux.setResponses([fauxAssistantMessage([fauxToolCall("effect", {})], { stopReason: "toolUse" })]);
+faux.setResponses([replay === "generation" ? fauxAssistantMessage("Committed partial before crash. ".repeat(100)) : fauxAssistantMessage([fauxToolCall("effect", {})], { stopReason: "toolUse" })]);
 const registry = createRegistry();
 registry.install(defineExtension({
   name: "crash-test",
@@ -31,12 +31,20 @@ registry.install(defineExtension({
         signal!.addEventListener("abort", () => reject(signal!.reason), { once: true });
       });
     },
-  }), replay)],
+  }), replay === "generation" ? "safe" : replay)],
 }));
 const workspace = await openDurableWorkspace(directory, "crash-workspace", { models, registry });
 const conversation = await workspace.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" }, {
   model: { provider: "faux", modelId: "faux-1" },
 });
 await conversation.submit({ type: "input", content: "Run the operation", requestId: "crash-request" }, BACKGROUND_CONTEXT);
+if (replay === "generation") {
+  const watch = await conversation.watch(BACKGROUND_CONTEXT);
+  const report = async (value: typeof watch.value) => {
+    if (JSON.stringify(value.docs["pi.live"]?.generation ?? null).includes("Committed")) process.stdout.write("partial-committed\n");
+  };
+  await report(watch.value);
+  watch.start(report);
+}
 // Keep the fixture alive even if the provider has no more active I/O.
 setInterval(() => {}, 60_000);

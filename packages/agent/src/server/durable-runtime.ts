@@ -3,7 +3,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
-import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
+import { commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { DurableConversationPresentation } from "./durable-presentation.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
@@ -65,6 +65,9 @@ export async function openDurableAgentRuntime(
     // A close/delete may have fenced another root while readiness was pending.
     // Mark its work before any command enables this workspace-wide scheduler.
     await persistGates();
+    // Native abort ends its run without admitting a new inbox boundary. Join
+    // saved Stop cleanup before admitting later genuine input into that root.
+    await settleStoppedDurableWork(harness);
     assertOpen();
   }
 
@@ -289,9 +292,15 @@ export async function openDurableAgentRuntime(
       /** Explicit Stop withdraws queued input and cancels owned work. */
       stop() {
         return command(async () => {
-          await readyForExecution();
-          assertAdmission();
-          await conversation.abort(context);
+          // Persist before probing Docker/providers. Recovery applies this exact
+          // scope before any progress; later genuine admissions remain allowed.
+          await harness.commit(tx => commitDurableStop(tx, conversation.id), context);
+          await markGatedDurableWork(harness);
+          try {
+            await settleTasks(conversation.id);
+          } catch (cause) {
+            throw new Error("Stop saved. Workspace cleanup is pending until execution is available.", { cause });
+          }
         });
       },
       compact(instructions?: string) {

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { createRegistry, defineExtension, defineTool, type HarnessOptions } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, defineTool, LiveDoc, type HarnessOptions } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { submitDurableInput } from "../../src/server/durable-input.ts";
 import { durableWorkspaceTool } from "../../src/server/durable-tools.ts";
@@ -214,6 +214,45 @@ describe("Durable workspace journal", () => {
       await child.exited;
     }
   }, 20_000);
+
+  test("SIGKILL retains committed generation partial as aborted and recovers without a synthetic input", async () => {
+    const path = await directory();
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "fixtures/durable-crash.ts"), path, "generation"], { stdout: "pipe", stderr: "pipe" });
+    try {
+      const reader = child.stdout.getReader();
+      let output = "";
+      while (!output.includes("partial-committed")) {
+        const chunk = await reader.read();
+        if (chunk.done) throw new Error(`Generation fixture exited early: ${await new Response(child.stderr).text()}`);
+        output += new TextDecoder().decode(chunk.value);
+      }
+      reader.releaseLock();
+      child.kill("SIGKILL");
+      await child.exited;
+      const options = provider();
+      options.faux.setResponses([request => {
+        expect(request.messages.filter(message => message.role === "user")).toHaveLength(1);
+        expect(JSON.stringify(request)).not.toContain("Atelier restarted");
+        return fauxAssistantMessage("Recovered generation");
+      }]);
+      const reopened = await open(path, options, "crash-workspace");
+      const conversation = await reopened.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" });
+      const partial = (await reopened.harness.snapshot(LiveDoc, conversation.id, context))?.generation?.message;
+      expect(JSON.stringify(partial?.content)).toContain("Committed");
+      expect(options.faux.state.callCount).toBe(0);
+      const inspection = await reopened.harness.inspect(context);
+      expect(inspection.scheduling).toBe("paused");
+      expect(inspection.submissions).toHaveLength(1);
+      const pending = (await reopened.harness.submission(inspection.submissions[0]!.id, context))!;
+      expect((await pending.wait(context)).status).toBe("done");
+      const messages = (await conversation.entries({}, 100, undefined, context)).items.flatMap(entry => entry.model ?? []);
+      const aborted = messages.find(message => message.role === "assistant" && message.stopReason === "aborted");
+      expect(aborted?.content).toEqual(partial!.content);
+      expect(messages.filter(message => message.role === "user")).toHaveLength(1);
+      expect(JSON.stringify(messages)).toContain("Recovered generation");
+      expect(options.faux.state.callCount).toBe(1);
+    } finally { child.kill(); await child.exited; }
+  }, 25_000);
 
   test("uses Atelier's existing model runtime directly, without a second provider/auth adapter", async () => {
     const runtime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, allowModelNetwork: false, refreshOnCreate: false });

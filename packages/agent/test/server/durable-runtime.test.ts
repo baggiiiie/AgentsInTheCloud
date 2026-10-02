@@ -623,3 +623,124 @@ test("native rewind rejects foreign IDs and live work, then forks before the sel
   release.resolve();
   await running.wait(context);
 });
+
+test.each(["offline", "commit-crash"] as const)("Stop %s boundary withdraws steering and never replays scoped safe work", async boundary => {
+  const { runtime, path, faux, registry, load, open } = await setup();
+  const { openDurableWorkspace } = await import("../../src/server/durable-workspace.ts");
+  const { commitDurableStop } = await import("../../src/server/durable-lifecycle.ts");
+  const started = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "stop-probe", tools: [defineTool({
+    name: "probe", description: "Safe replay probe", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, invocation) {
+      executions++;
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true }));
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" })]);
+  const agent = await runtime.conversation(record);
+  const independent = await runtime.conversation({ ...record, conversationId: "independent" });
+  await agent.submit({ requestId: "original", text: "Original input" });
+  await started.promise;
+  await agent.submit({ requestId: "queued", text: "Withdraw this steering" });
+  await runtime.suspend();
+  if (boundary === "commit-crash") {
+    const workspace = await openDurableWorkspace(path, "native-workspace", await load.harness());
+    // Fault immediately after the Stop transaction, before any abort mark or
+    // cleanup readiness. This is the exact exported production commit seam.
+    await workspace.harness.commit(tx => commitDurableStop(tx, agent.id), context);
+    expect((await workspace.harness.inspect(context)).tasks.every(task => !task.record.abortRequested)).toBe(true);
+    await workspace.close();
+  } else {
+    load.ready = async () => { throw new Error("Workspace unavailable"); };
+    load.prepare = async () => { throw new Error("No providers configured"); };
+    const offline = await open();
+    const restored = await offline.conversation(record);
+    await expect(restored.stop()).rejects.toThrow("Stop saved");
+    await offline.suspend();
+  }
+  const reopened = await open();
+  const restored = await reopened.conversation(record);
+  const queued = await restored.submit({ requestId: "queued", text: "Retry must stay withdrawn" });
+  expect((await queued.status(context)).status).toBe("unanswered");
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  expect((await reopened.admission())?.closed).toEqual([]);
+  expect((await reopened.admission())?.deleted).toBe(false);
+  load.ready = async () => {};
+  // No successful cleanup retry is required before the next genuine message.
+  faux.setResponses([fauxAssistantMessage("Later genuine answer"), fauxAssistantMessage("Independent answer")]);
+  expect((await (await restored.submit({ requestId: "later", text: "New genuine input" })).wait(context)).status).toBe("done");
+  expect(executions).toBe(1);
+  const original = await restored.submit({ requestId: "original", text: "Retry" });
+  expect((await original.status(context)).status).toBe("unanswered");
+  const other = await reopened.conversation({ ...record, conversationId: "independent" });
+  expect(other.id).toBe(independent.id);
+  expect((await (await other.submit({ requestId: "other", text: "Independent root" })).wait(context)).status).toBe("done");
+  expect(executions).toBe(1);
+  expect(JSON.stringify((await restored.history({}, 100, undefined, context)).items)).not.toContain("Withdraw this steering");
+});
+
+test("self-deleting workspace capability releases its invocation so durable deletion cannot join itself", async () => {
+  const { runtime, faux, registry, open } = await setup();
+  const { durableWorkspaceTool } = await import("../../src/server/durable-tools.ts");
+  const deleted = Promise.withResolvers<void>();
+  let executions = 0;
+  registry.install(defineExtension({ name: "self-delete", tools: [durableWorkspaceTool({
+    name: "delete_current_workspace", label: "Delete", description: "Delete this workspace", parameters: Type.Object({}),
+    async execute() {
+      executions++;
+      await runtime.delete();
+      deleted.resolve();
+      return { content: [{ type: "text", text: "Must not commit a success after abort" }], details: undefined };
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([fauxToolCall("delete_current_workspace", {})], { stopReason: "toolUse" })]);
+  const agent = await runtime.conversation(record);
+  await agent.submit({ requestId: "self-delete", text: "Delete this workspace" });
+  await deleted.promise;
+  expect((await runtime.admission())?.deleted).toBe(true);
+  expect(JSON.stringify((await agent.history({}, 100, undefined, context)).items)).not.toContain("Must not commit a success");
+  await runtime.suspend();
+  const reopened = await open();
+  await reopened.resume();
+  expect(executions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+  await expect((await reopened.conversation(record)).submit({ requestId: "no", text: "No" })).rejects.toThrow("deleted");
+});
+
+
+test("Stop does not signal another root's active tool", async () => {
+  const { runtime, faux, registry } = await setup();
+  const starts = [Promise.withResolvers<void>(), Promise.withResolvers<void>()];
+  const signals: AbortSignal[] = [];
+  const release = Promise.withResolvers<void>();
+  registry.install(defineExtension({ name: "independent-stop", tools: [defineTool({
+    name: "hold", description: "Hold work", parameters: Type.Object({}),
+    async execute(_args, _api, invocation) {
+      const index = signals.length;
+      signals.push(invocation.abortSignal!);
+      starts[index]!.resolve();
+      await Promise.race([release.promise, new Promise<never>((_resolve, reject) => invocation.abortSignal!.addEventListener("abort", () => reject(invocation.abortSignal!.reason), { once: true }))]);
+      return { content: [{ type: "text", text: "Independent completion" }] };
+    },
+  })] }));
+  faux.setResponses([
+    fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" }),
+    fauxAssistantMessage("Independent answer"),
+  ]);
+  const one = await runtime.conversation(record);
+  const two = await runtime.conversation({ ...record, conversationId: "other-live" });
+  const first = await one.submit({ requestId: "one", text: "First" });
+  await starts[0]!.promise;
+  const second = await two.submit({ requestId: "two", text: "Second" });
+  await starts[1]!.promise;
+  await one.stop();
+  expect(signals[0]!.aborted).toBe(true);
+  expect(signals[1]!.aborted).toBe(false);
+  expect((await first.status(context)).status).toBe("unanswered");
+  release.resolve();
+  expect((await second.wait(context)).status).toBe("done");
+});
