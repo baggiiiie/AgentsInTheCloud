@@ -41,7 +41,6 @@ export const ids = {
   itemTextTail: (ctx: AgentRenderContext, key: string) => domId(`${prefix(ctx)}_itemtext_tail`, key),
   itemSummaryContent: (ctx: AgentRenderContext, key: string) => domId(`${prefix(ctx)}_summary_content`, key),
   itemSummaryStatus: (ctx: AgentRenderContext, key: string) => domId(`${prefix(ctx)}_summary_status`, key),
-  itemSummaryMetadata: (ctx: AgentRenderContext, key: string) => domId(`${prefix(ctx)}_summary_metadata`, key),
   detailFrame: (ctx: AgentRenderContext, key: string) => domId(`${prefix(ctx)}_detail`, key),
   completionCatalog: (ctx: AgentRenderContext) => `${prefix(ctx)}_completion_catalog`,
   stats: (ctx: AgentRenderContext) => `${prefix(ctx)}_stats`,

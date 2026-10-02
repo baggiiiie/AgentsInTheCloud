@@ -1,6 +1,5 @@
 import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/agent/server";
 import { ids, listWorkspaceAgentConversations } from "@agents-in-the-cloud/agent/server";
-import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { requestAcceptsJson, type JsonValue } from "@agents-in-the-cloud/core";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -30,7 +29,7 @@ export const subagentsWorkViewAdapter: WorkspaceModuleWorkViewAdapter = {
   },
 };
 
-export const handleSubagentRequest: AgentRouteHandler = async (request, url, options) => {
+export const handleSubagentRequest: AgentRouteHandler = async (request, url) => {
   const match = url.pathname.match(/^\/workspaces\/([^/]+)\/subagents$/);
   if (!match || request.method !== "GET") return undefined;
   const workspaceId = decodeURIComponent(match[1]!);
@@ -69,7 +68,7 @@ function renderSubagentTree(workspaceId: string, rootId: string, agents: Subagen
 }
 
 /** Publish the tree while preserving independently subscribed child transcripts. */
-export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void, events?: AgentsInTheCloudEventBus): Promise<AgentLivePresentationSubscription> {
+export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void): Promise<AgentLivePresentationSubscription> {
   const roots = await listWorkspaceAgentConversations(workspaceId);
   if (!roots.some((root) => root.conversationId === rootId)) throw new Error("Subagent root not found");
   const owner = await durableWorkspaceOwner(workspaceId);

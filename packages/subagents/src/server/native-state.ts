@@ -1,4 +1,4 @@
-import { assistantTextPhase, finalAssistantText, isFinalAssistantMessage } from "@agents-in-the-cloud/agent/server";
+import { finalAssistantTextIndexes, finalAssistantText, isFinalAssistantMessage } from "@agents-in-the-cloud/agent/server";
 import { defineDoc, defineEntry, type ConversationId, type EntryRecord, type Tx } from "@earendil-works/pi-durable";
 import { type Message, type TextContent } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
@@ -35,10 +35,10 @@ export async function updateReceipt(tx: Tx, id: string, change: Partial<Receipt>
 
 const attributedSchema = Type.Object({
   type: Type.Literal("text"), text: Type.String(),
-  atelierAgentMessage: Type.Object({ id: Type.String(), conversationId: Type.Number(), requestConversationId: Type.Optional(Type.Number()), author: Type.String(), recipient: Type.String(), kind: Type.Union([Type.Literal("task"), Type.Literal("message"), Type.Literal("completion")]) }),
+  agentsInTheCloudAgentMessage: Type.Object({ id: Type.String(), conversationId: Type.Number(), requestConversationId: Type.Optional(Type.Number()), author: Type.String(), recipient: Type.String(), kind: Type.Union([Type.Literal("task"), Type.Literal("message"), Type.Literal("completion")]) }),
 });
 export const attributedMessagesSchema = Type.Array(Type.Object({ role: Type.Literal("user"), timestamp: Type.Number(), content: Type.Array(attributedSchema) }));
-export type AttributedText = TextContent & { atelierAgentMessage: { id: string; conversationId: ConversationId; requestConversationId?: ConversationId; author: string; recipient: string; kind: Receipt["kind"] } };
+export type AttributedText = TextContent & { agentsInTheCloudAgentMessage: { id: string; conversationId: ConversationId; requestConversationId?: ConversationId; author: string; recipient: string; kind: Receipt["kind"] } };
 export function attribution(message: Message) {
   if (message.role !== "user" || !Array.isArray(message.content) || message.content.length !== 1) return undefined;
   const part = message.content[0];
@@ -50,11 +50,11 @@ export function envelope(receipt: Receipt) {
   return `Message Type: ${receipt.kind === "task" ? "NEW_TASK" : receipt.kind === "completion" ? "FINAL_ANSWER" : "MESSAGE"}\nTask name: ${receipt.recipient}\nSender: ${receipt.author}\nPayload:\n${receipt.text}`;
 }
 export function attributedContent(receipt: Receipt): AttributedText[] {
-  return [{ type: "text", text: envelope(receipt), atelierAgentMessage: { id: receipt.id, conversationId: receipt.conversationId, author: receipt.author, recipient: receipt.recipient, kind: receipt.kind } }];
+  return [{ type: "text", text: envelope(receipt), agentsInTheCloudAgentMessage: { id: receipt.id, conversationId: receipt.conversationId, author: receipt.author, recipient: receipt.recipient, kind: receipt.kind } }];
 }
 export function attributedEntry(entry: EntryRecord) {
   const marked = entry.model?.flatMap(message => attribution(message) ?? [])[0];
-  return marked ? marked.atelierAgentMessage.kind === "task" ? "task" as const : "message" as const : undefined;
+  return marked ? marked.agentsInTheCloudAgentMessage.kind === "task" ? "task" as const : "message" as const : undefined;
 }
 
 /** Select turn boundaries before filtering. Inherited traffic never becomes a new receipt. */
@@ -64,7 +64,7 @@ export function selectNativeForkHistory(messages: readonly Message[], mode = "al
   if (mode !== "all") {
     const boundaries = messages.flatMap((message, index) => {
       const part = attribution(message);
-      return message.role === "user" && (!part || part.atelierAgentMessage.kind === "task") ? [index] : [];
+      return message.role === "user" && (!part || part.agentsInTheCloudAgentMessage.kind === "task") ? [index] : [];
     });
     if (!boundaries.length) return [];
     selected = messages.slice(boundaries.at(-Number(mode)) ?? boundaries[0]);
@@ -73,8 +73,7 @@ export function selectNativeForkHistory(messages: readonly Message[], mode = "al
     if (attribution(message)) return [];
     if (message.role === "user") return [structuredClone(message)];
     if (message.role !== "assistant" || !isFinalAssistantMessage(message.content, message.stopReason)) return [];
-    const phased = message.content.some(part => part.type === "text" && assistantTextPhase(part.textSignature) !== undefined);
-    const content = message.content.filter(part => part.type === "text" && (!phased || assistantTextPhase(part.textSignature) === "final_answer"));
+    const content = finalAssistantTextIndexes(message.content).map(index => message.content[index]!);
     return content.length ? [structuredClone({ ...message, content })] : [];
   });
 }

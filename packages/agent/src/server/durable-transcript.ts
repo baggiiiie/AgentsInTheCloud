@@ -126,7 +126,6 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
   const slots = new Map(live.tools?.map(slot => [slot.callId, slot]));
 
   function updateTools(tool: ToolView) {
-    tool.startedAt = undefined;
     // Upstream tool.settle appends the result and finishSlot(done, entry.id) in
     // the same commit. Prefer that entry; done without a result is the explicit
     // scheduler fault/orphan case, not a successful empty tool response.
@@ -154,7 +153,6 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       // The receipt operation owns this immutable session on the default
       // workspace tmux server. Detaching this read-only view never stops it.
       tool.tmuxSession = details.tmuxSession;
-      tool.terminalVisible = Boolean(details.tmuxSession);
     }
   }
 

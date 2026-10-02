@@ -73,10 +73,10 @@ test("selected legacy branch becomes passive native history with scoped images, 
   expect(runtime).toBeInstanceOf(ConversationPresentation);
   expect(runtime.currentModel()).toBeUndefined();
   expect(runtime.isStreaming).toBe(false);
-  expect(runtime.userMessages()).toEqual(["Original input"]);
+  expect(await controller.userMessages()).toEqual(["Original input"]);
   await unloadWorkspaceAgentPresentation(workspace, record.conversationId);
   const reopened = await durableWorkspaceOwner(workspace);
-  // Unload released the pooled owner. Reopening retains the same native entries.
+  // Unload only detaches presentation; the pooled owner retains the same entries.
   expect((await (await reopened.conversation(record)).historyView()).entries).toEqual(view.entries);
 });
 

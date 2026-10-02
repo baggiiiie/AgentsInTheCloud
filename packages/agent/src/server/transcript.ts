@@ -79,13 +79,8 @@ export interface ToolView {
   status: "streaming" | "running" | "ok" | "error";
   resultText?: string;
   resultImages?: SessionImageRef[];
-  argsStream?: string;
   tmuxSession?: string;
-  terminalVisible?: boolean;
-  startedAt?: number;
-  timeoutSeconds?: number;
   durationMs?: number;
-  tokenCount?: number;
   details?: ToolViewDetails;
   /** Timestamp of the assistant entry that issued this call. */
   issuedAt?: number;
@@ -103,7 +98,6 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
   type: "working";
   /** Initiating and steering entries whose activity belongs to this run. */
   inputEntryIds?: string[];
-  /** Messages that arrived in this run and are still unread. */
   startedAt: number;
   completedAt?: number;
   stoppedAt?: number;

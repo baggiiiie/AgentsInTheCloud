@@ -62,12 +62,8 @@ function limitModelLines(text: string): LimitedModelLines {
   return { text: lines.join("\n"), linesTruncated };
 }
 
-export function stripTmuxPaneFraming(text: string): string {
-  return stripObservablePaneFraming(text);
-}
-
 export function formatBashOutput(modelPane: string, displayPane: string, fullOutputPath: string) {
-  const modelLines = limitModelLines(plainModelOutput(stripTmuxPaneFraming(modelPane)));
+  const modelLines = limitModelLines(plainModelOutput(stripObservablePaneFraming(modelPane)));
   const modelLimited = truncateTail(modelLines.text);
   let output = modelLimited.content;
   const modelTruncated = modelLimited.truncated || modelLines.linesTruncated > 0;
@@ -80,7 +76,7 @@ export function formatBashOutput(modelPane: string, displayPane: string, fullOut
     output += `\n\n${truncationNotice}`;
   }
 
-  const displayLimited = truncateTail(stripTmuxPaneFraming(displayPane), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
+  const displayLimited = truncateTail(stripObservablePaneFraming(displayPane), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
   let displayAnsi = normalizeCarriageReturns(displayLimited.content).trimEnd();
   if (displayLimited.truncated) displayAnsi = `… output truncated to last ${maxDisplayAnsiBytes} bytes\n${displayAnsi}`;
   if (truncationNotice) displayAnsi += `\n\n${truncationNotice}`;

@@ -5,7 +5,7 @@ import type { TreeFilterMode } from "./session-tree.ts";
 import { createPiModelRuntime } from "@agents-in-the-cloud/llm/server";
 import { createLivePresentation } from "@agents-in-the-cloud/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import type { DurableAgentRuntime } from "./durable-runtime.ts";
+import type { DurableAgentController } from "./durable-runtime.ts";
 import { DurableConversationPresentation } from "./durable-presentation.ts";
 import { configuredModelOptionViews } from "./model-state.ts";
 import { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
@@ -15,8 +15,6 @@ import { renderAgentPaneComposerFooter, renderPromptActions, type AgentStatsView
 import { notificationControlId, renderNotificationControl } from "./render-notification.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 import type { AgentLivePresentationListener } from "./runtime-types.ts";
-
-type Controller = Awaited<ReturnType<DurableAgentRuntime["conversation"]>>;
 
 /** Host chrome wraps committed native views; it never synthesizes transcript events. */
 export class ConversationPresentation {
@@ -47,13 +45,13 @@ export class ConversationPresentation {
     ...(this.failure ? [{ target: ids.notices(this), html: renderNotice("error", "This Agent view disconnected. Reload to reconnect.") }] : []),
   ], 50);
 
-  private constructor(agent: WorkspaceAgentConversationInfo, private readonly controller: Controller, private readonly modelRuntime: Awaited<ReturnType<typeof createPiModelRuntime>>) {
+  private constructor(agent: WorkspaceAgentConversationInfo, private readonly controller: DurableAgentController, private readonly modelRuntime: Awaited<ReturnType<typeof createPiModelRuntime>>) {
     this.workspaceId = agent.workspaceId;
     this.conversationId = agent.conversationId;
     this.label = agent.label;
     this.readOnly = controller.readOnly;
   }
-  static async create(agent: WorkspaceAgentConversationInfo, controller: Controller) {
+  static async create(agent: WorkspaceAgentConversationInfo, controller: DurableAgentController) {
     const runtime = new ConversationPresentation(agent, controller, await createPiModelRuntime());
     try {
       runtime.presentation = await DurableConversationPresentation.attach(controller, { ...agent, branchId: String(controller.id) }, BACKGROUND_CONTEXT, () => runtime.committed());
@@ -146,7 +144,6 @@ export class ConversationPresentation {
   async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, hasStoppableWork: this.controller.hasStoppableWork, stats: this.stats(), readOnly: this.readOnly }; }
   async refreshCompletionCatalog() { if (this.readOnly) return ""; this.catalog = await renderWorkspaceCompletionCatalog(this.workspaceId); this.chrome.invalidate(); return this.catalog; }
   revealTurn(target: string) { return this.presentation.revealTurn(target); }
-  userMessages() { return this.presentation.userMessages(); }
   async refreshModelConfiguration() { if (this.readOnly) return; this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime); this.chrome.invalidate(); }
   async detailHtml(key: string, count?: number) { return this.presentation.detailHtml(key, count); }
   async treeHtml(options: { filter: TreeFilterMode; query: string }) { this.assertOpen(); return renderDurableTree(await this.controller.tree(), { ...options, historyPath: `/workspaces/${encodeURIComponent(this.workspaceId)}/agent-history` }); }
