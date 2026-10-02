@@ -39,6 +39,7 @@ const projectSecretSummarySchema = Type.Object({
   projectId: Type.String(),
   envName: Type.String(),
   hostPattern: Type.String(),
+  allowInPath: Type.Boolean(),
   placeholder: Type.Optional(Type.String()),
   annotation: Type.String(),
   optional: Type.Boolean(),

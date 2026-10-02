@@ -68,7 +68,7 @@ test("assembly opts only the observational read into replay and excludes legacy 
     expect(tools.map((tool) => [tool.name, tool.replay])).toEqual([
       ["read", "safe"], ["write", "unsafe"], ["edit", "unsafe"], ["present", "unsafe"],
     ]);
-    expect(tools.find((tool) => tool.name === "present")!.description).toContain("atelier-embed:");
+    expect(tools.find((tool) => tool.name === "present")!.description).toContain("artifact-preview:");
   } finally {
     unregister();
   }
