@@ -405,9 +405,11 @@ html.software-keyboard-visible .fixed-shell-app .fixed-shell-mobile-nav { displa
   .fixed-shell-app { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); gap: 0; padding: 0; }
   /* Fit the root, not individual descendants inside clipped full-height panes.
    * The keyboard arrangement snaps the shell above the (predicted) keyboard in
-   * one step; it never follows the keyboard's animation. */
-  html.software-keyboard-visible .fixed-shell-app {
-    position: fixed; left: 0; right: 0; top: var(--software-keyboard-top); bottom: var(--software-keyboard-inset); height: auto;
+   * one step; it never follows the keyboard's animation. The shell is always
+   * fixed: switching its position would make WebKit restore stale scroll
+   * offsets inside it a frame later. */
+  .fixed-shell-app {
+    position: fixed; left: 0; right: 0; top: var(--software-keyboard-top, 0px); bottom: var(--software-keyboard-inset, 0px); height: auto;
   }
   /* Resident workspaces own their bar; the overlaid workspace list uses the
    * outer grid's Atelier-bar row independently. */

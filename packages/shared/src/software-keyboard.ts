@@ -150,6 +150,25 @@ export function installSoftwareKeyboardTracking(): void {
     arrange(false, 0, 0, true);
   });
 
+  // WebKit scrolls the page to reveal a tapped field using where it was before
+  // focus rearranged the page, so the page would move twice. A tap focuses the
+  // field itself without that scroll; the arrangement already keeps it in view.
+  let touch: { x: number; y: number; time: number } | undefined;
+  document.addEventListener("touchstart", (event) => {
+    const point = event.touches.length === 1 ? event.touches[0]! : undefined;
+    touch = point ? { x: point.screenX, y: point.screenY, time: event.timeStamp } : undefined;
+  }, { capture: true, passive: true });
+  document.addEventListener("touchend", (event) => {
+    const start = touch;
+    touch = undefined;
+    const point = event.changedTouches.length === 1 && event.touches.length === 0 ? event.changedTouches[0]! : undefined;
+    const field = event.target instanceof Element ? event.target.closest("textarea, input, [contenteditable]") : null;
+    if (!start || !point || !event.cancelable || !(field instanceof HTMLElement) || !isTextEntry(field) || document.activeElement === field || field.inert) return;
+    if (event.timeStamp - start.time > 500 || Math.hypot(point.screenX - start.x, point.screenY - start.y) > 10) return;
+    event.preventDefault();
+    field.focus({ preventScroll: true });
+  }, { capture: true, passive: false });
+
   viewport.addEventListener("resize", measure);
   viewport.addEventListener("scroll", measure);
   measure();
