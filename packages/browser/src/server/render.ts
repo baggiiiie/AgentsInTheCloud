@@ -1,9 +1,8 @@
-import qrcode from "qrcode-generator";
-import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { qrCodeButtonHtml, qrCodeDialogHtml } from "@agents-in-the-cloud/design-system/qr-code";
 import { domId, escapeHtml, isWorkspaceLoopbackHost, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { browserFrameId, type WorkspaceBrowserView } from "./state.ts";
 
@@ -64,26 +63,9 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
       attributesHtml: 'data-browser-address-target="external" target="_blank" rel="noreferrer"',
     })
     : buttonHtml({ type: "button", variant: "secondary", content: externalLinkContent, disabled: true });
-  const qrIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h-3zM18 18h3v3h-3zM12 3v9H3M21 12h-6v3M12 15v6M21 15v-3"/></svg>';
-  const qrButton = buttonHtml({
-    type: "button",
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: qrIcon, label: "Open preview on your phone" },
-    disabled: !target,
-    attributesHtml: 'data-action="browser-address#showQr"',
-  });
-  let qrDialog = "";
-  if (target) {
-    const code = qrcode(0, "M");
-    code.addData(previewUrl);
-    code.make();
-    qrDialog = dialogHtml({
-      element: { attributesHtml: 'data-controller="dialog" data-browser-qr-dialog' },
-      iconHtml: qrIcon,
-      titleCaption: "Open on your phone",
-      bodyHtml: `<div class="browser-qr"><div class="browser-qr-code" role="img" aria-label="QR code for this preview">${code.createSvgTag({ cellSize: 4, margin: 16, scalable: true })}</div><a class="browser-qr-url" href="${escapeHtml(previewUrl)}" target="_blank" rel="noreferrer">${escapeHtml(previewUrl)}</a></div>`,
-    });
-  }
+  const qrDialogId = `${navigationKey}_qr`;
+  const qrButton = qrCodeButtonHtml(qrDialogId, "Open preview on your phone", !target);
+  const qrDialog = target ? qrCodeDialogHtml(qrDialogId, previewUrl) : "";
   const backButton = buttonHtml({
     type: "button",
     variant: "secondary",

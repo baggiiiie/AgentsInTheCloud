@@ -7,7 +7,9 @@ import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/
 import { invalidArguments } from "@agents-in-the-cloud/core";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
 import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
+import { instanceUrlHtml } from "../instance-url.ts";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { workspaceModules } from "../workspace-modules.generated.ts";
@@ -105,11 +107,11 @@ function settingsDialogHtml(titleCaption: string, bodyHtml: string, sectionId?: 
   });
 }
 
-export async function renderSettingsDialog(sectionId?: string): Promise<string> {
+export async function renderSettingsDialog(request: Request, sectionId?: string): Promise<string> {
   const contributions = listSettingsContributions().filter((contribution) => contribution.id !== "keypress-probe");
   if (sectionId && !contributions.some((contribution) => contribution.id === sectionId)) throw invalidArguments(`settings section not found: ${sectionId}`);
   const sections = await Promise.all(contributions.map((contribution) => contribution.render()));
-  return settingsDialogHtml("Settings", `<main class="settings-main">${sections.join("")}<div class="settings-dev-link"><a class="settings-development-link" href="/settings/development" data-turbo-frame="_top" data-turbo-stream="true">Development settings</a>${renderBuildIdentity()}</div></main>`, sectionId);
+  return settingsDialogHtml("Settings", `<main class="settings-main"><section class="settings-sec" id="settings-sec-instance-url"><h2>External URL</h2>${instanceUrlHtml(publicInstanceUrl(request), "settings_instance_url_qr")}</section>${sections.join("")}<div class="settings-dev-link"><a class="settings-development-link" href="/settings/development" data-turbo-frame="_top" data-turbo-stream="true">Development settings</a>${renderBuildIdentity()}</div></main>`, sectionId);
 }
 
 export async function renderDevelopmentSettingsDialog(): Promise<string> {
@@ -139,7 +141,7 @@ async function deleteAllStoredSettings(): Promise<void> {
 
 export async function handleSettingsPageRequest(request: Request, url: URL, options: { forceDeleteAllWorkspaces?: () => Promise<WorkspaceCleanupResult>; renderModelPickerUpdates: () => Promise<string> }): Promise<Response | undefined> {
   if (url.pathname === "/settings" && request.method === "GET") {
-    const html = await renderSettingsDialog();
+    const html = await renderSettingsDialog(request);
     return wantsStream(request) ? stream(update("settings_modal_host", html)) : response(html);
   }
   if (url.pathname === "/settings/development" && request.method === "GET") {
@@ -165,7 +167,7 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
       const message = error instanceof Error ? error.message : String(error);
       return stream(replace("settings_git_identity", await renderGitIdentityForm(message)));
     }
-    return stream(`${replace("settings_dialog", await renderSettingsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
+    return stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
   }
   return undefined;
 }

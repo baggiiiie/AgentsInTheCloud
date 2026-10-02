@@ -17,10 +17,6 @@ function createBrowserAddressController(Controller: WorkspaceClientControllerCon
       input.value = normalizeBrowserInput(input.value);
     }
 
-    showQr(): void {
-      this.element.closest(".browser-shell")!.querySelector<HTMLDialogElement>("[data-browser-qr-dialog]")!.showModal();
-    }
-
     reload(event?: Event): void {
       event?.preventDefault();
       const iframe = this.iframe();

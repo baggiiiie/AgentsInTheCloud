@@ -70,14 +70,14 @@ export async function handleGitHubSettingsRequest(request: Request, url: URL): P
     if (!await getStoredGitIdentity()) await setGitIdentity({ name: validation.name, email: validation.email });
     return surface === "onboarding"
       ? stream(update("onboarding_modal_host", await renderOnboardingDialog({ resumeAfter: "github" })))
-      : stream(`${replace("settings_dialog", await renderSettingsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
+      : stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
   }
   if (url.pathname === "/settings/github/disconnect" && request.method === "POST") {
     const surface = url.searchParams.get("surface") === "onboarding" ? "onboarding" : "settings";
     clearWorkspaceGitHubToken();
     return surface === "onboarding"
       ? stream(update("onboarding_modal_host", await renderOnboardingDialog()))
-      : stream(replace("settings_dialog", await renderSettingsDialog()));
+      : stream(replace("settings_dialog", await renderSettingsDialog(request)));
   }
   return undefined;
 }

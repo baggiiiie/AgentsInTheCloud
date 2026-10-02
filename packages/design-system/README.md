@@ -32,6 +32,7 @@ Prefer consistency over feature-specific visual preservation.
 | Running, still cancellable | `activity-button` | [ActivityButtonOptions](src/activity-button/activity-button-html.ts) |
 | Running, cannot invoke again | `progress-button` | [ProgressButtonOptions](src/progress-button/progress-button-html.ts) |
 | Clipboard + acknowledgement | `copy-button` | [CopyButtonOptions](src/copy-button/copy-button-html.ts) |
+| URL as a scannable QR code | `qr-code` | [qrCodeButtonHtml / qrCodeDialogHtml](src/qr-code/qr-code-html.ts) |
 | Destructive form confirmation | `destructive-confirmation` | [DestructiveConfirmationOptions](src/destructive-confirmation/destructive-confirmation-html.ts) |
 | Mutually exclusive visible choices | `toggle` | [ToggleOptions](src/toggle/toggle-html.ts) |
 | Anchored menu, trigger included | `popup` | [PopupOptions](src/popup/popup-html.ts) — prefer `popupHtml` |

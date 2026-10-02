@@ -1,8 +1,6 @@
 import { hostDiagnosticGroups } from "../diagnostics.ts";
 import { hostOriginAllowed } from "./authorization.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
-import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
-import { publicWorkspaceAppOrigin } from "@agents-in-the-cloud/proxy-ingress";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
@@ -67,10 +65,8 @@ async function handle(request: Request, url: URL, context: WorkspaceModuleRouteC
   const json = requestAcceptsJson(request);
   if (url.pathname === "/host" && request.method === "GET") {
     if (json) return Response.json({ available: hostAvailable(), url: "/host", boundary: "AgentsInTheCloud System", shellUser: "root" });
-    const instanceUrl = process.env.ATELIER_PUBLIC_URL || publicWorkspaceAppOrigin(request);
-    const instance = `<div class="host-instance-url"><span>External URL:</span><a href="${e(instanceUrl)}" target="_blank" rel="noopener noreferrer">${e(instanceUrl)}</a>${copyButtonHtml({ label: "Copy AgentsInTheCloud instance URL", copyText: instanceUrl })}</div>`;
     const body = hostAvailable() ? `<div class="host-content"><turbo-frame id="${statsFrame}" src="/host/sample"><p role="status">Sampling host…</p></turbo-frame><turbo-frame id="${terminalFrame}" src="/host/terminals"><p role="status">Loading terminals…</p></turbo-frame></div>` : `<p>Host access requires an AgentsInTheCloud System image with the host service. This instance has no System host connection.</p>`;
-    const dialog = dialogHtml({ element: { id: "host_dialog", attributesHtml: 'data-dialog-auto-show data-controller="host-panel" data-action="close->host-panel#closed"' }, titleCaption: "Host", iconHtml: Icons.Server, bodyHtml: `<div class="host-content">${instance}${body}</div>` });
+    const dialog = dialogHtml({ element: { id: "host_dialog", attributesHtml: 'data-dialog-auto-show data-controller="host-panel" data-action="close->host-panel#closed"' }, titleCaption: "Host", iconHtml: Icons.Server, bodyHtml: body });
     return request.headers.has("turbo-frame") ? response(`<turbo-frame id="${workspaceModuleModalFrameId}">${dialog}</turbo-frame>`) : context.renderModalPage(dialog);
   }
   if (!hostAvailable()) return json

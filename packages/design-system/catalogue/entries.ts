@@ -10,6 +10,7 @@ import { actionItemHtml } from "../src/action-item/action-item-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
 import { progressButtonHtml } from "../src/progress-button/progress-button-html.ts";
 import { copyButtonHtml } from "../src/copy-button/copy-button-html.ts";
+import { qrCodeButtonHtml, qrCodeDialogHtml } from "../src/qr-code/qr-code-html.ts";
 import { destructiveConfirmationHtml } from "../src/destructive-confirmation/destructive-confirmation-html.ts";
 import { dialogHtml } from "../src/dialog/dialog-html.ts";
 import { panelHtml } from "../src/panel/panel-html.ts";
@@ -719,6 +720,12 @@ export const entries: CatalogueEntry[] = [
           }),
       },
     ],
+  },
+  {
+    id: "qr-code", title: "QR code", when: "Let people open a URL on their phone.",
+    contract: "Point qrCodeButtonHtml at a qrCodeDialogHtml rendered outside any form. Opens natively via commandfor; no controller.",
+    imports: { "qr-code": "qrCodeButtonHtml, qrCodeDialogHtml" },
+    examples: [{ title: "Button and dialog", render: (suffix = "") => qrCodeButtonHtml(`catalogue_qr${suffix}`, "Open on your phone") + qrCodeDialogHtml(`catalogue_qr${suffix}`, "https://example.com/preview") }],
   },
   {
     id: "destructive-confirmation",

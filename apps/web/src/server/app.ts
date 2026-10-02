@@ -576,13 +576,13 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     | { kind: "module-modal"; dialogHtml: string }
     | { kind: "project-editor"; dialogHtml: string }
     | { kind: "new-workspace"; project?: ProjectSummary }
-    | { kind: "settings"; section: string | undefined; development?: true };
+    | { kind: "settings"; request: Request; section: string | undefined; development?: true };
 
   async function renderWorkspaceShell(selectedId?: string, surface?: ShellSurface, initialSelection?: FixedWorkspacePresentation["initialSelection"]): Promise<string> {
     const pane = await workspacePaneCollections(selectedId ?? "");
     const projectEditor = surface?.kind === "project-editor" ? surface.dialogHtml : '<div id="project-editor-modal"></div>';
     const settings = surface?.kind === "settings"
-      ? surface.development ? await renderDevelopmentSettingsDialog() : await renderSettingsDialog(surface.section)
+      ? surface.development ? await renderDevelopmentSettingsDialog() : await renderSettingsDialog(surface.request, surface.section)
       : "";
     const launchComposer = surface?.kind === "new-workspace"
       ? surface.project ? await renderProjectLaunchComposerFrame(surface.project) : await renderProjectlessLaunchComposerFrame()
@@ -1174,8 +1174,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/projects/new" && request.method === "GET") {
       return projectEditorResponse(request, { kind: "new" });
     }
-    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", section: url.searchParams.get("section") ?? undefined });
-    if (url.pathname === "/settings/development" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", section: undefined, development: true });
+    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
+    if (url.pathname === "/settings/development" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: undefined, development: true });
     if (url.pathname === "/workspaces" && request.method === "GET") return workspaceListEndpoint(request, url);
     if (url.pathname === "/workspaces" && request.method === "POST") return await createWorkspaceEndpoint(request);
     if (url.pathname === "/workspaces/open-oldest-attention" && request.method === "POST") return openOldestAttentionWorkspaceEndpoint();

@@ -103,6 +103,10 @@ export const designSystemStaticFiles = {
     ),
     contentType: "text/css; charset=utf-8",
   },
+  "/qr-code.css": {
+    url: new URL("./qr-code/qr-code.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
   "/toggle.css": {
     url: new URL("./toggle/toggle.css", import.meta.url),
     contentType: "text/css; charset=utf-8",

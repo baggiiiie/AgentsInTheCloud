@@ -2,7 +2,6 @@ import { AgentsInTheCloudCoreError, invalidArguments, readJsonObject, requestAcc
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
-import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -25,12 +24,13 @@ import {
   updateProjectEnvironmentVariable, updateProjectSecret,
   type ProjectEnvironmentVariable, type ProjectSecretInput, type ProjectSecretSummary, type ProjectSshKeySummary, type ProjectSummary,
 } from "@agents-in-the-cloud/projects";
-import { publicWorkspaceAppOrigin } from "@agents-in-the-cloud/proxy-ingress";
+import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
 import { domId, escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
 import { jsonResponse } from "./http-responses.ts";
+import { instanceUrlHtml } from "./instance-url.ts";
 import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 const jsonStringSchema = Type.String();
@@ -284,7 +284,7 @@ export function createProjectRoutes(deps: {
           <section class="project-edit-danger-zone"${revealSection(section, "danger")}>${projectConfigurationDisclosure("Danger zone", `<div class="project-edit-danger">${projectDeleteControl(project.id)}</div>`, section === "danger")}</section>
           <section class="project-configuration-list">
             <div class="project-configuration-head"><h3>AgentsInTheCloud instance URL</h3><p>The external URL for this AgentsInTheCloud instance.</p></div>
-            <div class="project-instance-url"><a href="${escapeHtml(instanceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(instanceUrl)}</a>${copyButtonHtml({ label: "Copy AgentsInTheCloud instance URL", copyText: instanceUrl })}</div>
+            ${instanceUrlHtml(instanceUrl, "project_instance_url_qr")}
           </section>
         </div>
       </div>
@@ -301,7 +301,7 @@ export function createProjectRoutes(deps: {
     const title = options.kind === "new" ? "Add project" : "Project settings";
     const bodyHtml = options.kind === "new"
       ? newProjectEditorBody()
-      : await projectEditorBody(await projectById(options.projectId), process.env.ATELIER_PUBLIC_URL || publicWorkspaceAppOrigin(request), parseProjectSettingsSection(options.section));
+      : await projectEditorBody(await projectById(options.projectId), publicInstanceUrl(request), parseProjectSettingsSection(options.section));
     return dialogHtml({
       element: {
         id: "project-editor-modal",

@@ -13,7 +13,6 @@
     "@agents-in-the-cloud/design-system": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@agents-in-the-cloud/proxy-ingress": "workspace:*",
-    "qrcode-generator": "2.0.4",
     "typebox": "^1.0.57",
     "@agents-in-the-cloud/workspace": "workspace:*"
   }

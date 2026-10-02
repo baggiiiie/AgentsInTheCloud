@@ -37,6 +37,7 @@ export const Icons = {
   Paperclip: iconHtml('<path d="m21 11-8.5 8.5a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.5-8.5"/>'),
   Plus: iconHtml('<path d="M12 5v14M5 12h14"/>'),
   Projects: iconHtml('<path d="M5 18V5a2 2 0 0 1 2-2h12v18H7a2 2 0 0 1 0-4h12M9 3v14M12 7h4"/>'),
+  QrCode: iconHtml('<path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h-3zM18 18h3v3h-3zM12 3v9H3M21 12h-6v3M12 15v6M21 15v-3"/>'),
   Refresh: iconHtml('<path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/>'),
   Review: iconHtml('<path d="M9 5h6M9 3h6v4H9zM7 5H5v16h14V5h-2M8 13l2 2 5-5"/>'),
   Star: iconHtml('<path d="m12 3 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9z"/>'),

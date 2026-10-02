@@ -453,6 +453,11 @@ export function publicWorkspaceAppOrigin(request: Request): string {
   return publicAgentsInTheCloudOrigin(request);
 }
 
+/** The URL people use to reach this AgentsInTheCloud instance from outside. */
+export function publicInstanceUrl(request: Request): string {
+  return process.env.ATELIER_PUBLIC_URL || publicAgentsInTheCloudOrigin(request);
+}
+
 function publicAgentsInTheCloudOrigin(request: Request): string {
   const context = publicRequestContext(request);
   return `${context.protocol}://${context.host}`;
