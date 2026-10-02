@@ -183,10 +183,11 @@ export function findProjectRecord(store: ProjectStore, projectId: string): Proje
   return project;
 }
 
-export function projectConfigurationFingerprint(project: Pick<ProjectRecord, "gitUrl" | "branch" | "sessionShareKey" | "dockerfile" | "secrets" | "sshKnownHosts"> & { environment?: Pick<ProjectEnvironmentVariable, "name" | "value">[] }): string {
-  // Only workspace setup snapshots belong here; SSH keys are authorized live.
+export function projectConfigurationFingerprint(project: Pick<ProjectRecord, "gitUrl" | "branch" | "dockerfile" | "secrets" | "sshKnownHosts"> & { environment?: Pick<ProjectEnvironmentVariable, "name" | "value">[] }): string {
+  // Only workspace setup snapshots belong here; SSH keys are authorized live. Renaming a project
+  // also changes its session share key, which is not worth warning existing workspaces about.
   const configuration = {
-    gitUrl: project.gitUrl, branch: project.branch, sessionShareKey: project.sessionShareKey,
+    gitUrl: project.gitUrl, branch: project.branch,
     dockerfile: project.dockerfile ?? "",
     environment: (project.environment ?? []).map(({ name, value }) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name)),
     secrets: (project.secrets ?? []).filter((secret) => secret.encryptedSecret).map(({ envName, hostPattern, placeholder, allowInPath, encryptedSecret }) => ({ envName, hostPattern, placeholder, allowInPath, encryptedSecret })).sort((a, b) => a.envName.localeCompare(b.envName)),

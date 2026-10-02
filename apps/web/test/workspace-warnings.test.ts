@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProjectEnvironmentVariable, deleteProjectSecret, getProjectConfiguration, isGitProjectInit, listProjects, projectWorkspaceInit, setProjectDockerfile, updateProjectSecret } from "@agents-in-the-cloud/projects";
+import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProjectEnvironmentVariable, deleteProjectSecret, getProjectConfiguration, isGitProjectInit, listProjects, updateProject, projectWorkspaceInit, setProjectDockerfile, updateProjectSecret } from "@agents-in-the-cloud/projects";
 import { workspaceWarnings } from "../src/server/workspace-warnings.ts";
 import type { WorkspaceEntry } from "../src/server/workspace-registry.ts";
 import { temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
@@ -29,6 +29,13 @@ test("setup changes are compared to creation, survive reconstruction, and revert
   expect(await warningsFor(workspace)).toEqual([]);
   await setProjectDockerfile(project.id, "FROM agents-in-the-cloud-workspace\nRUN echo ready");
   expect((await warningsFor(workspace))[0]!.state).not.toBe(changed[0]!.state);
+});
+
+test("renaming a project is not a setup change", async () => {
+  const { project } = await addProject("https://github.com/org/example.git");
+  const workspace = entry(projectWorkspaceInit(project));
+  await updateProject(project.id, { name: "Renamed", spec: "https://github.com/org/example.git" });
+  expect(await warningsFor(workspace)).toEqual([]);
 });
 
 test("missing mandatory secrets and changed settings are separate, while annotations are live metadata", async () => {
