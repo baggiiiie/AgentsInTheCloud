@@ -206,7 +206,7 @@ export async function openDurableAgentRuntime(
       const records = (await harness.snapshot(WorkspaceConversations, context))!.conversations;
       const scope = new Set(durableStopScope(records, conversation.id, !identity.parentId));
       const tasks = (await harness.inspect(context)).tasks;
-      if (live?.run || live?.compactions?.length || inbox?.items.length || tasks.some(item => scope.has(item.record.conversationId) && item.record.kind !== "atelier.delegation-anchor")) {
+      if (live?.run || live?.compactions?.length || inbox?.items.length || tasks.some(item => scope.has(item.record.conversationId) && item.record.kind !== "agents-in-the-cloud.delegation-anchor")) {
         throw new Error("Stop the agent and wait for its work to finish before navigating history.");
       }
     }
@@ -274,7 +274,7 @@ export async function openDurableAgentRuntime(
       settings: () => conversation.agent(context),
       get hasStoppableWork() {
         const scope = new Set(durableStopScope(catalogWatch!.value!.conversations, conversation.id, !identity.parentId));
-        return Object.values(taskWatch.value.tasks).some(task => scope.has(task.conversationId) && task.kind !== "atelier.delegation-anchor");
+        return Object.values(taskWatch.value.tasks).some(task => scope.has(task.conversationId) && task.kind !== "agents-in-the-cloud.delegation-anchor");
       },
       subscribeWork(listener: () => void) { workListeners.add(listener); return () => { workListeners.delete(listener); }; },
       isSubagent: Boolean(identity.parentId),

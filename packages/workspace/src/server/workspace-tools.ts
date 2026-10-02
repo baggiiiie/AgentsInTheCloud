@@ -1,4 +1,4 @@
-import { atelierDataPath, dockerHostAgentsInTheCloudDataPath, type AgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, dockerHostAgentsInTheCloudDataPath, type AgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { chmod, copyFile, mkdir, readdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ export async function prepareWorkspaceToolsMount(
   runtime: AgentsInTheCloudRuntimeContext,
   packagesDirectory = fileURLToPath(new URL("../../../", import.meta.url)),
 ): Promise<WorkspaceDockerMount> {
-  const directory = atelierDataPath(runtime, "workspace-tools");
+  const directory = agentsInTheCloudDataPath(runtime, "workspace-tools");
   const tools = new Map<string, string>();
   const packages = await readdir(packagesDirectory, { withFileTypes: true });
   for (const entry of packages.sort((left, right) => left.name.localeCompare(right.name))) {
@@ -41,7 +41,7 @@ export async function prepareWorkspaceToolsMount(
   return {
     type: "bind",
     source: dockerHostAgentsInTheCloudDataPath(runtime, "workspace-tools"),
-    target: "/opt/atelier/bin",
+    target: "/opt/agents-in-the-cloud/bin",
     readonly: true,
   };
 }

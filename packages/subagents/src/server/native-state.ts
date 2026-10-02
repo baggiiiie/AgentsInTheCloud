@@ -5,7 +5,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 
 export const maxConcurrentSubagents = 6;
-export const anchorTaskName = "atelier.delegation-anchor";
+export const anchorTaskName = "agents-in-the-cloud.delegation-anchor";
 export type Receipt = {
   id: string; from: string; to: string; author: string; recipient: string;
   conversationId: ConversationId; senderConversationId: ConversationId;
@@ -15,15 +15,15 @@ export type Receipt = {
   context: "pending" | "queued" | "placed" | "failed"; error?: string;
   prepared?: { timestamp: number; format: string };
 };
-export const inheritedBoundaryEntry = defineEntry<{ source: string; count: number }>("atelier.inherited-boundary");
-export const communicationEntry = defineEntry<{ direction: "incoming" | "outgoing"; receipt: Receipt }>("atelier.communication");
-export const communicationStateEntry = defineEntry<{ id: string; change: Partial<Receipt> }>("atelier.communication-state");
+export const inheritedBoundaryEntry = defineEntry<{ source: string; count: number }>("agents-in-the-cloud.inherited-boundary");
+export const communicationEntry = defineEntry<{ direction: "incoming" | "outgoing"; receipt: Receipt }>("agents-in-the-cloud.communication");
+export const communicationStateEntry = defineEntry<{ id: string; change: Partial<Receipt> }>("agents-in-the-cloud.communication-state");
 export const Delegation = defineDoc<{
   receipts: Record<string, Receipt>;
   assignments: Record<string, { recipient: ConversationId; status: "pending" | "completed" | "failed" | "interrupted"; result?: string }>;
   operations: Record<string, { child?: string; previous?: import("@earendil-works/chord").JsonValue }>;
-}>({ kind: "atelier.delegation", version: 1, scope: "session", initial: () => ({ receipts: {}, assignments: {}, operations: {} }) });
-export const Mailbox = defineDoc<{ receipts: Receipt[] }>({ kind: "atelier.mailbox", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ receipts: [] }) });
+}>({ kind: "agents-in-the-cloud.delegation", version: 1, scope: "session", initial: () => ({ receipts: {}, assignments: {}, operations: {} }) });
+export const Mailbox = defineDoc<{ receipts: Receipt[] }>({ kind: "agents-in-the-cloud.mailbox", version: 1, scope: "conversation", history: "latest", fork: "initial", initial: () => ({ receipts: [] }) });
 
 /** Keep routing state, the recipient mailbox and transcript evidence in one commit. */
 export async function updateReceipt(tx: Tx, id: string, change: Partial<Receipt>) {

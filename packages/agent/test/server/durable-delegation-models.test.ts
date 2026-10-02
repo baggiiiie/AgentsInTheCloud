@@ -58,9 +58,9 @@ for (const api of ["openai-codex-responses", "anthropic-messages"] as const) {
         (await tx.doc(Delegation)).receipts[receipt.id] = receipt;
         (await tx.doc(Mailbox, conversation.id)).receipts.push(receipt);
       }, ctx);
-      const part = { type: "text" as const, text: envelope, atelierAgentMessage: { id: "receipt-1", conversationId: conversation.id, author: native.author, recipient: native.recipient, kind: "message" } };
+      const part = { type: "text" as const, text: envelope, agentsInTheCloudAgentMessage: { id: "receipt-1", conversationId: conversation.id, author: native.author, recipient: native.recipient, kind: "message" } };
       const attributed: UserMessage = { role: "user", timestamp: 42, content: [part] };
-      await conversation.submit({ type: "write", entry: { kind: "atelier.agent-message", data: { receiptId: "receipt-1" }, model: [attributed] } }, ctx);
+      await conversation.submit({ type: "write", entry: { kind: "agents-in-the-cloud.agent-message", data: { receiptId: "receipt-1" }, model: [attributed] } }, ctx);
       const id = conversation.id;
       const head = (await conversation.entries({}, 1, undefined, ctx)).items[0]!;
       const branch = await conversation.fork(head.id, { ownership: { kind: "ownerless" } }, ctx);
@@ -75,8 +75,8 @@ for (const api of ["openai-codex-responses", "anthropic-messages"] as const) {
       await (await reopened.submit({ type: "input", content: "Retry after reopen", requestId: "second" }, ctx)).wait(ctx);
       expect(captured).toHaveLength(3);
       for (const payload of captured) {
-        expect(JSON.stringify(payload)).not.toContain("atelier-agent-message:");
-        expect(JSON.stringify(payload)).not.toContain("atelierAgentMessage");
+        expect(JSON.stringify(payload)).not.toContain("agents-in-the-cloud-agent-message:");
+        expect(JSON.stringify(payload)).not.toContain("agentsInTheCloudAgentMessage");
         expect(JSON.stringify(payload)).not.toContain("requestConversationId");
         if (api === "openai-codex-responses") {
           if (!Array.isArray(payload.input)) throw new Error("Expected Responses input");

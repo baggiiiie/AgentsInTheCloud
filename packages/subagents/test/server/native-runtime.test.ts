@@ -39,7 +39,7 @@ async function setup(pauseSpawn?: (context: Context) => Promise<void>) {
 async function completedDeliveries(owner: DurableAgentRuntime) {
   // Join the useful work, never the persistent background identity anchors.
   for (let round = 0; round < 5; round++) {
-    const tasks = (await owner.harness.inspect(context)).tasks.filter(item => item.record.kind !== "atelier.delegation-anchor");
+    const tasks = (await owner.harness.inspect(context)).tasks.filter(item => item.record.kind !== "agents-in-the-cloud.delegation-anchor");
     if (!tasks.length) return;
     await Promise.all(tasks.map(item => owner.harness.waitForTask(item.record.id, context)));
   }
@@ -116,7 +116,7 @@ test("root Stop cancels descendants without retiring their identities", async ()
   await work(false); // Idle identity anchors must not keep Stop available.
   expect((await owner.catalog()).find(record => record.conversationId === child.conversationId)).toBeDefined();
   expect(Object.values((await owner.harness.snapshot(Delegation, context))!.assignments)[0]?.status).toBe("interrupted");
-  expect((await owner.harness.inspect(context)).tasks.every(item => item.record.kind === "atelier.delegation-anchor")).toBe(true);
+  expect((await owner.harness.inspect(context)).tasks.every(item => item.record.kind === "agents-in-the-cloud.delegation-anchor")).toBe(true);
   release.resolve();
   const childController = await owner.conversation(child);
   faux.setResponses([fauxAssistantMessage("New work succeeds")]);

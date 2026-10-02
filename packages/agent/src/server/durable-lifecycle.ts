@@ -21,7 +21,7 @@ export const WorkspaceStops = defineDoc<{ tasks: Record<string, TaskId[]> }>({
 /** A background dispatcher can admit native input after its own task was captured
  * by Stop. Retain that relationship so cleanup fences the resulting run too. */
 export const DurableTaskAdmissions = defineDoc<{ requests: Record<string, { conversationId: ConversationId; requestId: string }> }>({
-  kind: "atelier.task-admissions", version: 1, scope: "session", initial: () => ({ requests: {} }),
+  kind: "agents-in-the-cloud.task-admissions", version: 1, scope: "session", initial: () => ({ requests: {} }),
 });
 
 /** The same scope is used to offer Stop and to commit it. Child Stop is local. */
@@ -47,7 +47,7 @@ async function stoppedTasks(tx: Tx, conversationId: ConversationId) {
   let cursor: Cursor | undefined;
   do {
     const page = await tx.scanTasks({ conversationId }, 500, cursor);
-    tasks.push(...page.items.filter(task => task.state.status !== "terminal" && task.kind !== "atelier.delegation-anchor").map(task => task.id));
+    tasks.push(...page.items.filter(task => task.state.status !== "terminal" && task.kind !== "agents-in-the-cloud.delegation-anchor").map(task => task.id));
     cursor = page.next;
   } while (cursor);
   return tasks;

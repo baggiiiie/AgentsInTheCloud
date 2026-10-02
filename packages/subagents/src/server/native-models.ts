@@ -12,7 +12,7 @@ export const delegationRequestIdentity = hook(GenerationTask, {
     return { messages: request.messages.map(message => {
       const part = attribution(message);
       if (!part) return message;
-      return { ...message, content: [{ ...part, atelierAgentMessage: { ...part.atelierAgentMessage, requestConversationId: api.conversationId } }] };
+      return { ...message, content: [{ ...part, agentsInTheCloudAgentMessage: { ...part.agentsInTheCloudAgentMessage, requestConversationId: api.conversationId } }] };
     }) };
   },
 });
@@ -23,12 +23,12 @@ export function delegationModels(models: Models, harness: () => Harness): Models
     const bridge = new SubagentModelInput();
     const delivered = request.messages.flatMap(message => {
       const part = attribution(message);
-      return part ? [part.atelierAgentMessage] : [];
+      return part ? [part.agentsInTheCloudAgentMessage] : [];
     });
     const messages = request.messages.map(message => {
       const part = attribution(message);
       if (!part) return message;
-      return bridge.forModel({ type: "agent_message", author: part.atelierAgentMessage.author, recipient: part.atelierAgentMessage.recipient, content: [{ type: "input_text", text: part.text }] }, model.api, message.timestamp);
+      return bridge.forModel({ type: "agent_message", author: part.agentsInTheCloudAgentMessage.author, recipient: part.agentsInTheCloudAgentMessage.recipient, content: [{ type: "input_text", text: part.text }] }, model.api, message.timestamp);
     });
     return models.streamSimple(model, { ...request, messages }, {
       ...options,

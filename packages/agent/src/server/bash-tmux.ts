@@ -112,7 +112,7 @@ export function createAgentTermSocketSession(url: URL): WorkspaceServerSocketSes
     // Inline terminals must never resize the agent's fixed-size command pane.
     cols: observableTerminalCols,
     rows: observableTerminalRows,
-    user: "atelier",
+    user: "agents-in-the-cloud",
     readonly: true,
     fixedSize: true,
   });

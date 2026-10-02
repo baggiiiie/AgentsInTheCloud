@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { prepareWorkspaceToolsMount } from "./workspace-tools.ts";
 
 test("combines package tools into one read-only executable directory and synchronizes changes", async () => {
-  const root = await mkdtemp(join(tmpdir(), "atelier-tools-mount-"));
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-tools-mount-"));
   try {
     const source = join(root, "packages");
     const firstPackage = join(source, "first-package/workspace_tools");
@@ -16,15 +16,15 @@ test("combines package tools into one read-only executable directory and synchro
     await writeFile(join(source, "not-a-package"), "ignored");
     await writeFile(join(firstPackage, "first"), "#!/bin/sh\necho first\n");
     await writeFile(join(secondPackage, "second"), "#!/bin/sh\necho second\n");
-    const runtime = { atelierDataDir: join(root, "data"), dockerHostAgentsInTheCloudDataDir: "/host/atelier", dockerBridgeHost: "unused" };
+    const runtime = { agentsInTheCloudDataDir: join(root, "data"), dockerHostAgentsInTheCloudDataDir: "/host/agents-in-the-cloud", dockerBridgeHost: "unused" };
     const mount = await prepareWorkspaceToolsMount(runtime, source);
     expect(mount).toEqual({
       type: "bind",
-      source: "/host/atelier/workspace-tools",
-      target: "/opt/atelier/bin",
+      source: "/host/agents-in-the-cloud/workspace-tools",
+      target: "/opt/agents-in-the-cloud/bin",
       readonly: true,
     });
-    const published = join(runtime.atelierDataDir, "workspace-tools");
+    const published = join(runtime.agentsInTheCloudDataDir, "workspace-tools");
     const inode = (await stat(published)).ino;
     for (const name of ["first", "second"]) {
       expect(await readFile(join(published, name), "utf8")).toBe(await readFile(join(name === "first" ? firstPackage : secondPackage, name), "utf8"));
@@ -44,11 +44,11 @@ test("combines package tools into one read-only executable directory and synchro
 });
 
 test("includes the agent bash helper in the shared tools directory", async () => {
-  const root = await mkdtemp(join(tmpdir(), "atelier-tools-mount-"));
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-tools-mount-"));
   try {
-    await prepareWorkspaceToolsMount({ atelierDataDir: root, dockerHostAgentsInTheCloudDataDir: root, dockerBridgeHost: "unused" });
-    expect(await readFile(join(root, "workspace-tools/atelier-agent-bash"), "utf8"))
-      .toBe(await readFile(new URL("../../../agent/workspace_tools/atelier-agent-bash", import.meta.url), "utf8"));
+    await prepareWorkspaceToolsMount({ agentsInTheCloudDataDir: root, dockerHostAgentsInTheCloudDataDir: root, dockerBridgeHost: "unused" });
+    expect(await readFile(join(root, "workspace-tools/agents-in-the-cloud-agent-bash"), "utf8"))
+      .toBe(await readFile(new URL("../../../agent/workspace_tools/agents-in-the-cloud-agent-bash", import.meta.url), "utf8"));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -56,7 +56,7 @@ test("includes the agent bash helper in the shared tools directory", async () =>
 
 
 test("rejects duplicate tool names before changing the published directory", async () => {
-  const root = await mkdtemp(join(tmpdir(), "atelier-tools-conflict-"));
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-tools-conflict-"));
   try {
     const packages = join(root, "packages");
     const first = join(packages, "one/workspace_tools/shared");
@@ -65,14 +65,14 @@ test("rejects duplicate tool names before changing the published directory", asy
       await mkdir(join(packages, name, "workspace_tools"), { recursive: true });
     }
     await writeFile(first, "first");
-    const runtime = { atelierDataDir: join(root, "data"), dockerHostAgentsInTheCloudDataDir: "/host/atelier", dockerBridgeHost: "unused" };
+    const runtime = { agentsInTheCloudDataDir: join(root, "data"), dockerHostAgentsInTheCloudDataDir: "/host/agents-in-the-cloud", dockerBridgeHost: "unused" };
     await prepareWorkspaceToolsMount(runtime, packages);
     await writeFile(first, "updated");
     await writeFile(second, "conflict");
     await expect(prepareWorkspaceToolsMount(runtime, packages)).rejects.toThrow(
       `Conflicting workspace tool "shared": ${first} and ${second}`,
     );
-    expect(await readFile(join(runtime.atelierDataDir, "workspace-tools/shared"), "utf8")).toBe("first");
+    expect(await readFile(join(runtime.agentsInTheCloudDataDir, "workspace-tools/shared"), "utf8")).toBe("first");
   } finally {
     await rm(root, { recursive: true, force: true });
   }
