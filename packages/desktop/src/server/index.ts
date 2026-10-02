@@ -1,5 +1,6 @@
 import { registerWorkspacePresenter } from "@atelier/agent/server";
 import { buttonHtml } from "@atelier/design-system/button";
+import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { Icons } from "@atelier/design-system/icons";
 import { domId, escapeHtml, type WorkspaceModule, type WorkspaceWorkViewPresentation } from "@atelier/shared";
 import { createWorkspaceMetadataState, workspacePortBackend } from "@atelier/workspace";
@@ -26,10 +27,31 @@ export const atelierServerModule: WorkspaceModule = {
     parseReference: (value) => Value.Parse(referenceSchema, value),
     identity: () => "desktop",
     render: ({ workspaceId }) => {
+      const clipboardCopy = copyButtonHtml({ label: "Copy remote text to local clipboard", attributesHtml: 'data-desktop-pane-target="clipboardCopy" hidden' });
       const fullscreen = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-desktop-pane-target="fullscreen" data-action="desktop-pane#toggleFullscreen" aria-pressed="false"' });
       const statuses = [["connecting", "Connecting", "running"], ["connected", "Connected", "success"], ["disconnected", "Disconnected · reconnecting", "warning"], ["starting", "Starting desktop", "running"], ["stopped", "Desktop stopped", ""], ["failed", "Desktop failed", "danger"]]
-        .map(([phase, label, tone]) => `<span data-desktop-pane-target="status" data-phase="${phase}"${phase === "connecting" ? "" : " hidden"}><i class="status-dot ${tone}" aria-hidden="true"></i>${label}</span>`).join("");
-      return `<section id="${domId("desktop_view", workspaceId)}" data-turbo-permanent class="work-view-pane" data-work-view-source="desktop"><div class="desktop-pane" data-controller="desktop-pane" data-action="message@window->desktop-pane#receive fullscreenchange@document->desktop-pane#fullscreenChanged"><div class="desktop-toolbar"><div class="desktop-connection" role="status" aria-live="polite">${statuses}<span class="desktop-status-detail" data-desktop-pane-target="detail"></span></div>${fullscreen}</div><iframe class="desktop-frame" title="Workspace desktop" data-desktop-pane-target="frame" data-action="load->desktop-pane#loaded desktop:navigating->desktop-pane#reset" data-controller="workspace-app-frame" data-workspace-app-frame-workspace-id-value="${escapeHtml(workspaceId)}" data-workspace-app-frame-app-key-value="desktop"></iframe></div></section>`;
+        .map(([phase, label, tone]) => `<span data-desktop-pane-target="status" aria-label="${label}" title="${label}" data-phase="${phase}"${phase === "connecting" ? "" : " hidden"}><i class="status-dot ${tone}" aria-hidden="true"></i><span class="desktop-status-caption">${label}</span></span>`).join("");
+      return `<section id="${domId("desktop_view", workspaceId)}" data-turbo-permanent class="work-view-pane" data-work-view-source="desktop">
+        <div class="desktop-pane" data-controller="desktop-pane" data-action="message@window->desktop-pane#receive fullscreenchange@document->desktop-pane#fullscreenChanged">
+          <div class="desktop-toolbar">
+            <div class="desktop-connection" role="status" aria-live="polite">${statuses}<span class="desktop-status-detail" data-desktop-pane-target="detail"></span></div>
+            <div class="desktop-clipboard" role="group" aria-label="Remote clipboard">
+              <textarea class="textarea desktop-clipboard-input" rows="1" wrap="off" aria-label="Remote clipboard text" title="Sends automatically after a short pause. Enter sends now; Shift+Enter adds a newline." placeholder="If you type here, it ends up in the remote clipboard" data-desktop-pane-target="clipboardInput" data-action="input->desktop-pane#queueClipboard compositionend->desktop-pane#queueClipboard keydown->desktop-pane#clipboardKeydown" disabled></textarea>
+              <div class="desktop-clipboard-action">
+                <span class="desktop-clipboard-feedback" data-desktop-pane-target="clipboardFeedback" role="status" aria-live="polite" hidden>
+                  <span data-clipboard-state="pending">${Icons.More}</span>
+                  <span data-clipboard-state="sending">${Icons.Refresh}</span>
+                  <span data-clipboard-state="sent">${Icons.Check}</span>
+                  <span class="desktop-clipboard-feedback-label" data-desktop-pane-target="clipboardFeedbackLabel"></span>
+                </span>
+                ${clipboardCopy}
+              </div>
+            </div>
+            ${fullscreen}
+          </div>
+          <iframe class="desktop-frame" data-desktop-pane-target="frame" data-controller="workspace-app-frame" data-workspace-app-frame-workspace-id-value="${escapeHtml(workspaceId)}" data-workspace-app-frame-app-key-value="desktop" data-action="load->desktop-pane#loaded desktop:navigating->desktop-pane#reset" title="Workspace desktop"></iframe>
+        </div>
+      </section>`;
     },
     close: ({ workspaceId }) => views.write(workspaceId, { open: false }),
   }],

@@ -129,7 +129,8 @@ def supervise(ready_fd):
             # Suppress the Chrome for Testing banner (also suppresses startup flag warnings).
             launch("Chromium", ["dbus-run-session", "--", "chromium", "--test-type=gpu", "--gtk-version=3", f"--user-data-dir={ROOT / 'profile'}", "--class=AtelierDesktop", "--no-first-run", "--no-default-browser-check", "--disable-dev-shm-usage", "--start-maximized", "--remote-debugging-address=127.0.0.1", f"--remote-debugging-port={CDP_PORT}", "about:blank"])
             wait_ready(cdp_ready, children, "Chromium CDP")
-            launch("x11vnc", ["x11vnc", "-display", DISPLAY, "-auth", str(auth), "-listen", "127.0.0.1", "-rfbport", str(VNC_PORT), "-forever", "-shared", "-nopw", "-noxdamage", "-xkb"])
+            # Only forward explicit copies (CLIPBOARD), not highlighted text (PRIMARY).
+            launch("x11vnc", ["x11vnc", "-display", DISPLAY, "-auth", str(auth), "-listen", "127.0.0.1", "-rfbport", str(VNC_PORT), "-forever", "-shared", "-nopw", "-noxdamage", "-xkb", "-noprimary"])
             wait_ready(lambda: port_ready(VNC_PORT), children, "VNC")
             launch("websockify", ["websockify", "--heartbeat", "30", f"127.0.0.1:{WEB_PORT}", f"127.0.0.1:{VNC_PORT}"])
             wait_ready(lambda: port_ready(WEB_PORT), children, "VNC WebSocket")
