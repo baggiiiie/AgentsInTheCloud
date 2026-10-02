@@ -1,4 +1,3 @@
-@import "/tab-strip.css";
 @import "/warning-banner.css";
 @import "/markdown.css";
 @import "/text-entry.css";
@@ -11,6 +10,7 @@
 @import "/popup.css";
 @import "/dialog.css";
 @import "/action-item.css";
+@import "/tab-strip.css";
 @import "/perimeter-button.css";
 @import "/activity-button.css";
 @import "/progress-button.css";

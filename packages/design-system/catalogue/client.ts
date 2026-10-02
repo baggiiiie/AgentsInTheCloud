@@ -1,6 +1,7 @@
 import { animateWarningChanges } from "../src/warning-banner/warning-banner-controller.ts";
 import { setActivityButtonState } from "../src/activity-button/activity-button-client.ts";
 import { CatalogueReloadController } from "./reload-controller.ts";
+import { setTabStatus } from "../src/tab-strip/tab-strip-controller.ts";
 import { Application, Controller } from "@hotwired/stimulus";
 import { registerDesignSystemControllers } from "../src/client.ts";
 import { showTransientFeedback } from "../src/transient-feedback/transient-feedback-controller.ts";
@@ -97,13 +98,31 @@ class CatalogueController extends Controller<HTMLElement> {
     const region = this.element.querySelector<HTMLElement>("#motion-warning-region")!;
     await animateWarningChanges([region], () => { region.querySelector<HTMLElement>(".warning-banner")!.hidden = false; });
   }
+  selectTab(event: Event): void {
+    // SAFETY: The action is bound to a server-rendered tab button.
+    const tab = event.currentTarget as HTMLElement;
+    const demo = tab.closest<HTMLElement>("[data-catalogue-tab-demo]")!;
+    for (const item of demo.querySelectorAll('[role="tab"]')) item.setAttribute("aria-selected", String(item === tab));
+    const status = tab.querySelector<HTMLElement>(".tab-strip__status")!;
+    demo.querySelector<HTMLInputElement>("[data-tab-busy]")!.checked = !status.querySelector<HTMLElement>(".running")!.hidden;
+    demo.querySelector<HTMLInputElement>("[data-tab-attention]")!.checked = !status.querySelector<HTMLElement>(".attention")!.hidden;
+    demo.querySelector("[data-tab-selected-title]")!.textContent = tab.querySelector(".action-item__label-text")!.textContent;
+  }
+  tabStatus(event: Event): void {
+    // SAFETY: This change action is bound to the specimen's native checkboxes.
+    const demo = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-catalogue-tab-demo]")!;
+    setTabStatus(demo.querySelector<HTMLElement>('.action-item:has([aria-selected="true"])')!, {
+      busy: demo.querySelector<HTMLInputElement>("[data-tab-busy]")!.checked,
+      requestingAttention: demo.querySelector<HTMLInputElement>("[data-tab-attention]")!.checked,
+    });
+  }
   submit(event: Event): void {
     event.preventDefault();
     // SAFETY: Catalogue submit actions are bound to the element containing the demo and its output.
     const demo = event.currentTarget as HTMLElement;
     demo.querySelector<HTMLElement>(":popover-open")?.hidePopover();
     demo.querySelector("output")!.textContent =
-      "Submitted — demo only. Nothing was deleted.";
+      "Demo only — nothing was changed.";
   }
 }
 const application = Application.start();

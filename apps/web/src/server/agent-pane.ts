@@ -8,7 +8,7 @@ import { popupHtml } from "@atelier/design-system/popup";
 import { tabHtml, tabStripHtml } from "@atelier/design-system/tab-strip";
 import { domId, escapeHtml } from "@atelier/shared";
 import type { WorkspacePresentation } from "./workspace-presentation.ts";
-import { barButton, behaviorTurboStream, busyAttentionIndicator, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
+import { barButton, behaviorTurboStream, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
 
 export interface AgentPaneContribution {
   bodyHtml?: string;
@@ -51,12 +51,6 @@ export function agentContentId(workspaceId: string, conversationId: string): str
   return domId("agent_content", workspaceId, conversationId);
 }
 
-function agentStateDomId(workspaceId: string, conversationId: string): string { return domId("agent_state", workspaceId, conversationId); }
-
-function renderAgentState(workspaceId: string, conversationId: string, state: { busy?: boolean; requestingAttention?: boolean; attentionSequence?: number }): string {
-  return `<span id="${agentStateDomId(workspaceId, conversationId)}" data-agent-attention-id="${escapeHtml(conversationId)}"${state.attentionSequence === undefined ? "" : ` data-attention-sequence="${state.attentionSequence}"`}${state.busy || state.requestingAttention ? "" : " hidden"}>${busyAttentionIndicator(state)}</span>`;
-}
-
 function mobileAgentAttentionHtml(agents: readonly AgentPaneContribution[]): string {
   return agents.some((agent) => agent.requestingAttention) ? '<i class="status-dot attention" aria-label="Agent requesting attention"></i>' : "";
 }
@@ -70,7 +64,10 @@ function renderAgentTab(workspaceId: string, agent: AgentPaneContribution): stri
     selected: false,
     label: { kind: "text", text: agent.title },
     iconHtml: agent.iconHtml,
-    metadataHtml: renderAgentState(workspaceId, agent.id, agent),
+    status: {
+      busy: agent.busy, requestingAttention: agent.requestingAttention,
+      attributesHtml: `data-agent-attention-id="${escapeHtml(agent.id)}"${agent.attentionSequence === undefined ? "" : ` data-attention-sequence="${agent.attentionSequence}"`}`,
+    },
     containerAttributesHtml: `id="${agentTabDomId(workspaceId, agent.id)}"`,
     primary: { tag: "button", attributesHtml: `type="button" data-agent-conversation-id="${escapeHtml(agent.id)}" ${fullscreenViewAttributes(agent.id, agent.title)} data-action="click->workspace-presentation#selectAgent"` },
     closeHtml: agent.close ? selectorCloseForm(agent.close) : "",
@@ -92,7 +89,7 @@ export function renderAgentNavigation(presentation: WorkspacePresentation): stri
   const conversations = presentation.agentConversations.length
     ? tabStripHtml({
       label: "Agent conversations",
-      attributesHtml: `id="${agentTabListDomId(presentation.workspace.id)}"`,
+      id: agentTabListDomId(presentation.workspace.id),
       tabsHtml: presentation.agentConversations.map((agent) => renderAgentTab(presentation.workspace.id, { ...agent, title: presentation.agentConversations.length === 1 && agent.untitled ? presentation.workspace.title : agent.title })).join(""),
     })
     : `<div class="fixed-shell-workspace-title"><strong>${escapeHtml(presentation.workspace.title)}</strong></div>`;
@@ -132,7 +129,7 @@ export function renderAgentPane(presentation: WorkspacePresentation): string {
   const panes = presentation.agentConversations.map((agent) => renderAgentPaneSlot(presentation.workspace.id, agent, agent.id === (presentation.initialSelection?.agent ?? presentation.agentConversations[0]?.id))).join("");
   return `<div class="fixed-shell-agent-pane"><div class="workspace-warning-stack" id="${domId("workspace_warnings", presentation.workspace.id)}">${presentation.warningsHtml ?? ""}</div>${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="agent" data-workspace-presentation-target="agentPane" aria-label="Agent"' },
-    headerHtml: `${barButton("Show Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-show-workspace-pane")}<div class="fixed-shell-agent-header-scroll"><div id="${agentNavigationDomId(presentation.workspace.id)}" class="fixed-shell-agent-navigation">${renderAgentNavigation(presentation)}</div><div id="${agentActionsDomId(presentation.workspace.id)}" class="fixed-shell-agent-actions">${renderAgentActions(presentation)}</div></div>`,
+    headerHtml: `${barButton("Show Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-show-workspace-pane")}<div id="${agentNavigationDomId(presentation.workspace.id)}" class="fixed-shell-agent-navigation">${renderAgentNavigation(presentation)}</div><div id="${agentActionsDomId(presentation.workspace.id)}" class="fixed-shell-agent-actions">${renderAgentActions(presentation)}</div>`,
     bodyHtml: `<div id="${agentBodiesDomId(presentation.workspace.id)}" class="fixed-shell-agent-bodies">${panes || renderAgentEmpty(presentation)}</div>`,
   })}</div>`;
 }

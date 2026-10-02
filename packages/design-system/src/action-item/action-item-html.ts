@@ -64,7 +64,7 @@ export function actionItemHtml(options: ActionItemOptions): string {
   }
 
   const primary = elementHtml(options.primary, "action-item__primary", content);
-  const actions = options.engagedActionsHtml ? `<div class="action-item__actions action-item__actions--engaged">${options.engagedActionsHtml}</div>` : "";
+  const actions = options.engagedActionsHtml ? `<div class="action-item__actions action-item__actions--engaged" data-controller="action-item-actions">${options.engagedActionsHtml}</div>` : "";
   const container = options.container ?? {};
   return `<div class="${escapeHtml(classNames("action-item", options.tone === "danger" && "is-danger"))}"${attributesHtml(container.attributesHtml)}>${primary}${actions}</div>`;
 }

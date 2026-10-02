@@ -33,10 +33,31 @@ export interface CatalogueEntry {
 export const entries: CatalogueEntry[] = [
   {
     id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Agent, Work and Host terminals.",
-    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering. Tabs stay between 9.5rem and 24rem wide, shrinking to their minimum before the strip scrolls horizontally.",
-    imports: { "tab-strip": "tabHtml, tabStripHtml" },
+    contract: "Provide a page-unique stable id for Turbo updates and scrollbar linkage. Content-sized short tabs; long titles shrink to 7rem (maximum 20rem) before scrolling. The strip owns edge fades, title fades, an overlay scrollbar, mouse-wheel scrolling, and Left/Right/Home/End navigation. Busy and attention share one status slot; desktop close replaces status on engagement without resizing tabs. On mobile/touch, only the selected tab shows close; unselected tabs retain status. Features supply selection, status, icons and close forms, with fixed pane actions beside the strip—no tab styling overrides.",
+    imports: { "tab-strip": "tabHtml, tabStripHtml", "tab-strip/client": "setTabStatus", button: "buttonHtml", "button-group": "buttonGroupHtml", "destructive-confirmation": "destructiveConfirmationHtml", panel: "panelHtml", icons: "Icons" },
     sources: ["tab-strip/tab-strip-controller.ts", "tab-strip/tab-strip.css"],
-    examples: [{ title: "Terminal tabs", render: () => tabStripHtml({ label: "Example terminals", tabsHtml: ["Shell", "Diagnostics"].map((text, index) => tabHtml({ label: { kind: "text", text }, selected: index === 0, primary: { tag: "button", attributesHtml: 'type="button"' }, iconHtml: Icons.Terminal })).join("") }) }],
+    examples: [{
+      title: "Content sizing · hover, scroll and change the selected tab’s status",
+      render: () => `<div class="form-stack" data-catalogue-tab-demo data-action="submit->catalogue#submit">
+        ${buttonGroupHtml({ semantics: "group", label: "Selected tab status", orientation: "horizontal", itemsHtml: '<label><input type="checkbox" data-tab-busy data-action="change->catalogue#tabStatus"> Busy</label><label><input type="checkbox" data-tab-attention data-action="change->catalogue#tabStatus"> Attention</label>' })}${panelHtml({
+          element: { tag: "section" },
+          headerHtml: tabStripHtml({
+            id: "catalogue_work_views", label: "Example work views",
+            tabsHtml: ["Shell", "Investigate terminal reconnect and attention handling", "Review", "Dev server", "Changes"].map((text, index) => tabHtml({
+              label: { kind: "text", text }, selected: index === 0,
+              primary: { tag: "button", attributesHtml: 'type="button" data-action="catalogue#selectTab"' },
+              iconHtml: index === 1 ? Icons.Browser : Icons.Terminal,
+              status: { busy: index === 1, requestingAttention: index === 1 || index === 2 },
+              closeHtml: `<form>${destructiveConfirmationHtml({
+                id: `catalogue_tab_close_${index}`,
+                trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Close, label: `Close ${text}` } },
+                confirmCaption: "Yes, close", cancelCaption: "Oops",
+              })}</form>`,
+            })).join(""),
+          }) + `<form>${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "New view" } })}</form>`,
+          bodyLayout: "padded", bodyHtml: '<span data-tab-selected-title>Shell</span><output></output>',
+        })}</div>`,
+    }],
   },
   {
     id: "motion",

@@ -19,9 +19,7 @@ import { TransientFeedbackController } from "./transient-feedback/transient-feed
 import { ToggleController } from "./toggle/toggle-controller.ts";
 
 const automaticBehaviors = [
-  ['[role="tablist"]', "tab-strip"],
   ["body", "action-items"],
-  [".action-item__actions--engaged", "action-item-actions"],
   ["body", "warning-banners"],
   [".activity-button, .progress-button", "perimeter-button"],
   [".copy-button", "copy-button", "click->copy-button#copy"],

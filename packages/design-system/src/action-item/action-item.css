@@ -13,9 +13,7 @@
   .action-item:not(:disabled):not([aria-disabled="true"]):hover { background: var(--accent-soft); color: var(--text-bright); }
 }
 .action-item :is(.action-item__primary, .action-item__label-text):focus-visible { outline: none; }
-.action-item__label { display: block; min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; }
-/* Attention follows its subject by default; at-edge preserves aligned list columns. */
-.action-item__primary:has(> .status-dot.attention:not(.at-edge)) > .action-item__label { flex: 0 1 auto; }
+.action-item__label { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
 .action-item__label-text { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .action-item.is-label-scrolling .action-item__label { mask-image: linear-gradient(to right, transparent, black 2px, black calc(100% - 2px), transparent); }
 .action-item.is-label-scrolling .action-item__label-text { width: max-content; overflow: visible; text-overflow: clip; animation: action-item-label-scroll var(--action-item-label-scroll-duration) linear infinite alternate; }

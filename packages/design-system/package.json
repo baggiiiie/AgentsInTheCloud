@@ -34,7 +34,8 @@
     "./styles": "./src/design-system.css",
     "./catalogue": "./catalogue/page.ts",
     "./styles/server": "./src/inline-styles.ts",
-    "./tab-strip": "./src/tab-strip/tab-strip-html.ts"
+    "./tab-strip": "./src/tab-strip/tab-strip-html.ts",
+    "./tab-strip/client": "./src/tab-strip/tab-strip-controller.ts"
   },
   "dependencies": {
     "@atelier/shared": "workspace:*",
