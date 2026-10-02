@@ -69,6 +69,9 @@ export function installSoftwareKeyboardTracking(): void {
   let top = 0;
   let detected = false;
   let hardwareCheck: ReturnType<typeof setTimeout> | undefined;
+  /** The current single-finger touch, and a text field it focused before the tap completed. */
+  let touch: { x: number; y: number; time: number } | undefined;
+  let touchFocus: EventTarget | null | undefined;
 
   const orientation = (): Orientation => window.matchMedia("(orientation: landscape)").matches ? "landscape" : "portrait";
   const layoutHeight = (): number => root.clientHeight;
@@ -129,9 +132,16 @@ export function installSoftwareKeyboardTracking(): void {
       changeLayout(() => document.dispatchEvent(new CustomEvent(softwareKeyboardEvent, { detail: { visible: true, inset, top, predicted: !detected } })));
       return;
     }
-    const remembered = memory.heights[orientation()];
     // Like WebKit, only expect a keyboard for focus that comes from a user gesture.
-    if (!memory.produced || remembered === undefined || !navigator.userActivation.isActive) return;
+    // Focus while a finger is still down (a terminal focuses on pointerdown)
+    // raises the keyboard when the tap completes, so predict then.
+    if (touch && !navigator.userActivation.isActive) touchFocus = event.target;
+    else if (navigator.userActivation.isActive) predict();
+  });
+
+  const predict = (): void => {
+    const remembered = memory.heights[orientation()];
+    if (!memory.produced || remembered === undefined) return;
     arrange(true, remembered, 0, true);
     cancelHardwareCheck();
     hardwareCheck = setTimeout(() => {
@@ -141,7 +151,7 @@ export function installSoftwareKeyboardTracking(): void {
       remember({ ...memory, produced: false });
       arrange(false, 0, 0, false);
     }, 1000);
-  });
+  };
 
   document.addEventListener("focusout", (event) => {
     if (isTextEntry(event.relatedTarget instanceof Element ? event.relatedTarget : null) && focusLikelyOpensSoftwareKeyboard()) return;
@@ -153,14 +163,18 @@ export function installSoftwareKeyboardTracking(): void {
   // WebKit scrolls the page to reveal a tapped field using where it was before
   // focus rearranged the page, so the page would move twice. A tap focuses the
   // field itself without that scroll; the arrangement already keeps it in view.
-  let touch: { x: number; y: number; time: number } | undefined;
   document.addEventListener("touchstart", (event) => {
     const point = event.touches.length === 1 ? event.touches[0]! : undefined;
     touch = point ? { x: point.screenX, y: point.screenY, time: event.timeStamp } : undefined;
+    touchFocus = undefined;
   }, { capture: true, passive: true });
+  document.addEventListener("touchcancel", () => { touch = undefined; touchFocus = undefined; }, { capture: true, passive: true });
   document.addEventListener("touchend", (event) => {
     const start = touch;
     touch = undefined;
+    const focusedDuringTouch = touchFocus;
+    touchFocus = undefined;
+    if (focusedDuringTouch && focusedDuringTouch === document.activeElement && !arranged) predict();
     const point = event.changedTouches.length === 1 && event.touches.length === 0 ? event.changedTouches[0]! : undefined;
     const field = event.target instanceof Element ? event.target.closest("textarea, input, [contenteditable]") : null;
     if (!start || !point || !event.cancelable || !(field instanceof HTMLElement) || !isTextEntry(field) || document.activeElement === field || field.inert) return;

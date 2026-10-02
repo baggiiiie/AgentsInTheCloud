@@ -2,8 +2,11 @@
 
 import { layoutAfterEvent, softwareKeyboardArranged } from "@atelier/shared";
 
-/** A changed size is applied only once it has held this long, so a rotation resizes the PTY once. */
-const settleMs = 300;
+/**
+ * A changed size is applied only once it has held this long, so a rotation
+ * resizes the PTY once (iOS hides the status bar a few hundred ms after rotating).
+ */
+const settleMs = 1000;
 
 export interface TerminalFrameOptions {
   /** Clips the terminal; the composer and key row shrink it. */
