@@ -86,7 +86,7 @@ async function conversationRecords(workspaceId: string): Promise<ConversationRec
     shareDirectory: sessionShareDir(await workspaceSessionShareKey(workspaceId)),
     metadata: content || undefined,
     destination: async () => {
-      const { durableWorkspaceOwner } = await import("./durable-owner.ts");
+      const { durableWorkspaceOwner } = await import("./runtime.ts");
       return durableWorkspaceOwner(workspaceId);
     },
   });
@@ -140,7 +140,7 @@ async function listWorkspaceAgentConversationsUnlocked(workspaceId: string): Pro
   const local: WorkspaceAgentConversationInfo[] = (await conversationRecords(workspaceId)).map(info => ({ ...info, workspaceId, path: journal }));
   // The journal catalog wins after a crash between a metadata commit and tab metadata.
   if (local.length && await Bun.file(join(journal, "main.jsonl")).exists()) {
-    const { durableWorkspaceOwner } = await import("./durable-owner.ts");
+    const { durableWorkspaceOwner } = await import("./runtime.ts");
     const catalog = await (await durableWorkspaceOwner(workspaceId)).catalog();
     for (const agent of local) {
       const committed = catalog.find(record => record.conversationId === agent.conversationId);
@@ -168,7 +168,7 @@ export async function setWorkspaceAgentConversationTitle(agent: WorkspaceAgentCo
   return await serializeConversationOperation(agent.workspaceId, async () => {
     const current = (await listWorkspaceAgentConversationsUnlocked(agent.workspaceId)).find((item) => item.conversationId === agent.conversationId)!;
     const updated = { ...current, title };
-    const { existingDurableController } = await import("./durable-owner.ts");
+    const { existingDurableController } = await import("./runtime.ts");
     await (await existingDurableController(current))?.setTitle(title);
     await persistConversation(updated);
     return updated;

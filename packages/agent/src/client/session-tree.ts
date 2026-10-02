@@ -109,7 +109,7 @@ function nodeAction(action: HTMLElement, input: TextInput): void {
   else if (kind === "label-remove") void updateLabel(action, input, "remove");
 }
 
-async function openSummary(option: HTMLElement, input: TextInput): Promise<void> {
+async function openContinuation(option: HTMLElement, input: TextInput): Promise<void> {
   const { menu, url } = elements(input);
   const endpoint = new URL(`${url}/summary`, window.location.href);
   endpoint.searchParams.set("entry", option.dataset.treeEntry!);
@@ -117,31 +117,12 @@ async function openSummary(option: HTMLElement, input: TextInput): Promise<void>
   await showResponse(menu, await fetch(endpoint, { headers: { Accept: "text/html" } }));
 }
 
-function showCustomSummary(input: TextInput): void {
-  const { menu } = elements(input);
-  for (const option of menu.querySelectorAll<HTMLElement>("[data-summary-mode]")) option.hidden = true;
-  const custom = menu.querySelector<HTMLElement>(".agent-tree-custom")!;
-  custom.hidden = false;
-  custom.querySelector<HTMLTextAreaElement>("textarea")!.focus();
-}
-
-function hideCustomSummary(input: TextInput): void {
-  const { menu } = elements(input);
-  menu.querySelector<HTMLElement>(".agent-tree-custom")!.hidden = true;
-  for (const option of menu.querySelectorAll<HTMLElement>("[data-summary-mode]")) option.hidden = false;
-  input.focus();
-}
-
 async function navigate(option: HTMLElement, input: TextInput): Promise<void> {
   const { menu, url } = elements(input);
   const summaryMenu = option.closest<HTMLElement>(".agent-tree-summary-menu")!;
-  const mode = option.dataset.summaryMode ?? "custom";
-  const customInstructions = mode === "custom" ? summaryMenu.querySelector<HTMLTextAreaElement>("textarea")!.value : "";
-  showMessage(menu, `${mode === "none" ? "Navigating" : "Summarizing branch"}…`, true);
+  showMessage(menu, "Navigating…", true);
   const body = new FormData();
   body.set("entry", summaryMenu.dataset.treeEntry!);
-  body.set("summaryMode", mode);
-  if (customInstructions) body.set("customInstructions", customInstructions);
   const response = await fetch(url, { method: "POST", body });
   if (!response.ok) {
     showMessage(menu, await response.text());
@@ -172,12 +153,8 @@ export function handleAgentTreeMenuEvent(event: Event, input: TextInput): boolea
 
 export function selectAgentTreeOption(option: HTMLElement, input: TextInput): boolean {
   if (option.dataset.commandAction === "tree") void open(input);
-  else if (option.dataset.completionKind === "tree-entry") void openSummary(option, input);
-  else if (option.dataset.completionKind === "tree-summary") {
-    if (option.dataset.summaryMode === "custom") showCustomSummary(input);
-    else void navigate(option, input);
-  } else if (option.dataset.completionKind === "tree-summary-confirm") void navigate(option, input);
-  else if (option.dataset.completionKind === "tree-summary-back") hideCustomSummary(input);
+  else if (option.dataset.completionKind === "tree-entry") void openContinuation(option, input);
+  else if (option.dataset.completionKind === "tree-continue") void navigate(option, input);
   else return false;
   return true;
 }

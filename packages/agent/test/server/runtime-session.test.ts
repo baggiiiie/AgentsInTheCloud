@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
-import { getWorkspaceAgentRuntime, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes } from "../../src/server/runtime.ts";
+import { getWorkspaceAgentPresentation, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes } from "../../src/server/runtime.ts";
 
 test("removed Workspace runtimes cannot be recreated by stale Agent requests", async () => {
   await removeWorkspaceAgentRuntimes("removed-runtime-test");
 
-  expect(() => getWorkspaceAgentRuntime({ workspaceId: "removed-runtime-test", conversationId: "conversation", label: "Agent 1", title: "Agent", path: "/tmp/removed-session.jsonl" })).toThrow("workspace not found");
+  expect(() => getWorkspaceAgentPresentation({ workspaceId: "removed-runtime-test", conversationId: "conversation", label: "Agent 1", title: "Agent", path: "/tmp/removed-session.jsonl" })).toThrow("workspace not found");
 });
 
 test("closed conversation runtimes cannot be recreated during the dispose-to-archive gap", async () => {
@@ -12,5 +12,5 @@ test("closed conversation runtimes cannot be recreated during the dispose-to-arc
 
   await closeWorkspaceAgentConversation(agent.workspaceId, agent.conversationId);
 
-  expect(() => getWorkspaceAgentRuntime(agent)).toThrow("Agent conversation not found");
+  expect(() => getWorkspaceAgentPresentation(agent)).toThrow("Agent conversation not found");
 });

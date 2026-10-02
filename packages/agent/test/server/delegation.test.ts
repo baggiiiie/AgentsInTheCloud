@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { configureAgentDelegation, type AgentDelegation } from "../../src/server/delegation.ts";
-import { closeWorkspaceAgentConversation, unloadWorkspaceAgentRuntime, removeWorkspaceAgentRuntimes, restoreWorkspaceAgentRuntime } from "../../src/server/runtime.ts";
+import { closeWorkspaceAgentConversation, unloadWorkspaceAgentPresentation, removeWorkspaceAgentRuntimes, restoreWorkspaceAgentRuntime } from "../../src/server/runtime.ts";
 import { recordsFromSessionEntries } from "../../src/server/session-records.ts";
 
 const delegation: AgentDelegation = {
@@ -19,7 +19,7 @@ test("unloading does not close delegation; explicit close and workspace removal 
     async closingConversation(workspaceId, conversationId) { await Promise.resolve(); operations.push(`close:${workspaceId}:${conversationId}`); },
     async removingWorkspace(workspaceId) { await Promise.resolve(); operations.push(`remove:${workspaceId}`); },
   });
-  await unloadWorkspaceAgentRuntime("delegation-lifecycle", "root");
+  await unloadWorkspaceAgentPresentation("delegation-lifecycle", "root");
   expect(operations).toEqual([]);
   await closeWorkspaceAgentConversation("delegation-lifecycle", "root");
   expect(operations).toEqual(["close:delegation-lifecycle:root"]);

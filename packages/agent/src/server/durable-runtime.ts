@@ -1,12 +1,16 @@
+import { configuredModelOptionViews } from "./model-state.ts";
+import { getAgentModelThinkingLevel } from "@atelier/llm/server";
+import { publishWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
+import { startNotificationTurn, finishNotificationTurn } from "./turn-notifications.ts";
+import { sendTurnNotification } from "./web-push.ts";
 import { durableTimingEntry } from "./durable-timing.ts";
 import { AtelierCoreError } from "@atelier/core";
 import { checkWorkspaceReadiness } from "@atelier/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type EntryDraft, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions } from "@earendil-works/pi-durable";
+import { contentText, getSupportedThinkingLevels } from "@earendil-works/pi-ai";
+import { UserEntry, LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type EntryDraft, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions, type LiveState } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
 import { commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
-import { DurableConversationPresentation } from "./durable-presentation.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
@@ -18,13 +22,18 @@ export const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]>
   kind: "atelier.history-labels", version: 1, scope: "session", initial: () => ({ labels: {} }),
 });
 type ConversationIdentity = Omit<DurableConversationRecord, "durableId">;
-type SettingsChange = Pick<AgentChange, "model" | "thinkingLevel">;
+type SettingsChange = Pick<AgentChange, "model"> & { thinkingLevel?: string };
 
 const dependencies = {
   harness: createDurableHarnessOptions,
   prepare: prepareDurableConversation,
   expand: expandWorkspaceSkillCommand,
   ready: checkWorkspaceReadiness,
+  async validateModel(ref: AgentChange["model"]) {
+    const selected = ref && { provider: ref.provider, id: ref.modelId };
+    const model = selected && (await configuredModelOptionViews(selected)).find(item => item.provider === selected.provider && item.id === selected.id);
+    if (!model?.available) throw new AtelierCoreError("invalid_arguments", model?.unavailableReason ?? "Choose a connected model in Settings → Models");
+  },
 };
 
 /**
@@ -44,7 +53,8 @@ export async function openDurableAgentRuntime(
   });
   const workspace = await openDurableWorkspace(directory, workspaceId, harnessOptions);
   const { harness } = workspace;
-  const agents = new Map<string, Promise<ReturnType<typeof controller>>>();
+  const agents = new Map<string, Promise<Awaited<ReturnType<typeof controller>>>>();
+  const observers = new Set<() => Promise<void>>();
   const commandDrains = new Set<() => Promise<void>>();
   let suspended = false;
   const gates = await harness.snapshot(WorkspaceAdmission, context);
@@ -95,12 +105,64 @@ export async function openDurableAgentRuntime(
     if (suspended) throw new Error("Durable agent runtime is suspended");
   }
 
-  function controller(conversation: Conversation, identity: ConversationIdentity) {
+  async function controller(conversation: Conversation, identity: ConversationIdentity) {
     // Only host commands queue here, never generation/tool execution. Different
     // roots prepare independently, while model changes cannot race image sizing
     // and skill expansion for this root's next admission.
     let tail: Promise<void> = Promise.resolve();
     let closing: Promise<void> | undefined;
+    const selectionListeners = new Set<() => Promise<void>>();
+    const statusListeners = new Set<() => void>();
+    const renderContext = { workspaceId, conversationId: identity.conversationId };
+    let busy = false;
+    let observation: Awaited<ReturnType<Conversation["watch"]>> | undefined;
+    function statusChanged() { for (const listener of statusListeners) listener(); }
+    function publishBusy(value: boolean) {
+      busy = value;
+      publishWorkspaceAgentBusy({ workspaceId, agentKey: `agent:${identity.conversationId}`, busy });
+      statusChanged();
+    }
+    async function committed(view: ConversationView) {
+      // SAFETY: Harness owns and versions the LiveDoc in this committed view.
+      const live = view.docs[LiveDoc.definition.kind] as LiveState | undefined;
+      const nextBusy = Boolean(live?.run || live?.compactions?.length);
+      if (nextBusy === busy) return;
+      if (nextBusy) startNotificationTurn(renderContext, statusChanged);
+      publishBusy(nextBusy);
+      if (!nextBusy) {
+        const subscription = finishNotificationTurn(renderContext);
+        if (subscription) void sendTurnNotification(renderContext, subscription).catch(error => console.error("Could not send Agent notification", error));
+        // Completion consumers (review refresh, catalog loading, etc.) do not own
+        // execution observation. Report their failure without terminating the watch.
+        await options.events?.emit("workspace_agent_turn_finished", renderContext)
+          .catch(error => console.error("Could not publish Agent turn completion", error));
+      }
+    }
+    async function observe() {
+      if (identity.readOnly) return;
+      const previous = observation;
+      observation = undefined;
+      await previous?.stop();
+      assertOpen();
+      const watch = await conversation.watch(context);
+      if (suspended) { await watch.stop(); assertOpen(); }
+      observation = watch;
+      await committed(watch.value);
+      watch.start(committed);
+      void watch.closed.then(result => {
+        if (observation !== watch || suspended) return;
+        console.error("Agent execution observation ended", result);
+        finishNotificationTurn(renderContext);
+        publishBusy(false);
+      });
+    }
+    observers.add(async () => {
+      const watch = observation;
+      observation = undefined;
+      await watch?.stop();
+      finishNotificationTurn(renderContext);
+      if (busy) publishBusy(false);
+    });
     async function record() {
       return (await harness.snapshot(WorkspaceConversations, context))!.conversations.find(item => item.conversationId === identity.conversationId)!;
     }
@@ -154,6 +216,8 @@ export async function openDurableAgentRuntime(
         return fork.id;
       }, context);
       conversation = (await harness.conversation(next, context))!;
+      await observe();
+      await Promise.all([...selectionListeners].map(listener => listener()));
     }
     function assertAdmission() {
       assertOpen();
@@ -180,7 +244,15 @@ export async function openDurableAgentRuntime(
       return undefined;
     }
     commandDrains.add(() => tail);
+    await observe();
     return {
+      subscribeSelection(listener: () => Promise<void>) { selectionListeners.add(listener); return () => { selectionListeners.delete(listener); }; },
+      subscribeStatus(listener: () => void) { statusListeners.add(listener); return () => { statusListeners.delete(listener); }; },
+      settings: () => conversation.agent(context),
+      async userMessages() {
+        const { entries } = await conversation.context(context);
+        return entries.filter(UserEntry.is).flatMap(entry => (entry.model ?? []).flatMap(message => message.role === "user" ? [contentText(message.content)] : []));
+      },
       get id() { return conversation.id; },
       readOnly: Boolean(identity.readOnly),
       tree,
@@ -237,14 +309,8 @@ export async function openDurableAgentRuntime(
       },
       /** Canonical committed state, including partials and queued input. No scheduling. */
       watch: (...args: Parameters<Conversation["watch"]>) => conversation.watch(...args),
-      /** Host-owned mount; disposal detaches observation, not execution. */
-      presentation: (onCommit?: Parameters<typeof DurableConversationPresentation.attach>[3]) => {
-        assertOpen();
-        return DurableConversationPresentation.attach(conversation, { workspaceId, conversationId: identity.conversationId, readOnly: identity.readOnly }, context, onCommit);
-      },
       history: (...args: Parameters<Conversation["entries"]>) => conversation.entries(...args),
       context: (...args: Parameters<Conversation["context"]>) => conversation.context(...args),
-      agent: (...args: Parameters<Conversation["agent"]>) => conversation.agent(...args),
       image(entryId: string, contentIndex: number) {
         return (async () => {
           if (entryId.startsWith("queued-")) return durableImageEndpoint(conversation, entryId, contentIndex, context);
@@ -276,6 +342,7 @@ export async function openDurableAgentRuntime(
           // The original admission wins even if the skill or model has gone
           // away, or a retry arrives with different text/attachments/settings.
           if (existing) return (await harness.submission(existing.id, context))!;
+          await load.validateModel((await conversation.agent(context)).model);
           await readyForExecution();
           assertAdmission();
           return submitDurableInput(conversation, workspaceId, harnessOptions.models, input, context, async (id, text) => {
@@ -290,11 +357,13 @@ export async function openDurableAgentRuntime(
           const current = await conversation.agent(context);
           const ref = change.model === undefined ? current.model : change.model;
           const model = ref ? harnessOptions.models.getModel(ref.provider, ref.modelId) : undefined;
-          if (ref && !model) throw new Error(`Model not found: ${ref.provider}/${ref.modelId}`);
-          if (change.thinkingLevel && model && !getSupportedThinkingLevels(model).includes(change.thinkingLevel)) {
-            throw new Error(`Thinking level ${change.thinkingLevel} is not supported by ${model.id}`);
-          }
-          await conversation.configure(change, context);
+          if (ref && !model) throw new AtelierCoreError("invalid_arguments", `Model not found: ${ref.provider}/${ref.modelId}`);
+          if (change.model !== undefined) await load.validateModel(ref);
+          const levels = model ? getSupportedThinkingLevels(model) : [];
+          const requested = change.thinkingLevel ?? (change.model ? await getAgentModelThinkingLevel("builtin", { provider: change.model.provider, id: change.model.modelId }) : undefined);
+          const thinkingLevel = levels.find(level => level === requested);
+          if (change.thinkingLevel !== undefined && !thinkingLevel) throw new AtelierCoreError("invalid_arguments", `Unsupported thinking level: ${change.thinkingLevel}`);
+          await conversation.configure({ ...change, thinkingLevel }, context);
         });
       },
       /** Explicit Stop withdraws queued input and cancels owned work. */
@@ -313,6 +382,7 @@ export async function openDurableAgentRuntime(
       },
       compact(instructions?: string) {
         return command(async () => {
+          await load.validateModel((await conversation.agent(context)).model);
           await readyForExecution();
           assertAdmission();
           return conversation.compact(instructions, context);
@@ -353,7 +423,7 @@ export async function openDurableAgentRuntime(
       return (await harness.snapshot(WorkspaceConversations, context))!.conversations;
     },
     /** Reuse one host command line per Atelier UUID; reopening never rebuilds its prompt. */
-    conversation(record: ConversationIdentity, initial: SettingsChange = {}) {
+    conversation(record: ConversationIdentity, initial: Pick<AgentChange, "model" | "thinkingLevel"> = {}) {
       assertOpen();
       let pending = agents.get(record.conversationId);
       if (!pending) {
@@ -395,13 +465,16 @@ export async function openDurableAgentRuntime(
     },
     /** Host restart resumes durable tasks, never submits a synthetic user prompt. */
     async resume() {
+      const catalog = (await harness.snapshot(WorkspaceConversations, context))!;
+      await Promise.all(catalog.conversations.filter(record => !record.readOnly && !closed.has(record.durableId)).map(record => this.conversation(record)));
       await readyForExecution();
       harness.resume();
     },
     /** Host shutdown/unload: stop observation and scheduling, not the task's effects. */
-    suspend() {
+    async suspend() {
       suspended = true;
-      return workspace.close();
+      await Promise.all([...observers].map(stop => stop()));
+      await workspace.close();
     },
   };
 }

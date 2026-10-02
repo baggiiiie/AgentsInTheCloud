@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxProvider, fauxAssistantMessage } from "@earendil-works/pi-ai";
 import { createRegistry } from "@earendil-works/pi-durable";
-import { NativeAgentRuntime } from "../../src/server/native-agent-runtime.ts";
+import { ConversationPresentation } from "../../src/server/conversation-presentation.ts";
 import { openDurableAgentRuntime } from "../../src/server/durable-runtime.ts";
-import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
-import { getWorkspaceAgentRuntime, unloadWorkspaceAgentRuntime, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, allowWorkspaceAgentResume } from "../../src/server/runtime.ts";
+import { durableWorkspaceOwner, retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
+import { getWorkspaceAgentController, getWorkspaceAgentPresentation, unloadWorkspaceAgentPresentation, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, allowWorkspaceAgentResume } from "../../src/server/runtime.ts";
 import { archiveWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle } from "../../src/server/session-store.ts";
 
 const originalDataDir = process.env.ATELIER_DATA_DIR;
@@ -32,19 +32,20 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   const initial = await openDurableAgentRuntime(agent.path, workspaceId, {}, {
     harness: async () => ({ models, registry: createRegistry() }),
     prepare: async () => ({ model: { provider: "faux", modelId: "test" }, thinkingLevel: "off" }),
-    expand: async (_workspace, text) => text, ready: async () => {},
+    expand: async (_workspace, text) => text, ready: async () => {}, validateModel: async () => {},
   });
   const controller = await initial.conversation(agent);
   await (await controller.submit({ text: "Persisted request", requestId: "admitted" })).wait(BACKGROUND_CONTEXT);
   await initial.suspend();
 
-  const [runtime, same] = await Promise.all([getWorkspaceAgentRuntime(agent), getWorkspaceAgentRuntime(agent)]);
-  expect(runtime).toBeInstanceOf(NativeAgentRuntime);
+  const [runtime, same] = await Promise.all([getWorkspaceAgentPresentation(agent), getWorkspaceAgentPresentation(agent)]);
+  expect(runtime).toBeInstanceOf(ConversationPresentation);
   expect(runtime).toBe(same);
   expect(runtime.userMessages()).toEqual(["Persisted request"]);
-  expect(await runtime.knownRequest!("admitted")).toBe(true);
+  const commands = await getWorkspaceAgentController(agent);
+  expect(await commands.knownRequest("admitted")).toBe(true);
   // No container or available Faux auth exists. A duplicate still succeeds.
-  await runtime.submit("Different retry", { requestId: "admitted" });
+  await commands.submit({ text: "Different retry", requestId: "admitted" });
   expect(runtime.currentModel()).toEqual({ provider: "faux", id: "test" });
   const named = await setWorkspaceAgentConversationTitle(agent, "Retained native title");
   expect((await (await durableWorkspaceOwner(workspaceId)).catalog())[0]!.title).toBe(named.title);
@@ -52,10 +53,10 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   const release = Promise.withResolvers<void>();
   const originalDispose = runtime.dispose.bind(runtime);
   const dispose = spyOn(runtime, "dispose").mockImplementation(async () => { disposing.resolve(); await release.promise; await originalDispose(); });
-  const unloading = unloadWorkspaceAgentRuntime(workspaceId, agent.conversationId);
+  const unloading = unloadWorkspaceAgentPresentation(workspaceId, agent.conversationId);
   await disposing.promise;
   let mounted = false;
-  const mounting = getWorkspaceAgentRuntime(named).then(value => { mounted = true; return value; });
+  const mounting = getWorkspaceAgentPresentation(named).then(value => { mounted = true; return value; });
   await Bun.sleep(5);
   expect(mounted).toBe(false);
   release.resolve();
@@ -81,4 +82,78 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   expect((await history.history({}, 100, undefined, BACKGROUND_CONTEXT)).items.length).toBeGreaterThan(0);
   await expect(history.knownRequest("admitted")).rejects.toThrow("deleted");
   expect(faux.state.callCount).toBe(1);
+});
+
+
+test("unloading the last presentation leaves the owner and its execution running", async () => {
+  directory = await mkdtemp(join(tmpdir(), "native-unload-"));
+  process.env.ATELIER_DATA_DIR = directory;
+  const workspaceId = `native-${crypto.randomUUID()}`;
+  const agent = await ensureDefaultWorkspaceAgentConversation(workspaceId);
+  const models = createModels();
+  const faux = fauxProvider({ tokensPerSecond: 100_000, models: [{ id: "test" }] });
+  models.setProvider(faux.provider);
+  const owner = await retainedDurableWorkspaceOwner(agent.path, workspaceId, {}, {
+    harness: async () => ({ models, registry: createRegistry() }),
+    prepare: async () => ({ model: { provider: "faux", modelId: "test" } }),
+    expand: async (_workspace, text) => text, ready: async () => {}, validateModel: async () => {},
+  });
+  const controller = await owner.conversation(agent);
+  const mounted = await getWorkspaceAgentPresentation(agent);
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  faux.setResponses([async () => { entered.resolve(); await release.promise; return fauxAssistantMessage("Completed after view disposal"); }]);
+  try {
+    const submission = await controller.submit({ requestId: "unload", text: "Keep working" });
+    await entered.promise;
+    await unloadWorkspaceAgentPresentation(workspaceId, agent.conversationId);
+    expect(await durableWorkspaceOwner(workspaceId)).toBe(owner);
+    expect((await submission.status(BACKGROUND_CONTEXT)).status).toBe("placed");
+    release.resolve();
+    expect((await submission.wait(BACKGROUND_CONTEXT)).status).toBe("done");
+    expect(faux.state.callCount).toBe(1);
+    const remounted = await getWorkspaceAgentPresentation(agent);
+    expect(remounted).not.toBe(mounted);
+    await unloadWorkspaceAgentPresentation(workspaceId, agent.conversationId);
+  } finally {
+    release.resolve();
+  }
+});
+
+test.each(["close", "suspend", "delete"] as const)("%s drains first controller acquisition before applying its lifecycle fence", async operation => {
+  directory = await mkdtemp(join(tmpdir(), `native-acquire-${operation}-`));
+  process.env.ATELIER_DATA_DIR = directory;
+  const workspaceId = `native-${crypto.randomUUID()}`;
+  const agent = await ensureDefaultWorkspaceAgentConversation(workspaceId);
+  const models = createModels();
+  const faux = fauxProvider({ tokensPerSecond: 100_000, models: [{ id: "test" }] });
+  models.setProvider(faux.provider);
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const owner = await retainedDurableWorkspaceOwner(agent.path, workspaceId, {}, {
+    harness: async () => ({ models, registry: createRegistry() }),
+    prepare: async () => { entered.resolve(); await release.promise; return { model: { provider: "faux", modelId: "test" } }; },
+    expand: async (_workspace, text) => text, ready: async () => {}, validateModel: async () => {},
+  });
+  // No presentation promise exists for the lifecycle operation to await.
+  const acquiring = getWorkspaceAgentController(agent);
+  await entered.promise;
+  expect(await owner.catalog()).toEqual([]);
+  let fenced = false;
+  const ending = (operation === "close" ? closeWorkspaceAgentConversation(workspaceId, agent.conversationId)
+    : operation === "suspend" ? suspendWorkspaceAgentRuntimes(workspaceId) : removeWorkspaceAgentRuntimes(workspaceId))
+    .then(() => { fenced = true; });
+  try {
+    await Bun.sleep(5);
+    expect(fenced).toBe(false);
+  } finally {
+    release.resolve();
+  }
+  const controller = await acquiring;
+  await ending;
+  await expect(controller.submit({ requestId: "after-fence", text: "Must not run" })).rejects.toThrow(operation === "close" ? "closed" : "suspended");
+  expect(() => getWorkspaceAgentController(agent)).toThrow(operation === "close" ? "conversation not found" : operation === "suspend" ? "suspended" : "workspace not found");
+  expect(faux.state.callCount).toBe(0);
+  if (operation === "close") expect((await owner.admission())?.closed).toContain(controller.id);
+  if (operation === "delete") expect((await (await durableWorkspaceOwner(workspaceId)).admission())?.deleted).toBe(true);
 });

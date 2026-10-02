@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { type AtelierEventBus } from "@atelier/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { getWorkspaceAgentRuntime } from "@atelier/agent/server";
+import { getWorkspaceAgentController } from "@atelier/agent/server";
 import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "@atelier/agent/server";
 import { SubagentRuntime, type SubagentPeer, type SubagentRecord, type SubagentState } from "./subagent-runtime.ts";
 
@@ -107,7 +107,7 @@ export function getSubagents(workspaceId: string, events?: AtelierEventBus): Pro
             const child = state.agents.find((agent) => agent.id === id);
             const conversation = child ? await subagentConversation(workspaceId, child) : (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === id);
             if (!conversation) throw new Error(`Agent conversation not found: ${id}`);
-            await getWorkspaceAgentRuntime(conversation, { events });
+            await getWorkspaceAgentController(conversation, { events });
           }
           const peer = peers.get(key);
           if (!peer) throw new Error(`Agent session not bound: ${id}`);
