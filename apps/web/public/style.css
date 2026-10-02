@@ -263,6 +263,8 @@ turbo-frame { display: contents; }
 /* Keep rows as wide as the header even when the body reserves scrollbar space. */
 .fixed-shell-projects-pane > .panel { container-type: inline-size; }
 .fixed-shell-projects-pane > .panel > .panel__body { overflow-x: hidden; }
+.fixed-shell-projects-pane:not(.is-scrolling) > .panel > .panel__body { scrollbar-color: transparent transparent; }
+.fixed-shell-projects-pane:not(.is-scrolling) > .panel > .panel__body::-webkit-scrollbar-thumb { background-color: transparent; }
 .fixed-shell-projects-list { width: 100cqw; padding: 8px 0 8px 8px; }
 .fixed-shell-projects-empty { position: relative; margin: 0; padding: 16px 56px 16px 8px; color: var(--text-muted); }
 .fixed-shell-projects-empty-arrow { position: absolute; top: 0; right: 10px; pointer-events: none; }

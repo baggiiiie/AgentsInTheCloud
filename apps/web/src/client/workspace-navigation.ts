@@ -50,9 +50,21 @@ class ProjectsPaneController extends Controller<HTMLElement> {
   static targets = ["toggle", "list"];
   declare readonly toggleTarget: HTMLButtonElement;
   declare readonly listTarget: HTMLElement;
+  private hideScrollbarTimer?: ReturnType<typeof setTimeout>;
 
   connect(): void {
     this.setCollapsed(localStorage.getItem("atelier:projects-pane-collapsed") === "true");
+  }
+
+  disconnect(): void {
+    clearTimeout(this.hideScrollbarTimer);
+    this.element.classList.remove("is-scrolling");
+  }
+
+  scrolled(): void {
+    this.element.classList.add("is-scrolling");
+    clearTimeout(this.hideScrollbarTimer);
+    this.hideScrollbarTimer = setTimeout(() => this.element.classList.remove("is-scrolling"), 800);
   }
 
   toggle(): void {
