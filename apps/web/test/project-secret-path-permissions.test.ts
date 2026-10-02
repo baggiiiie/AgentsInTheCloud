@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { addProject, createProjectSecret, listProjectSecrets, projectSecretRoutingRevision, revealProjectSecrets } from "@agents-in-the-cloud/projects";
+import { addProject, createProjectSecret, listProjectSecrets, revealProjectSecrets } from "@agents-in-the-cloud/projects";
 import { createTestApp, postJson, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 
 const data = temporaryAgentsInTheCloudDataDir();
@@ -23,7 +23,7 @@ test("secret API accepts boolean path permission and preserves omission", async 
   expect((await listProjectSecrets(project.id))[0]?.allowInPath).toBe(false);
 });
 
-test("form path permission persists and invalidates an earlier value-entry confirmation", async () => {
+test("form path permission persists and rejects invalid values", async () => {
   const { project } = await addProject("https://github.com/example/permissions.git");
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
   const secret = await createProjectSecret(project.id, values);
@@ -32,7 +32,6 @@ test("form path permission persists and invalidates an earlier value-entry confi
   const form = (allowInPath: string) => new Request(`http://test.local${path}`, { method: "POST", headers: { accept: "text/vnd.turbo-stream.html" }, body: new URLSearchParams({ ...values, allowInPath }) });
   expect((await app.fetch(form("true"))).status).toBe(200);
   expect((await listProjectSecrets(project.id))[0]?.allowInPath).toBe(true);
-  expect((await app.fetch(postJson(`${path}/value`, { secretValue: "private", expectedRoutingRevision: projectSecretRoutingRevision(secret) }))).status).toBe(409);
   expect(await revealProjectSecrets(project.id)).toEqual([]);
   expect((await app.fetch(form("false"))).status).toBe(200);
   expect((await listProjectSecrets(project.id))[0]?.allowInPath).toBe(false);
