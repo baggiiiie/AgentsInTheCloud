@@ -137,6 +137,11 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       this.autosize();
     }
 
+    /**
+     * Sizes the text field: line by line up to the max, never below the buttons'
+     * height. The buttons stack 1×4 whenever the text, at the stacked width,
+     * fills that taller stack; the choice depends only on the content, so it can't oscillate.
+     */
     autosize(): void {
       const input = this.input;
       const composer = this.composer;
@@ -146,24 +151,40 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       const keyboard = Number.parseFloat(style.getPropertyValue("--software-keyboard-inset") || "0")
         + Number.parseFloat(style.getPropertyValue("--software-keyboard-top") || "0");
       const maxComposer = Math.floor((root.clientHeight - keyboard) * composerMaxShare);
-      const current = input.getBoundingClientRect().height;
-      const chrome = composer.getBoundingClientRect().height - current;
-      // Measure at zero height without letting the pane reflow: the input area
-      // keeps its size, so the transcript above cannot clamp its scroll offset.
       const area = input.parentElement!;
+      const buttons = area.querySelector<HTMLElement>(":scope > .composer-buttons")!;
+      const launches = area.querySelector<HTMLElement>(":scope > .composer-quick-launches");
+      const height = (element: HTMLElement | null): number => element?.checkVisibility() ? element.getBoundingClientRect().height : 0;
+      // Everything but the input area: thumbnails, status, footer.
+      const chrome = composer.getBoundingClientRect().height - area.getBoundingClientRect().height;
+      const stacked = composer.classList.contains("composer-stacked");
+      // Measure without letting the pane reflow: the input area keeps its size,
+      // so the transcript above cannot clamp its scroll offset.
       const areaHeight = area.style.height;
       area.style.height = `${area.getBoundingClientRect().height}px`;
       const inline = input.style.height;
-      input.style.height = "0px";
-      const content = Math.ceil(input.scrollHeight);
+      const measure = (stack: boolean) => {
+        composer.classList.toggle("composer-stacked", stack);
+        input.style.height = "0px";
+        const content = Math.ceil(input.scrollHeight);
+        const below = height(launches);
+        const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, height(buttons) - below);
+        const room = maxComposer - chrome - below;
+        // The stack only fits when the content itself fills its height within the max.
+        return { content, minimum, limit: Math.max(minimum, room), fits: Math.min(content, room) + below >= height(buttons) - 1 };
+      };
+      // While typing with a soft keyboard only send shows; there is nothing to stack.
+      const stack = !root.classList.contains("software-keyboard-visible") && measure(true).fits;
+      const layout = measure(stack);
+      composer.classList.toggle("composer-stacked", stacked);
       input.style.height = inline;
       area.style.height = areaHeight;
-      const minimum = Number.parseFloat(getComputedStyle(input).minHeight) || 0;
-      const limit = Math.max(minimum, maxComposer - chrome);
-      const next = Math.max(minimum, Math.min(content, limit));
-      const overflow = content > limit ? "auto" : "hidden";
-      if (Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
+      const next = Math.max(layout.minimum, Math.min(layout.content, layout.limit));
+      const overflow = layout.content > layout.limit ? "auto" : "hidden";
+      const current = input.getBoundingClientRect().height;
+      if (stack !== stacked || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
         changeLayout(() => {
+          composer.classList.toggle("composer-stacked", stack);
           input.style.height = `${next}px`;
           input.style.overflowY = overflow;
         });

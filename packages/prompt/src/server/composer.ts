@@ -11,14 +11,15 @@ const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m
 
 /**
  * The shared form body; each host owns its form, supplementary UI, and optional footer.
- * Buttons form a 2×2 grid beside the text field: attach and close above, transcribe and send below.
+ * Buttons form a 2×2 grid at the bottom right: attach and close above, transcribe and send below.
+ * Quick launches wrap under the text field, beside the buttons. A composer tall enough stacks the buttons 1×4.
  */
 export function renderComposerBody(options: {
   draft: { id: string; rowId: string; attachments?: readonly StagedAttachment[] };
   inputHtml: string;
   sendHtml?: string;
   collapsible?: boolean;
-  /** A wrapping row of quick-launch buttons above the footer, filled from the completion catalog. */
+  /** A wrapping row of quick-launch buttons under the text field, filled from the completion catalog. */
   quickLaunches?: boolean;
 }): string {
   const { draft } = options;
@@ -28,13 +29,12 @@ export function renderComposerBody(options: {
     : "";
   return `<input type="hidden" name="attachmentDraft" value="${escapeHtml(draft.id)}">
     <div class="agent-attach-row" id="${escapeHtml(draft.rowId)}" data-agent-attachments-target="row">${(draft.attachments ?? []).map((attachment) => renderAttachmentChip(attachment, draft.id)).join("")}</div>
-    <div class="composer-input-area">${options.inputHtml}<div class="composer-buttons">
+    <div class="composer-input-area">${options.inputHtml}${options.quickLaunches ? '<div class="composer-quick-launches" data-agent-completions-target="quickLaunches"></div>' : ""}<div class="composer-buttons">
       <span class="composer-button composer-attach">${renderAttachmentPicker("icon-only")}</span>
       <span class="composer-button composer-close">${close}</span>
       <span class="composer-button composer-transcribe">${renderTranscriptionComposerControl()}</span>
       <span class="composer-button composer-send">${send}</span>
     </div></div>
-    ${options.quickLaunches ? '<div class="composer-quick-launches" data-agent-completions-target="quickLaunches"></div>' : ""}
     <p role="status" data-agent-attachments-target="status" hidden></p>`;
 }
 

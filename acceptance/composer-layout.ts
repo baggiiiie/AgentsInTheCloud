@@ -259,7 +259,10 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
     const row = pane.querySelector(".agent-attach-row");
     const chip = row.querySelector(".agent-chip");
     const input = pane.querySelector(".composer-input");
-    return { rowHeight: row.getBoundingClientRect().height, chipHeight: chip.getBoundingClientRect().height, scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, chips: row.children.length, composer: pane.querySelector(":scope > .composer").getBoundingClientRect().height, input: input.getBoundingClientRect().height, inputMin: Number.parseFloat(getComputedStyle(input).minHeight) };
+    // The text field never gets shorter than the buttons beside it (less the quick launches under it).
+    const launches = pane.querySelector(".composer-quick-launches");
+    const beside = pane.querySelector(".composer-buttons").getBoundingClientRect().height - (launches && launches.checkVisibility() ? launches.getBoundingClientRect().height : 0);
+    return { rowHeight: row.getBoundingClientRect().height, chipHeight: chip.getBoundingClientRect().height, scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, chips: row.children.length, composer: pane.querySelector(":scope > .composer").getBoundingClientRect().height, input: input.getBoundingClientRect().height, inputMin: Math.max(Number.parseFloat(getComputedStyle(input).minHeight), beside) };
   })()`);
   await recorder.file("attachments.png", await page.screenshot());
   recorder.add(
@@ -400,6 +403,8 @@ await scenario("mobile-D21-D22-floating", "D21/D22: floating buttons stack botto
 await page.layout("desktop");
 floatingInset = 10;
 await page.navigate(builtinUrl, sel.transcript);
+// Terminals open beside the agent attach at the desktop size before any scenario's baseline.
+await Bun.sleep(3000);
 
 await scenario("desktop-D1-selection", "D1: on desktop the composer is open and its text field focused when the workspace is selected.", async (recorder) => {
   await page.navigate(`${setup.atelier}/`, "body");
