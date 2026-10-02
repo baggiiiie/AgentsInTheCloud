@@ -15,7 +15,7 @@ import { renderAgentPane } from "./render-composer.ts";
 import { agentConversationKey } from "./render-context.ts";
 import { handleAgentRequest } from "./routes.ts";
 import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgentConversation, getWorkspaceAgentRuntime, restoreWorkspaceAgentRuntime, subscribeWorkspaceAgentBusy } from "./runtime.ts";
-import { archiveWorkspaceAgentConversation, createNextWorkspaceAgentConversation, listWorkspaceAgentConversations, sessionShareDir, sessionShareKeyForInit, sessionShareMountPath, publishWorkspaceAgentHistory, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
+import { archiveWorkspaceAgentConversation, createNextWorkspaceAgentConversation, listWorkspaceAgentConversations, sessionShareDir, sessionShareKeyForInit, sessionShareMountPath, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 import {
   createDeleteCurrentWorkspaceTool,
   registerWorkspaceAgentTool,
@@ -191,12 +191,8 @@ export const agentWorkspaceModule: WorkspaceModule = {
     agentEvents = events;
     registerAgentEvents(events);
     registerSessionShareMountEvents(events);
-    events.on("workspace_deleting", async ({ workspaceId }) => {
-      for (const agent of await listWorkspaceAgentConversations(workspaceId)) await publishWorkspaceAgentHistory(agent);
-    });
     events.on("workspace_agent_turn_finished", async ({ workspaceId, conversationId }) => {
       const agent = (await listWorkspaceAgentConversations(workspaceId)).find((item) => item.conversationId === conversationId);
-      if (agent) await publishWorkspaceAgentHistory(agent);
       context.registry.requestSurfaceAttention(workspaceId, agentConversationKey(conversationId));
       // Delegated conversations finish independently of the root's turn. Their
       // completion belongs to the Agent surface, not workspace-level attention.

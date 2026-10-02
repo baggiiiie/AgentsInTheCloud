@@ -1,34 +1,7 @@
 import type { ImageContent } from "@earendil-works/pi-ai";
-import { readFile } from "node:fs/promises";
-import { Type } from "typebox";
-import { Value } from "typebox/value";
 import { imageMimeByExtension } from "@atelier/prompt/server";
 
 const allowedMimeTypes = new Set(Object.values(imageMimeByExtension));
-const entrySchema = Type.Object({
-  id: Type.String(),
-  message: Type.Object({ content: Type.Array(Type.Unknown()) }),
-});
-const imagePartSchema = Type.Object({
-  type: Type.Literal("image"),
-  mimeType: Type.String(),
-  data: Type.String(),
-});
-
-export async function sessionImageEndpoint(sessionFile: string, entryId: string, contentIndex: number): Promise<Response> {
-  const lines = (await readFile(sessionFile, "utf8")).split("\n").filter(Boolean);
-  const entry = lines
-    .map((line) => {
-      const candidate: unknown = JSON.parse(line);
-      return Value.Check(entrySchema, candidate) ? candidate : undefined;
-    })
-    .find((candidate) => candidate?.id === entryId);
-  if (!entry) return new Response("not found", { status: 404 });
-
-  const part = entry.message.content[contentIndex];
-  return sessionImageResponse(Value.Check(imagePartSchema, part) ? part : undefined);
-}
-
 export function sessionImageResponse(part: ImageContent | undefined): Response {
   if (!part || !allowedMimeTypes.has(part.mimeType)) return new Response("not found", { status: 404 });
 

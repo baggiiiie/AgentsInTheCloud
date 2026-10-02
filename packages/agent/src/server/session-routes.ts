@@ -4,7 +4,6 @@ import { requestAcceptsJson } from "@atelier/core";
 import { turboStreamResponse } from "@atelier/shared";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
-import { sessionImageEndpoint } from "./session-images.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";
 
 export const handleSessionRequest: AgentRouteHandler = async (request, url, options) => {
@@ -22,11 +21,8 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
     const agent = await resolveAgentConversation(params[0], params[1], options.events);
-    if (agent.storage === "durable") {
-      const controller = await existingDurableController(agent, options);
-      return controller ? await controller.image(params[2], Number(params[3])) : new Response("not found", { status: 404 });
-    }
-    return await sessionImageEndpoint(agent.path, params[2], Number(params[3]));
+    const controller = await existingDurableController(agent, options);
+    return controller ? await controller.image(params[2], Number(params[3])) : new Response("not found", { status: 404 });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tree(\/summary|\/label|)$/))) {
     const [workspaceId, conversationId, suffix] = params;
@@ -36,8 +32,7 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
     const agent = await resolveAgentConversation(params[0], params[1], options.events);
-    if (agent.storage === "durable") await stopDurableWorkspaceAgentConversation(agent, options);
-    else await (await requireAgentRuntime(params[0], params[1], options)).abort();
+    await stopDurableWorkspaceAgentConversation(agent, options);
     await invalidateAgentView(options, params[0], params[1]);
     return requestAcceptsJson(request) ? Response.json({ agent: { conversationId: params[1], state: "idle", aborted: true } }) : turboStreamResponse("");
   }

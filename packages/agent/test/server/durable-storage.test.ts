@@ -6,7 +6,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { createRegistry } from "@earendil-works/pi-durable";
 import { durableJournalDirectory, durableJournalMountPath, workspaceDurableJournalDirectory } from "../../src/server/durable-storage.ts";
-import { openDurableAgentRuntime, openRetainedDurableAgentRuntime, type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
+import { openDurableAgentRuntime, type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 
 const previousDataDir = process.env.ATELIER_DATA_DIR;
 const paths: string[] = [];
@@ -45,7 +45,7 @@ test("journals use the existing project share outside disposable workspace files
   }
 });
 
-test("production opening retains the original searchable journal and deletion gate after workspace files are removed", async () => {
+test("workspace journal retains the original searchable journal and deletion gate after workspace files are removed", async () => {
   const root = await dataDirectory();
   await project(root, "retained", "Product Suite");
   const models = createModels();
@@ -58,7 +58,7 @@ test("production opening retains the original searchable journal and deletion ga
     expand: async (_workspace: string, text: string) => text,
     ready: async () => {},
   };
-  const runtime = await openRetainedDurableAgentRuntime("retained", {}, load);
+  const runtime = await openDurableAgentRuntime(await workspaceDurableJournalDirectory("retained"), "retained", {}, load);
   runtimes.push(runtime);
   const record = { conversationId: "tab", label: "Agent 1", title: "Retained history" };
   const agent = await runtime.conversation(record);

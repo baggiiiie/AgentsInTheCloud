@@ -37,22 +37,22 @@ export interface AgentPaneState {
 export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceAgentConversationInfo, state: AgentPaneState, completionCatalogHtml = ""): Promise<string> {
   const key = agentConversationKey(agent.conversationId);
   const draftId = agentAttachmentDraftId(ctx.workspaceId, ctx.conversationId);
-  const attachments = await listStagedAttachments(draftId);
-  const initialPromptDraft = await readInitialPromptDraft(ctx.workspaceId, ctx.conversationId);
+  const attachments = state.readOnly ? [] : await listStagedAttachments(draftId);
+  const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.conversationId);
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
   return `<section id="${domId("agent_pane", ctx.workspaceId, agent.conversationId)}" data-turbo-permanent class="agent-conversation-pane" data-agent-conversation-source="${escapeHtml(key)}">
     <div class="agent-pane agent-composer-pane" id="${ids.pane(ctx)}"
-      data-controller="agent-pane agent-attachments agent-composer composer-focus"
+      ${state.readOnly ? "" : `data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
       data-agent-pane-conversation-id-value="${escapeHtml(ctx.conversationId)}"
-      ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}>
-      <div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>
+      ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}`}>
+      ${state.readOnly ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
       <div class="agent-transcript-region">
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
         </div>
-        ${renderTranscriptEndNavigation()}
+        ${state.readOnly ? "" : renderTranscriptEndNavigation()}
       </div>
       ${state.readOnly ? "" : renderOpenComposerButton()}
       ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({

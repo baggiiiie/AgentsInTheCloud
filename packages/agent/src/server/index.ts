@@ -3,7 +3,6 @@ export {
   createNextWorkspaceAgentConversation,
   ensureDefaultWorkspaceAgentConversation,
   listWorkspaceAgentConversations,
-  parseWorkspaceAgentFilename,
   publishSessionSnapshot,
   sessionShareDir,
   workspaceSessionShareKey,
@@ -36,7 +35,6 @@ export { runAgentSessionNameCommand } from "./session-name-command.ts";
 export { agentWorkspaceModule, agentWorkspaceModule as atelierServerModule, workspaceAgentTabProvider } from "./web.ts";
 export {
   createDeleteCurrentWorkspaceTool,
-  createWorkspaceAgentTools,
   normalizeWorkspacePath,
   registerWorkspaceAgentTool,
   registerWorkspacePresenter,

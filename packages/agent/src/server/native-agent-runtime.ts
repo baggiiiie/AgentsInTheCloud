@@ -30,6 +30,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   readonly conversationId: string;
   readonly label: string;
   readonly sessionFile: string;
+  readonly readOnly: boolean;
   private presentation!: DurableConversationPresentation;
   private readonly transcriptListeners = new Map<AgentLivePresentationListener, { unsubscribe(): void }>();
   readonly treeSummaryAvailable = false;
@@ -55,6 +56,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     this.conversationId = agent.conversationId;
     this.label = agent.label;
     this.sessionFile = agent.path;
+    this.readOnly = controller.readOnly;
   }
   static async create(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions) {
     const owner = await durableWorkspaceOwner(agent.workspaceId, options);
@@ -62,7 +64,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     const runtime = new NativeAgentRuntime(agent, controller, await createPiModelRuntime(), options);
     runtime.presentation = await controller.presentation(() => runtime.committed());
     await runtime.committed();
-    await runtime.refreshModelConfiguration();
+    if (!runtime.readOnly) await runtime.refreshModelConfiguration();
     runtime.observePresentation();
     return runtime;
   }
@@ -103,6 +105,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   private async committed() {
     // attach starts the watch before returning its initial frame.
     if (!this.presentation || this.disposed) return;
+    if (this.readOnly) return;
     const { agent } = this.presentation.state;
     this.model = agent.model ? { provider: agent.model.provider, id: agent.model.modelId } : undefined;
     this.thinking = agent.thinkingLevel ?? "off";
@@ -140,8 +143,8 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     return { unsubscribe: () => { this.transcriptListeners.get(listener)?.unsubscribe(); this.transcriptListeners.delete(listener); chrome.unsubscribe(); } };
   }
   subscribeTurnPresentation(turn: string, branch: string, listener: AgentLivePresentationListener) { this.assertOpen(); return this.presentation.subscribeTurnPresentation(turn, branch, listener); }
-  async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, stats: this.stats() }; }
-  async refreshCompletionCatalog() { this.catalog = await renderWorkspaceCompletionCatalog(this.workspaceId); this.chrome.invalidate(); return this.catalog; }
+  async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, stats: this.stats(), readOnly: this.readOnly }; }
+  async refreshCompletionCatalog() { if (this.readOnly) return ""; this.catalog = await renderWorkspaceCompletionCatalog(this.workspaceId); this.chrome.invalidate(); return this.catalog; }
   revealTurn(target: string) { return this.presentation.revealTurn(target); }
   userMessages() { return this.presentation.userMessages(); }
   knownRequest(requestId: string) { this.assertOpen(); return this.controller.knownRequest(requestId); }
@@ -154,7 +157,12 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     await this.controller.submit({ text, requestId, attachmentNotes: options.attachmentNotes,
       images: options.images?.map(image => ({ type: "image", data: image.data, mimeType: image.mimeType })) });
   }
+  private assertWritable() {
+    this.assertOpen();
+    if (this.readOnly) throw new AtelierCoreError("invalid_arguments", "This conversation is read-only. Start a new Agent conversation to continue.");
+  }
   private async requireAvailableModel() {
+    this.assertWritable();
     const model = this.currentModel();
     const available = model && (await configuredModelOptionViews(model, this.modelRuntime)).find(item => item.provider === model.provider && item.id === model.id);
     if (!available?.available) throw new AtelierCoreError("invalid_arguments", available?.unavailableReason ?? "Choose a connected model in Settings → Models");
@@ -162,9 +170,9 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   async compact(instructions?: string) { this.assertOpen(); await this.requireAvailableModel(); await this.controller.compact(instructions); }
   async abort() { this.assertOpen(); await this.controller.stop(); }
   async newSession() { this.assertOpen(); await this.controller.reset(); }
-  async refreshModelConfiguration() { this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime); this.chrome.invalidate(); }
+  async refreshModelConfiguration() { if (this.readOnly) return; this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime); this.chrome.invalidate(); }
   async setModel(provider: string, modelId: string) {
-    this.assertOpen();
+    this.assertWritable();
     const model = (await configuredModelOptionViews({ provider, id: modelId }, this.modelRuntime)).find(item => item.provider === provider && item.id === modelId);
     if (!model?.available) throw new AtelierCoreError("invalid_arguments", model?.unavailableReason ?? "Model unavailable");
     const remembered = await getAgentModelThinkingLevel("builtin", { provider, id: modelId });
@@ -176,7 +184,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
     await this.refreshModelConfiguration();
   }
   async setThinkingLevel(level: string) {
-    this.assertOpen();
+    this.assertWritable();
     const selected = this.availableThinkingLevels().find(item => item === level);
     if (!selected) throw new AtelierCoreError("invalid_arguments", `Unsupported thinking level: ${level}`);
     await this.controller.configure({ thinkingLevel: selected });

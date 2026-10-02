@@ -1,16 +1,7 @@
 import type { AtelierEventBus } from "@atelier/core";
 import type { DeleteCurrentWorkspaceResult, WorkspaceWorkViewReference } from "@atelier/shared";
-import { workspaceRoot } from "@atelier/workspace";
-import {
-  createEditToolDefinition,
-  createReadToolDefinition,
-  createWriteToolDefinition,
-  type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
-import { createTmuxBashTool } from "./bash-tmux.ts";
 import { defineWorkspaceTool, type WorkspaceTool } from "./workspace-tool.ts";
-import { workspaceFileToolOptions } from "./workspace-file-tools.ts";
 export { normalizeWorkspacePath } from "./workspace-file-tools.ts";
 
 export interface WorkspaceAgentToolOptions {
@@ -108,15 +99,6 @@ export function createDeleteCurrentWorkspaceTool(workspaceId: string, deleteCurr
     }),
     execute: (_toolCallId: string, params: { force: boolean }) => executeDeleteCurrentWorkspace(workspaceId, deleteCurrentWorkspace, params.force),
   });
-}
-
-export function createWorkspaceAgentTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): ToolDefinition<any, any>[] {
-  const operations = workspaceFileToolOptions(workspaceId);
-  const read = createReadToolDefinition(workspaceRoot, operations.read);
-  const write = createWriteToolDefinition(workspaceRoot, operations.write);
-  const edit = createEditToolDefinition(workspaceRoot, operations.edit);
-  const bash = createTmuxBashTool(workspaceId);
-  return [read, write, edit, bash, ...createAtelierControlTools(workspaceId, { ...options, embeds: true })];
 }
 
 export function createAtelierControlTools(workspaceId: string, options: WorkspaceAgentToolOptions = {}): WorkspaceTool<any, any>[] {

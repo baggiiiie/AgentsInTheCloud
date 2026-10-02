@@ -52,7 +52,7 @@ export async function suspendAllDurableWorkspaceOwners() {
 
 /** Lookup must not create a new root or prepare prompts just to reject bad input. */
 export async function existingDurableController(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions = {}) {
-  if (agent.storage !== "durable" || !existsSync(join(await workspaceDurableJournalDirectory(agent.workspaceId), "main.jsonl"))) return undefined;
+  if (!existsSync(join(await workspaceDurableJournalDirectory(agent.workspaceId), "main.jsonl"))) return undefined;
   const owner = await durableWorkspaceOwner(agent.workspaceId, options);
   if (!(await owner.catalog()).some(record => record.conversationId === agent.conversationId)) return undefined;
   return owner.conversation(agent);

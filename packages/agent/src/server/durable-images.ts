@@ -32,8 +32,7 @@ export async function durableImageEndpoint(conversation: Conversation, entryId: 
     } finally { await watch.stop(); }
   }
   const numericId = Number(entryId);
-  if (!/^\d+$/.test(entryId) || !Number.isSafeInteger(numericId) || numericId < 1
-    || !Number.isSafeInteger(contentIndex) || contentIndex < 0) return new Response("not found", { status: 404 });
+  if (!/^\d+$/.test(entryId) || !Number.isSafeInteger(numericId) || numericId < 1) return new Response("not found", { status: 404 });
   // SAFETY: external ID validated as a positive safe integer; the scoped scan
   // below establishes visibility instead of trusting this nominal type cast.
   const id = numericId as EntryId;
