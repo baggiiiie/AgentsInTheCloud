@@ -4,6 +4,7 @@
 import { tabHtml, tabStripHtml } from "../src/tab-strip/tab-strip-html.ts";
 import { buttonHtml } from "../src/button/button-html.ts";
 import { actionLinkHtml } from "../src/action-link/action-link-html.ts";
+import { comparisonRingHtml } from "../src/comparison-ring/comparison-ring-html.ts";
 import { buttonGroupHtml } from "../src/button-group/button-group-html.ts";
 import { actionItemHtml } from "../src/action-item/action-item-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
@@ -406,6 +407,22 @@ export const entries: CatalogueEntry[] = [
           }),
       },
     ],
+  },
+  {
+    id: "comparison-ring",
+    title: "Comparison ring",
+    when: "Glanceable, non-interactive progress against a schedule, such as several usage limits in one row. For a link, use Action link's perimeterComparison.",
+    contract: "referencePercent and valuePercent (0–100) share one ring clockwise from twelve, drawn exactly like Action link's comparison. caption is at most three characters inside the ring. label is the accessible name and tooltip; include both values and their meaning.",
+    imports: { "comparison-ring": "comparisonRingHtml" },
+    sources: ["comparison-ring/comparison-ring-html.ts", "comparison-ring/comparison-ring.css"],
+    examples: [{
+      title: "Limits · ahead, behind and unused",
+      render: () => `<div style="display:flex;gap:6px">${[
+        { caption: "5h", referencePercent: 60, valuePercent: 80 },
+        { caption: "7d", referencePercent: 73, valuePercent: 32 },
+        { caption: "Op", referencePercent: 20, valuePercent: 0 },
+      ].map((ring) => comparisonRingHtml({ ...ring, label: `${ring.caption}: Time ${ring.referencePercent}%, Usage ${ring.valuePercent}%` })).join("")}</div>`,
+    }],
   },
   {
     id: "action-link",

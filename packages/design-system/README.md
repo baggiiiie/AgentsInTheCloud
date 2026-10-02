@@ -26,6 +26,7 @@ Prefer consistency over feature-specific visual preservation.
 | Tokens, themes, spacing | `foundations` (CSS) | [role tokens and composition](src/design-system.css) |
 | Action, including icon-only | `button` | [ButtonOptions](src/button/button-html.ts), [content / variants](src/button/button-content.ts) |
 | Prominent navigation, optional icon-only comparison ring | `action-link` | [ActionLinkOptions](src/action-link/action-link-html.ts) |
+| Glanceable gauge, not interactive | `comparison-ring` | [ComparisonRingOptions](src/comparison-ring/comparison-ring-html.ts) |
 | Related actions, not selection | `button-group` | [ButtonGroupOptions](src/button-group/button-group-html.ts) |
 | Actionable row / compound row | `action-item` | [ActionItemOptions](src/action-item/action-item-html.ts) |
 | Running, still cancellable | `activity-button` | [ActivityButtonOptions](src/activity-button/activity-button-html.ts) |

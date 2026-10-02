@@ -11,6 +11,7 @@
     "./activity-button/client": "./src/activity-button/activity-button-client.ts",
     "./button": "./src/button/button-html.ts",
     "./button-group": "./src/button-group/button-group-html.ts",
+    "./comparison-ring": "./src/comparison-ring/comparison-ring-html.ts",
     "./copy-button": "./src/copy-button/copy-button-html.ts",
     "./copy-button/client": "./src/copy-button/copy-button-controller.ts",
     "./destructive-confirmation": "./src/destructive-confirmation/destructive-confirmation-html.ts",

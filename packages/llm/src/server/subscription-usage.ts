@@ -5,6 +5,8 @@ export type SubscriptionUsage = {
   limitReached: boolean | null;
   credits?: { unlimited: boolean; balance: string | null };
   resets?: { available: number };
+  /** Prepaid money rather than allowance windows; amounts are in currency units. */
+  balance?: { currency: string; available: number; monthSpend: number };
   windows: { limitName: string; meteredFeature: string | null; kind: "primary" | "secondary"; usedPercent: number; durationSeconds: number; resetsAt: string | null }[];
 };
 

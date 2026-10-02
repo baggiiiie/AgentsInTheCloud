@@ -40,6 +40,10 @@ export const designSystemStaticFiles = {
     url: new URL("./activity-button/activity-button.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/comparison-ring.css": {
+    url: new URL("./comparison-ring/comparison-ring.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
   "/button.css": {
     url: new URL("./button/button.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
