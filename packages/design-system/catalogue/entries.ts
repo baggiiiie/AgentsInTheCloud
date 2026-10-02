@@ -18,7 +18,7 @@ import { toggleHtml } from "../src/toggle/toggle-html.ts";
 import { autocompleteHtml } from "../src/autocomplete/autocomplete-html.ts";
 import { transientFeedbackHtml } from "../src/transient-feedback/transient-feedback-html.ts";
 import { warningBannerHtml } from "../src/warning-banner/warning-banner-html.ts";
-import { Icons } from "../src/icons/icons-html.ts";
+import { agentsInTheCloudBrandIconHtml, Icons } from "../src/icons/icons-html.ts";
 
 export interface CatalogueEntry {
   id: string;
@@ -1071,9 +1071,13 @@ export const entries: CatalogueEntry[] = [
     title: "Icons",
     when: "Shared decorative vocabulary. Use icon-only Button for standalone icon actions.",
     contract:
-      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudLogoPathsHtml exports the same logo geometry without a nested SVG viewport for animated scenes using 24×24 user units. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
+      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for dialogs and agent controls. Icons.AgentsInTheCloud and agentsInTheCloudLogoPathsHtml retain the old easel SVG only for the sidebar animation. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
     imports: { icons: "Icons" },
     examples: [
+      {
+        title: "Product brand mark",
+        render: () => `<span class="catalogue-icon">${agentsInTheCloudBrandIconHtml}<span>AgentsInTheCloud</span></span>`,
+      },
       {
         title: "Icon vocabulary",
         render: () =>

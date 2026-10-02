@@ -64,7 +64,7 @@ ${options.devReload ? `
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#172033">
+<meta name="theme-color" content="#eadcc6">
 <link rel="stylesheet" href="${assetPath("/design-system.css")}">
 <link rel="stylesheet" href="${assetPath("/style.css")}">
 <link rel="stylesheet" href="${assetPath("/provisioning.css")}">

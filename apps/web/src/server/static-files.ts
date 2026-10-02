@@ -24,6 +24,8 @@ export const fingerprintedStaticFiles: StaticFileRegistry = {
   "/apple-touch-icon.png": { url: new URL("../../public/apple-touch-icon.png", import.meta.url), contentType: "image/png" },
   "/icon-192.png": { url: new URL("../../public/icon-192.png", import.meta.url), contentType: "image/png" },
   "/icon-512.png": { url: new URL("../../public/icon-512.png", import.meta.url), contentType: "image/png" },
+  "/icon-maskable-192.png": { url: new URL("../../public/icon-maskable-192.png", import.meta.url), contentType: "image/png" },
+  "/icon-maskable-512.png": { url: new URL("../../public/icon-maskable-512.png", import.meta.url), contentType: "image/png" },
   "/manifest.webmanifest": { url: new URL("../../public/manifest.webmanifest", import.meta.url), contentType: "application/manifest+json; charset=utf-8" },
   "/service-worker.js": { url: new URL("../client/service-worker.js", import.meta.url), contentType: "text/javascript; charset=utf-8" },
   "/style.css": { url: new URL("../../public/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },

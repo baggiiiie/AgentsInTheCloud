@@ -2,7 +2,7 @@ import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { agentsInTheCloudBrandIconHtml, Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 // Menu paths checked against the linked vendor documentation on 2026-09-08.
@@ -115,7 +115,7 @@ export function renderPwaReminder(): string {
   </section>`).join("");
   const dialog = dialogHtml({
     element: { attributesHtml: 'data-pwa-reminder-target="dialog"' },
-    iconHtml: Icons.AgentsInTheCloud,
+    iconHtml: agentsInTheCloudBrandIconHtml,
     titleCaption: "Install AgentsInTheCloud as an app",
     bodyHtml: `<div class="pwa-reminder-body"><p>Open AgentsInTheCloud in its own window and launch it from your home screen or apps.</p>${body}</div>`,
     footerHtml: footer,
