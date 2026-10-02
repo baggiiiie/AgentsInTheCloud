@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -9,7 +9,7 @@ import { NativeAgentRuntime } from "../../src/server/native-agent-runtime.ts";
 import { LegacyAgentRuntime } from "../../src/server/legacy-agent-runtime.ts";
 import { openDurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
-import { getWorkspaceAgentRuntime, unloadWorkspaceAgentRuntime, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes } from "../../src/server/runtime.ts";
+import { getWorkspaceAgentRuntime, unloadWorkspaceAgentRuntime, closeWorkspaceAgentConversation, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, allowWorkspaceAgentResume } from "../../src/server/runtime.ts";
 import { archiveWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle } from "../../src/server/session-store.ts";
 
 const originalDataDir = process.env.ATELIER_DATA_DIR;
@@ -49,11 +49,30 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   expect(runtime.currentModel()).toEqual({ provider: "faux", id: "test" });
   const named = await setWorkspaceAgentConversationTitle(agent, "Retained native title");
   expect((await (await durableWorkspaceOwner(workspaceId)).catalog())[0]!.title).toBe(named.title);
-  await unloadWorkspaceAgentRuntime(workspaceId, agent.conversationId);
-  const reopened = await getWorkspaceAgentRuntime(named);
+  const disposing = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const originalDispose = runtime.dispose.bind(runtime);
+  const dispose = spyOn(runtime, "dispose").mockImplementation(async () => { disposing.resolve(); await release.promise; await originalDispose(); });
+  const unloading = unloadWorkspaceAgentRuntime(workspaceId, agent.conversationId);
+  await disposing.promise;
+  let mounted = false;
+  const mounting = getWorkspaceAgentRuntime(named).then(value => { mounted = true; return value; });
+  await Bun.sleep(5);
+  expect(mounted).toBe(false);
+  release.resolve();
+  await unloading;
+  dispose.mockRestore();
+  const reopened = await mounting;
   expect(reopened).not.toBe(runtime);
   expect(reopened.userMessages()).toEqual(["Persisted request"]);
-  await closeWorkspaceAgentConversation(workspaceId, agent.conversationId);
+  // Park and close overlap: closure must reopen passively after disposal and
+  // persist its fence rather than operating on a just-suspended owner.
+  const parking = suspendWorkspaceAgentRuntimes(workspaceId);
+  const closing = closeWorkspaceAgentConversation(workspaceId, agent.conversationId);
+  await parking;
+  await closing;
+  allowWorkspaceAgentResume(workspaceId);
+  expect((await (await durableWorkspaceOwner(workspaceId)).admission())?.closed).toContain(controller.id);
   await archiveWorkspaceAgentConversation(named);
   expect(await listWorkspaceAgentConversations(workspaceId)).toEqual([]);
   // Deletion must fence the retained owner even when no mounted tabs remain.

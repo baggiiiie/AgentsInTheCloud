@@ -1,3 +1,4 @@
+import { Type } from "typebox";
 import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -7,7 +8,7 @@ import { createAtelierEventBus } from "@atelier/core";
 import { agentAttachmentDraftId, findStagedAttachment, stageAttachment } from "@atelier/prompt/server";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
-import { createRegistry } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "../../src/server/session-store.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
@@ -86,5 +87,55 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   expect(retried?.headers.get("x-atelier-attachment-draft-consumed")).toBe("true");
   expect(preparations).toBe(1);
   expect(admissions).toBe(1);
+  expect(faux.state.callCount).toBe(1);
+});
+
+
+test("offline HTTP Stop bypasses model/UI preparation and commits intent before cleanup failure", async () => {
+  directory = await mkdtemp(join(tmpdir(), "durable-http-stop-"));
+  process.env.ATELIER_DATA_DIR = directory;
+  const agent = await ensureDefaultWorkspaceAgentConversation(`stop-${crypto.randomUUID()}`);
+  const models = createModels();
+  const faux = fauxProvider({ tokensPerSecond: 100_000 });
+  models.setProvider(faux.provider);
+  const started = Promise.withResolvers<void>();
+  const registry = createRegistry();
+  registry.install(defineExtension({ name: "hold", tools: [defineTool({
+    name: "hold", description: "Wait", parameters: Type.Object({}), replay: "safe",
+    async execute(_args, _api, context) {
+      started.resolve();
+      return new Promise<never>((_resolve, reject) => context.abortSignal!.addEventListener("abort", () => reject(context.abortSignal!.reason), { once: true }));
+    },
+  })] }));
+  faux.setResponses([fauxAssistantMessage([{ type: "toolCall", id: "hold", name: "hold", arguments: {} }], { stopReason: "toolUse" })]);
+  owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
+    harness: async () => ({ models, registry }), prepare: async () => ({ model: { provider: "faux", modelId: "faux-1" } }),
+    expand: async (_workspace, text) => text, ready: async () => {},
+  });
+  const controller = await owner.conversation(agent);
+  await controller.submit({ requestId: "initial", text: "Start" });
+  await started.promise;
+  await controller.submit({ requestId: "queued", text: "Steering" });
+  await suspendAllDurableWorkspaceOwners();
+  owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
+    harness: async () => ({ models: createModels(), registry }),
+    prepare: async () => { throw new Error("No model providers"); },
+    expand: async () => { throw new Error("No workspace"); }, ready: async () => { throw new Error("Offline"); },
+  });
+  const request = new Request(`http://atelier.test/workspaces/${agent.workspaceId}/agents/${agent.conversationId}/abort`, { method: "POST" });
+  await expect(handleAgentRequest(request, new URL(request.url), {
+    getRuntime: async () => { throw new Error("Must not mount UI for Stop"); },
+  })).rejects.toThrow("Stop saved");
+  const restored = await owner.conversation(agent);
+  const queued = await restored.submit({ requestId: "queued", text: "Retry" });
+  expect((await queued.status(BACKGROUND_CONTEXT)).status).toBe("unanswered");
+  const { WorkspaceStops } = await import("../../src/server/durable-lifecycle.ts");
+  await suspendAllDurableWorkspaceOwners();
+  const { openDurableWorkspace } = await import("../../src/server/durable-workspace.ts");
+  const workspace = await openDurableWorkspace(agent.path, agent.workspaceId, { models, registry });
+  try {
+    expect(Object.values((await workspace.harness.snapshot(WorkspaceStops, BACKGROUND_CONTEXT))!.tasks).flat().length).toBeGreaterThan(0);
+    expect((await workspace.harness.inspect(BACKGROUND_CONTEXT)).tasks.every(task => task.record.abortRequested)).toBe(true);
+  } finally { await workspace.close(); }
   expect(faux.state.callCount).toBe(1);
 });

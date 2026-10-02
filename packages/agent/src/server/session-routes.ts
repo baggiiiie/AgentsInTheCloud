@@ -1,3 +1,4 @@
+import { stopDurableWorkspaceAgentConversation } from "./runtime.ts";
 import { existingDurableController } from "./durable-owner.ts";
 import { requestAcceptsJson } from "@atelier/core";
 import { turboStreamResponse } from "@atelier/shared";
@@ -34,8 +35,9 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     return response;
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
-    const runtime = await requireAgentRuntime(params[0], params[1], options);
-    await runtime.abort();
+    const agent = await resolveAgentConversation(params[0], params[1], options.events);
+    if (agent.storage === "durable") await stopDurableWorkspaceAgentConversation(agent, options);
+    else await (await requireAgentRuntime(params[0], params[1], options)).abort();
     await invalidateAgentView(options, params[0], params[1]);
     return requestAcceptsJson(request) ? Response.json({ agent: { conversationId: params[1], state: "idle", aborted: true } }) : turboStreamResponse("");
   }
