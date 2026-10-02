@@ -32,7 +32,8 @@
     "@modelcontextprotocol/sdk": "1.30.0",
     "@earendil-works/pi-durable": "catalog:",
     "@earendil-works/chord": "catalog:",
-    "proper-lockfile": "4.1.2"
+    "proper-lockfile": "4.1.2",
+    "@atelier/legacy-converter": "workspace:*"
   },
   "devDependencies": {
     "@types/web-push": "3.6.4",

@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { fauxAssistantMessage, fauxToolCall, type Message } from "@earendil-works/pi-ai";
-import { convertLegacyConversations } from "../../src/server/legacy-converter.ts";
+import { convertLegacyConversations } from "@atelier/legacy-converter";
 import { archiveWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle } from "../../src/server/session-store.ts";
 import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/durable-owner.ts";
 import { getWorkspaceAgentRuntime, unloadWorkspaceAgentRuntime, closeWorkspaceAgentConversation } from "../../src/server/runtime.ts";
 import { NativeAgentRuntime } from "../../src/server/native-agent-runtime.ts";
-import { historyNote } from "../../src/server/durable-transcript.ts";
+import { historyNote } from "@atelier/legacy-converter/entries";
 
 let root: string;
 let workspace: string;
@@ -98,8 +98,13 @@ test("read-only is enforced by the canonical owner even with forged writable tab
 
 test("crash after journal commit before metadata replacement retries without reopening the source", async () => {
   const { record, path } = await fixture();
-  const metadata = await Bun.file(metadataPath()).json();
-  await Promise.all([convertLegacyConversations(workspace, metadata), convertLegacyConversations(workspace, metadata)]);
+  const metadata = await Bun.file(metadataPath()).text();
+  const options = {
+    workspaceId: workspace, workspaceDirectory: join(root, "workspaces", workspace),
+    shareDirectory: join(root, "session-shares", "projectless"), metadata,
+    destination: () => durableWorkspaceOwner(workspace),
+  };
+  await Promise.all([convertLegacyConversations(options), convertLegacyConversations(options)]);
   const owner = await durableWorkspaceOwner(workspace);
   const before = await (await owner.conversation(record)).historyView();
   await rm(path);

@@ -54,6 +54,7 @@
       "dependencies": {
         "@atelier/core": "workspace:*",
         "@atelier/design-system": "workspace:*",
+        "@atelier/legacy-converter": "workspace:*",
         "@atelier/llm": "workspace:*",
         "@atelier/markdown": "workspace:*",
         "@atelier/observable-terminal": "workspace:*",
@@ -216,6 +217,15 @@
         "@atelier/core": "workspace:*",
         "@atelier/design-system": "workspace:*",
         "@atelier/shared": "workspace:*",
+      },
+    },
+    "packages/legacy-converter": {
+      "name": "@atelier/legacy-converter",
+      "dependencies": {
+        "@earendil-works/pi-ai": "catalog:",
+        "@earendil-works/pi-coding-agent": "catalog:",
+        "@earendil-works/pi-durable": "catalog:",
+        "typebox": "^1.0.57",
       },
     },
     "packages/llm": {
@@ -465,6 +475,8 @@
     "@atelier/host": ["@atelier/host@workspace:packages/host"],
 
     "@atelier/keypress-probe": ["@atelier/keypress-probe@workspace:packages/keypress-probe"],
+
+    "@atelier/legacy-converter": ["@atelier/legacy-converter@workspace:packages/legacy-converter"],
 
     "@atelier/llm": ["@atelier/llm@workspace:packages/llm"],
 
