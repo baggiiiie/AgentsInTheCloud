@@ -67,6 +67,20 @@ test("retained discovery is share-scoped and reads closed/deleted native history
   expect(faux.state.callCount).toBe(1);
 });
 
+test("retained discovery requires an existing viewer and cannot fall through to projectless history", async () => {
+  const { load } = await setup();
+  const owner = await retainedDurableWorkspaceOwner(durableJournalDirectory("projectless", "deleted"), "deleted", {}, load);
+  await owner.conversation({ conversationId: "private", title: "Projectless history", label: "Agent 1" });
+  for (const viewer of ["missing", "deleted", "../workspaces", "/absolute", "..", "viewer/child"]) {
+    await expect(retainedDurableHistories(viewer)).rejects.toThrow();
+  }
+  // A real projectless viewer need not have an init.json or running container.
+  await mkdir(join(directory, "workspaces", "viewer", "metadata"), { recursive: true });
+  expect((await retainedDurableHistories("viewer")).map(item => item.workspaceId)).toEqual(["deleted"]);
+  await rm(join(directory, "workspaces", "viewer"), { recursive: true });
+  await expect(retainedDurableHistories("viewer")).rejects.toThrow("workspace not found");
+});
+
 test("committed catalog title reconciles stale tab metadata without reopening a closed tab", async () => {
   const { load } = await setup();
   const agent = await ensureDefaultWorkspaceAgentConversation("workspace");
