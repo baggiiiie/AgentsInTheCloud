@@ -23,11 +23,11 @@ import (
 
 // Keep in sync with packages/shared/src/workspace-gateway.ts.
 const gatewayPort = 2999
-const hostHeader = "X-AgentsInTheCloud-Gateway-Host"
-const tokenHeader = "X-AgentsInTheCloud-Gateway-Token"
-const portHeader = "X-AgentsInTheCloud-Gateway-Port"
-const protocolHeader = "X-AgentsInTheCloud-Gateway-Protocol"
-const errorHeader = "X-AgentsInTheCloud-Gateway-Error"
+const hostHeader = "X-Agents-In-The-Cloud-Gateway-Host"
+const tokenHeader = "X-Agents-In-The-Cloud-Gateway-Token"
+const portHeader = "X-Agents-In-The-Cloud-Gateway-Port"
+const protocolHeader = "X-Agents-In-The-Cloud-Gateway-Protocol"
+const errorHeader = "X-Agents-In-The-Cloud-Gateway-Error"
 
 func targetPort(value string) (int, error) {
 	for _, c := range value {

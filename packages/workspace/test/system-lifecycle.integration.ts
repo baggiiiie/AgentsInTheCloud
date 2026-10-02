@@ -226,7 +226,7 @@ try {
   const afterBuild = (await content()).split("\n").filter(Boolean);
   for (const layer of manifest.layers) assert(!afterBuild.includes(layer.digest), "building with incomplete export adds no base-layer blobs");
   for (const [path, hash] of hashes) assert.equal(await digest(path), hash, "shared EROFS files remain unchanged");
-  const echoed: { headers: Record<string, string> } = JSON.parse(await exec(loaded.Id, "sh", "-c", 'curl --fail --silent --show-error --max-time 30 -H "X-AgentsInTheCloud-Test: $LIFECYCLE_TEST_SECRET" https://httpbin.org/headers'));
+  const echoed: { headers: Record<string, string> } = JSON.parse(await exec(loaded.Id, "sh", "-c", 'curl --fail --silent --show-error --max-time 30 -H "X-Agents-In-The-Cloud-Test: $LIFECYCLE_TEST_SECRET" https://httpbin.org/headers'));
   const injected = Object.entries(echoed.headers).find(([name]) => name.toLowerCase() === "x-agents-in-the-cloud-test")?.[1];
   assert.equal(injected, secret, "egress socket injects the project secret");
   await api(`/projects/${projectId}/preload-images`, { preloadImages: [] });

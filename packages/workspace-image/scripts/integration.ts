@@ -81,7 +81,7 @@ try {
   await exec(workspace, "systemd-run", "--unit", "test-dev-server", "/usr/bin/python3", "/tmp/server.py");
   const ip = (await command(["docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", workspace])).stdout.toString().trim();
   assert.equal(await exec(producer, "curl", "--fail", "--silent", "--retry", "3", "--retry-connrefused", "--max-time", "10", `http://${ip}:2999/products`,
-    "-H", `X-AgentsInTheCloud-Gateway-Token: ${token}`, "-H", "X-AgentsInTheCloud-Gateway-Port: 8080", "-H", "X-AgentsInTheCloud-Gateway-Protocol: http", "-H", "X-AgentsInTheCloud-Gateway-Host: localhost:8080"), "localhost-gateway-ok");
+    "-H", `X-Agents-In-The-Cloud-Gateway-Token: ${token}`, "-H", "X-Agents-In-The-Cloud-Gateway-Port: 8080", "-H", "X-Agents-In-The-Cloud-Gateway-Protocol: http", "-H", "X-Agents-In-The-Cloud-Gateway-Host: localhost:8080"), "localhost-gateway-ok");
   console.log("Internet access and gateway forwarding to a localhost-only server passed");
 
   await exec(producer, "systemctl", "start", "containerd.service");

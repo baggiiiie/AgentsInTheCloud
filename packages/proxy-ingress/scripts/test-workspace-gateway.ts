@@ -25,7 +25,9 @@ async function exerciseIngress(gatewayUrl: string, token: string) {
       assert.equal(request.headers.get("x-forwarded-proto"), "http");
       assert.equal(request.headers.get("x-forwarded-port"), String(app.port));
       assert.equal(request.headers.get("forwarded"), null);
-      assert.equal(request.headers.get("x-agents-in-the-cloud-parent-workspace"), "integration");
+      assert.equal(request.headers.get("x-agents-in-the-cloud-parent-workspace"), null);
+      assert.equal(request.headers.get("x-agents-in-the-cloud-parent-origin"), null);
+      assert.ok(request.headers.get("x-agents-in-the-cloud-public-origin"));
       const url = new URL(request.url);
       if (url.pathname === "/origin-check") {
         // Match both styles used by real frameworks: direct Host (Webpack)

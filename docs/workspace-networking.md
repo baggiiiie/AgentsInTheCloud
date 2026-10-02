@@ -57,7 +57,7 @@ A small Go binary, `/usr/local/bin/agents-in-the-cloud-workspace-gateway`, runs 
 
 Workspace web apps can use **any TCP port from 1 through 65535 except 2999**, including privileged ports and services bound only to IPv4 loopback (`127.0.0.1`). The gateway always connects to `127.0.0.1:<port>` inside the workspace. It never resolves a caller-supplied hostname or routes to another container, the Docker host, or the internet. This is web-app ingress, not general-purpose TCP/UDP publishing. Only explicitly requested app routes are exposed; services are not scanned or automatically published.
 
-Ingress sends the destination port, HTTP/HTTPS protocol, app Host, and a per-workspace credential in reserved `X-AgentsInTheCloud-Gateway-*` headers. Browser-supplied values are removed and replaced with trusted routing metadata. The gateway authenticates and validates the request, strips its metadata and proxy credentials, then forwards it using Go's standard reverse proxy. App authorization, streaming, and WebSocket upgrades are preserved. Ingress applies the workspace app-port Host policy and narrow redirect/cookie translation described below. HTTPS upstreams require certificates trusted by the gateway; certificate verification is not disabled.
+Ingress sends the destination port, HTTP/HTTPS protocol, app Host, and a per-workspace credential in reserved `X-Agents-In-The-Cloud-Gateway-*` headers. Browser-supplied values are removed and replaced with trusted routing metadata. The gateway authenticates and validates the request, strips its metadata and proxy credentials, then forwards it using Go's standard reverse proxy. App authorization, streaming, and WebSocket upgrades are preserved. Ingress applies the workspace app-port Host policy and narrow redirect/cookie translation described below. HTTPS upstreams require certificates trusted by the gateway; certificate verification is not disabled.
 
 The credential is generated at workspace creation, stored in a mode-0600 host-side workspace file, and copied to `/etc/agents-in-the-cloud-workspace-gateway-token` inside the container. It is not an environment variable, URL parameter, or browser credential. Workspaces already allow privileged/root access, so this protects gateway access from other network callers, not from code executing inside that same workspace.
 
@@ -77,9 +77,9 @@ one consistent view. Next.js Server Actions and Webpack's Host/Origin checks bot
 work with this policy. No framework detection or alternate-host retries are used.
 
 The browser keeps its public preview URL. AgentsInTheCloud carries that identity separately
-in `X-AgentsInTheCloud-Public-Origin` for nested routing and response adaptation. Public
+in `X-Agents-In-The-Cloud-Public-Origin` for nested routing and response adaptation. Public
 ingress derives it from the canonical app lease and overwrites caller-supplied
-metadata. `X-AgentsInTheCloud-Origin-Context` carries the same-origin decision between
+metadata. `X-Agents-In-The-Cloud-Origin-Context` carries the same-origin decision between
 nested hops, preventing a foreign Origin that happens to name an intermediate
 localhost address from becoming same-origin. Nested metadata comes from the
 surrounding trusted AgentsInTheCloud ingress, like the existing parent-routing metadata.
@@ -102,7 +102,7 @@ Bun 1.4's `fetch` honors `NO_PROXY` even with an explicit proxy, and an empty `p
 
 Bun WebSockets connect directly to the gateway with routing headers and no proxy; unlike `fetch`, that client does not implicitly select an environment proxy. Go handles the app-side HTTP or HTTPS upgrade. There is no CONNECT handshake in this gateway protocol.
 
-The gateway preserves raw query strings, including semicolons, leaving query parsing to the app. Transport failures carry a reserved `X-AgentsInTheCloud-Gateway-Error: upstream` response marker; the gateway strips this marker from app responses. Ingress consumes marked failures, retries GET/HEAD startup requests, and records persistent failures in ingress status. Application-generated 502 responses pass through without retries.
+The gateway preserves raw query strings, including semicolons, leaving query parsing to the app. Transport failures carry a reserved `X-Agents-In-The-Cloud-Gateway-Error: upstream` response marker; the gateway strips this marker from app responses. Ingress consumes marked failures, retries GET/HEAD startup requests, and records persistent failures in ingress status. Application-generated 502 responses pass through without retries.
 
 ### Existing workspaces and verification
 
