@@ -1,7 +1,6 @@
 import { agentDelegation } from "./delegation.ts";
 import { AtelierCoreError } from "@atelier/core";
 import { NativeAgentRuntime } from "./native-agent-runtime.ts";
-import { LegacyAgentRuntime } from "./legacy-agent-runtime.ts";
 import { durableWorkspaceOwner, suspendDurableWorkspaceOwner, existingDurableController, suspendAllDurableWorkspaceOwners } from "./durable-owner.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -79,7 +78,7 @@ export function getWorkspaceAgentRuntime(agent: WorkspaceAgentConversationInfo, 
   if (pendingLifecycle) return pendingLifecycle.then(() => getWorkspaceAgentRuntime(agent, options));
   let runtime = runtimes.get(key);
   if (!runtime) {
-    runtime = (agent.storage === "durable" ? NativeAgentRuntime.create(agent, options) : Promise.resolve(new LegacyAgentRuntime(agent))).catch((error) => {
+    runtime = NativeAgentRuntime.create(agent, options).catch((error) => {
       runtimes.delete(key);
       throw error;
     });
@@ -98,7 +97,7 @@ async function closeConversation(workspaceId: string, conversationId: string): P
   const pending = runtimes.get(key);
   if (pending) await pending;
   const agent = (await listWorkspaceAgentConversations(workspaceId)).find(item => item.conversationId === conversationId);
-  if (agent?.storage === "durable") {
+  if (agent) {
     nativeClosedConversationKeys.add(key);
     await (await existingDurableController(agent))?.close();
   }

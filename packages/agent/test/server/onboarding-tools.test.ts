@@ -8,7 +8,7 @@ import { addProject, projectWorkspaceInit, readProjectWorkspaceSettings, type Gi
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createOnboardingTools, createRegisteredOnboardingTools, configureOnboardingTools, type OnboardingToolDependencies } from "../../src/server/onboarding-tools.ts";
 import { createTmuxBashTool } from "../../src/server/bash-tmux.ts";
-import { createWorkspaceAgentTools } from "../../src/server/tools.ts";
+import { createAtelierControlTools } from "../../src/server/tools.ts";
 
 async function execute(tool: ToolDefinition<any, any>, args: any, update?: (result: any) => void) {
   // SAFETY: These tools and the concrete tmux executor do not inspect Pi's ExtensionContext.
@@ -59,9 +59,8 @@ describe("onboarding tool capabilities", () => {
       expect(createBashTool).not.toHaveBeenCalled();
       expect(createRegisteredOnboardingTools("parent", "sibling").map((tool) => tool.name)).toEqual(group.map((tool) => tool.name));
       expect(createRegisteredOnboardingTools("ordinary", "conversation")).toEqual([]);
-      const defaults = createWorkspaceAgentTools("parent").map((tool) => tool.name);
+      const defaults = createAtelierControlTools("parent").map((tool) => tool.name);
       for (const tool of group) expect(defaults).not.toContain(tool.name);
-      expect(defaults).toContain("bash");
     } finally { configureOnboardingTools(undefined); }
     expect(createRegisteredOnboardingTools("parent", "conversation")).toEqual([]);
   });

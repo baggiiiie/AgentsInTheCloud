@@ -1,9 +1,12 @@
 import { contentText, type Message } from "@earendil-works/pi-ai";
-import { AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
+import { defineEntry, AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { isJsonObject } from "@atelier/core";
 import { buildTranscript, isFinalAssistantMessage, isToolViewDetails, toolDetailsIndicateError, type SessionImageRef, type ToolView, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
+
+/** Display-only history notes, independent of any source file format. */
+export const historyNote = defineEntry<{ text: string; tone: "system" | "summary" }>("atelier.history-note");
 
 /** The native watch is an exact committed frame, not an AgentSession event stream. */
 export function durableViewState(view: ConversationView) {
@@ -73,6 +76,10 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
   // ConversationView is already in context order: head marker first, then
   // oldest-to-newest entries. Sorting by ID would misplace compaction summaries.
   for (const entry of view.entries) {
+    if (historyNote.is(entry)) {
+      records.push({ kind: "note", id: String(entry.id), text: entry.data.text, tone: entry.data.tone });
+      continue;
+    }
     if (CompactionEntry.is(entry) || ResetEntry.is(entry)) {
       records.push({ kind: "note", id: String(entry.id), text: entry.model?.map(message => contentText(message.content)).join("\n") || "New session", tone: CompactionEntry.is(entry) ? "summary" : "system" });
       pendingBoundary = true;

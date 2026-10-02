@@ -1,7 +1,8 @@
+import { AtelierCoreError } from "@atelier/core";
 import { checkWorkspaceReadiness } from "@atelier/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
-import { LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions } from "@earendil-works/pi-durable";
+import { LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type EntryDraft, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions } from "@earendil-works/pi-durable";
 import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
 import { commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { DurableConversationPresentation } from "./durable-presentation.ts";
@@ -9,7 +10,6 @@ import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
 import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
 import { expandWorkspaceSkillCommand } from "./skills.ts";
-import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 const context = BACKGROUND_CONTEXT;
@@ -157,8 +157,12 @@ export async function openDurableAgentRuntime(
       if (deleted) throw new Error("Durable workspace is deleted");
       if (closed.has(conversation.id)) throw new Error("Durable conversation is closed");
     }
-    function command<T>(run: () => Promise<T>): Promise<T> {
-      const result = tail.then(() => { assertAdmission(); return run(); });
+    function command<T>(run: () => Promise<T>, metadataOnly = false): Promise<T> {
+      const result = tail.then(() => {
+        assertAdmission();
+        if (identity.readOnly && !metadataOnly) throw new AtelierCoreError("invalid_arguments", "This conversation is read-only. Start a new Agent conversation to continue.");
+        return run();
+      });
       // The caller receives the rejection; a rejected command must not poison
       // the command line and prevent a later correction or Stop.
       tail = result.then(() => {}, () => {});
@@ -175,6 +179,7 @@ export async function openDurableAgentRuntime(
     commandDrains.add(() => tail);
     return {
       get id() { return conversation.id; },
+      readOnly: Boolean(identity.readOnly),
       tree,
       async historyView(branchId?: string) {
         const ids = await branches();
@@ -232,7 +237,7 @@ export async function openDurableAgentRuntime(
       /** Host-owned mount; disposal detaches observation, not execution. */
       presentation: (onCommit?: Parameters<typeof DurableConversationPresentation.attach>[3]) => {
         assertOpen();
-        return DurableConversationPresentation.attach(conversation, { workspaceId, conversationId: identity.conversationId }, context, onCommit);
+        return DurableConversationPresentation.attach(conversation, { workspaceId, conversationId: identity.conversationId, readOnly: identity.readOnly }, context, onCommit);
       },
       history: (...args: Parameters<Conversation["entries"]>) => conversation.entries(...args),
       context: (...args: Parameters<Conversation["context"]>) => conversation.context(...args),
@@ -256,7 +261,7 @@ export async function openDurableAgentRuntime(
           const result = { ...record };
           if (record.branches) result.branches = [...record.branches];
           return result;
-        }, context));
+        }, context), true);
       },
       knownRequest(requestId: string) {
         return command(async () => Boolean(await known(requestId)));
@@ -323,6 +328,21 @@ export async function openDurableAgentRuntime(
   }
 
   return {
+    /** Atomic passive import. No prompts, submissions, model calls, or task replay. */
+    async importHistory(identity: Pick<DurableConversationRecord, "conversationId" | "label" | "title">, entries: readonly EntryDraft[]) {
+      assertOpen();
+      return harness.commit(async tx => {
+        assertOpen();
+        const catalog = await tx.doc(WorkspaceConversations);
+        const existing = catalog.conversations.find(record => record.conversationId === identity.conversationId);
+        if (existing) return existing.durableId;
+        if (deleted) throw new Error("Durable workspace is deleted");
+        const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
+        for (const entry of entries) await tx.appendEntry(created.id, entry);
+        catalog.conversations.push({ conversationId: identity.conversationId, label: identity.label, title: identity.title, durableId: created.id, readOnly: true });
+        return created.id;
+      }, context);
+    },
     async admission() { assertOpen(); return harness.snapshot(WorkspaceAdmission, context); },
     /** Discover retained histories without preparing prompts or starting work. */
     async catalog() {
@@ -345,7 +365,7 @@ export async function openDurableAgentRuntime(
           const prepared = existing ? {} : await load.prepare(workspaceId, record.conversationId, options, initial);
           assertOpen();
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
-          return controller(await workspace.conversation(record, prepared), record);
+          return controller(await workspace.conversation(record, prepared), existing ?? record);
         })().catch((error) => {
           agents.delete(record.conversationId);
           throw error;
@@ -381,15 +401,6 @@ export async function openDurableAgentRuntime(
       return workspace.close();
     },
   };
-}
-
-/** Production opening path: retained, project-scoped storage on the existing read-only share. */
-export async function openRetainedDurableAgentRuntime(
-  workspaceId: string,
-  options: WorkspaceAgentToolOptions = {},
-  load: typeof dependencies = dependencies,
-) {
-  return openDurableAgentRuntime(await workspaceDurableJournalDirectory(workspaceId), workspaceId, options, load);
 }
 
 export type DurableAgentRuntime = Awaited<ReturnType<typeof openDurableAgentRuntime>>;
