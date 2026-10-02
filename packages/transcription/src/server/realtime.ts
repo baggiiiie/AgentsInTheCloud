@@ -9,6 +9,7 @@ import { readTranscriptionModel, transcriptionModel, type TranscriptionModelId }
 import { captureProcessStderr, processExitMessage } from "./process-diagnostics.ts";
 import { addTranscriptionContext, readTranscriptionContext } from "./transcription-context.ts";
 import { ensureTranscriptionRuntime } from "./runtime.ts";
+import { spawnTranscriptionProcess } from "./process.ts";
 
 const transcriptionPort = 8098;
 const transcriptionReadyUrl = `http://127.0.0.1:${transcriptionPort}/ready`;
@@ -46,7 +47,7 @@ async function startTranscriptionServer(model: TranscriptionModelId): Promise<vo
 
   const cacheDir = transcriptionCacheDir();
   const executable = await ensureTranscriptionRuntime(cacheDir);
-  const child = Bun.spawn([
+  const child = spawnTranscriptionProcess([
     executable,
     "serve",
     "--host", "127.0.0.1",
@@ -55,11 +56,7 @@ async function startTranscriptionServer(model: TranscriptionModelId): Promise<vo
     "--asr-model", model,
     "--device", "cpu",
     "--no-ui",
-  ], {
-    env: { ...process.env, XDG_CACHE_HOME: cacheDir },
-    stdout: "inherit",
-    stderr: "pipe",
-  });
+  ], cacheDir);
   transcriptionProcess = child;
   const stderr = captureProcessStderr(child.stderr);
 
