@@ -18,10 +18,15 @@ export function renderCliTranscriptView(adapter: CliAgentAdapter, workspaceId: s
 }
 
 /** The terminal/transcript toggle and the transcript's scroll-to-bottom, for the floating button stack. */
-export function renderCliTranscriptControls(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): string {
-  if (!adapter.loadTranscript) return "";
+interface CliTranscriptControls { toggle: string; scrollToBottom: string }
+
+export function renderCliTranscriptControls(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): CliTranscriptControls {
+  if (!adapter.loadTranscript) return { toggle: "", scrollToBottom: "" };
   const ctx = context(workspaceId, conversationId, adapter.id);
-  return `${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>', label: "Follow latest" }, attributesHtml: 'data-popular-button data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd" hidden' })}`;
+  return {
+    toggle: `${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}`,
+    scrollToBottom: buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>', label: "Follow latest" }, attributesHtml: 'data-popular-button data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd" hidden' }),
+  };
 }
 
 export function cliTranscriptRoutes(adapter: CliAgentAdapter, sessions: CliSessions) {

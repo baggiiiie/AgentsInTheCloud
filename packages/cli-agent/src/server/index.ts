@@ -59,6 +59,8 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const draftId = agentAttachmentDraftId(workspaceId, `${adapter.id}:${conversationId}`);
           const rowId = domId("cli_attach", workspaceId, conversationId);
           const composerUrl = `${url}/composer`;
+          // Bottom up: the terminal/transcript toggle, scroll-to-bottom, then open-composer.
+          const transcriptControls = renderCliTranscriptControls(adapter, workspaceId, conversationId);
           const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-transcription-composer-workspace-id-value="${escapeHtml(workspaceId)}">
             <div class="composer-surface">
               <form id="${domId("cli_composer_form", workspaceId, conversationId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
@@ -79,7 +81,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
               ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture terminal-text-input:input->cli-terminal#sendNativeInput keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
               ${renderCliTranscriptView(adapter, workspaceId, conversationId)}
-              ${renderFloatingButtons(`${renderCliTranscriptControls(adapter, workspaceId, conversationId)}${composer ? renderOpenComposerButton() : ""}`)}
+              ${renderFloatingButtons(`${composer ? renderOpenComposerButton() : ""}${transcriptControls.scrollToBottom}${transcriptControls.toggle}`)}
             </div>
             ${terminal.exists ? renderTerminalKeyBar("cli-terminal") : ""}
             ${composer}
