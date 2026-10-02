@@ -1,3 +1,6 @@
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { durableContextTokens } from "./durable-accounting.ts";
+import { contextUsagePercent } from "./runtime-status.ts";
 import { renderDurableTree } from "./durable-tree.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
 import { AtelierCoreError } from "@atelier/core";
@@ -36,6 +39,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   private models: AgentStatsView["models"] = [];
   private catalog = "";
   private busy = false;
+  private contextTokens = 0;
   private disposed = false;
   private failure?: Error;
   private readonly chrome = createLivePresentation(() => [
@@ -110,6 +114,7 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
       if (subscription) void sendTurnNotification(this, subscription).catch(error => console.error("Could not send Agent notification", error));
       await this.options.events?.emit("workspace_agent_turn_finished", { workspaceId: this.workspaceId, conversationId: this.conversationId });
     }
+    this.contextTokens = durableContextTokens(await this.controller.context(BACKGROUND_CONTEXT));
     this.chrome.invalidate();
   }
   get isStreaming() { return this.busy; }
@@ -122,7 +127,8 @@ export class NativeAgentRuntime implements WorkspaceAgentRuntime {
   private stats(): AgentStatsView {
     const usage = this.presentation.state.usage;
     const buckets = [...Object.values(usage.models), ...Object.values(usage.tools)];
-    return { contextPercent: null, compactAvailable: !this.isStreaming && Boolean(this.model),
+    const model = this.model && this.modelRuntime.getModel(this.model.provider, this.model.id);
+    return { nativeBranchUsage: true, contextPercent: contextUsagePercent(undefined, this.contextTokens, model?.contextWindow), compactAvailable: !this.isStreaming && Boolean(this.model),
       inputTokens: buckets.reduce((sum, item) => sum + item.input, 0), outputTokens: buckets.reduce((sum, item) => sum + item.output, 0),
       cost: buckets.reduce((sum, item) => sum + item.cost.total, 0), modelName: this.model?.id,
       thinkingLevel: this.thinking, thinkingLevels: this.availableThinkingLevels(), models: this.models.map(model => ({ ...model, selected: model.provider === this.model?.provider && model.id === this.model.id })) };
