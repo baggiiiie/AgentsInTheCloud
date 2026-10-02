@@ -1,7 +1,7 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { buttonHtml } from "@atelier/design-system/button";
-import { popupHtml } from "@atelier/design-system/popup";
-import { escapeHtml, providerBrandIconHtml } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
+import { escapeHtml, providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { createPiModelRuntime } from "./pi-config-models.ts";
 import type { ModelRef } from "./model-reference.ts";

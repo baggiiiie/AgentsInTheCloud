@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { escapeHtml, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
+import { escapeHtml, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export type KeypressProbeDetail = {
   type: string;
@@ -17,7 +17,7 @@ export type KeypressProbeDetail = {
 
 declare global {
   interface DocumentEventMap {
-    "atelier:keypress-probe": CustomEvent<KeypressProbeDetail>;
+    "agents-in-the-cloud:keypress-probe": CustomEvent<KeypressProbeDetail>;
   }
 }
 
@@ -64,7 +64,7 @@ function installKeypressProbe(): void {
       };
       window.setTimeout(() => {
         detail.defaultPrevented = event.defaultPrevented;
-        document.dispatchEvent(new CustomEvent<KeypressProbeDetail>("atelier:keypress-probe", { detail }));
+        document.dispatchEvent(new CustomEvent<KeypressProbeDetail>("agents-in-the-cloud:keypress-probe", { detail }));
       }, 0);
     };
     window.addEventListener(type, listener, true);
@@ -89,11 +89,11 @@ function createKeypressProbeController(Controller: WorkspaceClientControllerCons
     connect(): void {
       activeProbeControllers += 1;
       installKeypressProbe();
-      document.addEventListener("atelier:keypress-probe", this.record);
+      document.addEventListener("agents-in-the-cloud:keypress-probe", this.record);
     }
 
     disconnect(): void {
-      document.removeEventListener("atelier:keypress-probe", this.record);
+      document.removeEventListener("agents-in-the-cloud:keypress-probe", this.record);
       activeProbeControllers -= 1;
       if (activeProbeControllers === 0) uninstallKeypressProbe();
     }
@@ -130,4 +130,4 @@ const keypressProbeClientModule: WorkspaceClientModule = {
   },
 };
 
-export { keypressProbeClientModule as atelierClientModule };
+export { keypressProbeClientModule as agentsInTheCloudClientModule };

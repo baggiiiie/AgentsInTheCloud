@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 /** Two 0–100 values on one clockwise ring. */
 export interface Comparison { referencePercent: number; valuePercent: number }

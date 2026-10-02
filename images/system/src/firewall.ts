@@ -1,8 +1,8 @@
 /** Private LAN/VPN destinations are allowed; System and peer workspaces remain isolated.
  * One table covers current and future workspace bridges, independent of Docker's rules. */
-const rules = `add table inet atelier_workspaces
-flush table inet atelier_workspaces
-table inet atelier_workspaces {
+const rules = `add table inet agents-in-the-cloud_workspaces
+flush table inet agents-in-the-cloud_workspaces
+table inet agents-in-the-cloud_workspaces {
   set special_v4 {
     type ipv4_addr; flags interval;
     elements = { 0.0.0.0/8, 127.0.0.0/8,

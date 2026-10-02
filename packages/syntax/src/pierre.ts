@@ -1,7 +1,7 @@
 import { registerCustomCSSVariableTheme } from "@pierre/diffs";
-import { atelierPierreTheme } from "./diff-options.ts";
+import { agentsInTheCloudPierreTheme } from "./diff-options.ts";
 
-registerCustomCSSVariableTheme(atelierPierreTheme, {
+registerCustomCSSVariableTheme(agentsInTheCloudPierreTheme, {
   foreground: "var(--text-bright)", background: "transparent",
   "token-comment": "var(--syntax-comment)", "token-string": "var(--syntax-string)",
   "token-string-expression": "var(--syntax-string)", "token-keyword": "var(--syntax-keyword)",

@@ -1,6 +1,6 @@
-import { AtelierCoreError, type JsonObject } from "@atelier/core";
-import { StreamingMarkdownRenderer } from "@atelier/markdown";
-import { createLivePresentation, createPublishedRefresh, turboStream } from "@atelier/shared";
+import { AgentsInTheCloudCoreError, type JsonObject } from "@agents-in-the-cloud/core";
+import { StreamingMarkdownRenderer } from "@agents-in-the-cloud/markdown";
+import { createLivePresentation, createPublishedRefresh, turboStream } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
@@ -242,7 +242,7 @@ export abstract class BaseAgentRuntime implements WorkspaceAgentRuntime {
   }
 
   protected assertActive(): void {
-    if (this.disposed) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${this.conversationId}`);
+    if (this.disposed) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${this.conversationId}`);
   }
 
   protected markDisposed(): boolean {

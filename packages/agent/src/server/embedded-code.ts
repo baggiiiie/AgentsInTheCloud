@@ -1,8 +1,8 @@
 import { format as formatJavaScript } from "@wasm-fmt/biome_fmt";
 import { format as formatPython } from "@wasm-fmt/ruff_fmt";
 import { format as formatShell } from "@wasm-fmt/shfmt";
-import { highlightCodeHtmlForPath, languageFromPath } from "@atelier/syntax";
-import { escapeHtml } from "@atelier/shared";
+import { highlightCodeHtmlForPath, languageFromPath } from "@agents-in-the-cloud/syntax";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 interface BashHeredoc {
   path: string;

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
-import { nativeImageResponse, nativeImageTypes, nativeJsonlRows, nativeJsonlFiles } from "@atelier/cli-agent/server";
-import type { TranscriptRecord } from "@atelier/agent/server";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { nativeImageResponse, nativeImageTypes, nativeJsonlRows, nativeJsonlFiles } from "@agents-in-the-cloud/cli-agent/server";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -100,7 +100,7 @@ export function codexTranscriptRecords(jsonl: string, fallbackPrefix = "codex"):
 }
 
 function sessionDirectory(workspaceId: string, sessionId: string): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "atelier-agents", sessionId, "codex", "sessions");
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "agents-in-the-cloud-agents", sessionId, "codex", "sessions");
 }
 async function sessionFiles(workspaceId: string, sessionId: string): Promise<string[]> {
   return (await nativeJsonlFiles(sessionDirectory(workspaceId, sessionId))).sort();

@@ -2,7 +2,7 @@ import { type ReleaseChannel } from "./channels.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
-export const repository = "lucasmeijer/atelier";
+export const repository = "lucasmeijer/agents-in-the-cloud";
 
 export type HttpFetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 

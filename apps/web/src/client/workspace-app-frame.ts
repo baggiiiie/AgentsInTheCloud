@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
-import { isWorkspacePaneVisible } from "@atelier/shared";
+import { isWorkspacePaneVisible } from "@agents-in-the-cloud/shared";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 import { clientHooks } from "./workspace-client-hooks.ts";
 
@@ -13,12 +13,12 @@ class WorkspaceAppFrameController extends Controller<HTMLIFrameElement> {
   private pendingLoad?: { url: string; promise: Promise<void> };
 
   connect(): void {
-    document.addEventListener("atelier:theme-change", this.themeChanged);
+    document.addEventListener("agents-in-the-cloud:theme-change", this.themeChanged);
     if (isWorkspacePaneVisible(this.element)) this.load();
   }
 
   disconnect(): void {
-    document.removeEventListener("atelier:theme-change", this.themeChanged);
+    document.removeEventListener("agents-in-the-cloud:theme-change", this.themeChanged);
   }
 
   initialPathValueChanged(): void {

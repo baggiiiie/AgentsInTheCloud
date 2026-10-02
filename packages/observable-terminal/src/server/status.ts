@@ -1,5 +1,5 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 /** Shared status for interactive terminal controllers, which expose a retry action and target. */
 export function renderTerminalConnectionStatus(controller: string): string {

@@ -1,19 +1,19 @@
 #!/usr/bin/env bun
 
-import { workloadBuildArgs } from "@atelier/core";
+import { workloadBuildArgs } from "@agents-in-the-cloud/core";
 import { rmSync } from "node:fs";
 import { arch } from "node:os";
 import { imageHasPlatforms } from "../packages/workspace-image/src/local-images.ts";
 import { registryImageHasPlatforms } from "./image-platforms.ts";
-import { prepareDefaultWorkspaceImage, ensureGeneratedDefaultWorkspaceImage } from "@atelier/workspace-image";
+import { prepareDefaultWorkspaceImage, ensureGeneratedDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 
-const usage = `Build the Atelier Docker image.
+const usage = `Build the AgentsInTheCloud Docker image.
 
 Usage:
-  bun run scripts/build-atelier-image.ts [options]
+  bun run scripts/build-agents-in-the-cloud-image.ts [options]
 
 Options:
-  --image <name>        Image repository/name (default: ghcr.io/lucasmeijer/atelier)
+  --image <name>        Image repository/name (default: ghcr.io/lucasmeijer/agents-in-the-cloud)
   --tag <tag>           Tag to apply. May be passed more than once (default: git describe/short sha)
   --latest             Tag the image as <image>:latest (default)
   --no-latest          Do not update latest (release staging)
@@ -26,7 +26,7 @@ Options:
   --no-cache           Build without Docker cache
   --workspace          Force building the default workspace image even when the deterministic tag already exists
   --progress <value>   Docker progress mode (auto, plain, tty, quiet, rawjson)
-  --build-arg K=V      Extra Atelier app Docker build argument. May be passed more than once
+  --build-arg K=V      Extra AgentsInTheCloud app Docker build argument. May be passed more than once
   --help               Show this help
 
 Examples:
@@ -65,7 +65,7 @@ function takeValue(args: string[], index: number, flag: string): string {
 
 function parseArgs(args: string[]): Options {
   const options: Options = {
-    image: "ghcr.io/lucasmeijer/atelier",
+    image: "ghcr.io/lucasmeijer/agents-in-the-cloud",
     tags: [],
     latest: true,
     stable: false,
@@ -208,12 +208,12 @@ function gitCommitDescription(): string {
 }
 
 function workspaceImageRepository(appImage: string): string {
-  if (appImage === "ghcr.io/lucasmeijer/atelier") return "ghcr.io/lucasmeijer/atelier-workspace";
+  if (appImage === "ghcr.io/lucasmeijer/agents-in-the-cloud") return "ghcr.io/lucasmeijer/agents-in-the-cloud-workspace";
   return `${appImage}-workspace`;
 }
 
 function workspaceHashTag(metadataTag: string): string {
-  const marker = "atelier-workspace:";
+  const marker = "agents-in-the-cloud-workspace:";
   if (!metadataTag.startsWith(marker)) throw new Error(`unexpected workspace image metadata tag: ${metadataTag}`);
   return metadataTag.slice(marker.length);
 }
@@ -279,7 +279,7 @@ const defaultWorkspaceImageRef = `${workspaceRepo}:${workspaceTag}`;
 let shouldBuildWorkspace = false;
 
 console.log();
-console.log(`${options.push ? "Publishing" : "Building"} Atelier image:`);
+console.log(`${options.push ? "Publishing" : "Building"} AgentsInTheCloud image:`);
 for (const ref of imageRefs) console.log(`  ${ref}`);
 console.log(`  default workspace image: ${defaultWorkspaceImageRef}`);
 console.log();

@@ -1,9 +1,9 @@
-import { AtelierCoreError, createKeyedOperationQueue, dockerHostAtelierDataPath, getAtelierRuntimeContext, type AtelierEventBus } from "@atelier/core";
-import { Icons } from "@atelier/design-system/icons";
-import type { WorkspaceAgentTabProvider, WorkspaceCommandContribution, WorkspaceModule } from "@atelier/shared";
-import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
-import type { WorkspaceDockerMount, WorkspaceInitInstruction } from "@atelier/workspace";
-import { workspacePortBackend } from "@atelier/workspace";
+import { AgentsInTheCloudCoreError, createKeyedOperationQueue, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import type { WorkspaceAgentTabProvider, WorkspaceCommandContribution, WorkspaceModule } from "@agents-in-the-cloud/shared";
+import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
+import type { WorkspaceDockerMount, WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
+import { workspacePortBackend } from "@agents-in-the-cloud/workspace";
 import { mkdir } from "node:fs/promises";
 import { registerAgentEvents } from "./agent-events.ts";
 import { createAgentTermSocketSession } from "./bash-tmux.ts";
@@ -24,7 +24,7 @@ import { usageOpenApiPaths } from "./usage-openapi.ts";
 import { handleUsageRequest, renderUsagePaneAction } from "./usage-web.ts";
 import { workspaceFileEndpoint } from "./workspace-files.ts";
 
-let agentEvents: AtelierEventBus | undefined;
+let agentEvents: AgentsInTheCloudEventBus | undefined;
 
 export function createWorkspaceAgentTabProvider(dependencies: {
   list(workspaceId: string): Promise<readonly WorkspaceAgentConversationInfo[]>;
@@ -42,7 +42,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
 
     async render({ workspaceId, conversationId }) {
       const conversation = (await dependencies.list(workspaceId)).find((candidate) => candidate.conversationId === conversationId);
-      if (!conversation) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+      if (!conversation) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
       return await dependencies.render(conversation);
     },
 
@@ -50,7 +50,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
       await serializedClose(workspaceId, async () => {
         const conversations = await dependencies.list(workspaceId);
         const conversation = conversations.find((candidate) => candidate.conversationId === conversationId);
-        if (!conversation) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+        if (!conversation) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
         try {
           await dependencies.dispose(workspaceId, conversationId);
           await dependencies.archive(conversation);
@@ -96,10 +96,10 @@ type WorkspacePlanEvents = {
 };
 
 function dockerHostSessionShareDir(shareKey: string): string {
-  return dockerHostAtelierDataPath(getAtelierRuntimeContext(), "session-shares", shareKey);
+  return dockerHostAgentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "session-shares", shareKey);
 }
 
-function registerSessionShareMountEvents(events: AtelierEventBus): void {
+function registerSessionShareMountEvents(events: AgentsInTheCloudEventBus): void {
   // SAFETY: The module boundary validates or constructs this value with the asserted domain shape.
   (events as WorkspacePlanEvents).on("workspace_plan_prepare", async ({ init, plan }) => {
     const shareKey = sessionShareKeyForInit(init);
@@ -108,7 +108,7 @@ function registerSessionShareMountEvents(events: AtelierEventBus): void {
   });
 }
 
-async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, source: WorkspaceAgentConversationInfo | undefined, events?: AtelierEventBus): Promise<void> {
+async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, source: WorkspaceAgentConversationInfo | undefined, events?: AgentsInTheCloudEventBus): Promise<void> {
   const runtimeOptions = { events };
   const sourceRuntime = source ? await getWorkspaceAgentRuntime(source, runtimeOptions) : undefined;
   const model = sourceRuntime?.currentModel() ?? await resolveNewWorkspaceAgentModel();
@@ -146,7 +146,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
   renderWorkspacePaneActions: renderUsagePaneAction,
   openApiPaths: {
     "/agent-notifications/public-key": { get: {
-      summary: "Get this Atelier installation's VAPID public key for browser PushManager subscription",
+      summary: "Get this AgentsInTheCloud installation's VAPID public key for browser PushManager subscription",
       responses: { "200": { description: "Public application-server key", content: { "application/json": { schema: { type: "object", properties: { publicKey: { type: "string" } } } } } } },
     } },
     "/workspaces/{id}/agents/{conversationId}/notification": {
@@ -176,18 +176,18 @@ export const agentWorkspaceModule: WorkspaceModule = {
   routes: [{ handle: handleUsageRequest }, {
     async handle(request, url, context) {
       // SAFETY: The module boundary validates or constructs this value with the asserted domain shape.
-      return handleAgentRequest(request, url, { events: context.events as AtelierEventBus | undefined });
+      return handleAgentRequest(request, url, { events: context.events as AgentsInTheCloudEventBus | undefined });
     },
   }],
   agentProvider: {
-    id: "builtin", label: "Builtin", iconHtml: Icons.Atelier,
+    id: "builtin", label: "Builtin", iconHtml: Icons.AgentsInTheCloud,
     tabs: workspaceAgentTabProvider,
     create: createBuiltinAgent,
     launch: nativeAgentLaunch,
   },
   initialize(context) {
     // SAFETY: The module boundary validates or constructs this value with the asserted domain shape.
-    const events = context.events as AtelierEventBus;
+    const events = context.events as AgentsInTheCloudEventBus;
     agentEvents = events;
     registerAgentEvents(events);
     registerSessionShareMountEvents(events);
@@ -225,7 +225,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
   },
 };
 
-async function createBuiltinAgent({ workspaceId, events }: { workspaceId: string; events?: AtelierEventBus }): Promise<string> {
+async function createBuiltinAgent({ workspaceId, events }: { workspaceId: string; events?: AgentsInTheCloudEventBus }): Promise<string> {
   const sourceConversation = (await listWorkspaceAgentConversations(workspaceId))[0];
   const conversation = await createNextWorkspaceAgentConversation(workspaceId);
   const applySettingsTimer = setTimeout(() => {

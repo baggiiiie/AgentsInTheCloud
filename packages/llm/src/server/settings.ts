@@ -5,14 +5,14 @@ import { providerAccountSummary } from "./provider-accounts.ts";
 import { providerUsageFrameId, supportedUsageProviders } from "./provider-usage.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef } from "./model-reference.ts";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { warningBannerHtml } from "@atelier/design-system/warning-banner";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import {
   connectModelProviderApiKey,
   ProviderCatalogueRefreshError,
@@ -27,8 +27,8 @@ import {
   type ConfiguredModel,
   type PiAuthPrompt,
 } from "./pi-config-models.ts";
-import { domId, escapeHtml, providerBadgeHtml } from "@atelier/shared";
-import { append, remove, replace, replaceTargets, response, stream, update, wantsStream } from "@atelier/shared/http";
+import { domId, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
+import { append, remove, replace, replaceTargets, response, stream, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 type ProviderSummary = { provider: string; label: string; connection: ProviderConnection; subscription: boolean; account?: string; methods: string[] };
 
@@ -126,7 +126,7 @@ function inlineModelsFrameId(surface: ModelSetupSurface, provider: string): stri
 function usageUnavailableReason(provider: ProviderSummary): string | undefined {
   if (provider.connection === "needs_attention") return "Sign in again to see usage.";
   if (!supportedUsageProviders.some((supported) => supported.id === provider.provider)) {
-    return provider.subscription ? `Atelier can’t read ${provider.label} usage limits yet.` : "Only subscriptions report usage limits.";
+    return provider.subscription ? `AgentsInTheCloud can’t read ${provider.label} usage limits yet.` : "Only subscriptions report usage limits.";
   }
   return undefined;
 }
@@ -292,7 +292,7 @@ async function renderModelSetup(surface: ModelSetupSurface = "settings", customM
   return renderProviderPicker(await providerSummaries(), surface, customModels);
 }
 function modelSetupDialog(body: string, surface: ModelSetupSurface = "dialog"): string {
-  return dialogHtml({ element: { id: surface === "onboarding" ? "onboarding_dialog" : "model_setup_dialog", attributesHtml: "data-dialog-auto-show" }, iconHtml: Icons.Settings, titleCaption: surface === "onboarding" ? "Set up Atelier" : "Models", bodyHtml: body, omitCancelButton: surface === "onboarding" });
+  return dialogHtml({ element: { id: surface === "onboarding" ? "onboarding_dialog" : "model_setup_dialog", attributesHtml: "data-dialog-auto-show" }, iconHtml: Icons.Settings, titleCaption: surface === "onboarding" ? "Set up AgentsInTheCloud" : "Models", bodyHtml: body, omitCancelButton: surface === "onboarding" });
 }
 async function modelSelectionDialog(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
   const forgetCaption = `Forget ${provider.label.replace(" / ", "/")} credentials`;

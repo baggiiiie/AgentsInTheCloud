@@ -1,5 +1,5 @@
-import type { AtelierEventBus, JsonObject } from "@atelier/core";
-import type { WorkspaceDeletionReview } from "@atelier/shared";
+import type { AgentsInTheCloudEventBus, JsonObject } from "@agents-in-the-cloud/core";
+import type { WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,7 +24,7 @@ interface TestAppOptions {
   inspect?: (id: string) => Promise<string[]>;
   destroy?: (id: string) => Promise<void>;
   persistParked?: (id: string, parked: boolean) => Promise<void>;
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
 }
 
 const deletionDetailsSchema = Type.Object({ risks: Type.Array(Type.String()) });
@@ -59,13 +59,13 @@ export function createTestApp(options: TestAppOptions = {}) {
   return { app, registry };
 }
 
-export function temporaryAtelierDataDir() {
+export function temporaryAgentsInTheCloudDataDir() {
   let previous: string | undefined;
   let path: string | undefined;
   return {
     async setUp() {
       previous = process.env.ATELIER_DATA_DIR;
-      path = await mkdtemp(join(tmpdir(), "atelier-web-test-"));
+      path = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-web-test-"));
       process.env.ATELIER_DATA_DIR = path;
     },
     async tearDown() {

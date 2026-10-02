@@ -1,7 +1,7 @@
 import { prepareCodexMcp } from "./mcp.ts";
-import { createCliAgentModule, createCliModelSettings } from "@atelier/cli-agent/server";
-import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscription } from "@atelier/llm/server";
-import { providerBrandIconHtml } from "@atelier/shared";
+import { createCliAgentModule, createCliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
+import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscription } from "@agents-in-the-cloud/llm/server";
+import { providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { codexLaunchScript } from "./launch-command.ts";
 import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId } from "./transcript.ts";
 
@@ -10,7 +10,7 @@ export const codexModelSettings = createCliModelSettings({
   effort: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level),
 });
 
-export const atelierServerModule = createCliAgentModule({
+export const agentsInTheCloudServerModule = createCliAgentModule({
   id: "codex", label: "Codex", iconHtml: providerBrandIconHtml("openai"),
   requireSetup: async () => requireProviderSubscription(await createPiModelRuntime(), "openai-codex", "Codex"),
   settings: codexModelSettings,

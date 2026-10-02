@@ -7,7 +7,7 @@ import { createAgentSession, ModelRuntime, SessionManager, SettingsManager, type
 import { configureAgentDelegation } from "../../../agent/src/server/delegation.ts";
 import { RealAgentRuntime } from "../../../agent/src/server/real-agent-runtime.ts";
 import { AgentServiceTierState } from "../../../agent/src/server/service-tier.ts";
-import { createAtelierResourceLoader } from "../../../agent/src/server/system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader } from "../../../agent/src/server/system-prompt.ts";
 import { turnStartEntryType, turnTimingEntryType } from "../../../agent/src/server/turn-timing.ts";
 import { subagentsDelegation } from "../../src/server/delegation.ts";
 import { inheritedContextEntryType } from "../../src/server/fork-history.ts";
@@ -24,7 +24,7 @@ class TaskRuntime extends RealAgentRuntime {
 // run identity and timing, not transcript presentation.
 for (const context of ["inherited", "unfinished-local", "empty"] as const) {
   test(`consumed tasks own their runs with ${context} context, steering, and follow-ups`, async () => {
-    const dir = await mkdtemp(join(tmpdir(), "atelier-task-run-"));
+    const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-task-run-"));
     let session: AgentSession | undefined;
     let runtime: TaskRuntime | undefined;
     configureAgentDelegation(subagentsDelegation);
@@ -41,7 +41,7 @@ for (const context of ["inherited", "unfinished-local", "empty"] as const) {
       ({ session } = await createAgentSession({
         cwd: dir, agentDir: dir, modelRuntime, model, thinkingLevel: "off", sessionManager: manager,
         settingsManager: SettingsManager.inMemory({ compaction: { enabled: false }, retry: { enabled: false } }),
-        resourceLoader: createAtelierResourceLoader(), tools: [],
+        resourceLoader: createAgentsInTheCloudResourceLoader(), tools: [],
       }));
       runtime = new TaskRuntime({ workspaceId: "task-run", conversationId: crypto.randomUUID(),
         label: "Task", title: "Task", path: join(dir, "session.jsonl") }, session, [], new AgentServiceTierState(manager));

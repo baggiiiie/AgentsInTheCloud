@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Value } from "typebox/value";
-import { addProject, projectWorkspaceInit, readProjectWorkspaceSettings, type GitProjectInitInstruction } from "@atelier/projects";
+import { addProject, projectWorkspaceInit, readProjectWorkspaceSettings, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { createOnboardingTools, createRegisteredOnboardingTools, configureOnboardingTools, type OnboardingToolDependencies } from "../../src/server/onboarding-tools.ts";
 import { createTmuxBashTool } from "../../src/server/bash-tmux.ts";
@@ -27,7 +27,7 @@ describe("onboarding tool capabilities", () => {
   const secret = mock<OnboardingToolDependencies["requestSecretValue"]>(async (_projectId, request) => ({ status: "cancelled", envName: request.envName }));
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "atelier-onboarding-tools-"));
+    dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-onboarding-tools-"));
     previous = process.env.ATELIER_DATA_DIR;
     process.env.ATELIER_DATA_DIR = dir;
     source = projectWorkspaceInit((await addProject("https://github.com/example/app.git")).project);
@@ -99,7 +99,7 @@ describe("onboarding tool capabilities", () => {
     expect(result.content).toEqual([{ type: "text", text: "hello" }]);
     expect(result.details).toMatchObject({ workspaceId: "child", exitCode: 0, aborted: false, timedOut: false, displayAnsi: "hello" });
     expect(updates[0]?.details.workspaceId).toBe("child");
-    expect(updates[0]?.details.tmuxSession).toStartWith("atelier-agent-");
+    expect(updates[0]?.details.tmuxSession).toStartWith("agents-in-the-cloud-agent-");
     expect(shell.mock.calls.every(([id]) => id === "child")).toBe(true);
     expect(shell.mock.calls.find(([, command]) => command.includes("new-session"))?.[1]).toContain("unset NO_COLOR");
   });

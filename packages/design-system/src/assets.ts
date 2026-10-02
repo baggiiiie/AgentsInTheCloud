@@ -1,4 +1,4 @@
-import type { StaticFileContribution } from "@atelier/shared";
+import type { StaticFileContribution } from "@agents-in-the-cloud/shared";
 
 /** Mount these logical URLs; the host may fingerprint them and rewrite CSS imports. */
 export const designSystemStaticFiles = {

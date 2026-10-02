@@ -1,17 +1,17 @@
 import { renderAccessSettings } from "./access.ts";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { Icons } from "@atelier/design-system/icons";
-import { createPiModelRuntime, setConfiguredModels } from "@atelier/llm/server";
-import { invalidArguments } from "@atelier/core";
-import { escapeHtml } from "@atelier/shared";
-import { clearWorkspaceGitHubToken } from "@atelier/proxy-egress";
-import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@atelier/projects";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
+import { invalidArguments } from "@agents-in-the-cloud/core";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { workspaceModules } from "../workspace-modules.generated.ts";
-import { remove, replace, response, stream, update, wantsStream } from "@atelier/shared/http";
+import { remove, replace, response, stream, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 import { listSettingsContributions, registerSettingsContribution } from "./registry.ts";
 import { renderThemeSettings } from "./theme.ts";
 
@@ -70,7 +70,7 @@ function renderResetSettings(): string {
   return `<div class="settings-development-action">
     <div class="settings-development-copy">
       <div>Stored settings</div>
-      <p>Delete the Git identity, GitHub token, and model provider credentials stored by Atelier.</p>
+      <p>Delete the Git identity, GitHub token, and model provider credentials stored by AgentsInTheCloud.</p>
     </div>
     <div class="settings-development-control"><form method="post" action="/settings/reset" data-turbo="true">${confirmation}</form></div>
   </div>`;

@@ -1,11 +1,11 @@
-import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@atelier/agent/server";
-import { parseModelRef } from "@atelier/llm/server";
+import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@agents-in-the-cloud/agent/server";
+import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
-import { AtelierCoreError, createKeyedOperationQueue, shellQuote } from "@atelier/core";
-import { buildObservableSessionCommand } from "@atelier/observable-terminal/server";
-import { imageMimeByExtension } from "@atelier/prompt/server";
-import type { AgentWorkspaceParameters, WorkspaceAgentInput } from "@atelier/shared";
-import { createWorkspaceMetadataState, execWorkspaceShell, workspaceRoot } from "@atelier/workspace";
+import { AgentsInTheCloudCoreError, createKeyedOperationQueue, shellQuote } from "@agents-in-the-cloud/core";
+import { buildObservableSessionCommand } from "@agents-in-the-cloud/observable-terminal/server";
+import { imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
+import type { AgentWorkspaceParameters, WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
+import { createWorkspaceMetadataState, execWorkspaceShell, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
@@ -38,7 +38,7 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
   function list(workspaceId: string): CliSession[] { return store().read(workspaceId).sessions; }
   function get(workspaceId: string, id: string): CliSession {
     const session = list(workspaceId).find((session) => session.id === id);
-    if (!session) throw new AtelierCoreError("agent_conversation_not_found", `${adapter.label} conversation not found: ${id}`);
+    if (!session) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `${adapter.label} conversation not found: ${id}`);
     return session;
   }
 
@@ -60,7 +60,7 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
     starting.set(id, ready.promise);
     try {
       await adapter.prepareWorkspace?.(workspaceId);
-      const directory = `/tmp/atelier-attachments/${adapter.id}-${id}`;
+      const directory = `/tmp/agents-in-the-cloud-attachments/${adapter.id}-${id}`;
       const imagePaths: string[] = [];
       for (const [index, image] of (input?.images ?? []).entries()) {
         const extension = Object.entries(imageMimeByExtension).find(([, mime]) => mime === image.mimeType)?.[0];
@@ -70,14 +70,14 @@ export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (wor
         imagePaths.push(path);
       }
       const mcp = await prepareAgentMcp(workspaceId, id);
-      const sessionDirectory = `/home/atelier/.local/share/atelier-agents/${id}`;
+      const sessionDirectory = `/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-agents/${id}`;
       const turnSignalCommand = `${sessionDirectory}/turn-signal.sh`;
       const launchSession: CliAgentSession = { id, directory: sessionDirectory, turnSignalCommand };
       // $1 is the TurnBoundary the CLI reports.
       await checkedWorkspaceShell(workspaceId, `umask 077; mkdir -p ${shellQuote(sessionDirectory)} && cat > ${shellQuote(turnSignalCommand)}`, `#!/bin/sh
 exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${shellQuote("Authorization: Bearer " + mcp.token)} ${shellQuote(new URL("/agent-turn-", mcp.url).href)}"$1"
 `);
-      const env = { HOME: "/home/atelier", ...await adapter.prepareSession?.(workspaceId, launchSession, mcp) };
+      const env = { HOME: "/home/agents-in-the-cloud", ...await adapter.prepareSession?.(workspaceId, launchSession, mcp) };
       const script = input
         ? adapter.launchScript(input, imagePaths, settings, launchSession)
         : await adapter.resumeScript!(workspaceId, settings, launchSession);
@@ -162,7 +162,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     if (starting.has(session.id)) return { starting: true, exists: false, ended: false };
     const result = await execWorkspaceShell(workspaceId, `tmux list-panes -t ${shellQuote(session.tmuxSession)} -F '#{pane_dead}:#{pane_dead_status}'`);
     if (result.exitCode === 1) return { exists: false, ended: true };
-    if (result.exitCode !== 0) throw new AtelierCoreError(`${adapter.id}_session_check_failed`, result.stderr.trim() || `Could not inspect ${adapter.label} terminal`);
+    if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError(`${adapter.id}_session_check_failed`, result.stderr.trim() || `Could not inspect ${adapter.label} terminal`);
     const [dead, status] = result.stdout.trim().split(":");
     return { exists: true, ended: dead === "1", exitCode: status ? Number(status) : undefined };
   }

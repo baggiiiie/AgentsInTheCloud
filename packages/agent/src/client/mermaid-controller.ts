@@ -1,4 +1,4 @@
-import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 
 let rendererPromise: Promise<typeof import("beautiful-mermaid")["renderMermaidSVG"]> | undefined;
 
@@ -58,13 +58,13 @@ export function createAgentMermaidController(Controller: StimulusControllerConst
       try {
         const renderMermaidSVG = await (rendererPromise ??= import("beautiful-mermaid").then(module => module.renderMermaidSVG));
         const svgHtml = withoutRemoteFontImports(renderMermaidSVG(source, {
-          bg: "var(--atelier-mermaid-bg)",
-          fg: "var(--atelier-mermaid-fg)",
-          line: "var(--atelier-mermaid-line)",
-          accent: "var(--atelier-mermaid-accent)",
-          muted: "var(--atelier-mermaid-muted)",
-          surface: "var(--atelier-mermaid-surface)",
-          border: "var(--atelier-mermaid-border)",
+          bg: "var(--agents-in-the-cloud-mermaid-bg)",
+          fg: "var(--agents-in-the-cloud-mermaid-fg)",
+          line: "var(--agents-in-the-cloud-mermaid-line)",
+          accent: "var(--agents-in-the-cloud-mermaid-accent)",
+          muted: "var(--agents-in-the-cloud-mermaid-muted)",
+          surface: "var(--agents-in-the-cloud-mermaid-surface)",
+          border: "var(--agents-in-the-cloud-mermaid-border)",
           padding: 16,
           transparent: true,
         }));

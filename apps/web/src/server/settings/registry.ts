@@ -1,4 +1,4 @@
-import type { SettingsContribution } from "@atelier/shared";
+import type { SettingsContribution } from "@agents-in-the-cloud/shared";
 
 const contributions: SettingsContribution[] = [];
 

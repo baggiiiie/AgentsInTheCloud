@@ -8,17 +8,17 @@ import { createServer as createHttpsServer } from "node:https";
 import net, { type AddressInfo } from "node:net";
 import { Readable, type Duplex } from "node:stream";
 import tls from "node:tls";
-import { atelierDataPath, dockerHostAtelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
+import { agentsInTheCloudDataPath, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { HttpRequestBlockedError } from "../secrets/errors.ts";
 import { matchHostname } from "../secrets/patterns.ts";
 import { workspaceRequestTransformMatchesHost, createWorkspaceSecretContext, forgetWorkspaceSecretContext, getWorkspaceSecretContext, type WorkspaceSecretContext } from "../secrets/workspace-secrets.ts";
-import type { AtelierEventBus } from "@atelier/core";
-import { isHopByHopHeader, stripHopByHopHeaders } from "@atelier/shared";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { isHopByHopHeader, stripHopByHopHeaders } from "@agents-in-the-cloud/shared";
 import { workspaceLocalProxyInitScript, workspaceLocalProxyUrl } from "./local-proxy.ts";
 import { defaultNoProxyEntries, uniqueNoProxyEntries } from "./no-proxy.ts";
 import { ensureLeafCertificate, ensureMitmCa, type MitmCa } from "./mitm-ca.ts";
 
-const workspaceMitmCaPath = "/run/atelier-mitm-ca.crt";
+const workspaceMitmCaPath = "/run/agents-in-the-cloud-mitm-ca.crt";
 
 const workspaceProxies = new Map<string, Promise<WorkspaceEgressProxy>>();
 type SecretContext = () => Promise<WorkspaceSecretContext>;
@@ -53,9 +53,9 @@ function workspaceProxyEnv() {
   };
 }
 
-export function registerWorkspaceProxyEvents(events: AtelierEventBus): void {
+export function registerWorkspaceProxyEvents(events: AgentsInTheCloudEventBus): void {
   events.on("workspace_plan_prepare", async ({ workspaceId, init, plan }) => {
-    const runtimeContext = getAtelierRuntimeContext();
+    const runtimeContext = getAgentsInTheCloudRuntimeContext();
     const secretContext = await createWorkspaceSecretContext(workspaceId, init);
     Object.assign(plan.env, secretContext.env);
 
@@ -63,7 +63,7 @@ export function registerWorkspaceProxyEvents(events: AtelierEventBus): void {
     Object.assign(plan.env, workspaceProxyEnv());
     // Repository init scripts can already use the proxy environment, so the
     // forwarder must start before any of them (and before nested dockerd).
-    plan.mounts.push({ type: "bind", source: dockerHostAtelierDataPath(runtimeContext, "proxy-ca", "atelier-mitm-ca.pem"), target: workspaceMitmCaPath, readonly: true });
+    plan.mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(runtimeContext, "proxy-ca", "agents-in-the-cloud-mitm-ca.pem"), target: workspaceMitmCaPath, readonly: true });
     plan.initScripts.unshift(
       workspaceLocalProxyInitScript(),
       `cat ${workspaceMitmCaPath} >> /etc/ssl/certs/ca-certificates.crt`,
@@ -89,7 +89,7 @@ export async function ensureWorkspaceEgressProxy(workspaceId: string): Promise<v
   let existing = workspaceProxies.get(workspaceId);
   if (!existing) {
     existing = (async () => startWorkspaceEgressProxy({
-      socketPath: atelierDataPath(getAtelierRuntimeContext(), "workspace-sockets", workspaceId, "egress.sock"),
+      socketPath: agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", workspaceId, "egress.sock"),
       ca: await ensureMitmCa(),
       getContext: () => getWorkspaceSecretContext(workspaceId),
     }))().catch(error => { workspaceProxies.delete(workspaceId); throw error; });

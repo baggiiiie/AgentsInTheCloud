@@ -4,10 +4,10 @@ import { request as httpsRequest } from "node:https";
 import type { Duplex } from "node:stream";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { getProxyForUrl } from "proxy-from-env";
-import { stripHopByHopHeaders } from "@atelier/shared";
+import { stripHopByHopHeaders } from "@agents-in-the-cloud/shared";
 import { HttpRequestBlockedError } from "../secrets/errors.ts";
 
-// Match the HTTP fetch path's environment proxy routing, including nested Atelier.
+// Match the HTTP fetch path's environment proxy routing, including nested AgentsInTheCloud.
 export type UpgradeRequest = (url: URL, options: RequestOptions) => ClientRequest;
 export const requestWebSocketUpgrade: UpgradeRequest = (url, options) => {
   const proxy = getProxyForUrl(url.href);

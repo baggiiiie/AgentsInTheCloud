@@ -9,7 +9,7 @@ import { contextUsagePercent, manualCompactionAvailable, terminalCompactionNotic
 let dir: string | undefined;
 
 async function sessionFile(): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "atelier-runtime-session-test-"));
+  dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-runtime-session-test-"));
   return join(dir, "session.jsonl");
 }
 

@@ -1,5 +1,5 @@
-import { AtelierCoreError } from "@atelier/core";
-import type { WorkspaceAgentProvider, WorkspaceAgentTabSummary } from "@atelier/shared";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
+import type { WorkspaceAgentProvider, WorkspaceAgentTabSummary } from "@agents-in-the-cloud/shared";
 
 export interface HostedAgentTab extends WorkspaceAgentTabSummary {
   providerId: string;
@@ -21,7 +21,7 @@ export function createAgentPaneHost(providers: readonly WorkspaceAgentProvider[]
 
   async function owner(context: { workspaceId: string; conversationId: string }) {
     const tab = (await list(context)).find((tab) => tab.id === context.conversationId);
-    if (!tab) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${context.conversationId}`);
+    if (!tab) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${context.conversationId}`);
     return byId.get(tab.providerId)!;
   }
 

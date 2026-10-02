@@ -1,4 +1,4 @@
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { expect, spyOn, test } from "bun:test";
 import { RealAgentRuntime } from "../../src/server/real-agent-runtime.ts";
 import type { AgentStatsView } from "../../src/server/render-composer.ts";
@@ -144,7 +144,7 @@ class InspectableAgentRuntime extends RealAgentRuntime {
   }
 }
 
-function runtimeFor(session: any, events = createAtelierEventBus()): InspectableAgentRuntime {
+function runtimeFor(session: any, events = createAgentsInTheCloudEventBus()): InspectableAgentRuntime {
   return new InspectableAgentRuntime(
     {
       workspaceId: "runtime-lifecycle-workspace",
@@ -232,7 +232,7 @@ test("pending tool updates stop when the last subscriber leaves", async () => {
 test("awaited tree summarization leaves busy and emits one terminal event when navigation fails", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let finished = 0;
@@ -263,7 +263,7 @@ test("awaited tree summarization leaves busy and emits one terminal event when n
 test("detached rewind summarization requests attention for a hidden Agent exactly once", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let hidden = false;
@@ -300,7 +300,7 @@ test("detached rewind summarization requests attention for a hidden Agent exactl
 test("aborting detached rewind summarization waits for terminal cleanup", async () => {
   const navigation = deferred<{ cancelled?: boolean; aborted?: boolean }>();
   const { session } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   let finished = 0;
   const terminal = deferred<void>();
@@ -320,7 +320,7 @@ test("aborting detached rewind summarization waits for terminal cleanup", async 
 test("disposing a busy closed Agent unsubscribes and suppresses delayed terminal readiness", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session, emit, emitStale, abortCount, unsubscribeCount } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let finished = 0;
@@ -358,7 +358,7 @@ test("dispose cancels and joins detached rewind summarization without publishing
   session.abortBranchSummary = () => {
     summaryAborts += 1;
   };
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let finished = 0;
@@ -422,7 +422,7 @@ test("dispose signals compaction cancellation and waits for the session operatio
 test("retry boundaries remain continuously busy and only the settled prompt becomes ready", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session, emit } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let finished = 0;
@@ -457,7 +457,7 @@ test("retry boundaries remain continuously busy and only the settled prompt beco
 
 test("threshold compaction inside an Agent loop stays busy until the prompt settles", async () => {
   const { session, emit } = fakeSession(deferred<{ editorText?: string }>());
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const busy: boolean[] = [];
   let finished = 0;
@@ -504,7 +504,7 @@ test("threshold compaction inside an Agent loop stays busy until the prompt sett
 test("a settled prompt becomes ready before stats and cannot clear a newer run", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session, emit } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   const releaseOldStats = deferred<void>();
   runtime.queueStatsCompletion(() => releaseOldStats.promise);
@@ -539,7 +539,7 @@ test("a settled prompt becomes ready before stats and cannot clear a newer run",
 test("throwing terminal stats do not suppress idle state or readiness", async () => {
   const navigation = deferred<{ editorText?: string }>();
   const { session, emit } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   runtime.queueStatsCompletion(async () => { throw new Error("stats unavailable"); });
   const busy: boolean[] = [];
@@ -591,7 +591,7 @@ test.each([
 ] as const)("%s settled prompt emits one terminal readiness", async (_name, terminalEvent) => {
   const navigation = deferred<{ editorText?: string }>();
   const { session, emit } = fakeSession(navigation);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   runtimeFor(session, events);
   let finished = 0;
   events.on("workspace_agent_turn_finished", () => { finished += 1; });
@@ -643,7 +643,7 @@ test("submit rejects failed Pi preflight without emitting terminal readiness", a
     options.preflightResult(false);
     throw new Error("model authentication unavailable");
   };
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(session, events);
   let finished = 0;
   events.on("workspace_agent_turn_finished", () => { finished += 1; });
@@ -861,7 +861,7 @@ test("cancelling retry backoff closes the existing block with a stopped summary"
   const { session, emit } = fakeSession(deferred());
   const timings: Array<{ turnEntryId: string; outcome: string }> = [];
   session.sessionManager.appendCustomEntry = (_type: string, timing: { turnEntryId: string; outcome: string }) => { if (_type === turnTimingEntryType) timings.push(timing); return "timing"; };
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   let finished = 0;
   events.on("workspace_agent_turn_finished", () => { finished += 1; });
   const runtime = runtimeFor(session, events);
@@ -898,7 +898,7 @@ test("an early-final answer that fails is demoted to inner non-final activity", 
 
 test("disposal joins a completion event already awaiting workspace subscribers", async () => {
   const harness = fakeSession(deferred());
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(harness.session, events);
   const completion = deferred<void>();
   let entered = false;
@@ -920,7 +920,7 @@ test("disposal joins a completion event already awaiting workspace subscribers",
 
 test("rejected completion subscribers are reported at the session event boundary", async () => {
   const harness = fakeSession(deferred());
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const runtime = runtimeFor(harness.session, events);
   const failure = new Error("workspace completion refresh failed");
   events.on("workspace_agent_turn_finished", async () => { throw failure; });

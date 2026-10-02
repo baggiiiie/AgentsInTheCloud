@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { agentSessionNeedsRestartRecovery, atelierRestartPrompt } from "../../src/server/restart-recovery.ts";
+import { agentSessionNeedsRestartRecovery, agentsInTheCloudRestartPrompt } from "../../src/server/restart-recovery.ts";
 
 function entries(...values: unknown[]): SessionEntry[] {
   // SAFETY: Tests construct only the SessionEntry shapes needed by the recovery predicate.
@@ -41,6 +41,6 @@ describe("Agent restart recovery", () => {
   });
 
   test("uses the host restart handoff message verbatim", () => {
-    expect(atelierRestartPrompt).toBe("The atelier host had to restart. Your execution environment did not restart. You may continue if you had any unfinished business");
+    expect(agentsInTheCloudRestartPrompt).toBe("The agents-in-the-cloud host had to restart. Your execution environment did not restart. You may continue if you had any unfinished business");
   });
 });

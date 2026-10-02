@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/design-system",
+  "name": "@agents-in-the-cloud/design-system",
   "private": true,
   "type": "module",
   "exports": {
@@ -39,9 +39,9 @@
     "./tab-strip/client": "./src/tab-strip/tab-strip-controller.ts"
   },
   "dependencies": {
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
     "@fontsource/jetbrains-mono": "5.2.8",
-    "@atelier/syntax": "workspace:*"
+    "@agents-in-the-cloud/syntax": "workspace:*"
   }
 }

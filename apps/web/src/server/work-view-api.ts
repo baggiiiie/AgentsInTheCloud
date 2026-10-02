@@ -1,4 +1,4 @@
-import { invalidArguments, type JsonObject } from "@atelier/core";
+import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 

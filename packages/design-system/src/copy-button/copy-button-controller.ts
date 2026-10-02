@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { Controller } from "@hotwired/stimulus";
-import { copyTextToClipboard } from "@atelier/shared";
+import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
 import { showTransientFeedback } from "../transient-feedback/transient-feedback-controller.ts";
 
 export class CopyButtonController extends Controller<HTMLButtonElement> {

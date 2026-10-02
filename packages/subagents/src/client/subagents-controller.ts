@@ -1,4 +1,4 @@
-import { CableTopics, selectedWorkspaceAgent, type CableSubscription, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { CableTopics, selectedWorkspaceAgent, type CableSubscription, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -15,7 +15,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
     private expanded = new Set<string>();
     private reveal?: string;
     private message?: string;
-    private get storageKey(): string { return `atelier:subagents:/workspaces/${this.workspaceIdValue}/subagents:${this.parentId}`; }
+    private get storageKey(): string { return `agents-in-the-cloud:subagents:/workspaces/${this.workspaceIdValue}/subagents:${this.parentId}`; }
 
     connect(): void { this.sync(); }
     disconnect(): void { this.stop(); }
@@ -38,7 +38,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
       }
       if (!id || document.hidden || !this.element.checkVisibility()) { this.stop(); return; }
       if (!this.tree) {
-        this.tree = window.AtelierCable!.subscribe(CableTopics.module("subagents", this.workspaceIdValue, { conversationId: id }), {
+        this.tree = window.AgentsInTheCloudCable!.subscribe(CableTopics.module("subagents", this.workspaceIdValue, { conversationId: id }), {
           onReady: () => this.restore(),
           onDisconnected: () => {
             for (const child of this.children.values()) child.subscription.unsubscribe();
@@ -72,7 +72,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
         if (!visible) { child?.subscription.unsubscribe(); this.children.delete(id); continue; }
         if (child?.branch === branch) continue;
         child?.subscription.unsubscribe();
-        const subscription = window.AtelierCable!.subscribe(CableTopics.agent(this.workspaceIdValue, id), {
+        const subscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.agent(this.workspaceIdValue, id), {
           onReady: () => {
             if (this.reveal === id && this.message) void this.revealMessage(branch, id, this.message);
             else this.loaded();

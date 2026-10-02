@@ -4,7 +4,7 @@ import { join } from "node:path";
 async function scenario(script: string) {
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
-    const llm = await import("@atelier/llm/server");
+    const llm = await import("@agents-in-the-cloud/llm/server");
     let runtimeCreations = 0;
     let runtime;
     let availabilityChecks = 0;
@@ -15,7 +15,7 @@ async function scenario(script: string) {
       { provider: "custom", id: "unavailable", label: "Unavailable" },
       { provider: "amazon-bedrock", id: "ambient", label: "AWS profile" },
     ];
-    mock.module("@atelier/llm/server", () => ({ ...llm,
+    mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
       getConfiguredModels: async () => favorites,
       createPiModelRuntime: async () => {
         runtimeCreations++;
@@ -36,7 +36,7 @@ async function scenario(script: string) {
   expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
 }
 
-test("uses Atelier favorites across providers, including custom providers", () => scenario(`
+test("uses AgentsInTheCloud favorites across providers, including custom providers", () => scenario(`
   expect(await preparePiModelSettings()).toEqual({ model: "anthropic::claude", thinkingLevel: "medium" });
   for (const model of ["anthropic::claude", "openai-codex::gpt", "custom::model"]) {
     expect(await preparePiModelSettings({ model, thinkingLevel: "minimal" })).toEqual({ model, thinkingLevel: "minimal" });

@@ -2,18 +2,18 @@ import { expect, test } from "bun:test";
 import { installationStatus } from "./installation-status.ts";
 
 const input = {
-  activity: { description: "Preparing Atelier", percent: 40 },
+  activity: { description: "Preparing AgentsInTheCloud", percent: 40 },
   stopping: false, busy: false, appResponding: true,
-  hostname: "atelier.example.ts.net", appliedRoute: "atelier.example.ts.net:3000",
+  hostname: "agents-in-the-cloud.example.ts.net", appliedRoute: "agents-in-the-cloud.example.ts.net:3000",
   connectionState: "Running", logs: ["App exited with code 1"],
 };
 
 test("System owns destinations and only releases the app URL after health and routing", () => {
   const status = installationStatus(input);
   expect(status.state).toBe("ready");
-  expect(status.appUrl).toBe("https://atelier.example.ts.net");
-  expect(status.supervisorUrl).toBe("https://atelier.example.ts.net:8443");
-  for (const change of [{ appResponding: false }, { busy: true }, { appliedRoute: "atelier.example.ts.net:3001" }, { hostname: undefined }]) {
+  expect(status.appUrl).toBe("https://agents-in-the-cloud.example.ts.net");
+  expect(status.supervisorUrl).toBe("https://agents-in-the-cloud.example.ts.net:8443");
+  for (const change of [{ appResponding: false }, { busy: true }, { appliedRoute: "agents-in-the-cloud.example.ts.net:3001" }, { hostname: undefined }]) {
     const pending = installationStatus({ ...input, ...change });
     expect(pending.state).toBe("starting");
     expect(pending.appUrl).toBeUndefined();
@@ -48,15 +48,15 @@ test("System translates sign-in and machine approval into user actions", () => {
 
 test("stopping never advertises readiness and unknown-duration activity has no percent", () => {
   expect(installationStatus({ ...input, stopping: true }).state).toBe("failed");
-  const starting = installationStatus({ ...input, appResponding: false, activity: { description: "Starting Atelier" } });
+  const starting = installationStatus({ ...input, appResponding: false, activity: { description: "Starting AgentsInTheCloud" } });
   expect(starting.activity.percent).toBeUndefined();
 });
 
 test("local install becomes ready without Tailscale and keeps diagnostics reachable", () => {
-  const status = installationStatus({ activity: { description: "Starting" }, stopping: false, busy: false, appResponding: true, appliedRoute: "", connectionState: "NeedsLogin", authUrl: "https://login.tailscale.com/test", logs: [], localMode: true, localOrigin: "http://atelier.localhost:55001" });
+  const status = installationStatus({ activity: { description: "Starting" }, stopping: false, busy: false, appResponding: true, appliedRoute: "", connectionState: "NeedsLogin", authUrl: "https://login.tailscale.com/test", logs: [], localMode: true, localOrigin: "http://agents-in-the-cloud.localhost:55001" });
   expect(status.state).toBe("ready");
-  expect(status.appUrl).toBe("http://atelier.localhost:55001");
-  expect(status.supervisorUrl).toBe("http://system.atelier.localhost:55001");
+  expect(status.appUrl).toBe("http://agents-in-the-cloud.localhost:55001");
+  expect(status.supervisorUrl).toBe("http://system.agents-in-the-cloud.localhost:55001");
   expect(status.action).toBeUndefined();
 });
 
@@ -78,7 +78,7 @@ test("HTTPS setup is recoverable and cannot advertise readiness or a stale app U
     expect(pending.action).toEqual(action);
     expect(pending.supervisorUrl).toBeUndefined();
     expect(pending.appUrl).toBeUndefined();
-    expect(installationStatus({ ...input, connectionAction: action, localMode: true, localOrigin: "http://atelier.localhost:5000" }).state).toBe("ready");
+    expect(installationStatus({ ...input, connectionAction: action, localMode: true, localOrigin: "http://agents-in-the-cloud.localhost:5000" }).state).toBe("ready");
   }
   expect(installationStatus(input).state).toBe("ready");
 });

@@ -1,8 +1,8 @@
-import type { JsonValue } from "@atelier/core";
-import { Icons } from "@atelier/design-system/icons";
-import { renderMarkdown } from "@atelier/markdown";
-import { parseWorkspaceFileTarget, type WorkspaceFileTarget, type WorkspaceModule, type WorkspaceModuleRouteContext } from "@atelier/shared";
-import { workspaceRoot } from "@atelier/workspace";
+import type { JsonValue } from "@agents-in-the-cloud/core";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { renderMarkdown } from "@agents-in-the-cloud/markdown";
+import { parseWorkspaceFileTarget, type WorkspaceFileTarget, type WorkspaceModule, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { fileSaveRequestSchema, type FileSaveRequest } from "../protocol.ts";
@@ -155,4 +155,4 @@ const filesWorkspaceModule: WorkspaceModule = {
   },
 };
 
-export { filesWorkspaceModule as atelierServerModule };
+export { filesWorkspaceModule as agentsInTheCloudServerModule };

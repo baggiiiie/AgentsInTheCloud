@@ -7,7 +7,7 @@ const desktopPhase = Type.Union([
 export type DesktopPhase = Static<typeof desktopPhase>;
 
 const statusMessage = Type.Object({
-  type: Type.Literal("atelier:desktop:status"),
+  type: Type.Literal("agents-in-the-cloud:desktop:status"),
   token: Type.String(),
   phase: desktopPhase,
   detail: Type.String(),
@@ -15,10 +15,10 @@ const statusMessage = Type.Object({
 
 const clipboardFields = { token: Type.String(), text: Type.String() };
 const clipboardMessage = Type.Object({
-  type: Type.Union([Type.Literal("atelier:desktop:clipboard"), Type.Literal("atelier:desktop:clipboard-sent")]),
+  type: Type.Union([Type.Literal("agents-in-the-cloud:desktop:clipboard"), Type.Literal("agents-in-the-cloud:desktop:clipboard-sent")]),
   ...clipboardFields,
 });
 
 export const desktopViewerMessage = Type.Union([statusMessage, clipboardMessage]);
-export const desktopClipboardSetMessage = Type.Object({ type: Type.Literal("atelier:desktop:clipboard-set"), ...clipboardFields });
+export const desktopClipboardSetMessage = Type.Object({ type: Type.Literal("agents-in-the-cloud:desktop:clipboard-set"), ...clipboardFields });
 export type DesktopViewerPayload = Omit<Static<typeof statusMessage>, "token"> | Omit<Static<typeof clipboardMessage>, "token">;

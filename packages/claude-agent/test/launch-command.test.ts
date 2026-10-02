@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shellQuote } from "@atelier/core";
+import { shellQuote } from "@agents-in-the-cloud/core";
 import { claudeLaunchScript } from "../src/server/launch-command.ts";
 import { claudeMcpConfigPath } from "../src/server/mcp.ts";
 
@@ -21,13 +21,13 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: "custom:atelier" })];
+const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: "custom:agents-in-the-cloud" })];
 
 test("reuses home Claude and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
   const text = `--help 'quoted' $(touch ${home}/injected)\nsecond line`;
-  const notes = "[Attached file copied into the workspace at /tmp/atelier-attachments/my file.txt]";
-  const image = "/tmp/atelier-attachments/image 1.png";
+  const notes = "[Attached file copied into the workspace at /tmp/agents-in-the-cloud-attachments/my file.txt]";
+  const image = "/tmp/agents-in-the-cloud-attachments/image 1.png";
   const [code, output] = await run(claudeLaunchScript({ ...empty, text, attachmentNotes: [notes] }, [image]));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--", `${text}\n\n${notes}\n\nRead the attached image at ${JSON.stringify(image)}.`]);
@@ -102,11 +102,11 @@ test("invalid CLI preferences fail visibly rather than being overwritten", async
   expect(await readFile(`${home}/.claude.json`, "utf8")).toBe("invalid json");
 });
 
-test("installs the Atelier Claude theme so inline code follows the terminal palette", async () => {
+test("installs the AgentsInTheCloud Claude theme so inline code follows the terminal palette", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
   const [code] = await run(claudeLaunchScript(empty, []));
   expect(code).toBe(0);
-  expect(JSON.parse(await readFile(`${home}/.claude/themes/atelier.json`, "utf8"))).toMatchObject({ base: "dark-ansi" });
+  expect(JSON.parse(await readFile(`${home}/.claude/themes/agents-in-the-cloud.json`, "utf8"))).toMatchObject({ base: "dark-ansi" });
 });
 
 for (const preferences of [{}, { autoUpdates: false }, { installMethod: "native", autoUpdates: false, autoUpdatesProtectedForNative: true }]) {
@@ -131,7 +131,7 @@ test("registers session-local turn boundary hooks", async () => {
   } });
 });
 
-test("adds the session-local Atelier MCP configuration without disabling the user's own servers", async () => {
+test("adds the session-local AgentsInTheCloud MCP configuration without disabling the user's own servers", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');
   const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn signal.sh` };
   const [code, output] = await run(claudeLaunchScript(empty, [], {}, session));

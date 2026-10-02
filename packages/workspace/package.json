@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/workspace",
+  "name": "@agents-in-the-cloud/workspace",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,11 +9,11 @@
     "./server/provisioning": "./src/server/provisioning-web.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/observable-terminal": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/workspace-image": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/observable-terminal": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/workspace-image": "workspace:*",
     "typebox": "^1.0.57",
-    "@atelier/design-system": "workspace:*"
+    "@agents-in-the-cloud/design-system": "workspace:*"
   }
 }

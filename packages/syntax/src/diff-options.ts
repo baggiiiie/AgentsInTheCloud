@@ -1,4 +1,4 @@
-export const atelierPierreTheme = "atelier";
+export const agentsInTheCloudPierreTheme = "agents-in-the-cloud";
 
 const changedLineCSS = `[data-line-type="change-addition"], [data-line-type="change-deletion"] { --mix-light: 80%; --mix-dark: 80%; }`;
 export const wordDiffCSS = `[data-line-type="change-addition"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-addition-base) 48%, transparent); } [data-line-type="change-deletion"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-deletion-base) 48%, transparent); }`;
@@ -9,7 +9,7 @@ function diffOptions(presentation: "review" | "tool") {
   const review = presentation === "review";
   return {
     preferredHighlighter: "shiki-wasm" as const,
-    theme: atelierPierreTheme,
+    theme: agentsInTheCloudPierreTheme,
     themeType: "dark" as const,
     diffStyle: "unified" as const,
     overflow: review ? "wrap" as const : "scroll" as const,

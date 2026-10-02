@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { ButtonVariant } from "../button/button-content.ts";
 import { type HtmlContent } from "../html.ts";
 import { perimeterButtonHtml } from "../perimeter-button/perimeter-button-html.ts";

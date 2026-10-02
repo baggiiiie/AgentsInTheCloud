@@ -1,9 +1,9 @@
-import type { StaticFileContribution } from "@atelier/shared";
+import type { StaticFileContribution } from "@agents-in-the-cloud/shared";
 import { designSystemStaticFiles } from "./assets.ts";
 
 /** Self-contained CSS for documents on foreign origins (for example proxy errors).
  * Resolves the same package stylesheet and font, without another visual theme or
- * requiring that the document's origin serve Atelier assets.
+ * requiring that the document's origin serve AgentsInTheCloud assets.
  */
 export async function inlineDesignSystemCss(): Promise<string> {
   const assets: Record<string, StaticFileContribution> =

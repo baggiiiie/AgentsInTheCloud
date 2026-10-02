@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
-import { observableWebSocketUrl } from "@atelier/observable-terminal/client";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { observableWebSocketUrl } from "@agents-in-the-cloud/observable-terminal/client";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { type MicrophoneLease, SharedMicrophone } from "./microphone.ts";
@@ -139,7 +139,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
     }
 
     private received(event: TranscriptionEvent): void {
-      if (event.type === "atelier.transcription.status") {
+      if (event.type === "agents-in-the-cloud.transcription.status") {
         if (event.status === "loading") {
           this.setState("loading", event.message ?? "Preparing transcription model…");
           this.setProgress(event.progress ?? 0);

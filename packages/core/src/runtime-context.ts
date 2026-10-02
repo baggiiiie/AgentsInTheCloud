@@ -1,29 +1,29 @@
 import { homedir, platform } from "node:os";
 import { isAbsolute, join } from "node:path";
 
-export interface AtelierRuntimeContext {
-  /** Path as seen by the Atelier process itself. Use this for normal Atelier file IO. */
-  atelierDataDir: string;
+export interface AgentsInTheCloudRuntimeContext {
+  /** Path as seen by the AgentsInTheCloud process itself. Use this for normal AgentsInTheCloud file IO. */
+  agentsInTheCloudDataDir: string;
   /** Same directory as seen by the Docker daemon. Use this for Docker bind mount sources. */
-  dockerHostAtelierDataDir: string;
-  /** Host-side Docker bridge IP used for Atelier/workspace traffic. */
+  dockerHostAgentsInTheCloudDataDir: string;
+  /** Host-side Docker bridge IP used for AgentsInTheCloud/workspace traffic. */
   dockerBridgeHost: string;
 }
 
-let cachedRuntimeContext: AtelierRuntimeContext | undefined;
+let cachedRuntimeContext: AgentsInTheCloudRuntimeContext | undefined;
 let cachedRuntimeContextKey: string | undefined;
 
-export function atelierDataPath(context: AtelierRuntimeContext, ...segments: string[]): string {
-  return join(context.atelierDataDir, ...segments);
+export function agentsInTheCloudDataPath(context: AgentsInTheCloudRuntimeContext, ...segments: string[]): string {
+  return join(context.agentsInTheCloudDataDir, ...segments);
 }
 
-export function dockerHostAtelierDataPath(context: AtelierRuntimeContext, ...segments: string[]): string {
-  return join(context.dockerHostAtelierDataDir, ...segments);
+export function dockerHostAgentsInTheCloudDataPath(context: AgentsInTheCloudRuntimeContext, ...segments: string[]): string {
+  return join(context.dockerHostAgentsInTheCloudDataDir, ...segments);
 }
 
-export function getAtelierRuntimeContext(): AtelierRuntimeContext {
+export function getAgentsInTheCloudRuntimeContext(): AgentsInTheCloudRuntimeContext {
   const paths = runtimePathsFromEnv();
-  const key = `${paths.atelierDataDir}\0${paths.dockerHostAtelierDataDir}`;
+  const key = `${paths.agentsInTheCloudDataDir}\0${paths.dockerHostAgentsInTheCloudDataDir}`;
   if (!cachedRuntimeContext || cachedRuntimeContextKey !== key) {
     cachedRuntimeContext = createRuntimeContext(paths);
     cachedRuntimeContextKey = key;
@@ -31,12 +31,12 @@ export function getAtelierRuntimeContext(): AtelierRuntimeContext {
   return cachedRuntimeContext;
 }
 
-export function resetAtelierRuntimeContextForTests(): void {
+export function resetAgentsInTheCloudRuntimeContextForTests(): void {
   cachedRuntimeContext = undefined;
   cachedRuntimeContextKey = undefined;
 }
 
-function createRuntimeContext(paths: Pick<AtelierRuntimeContext, "atelierDataDir" | "dockerHostAtelierDataDir">): AtelierRuntimeContext {
+function createRuntimeContext(paths: Pick<AgentsInTheCloudRuntimeContext, "agentsInTheCloudDataDir" | "dockerHostAgentsInTheCloudDataDir">): AgentsInTheCloudRuntimeContext {
   let dockerBridgeHost: string | undefined;
   return {
     ...paths,
@@ -46,11 +46,11 @@ function createRuntimeContext(paths: Pick<AtelierRuntimeContext, "atelierDataDir
   };
 }
 
-function runtimePathsFromEnv(): Pick<AtelierRuntimeContext, "atelierDataDir" | "dockerHostAtelierDataDir"> {
-  const atelierDataDir = envString("ATELIER_DATA_DIR") ?? defaultDataDir();
+function runtimePathsFromEnv(): Pick<AgentsInTheCloudRuntimeContext, "agentsInTheCloudDataDir" | "dockerHostAgentsInTheCloudDataDir"> {
+  const agentsInTheCloudDataDir = envString("ATELIER_DATA_DIR") ?? defaultDataDir();
   return {
-    atelierDataDir,
-    dockerHostAtelierDataDir: envString("ATELIER_DOCKER_HOST_DATA_DIR") ?? atelierDataDir,
+    agentsInTheCloudDataDir,
+    dockerHostAgentsInTheCloudDataDir: envString("ATELIER_DOCKER_HOST_DATA_DIR") ?? agentsInTheCloudDataDir,
   };
 }
 
@@ -61,9 +61,9 @@ function xdgDataHome(): string {
 }
 
 function defaultDataDir(): string {
-  if (platform() === "darwin") return join(homedir(), "Library", "Application Support", "atelier-host");
-  if (platform() === "linux") return join(xdgDataHome(), "atelier-host");
-  return "/var/lib/atelier-host";
+  if (platform() === "darwin") return join(homedir(), "Library", "Application Support", "agents-in-the-cloud-host");
+  if (platform() === "linux") return join(xdgDataHome(), "agents-in-the-cloud-host");
+  return "/var/lib/agents-in-the-cloud-host";
 }
 
 function envString(name: string): string | undefined {

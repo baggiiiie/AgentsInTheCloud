@@ -1,7 +1,7 @@
-import { registerWorkspacePresenter } from "@atelier/agent/server";
-import { invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject, type JsonValue } from "@atelier/core";
-import { Icons } from "@atelier/design-system/icons";
-import { isWorkspaceLoopbackHost, turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@atelier/shared";
+import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
+import { invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { isWorkspaceLoopbackHost, turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@agents-in-the-cloud/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { createBrowserPresenter } from "./agent-tool.ts";

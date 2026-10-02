@@ -1,8 +1,8 @@
-import { getWorkspaceInit, getWorkspaceTitle } from "@atelier/workspace";
-import { isGitProjectInit } from "@atelier/projects";
+import { getWorkspaceInit, getWorkspaceTitle } from "@agents-in-the-cloud/workspace";
+import { isGitProjectInit } from "@agents-in-the-cloud/projects";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import webPush, { type PushSubscription } from "web-push";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -13,7 +13,7 @@ let keys: Promise<webPush.VapidKeys> | undefined;
 
 function vapidKeys(): Promise<webPush.VapidKeys> {
   return keys ??= (async () => {
-    const directory = getAtelierRuntimeContext().atelierDataDir;
+    const directory = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir;
     const path = join(directory, "web-push-vapid.json");
     if (await Bun.file(path).exists()) return Value.Parse(vapidSchema, JSON.parse(await readFile(path, "utf8")));
     const generated = webPush.generateVAPIDKeys();

@@ -46,6 +46,6 @@ Bun.serve({
   },
 });
 
-console.log(`Codex-inspired Atelier prototype: http://127.0.0.1:${port}`);
+console.log(`Codex-inspired AgentsInTheCloud prototype: http://127.0.0.1:${port}`);
 
 await new Promise(() => {});

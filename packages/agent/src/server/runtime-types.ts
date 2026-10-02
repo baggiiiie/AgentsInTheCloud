@@ -1,4 +1,4 @@
-import type { AtelierEventBus } from "@atelier/core";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { AgentPaneState } from "./render-composer.ts";
 import type { AgentServiceTier } from "./service-tier.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
@@ -6,7 +6,7 @@ import type { ImageRef } from "./transcript.ts";
 
 export type AgentLivePresentationListener = (streamHtml: string) => void;
 
-export type AgentLivePresentationSubscription = import("@atelier/shared").LiveSubscription;
+export type AgentLivePresentationSubscription = import("@agents-in-the-cloud/shared").LiveSubscription;
 
 export interface SubmitOptions {
   images?: ImageRef[];
@@ -17,7 +17,7 @@ export interface SubmitOptions {
 export type RewindMode = "discard" | "summary";
 
 export interface WorkspaceAgentRuntimeOptions {
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
 }
 
 export interface WorkspaceAgentRuntime {

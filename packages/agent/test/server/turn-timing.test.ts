@@ -30,7 +30,7 @@ test("timing survives session loading and belongs to the completed user turn", (
   const transcript = buildTranscript(recordsFromSessionEntries([
     { type: "message", id: "u", timestamp: new Date(0).toISOString(), message: { role: "user", content: [{ type: "text", text: "hello" }] } },
     { type: "message", id: "a", timestamp: new Date(8000).toISOString(), message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" } },
-    { type: "custom", customType: "atelier.turn-timing", timestamp: new Date(8000).toISOString(), data: timing },
+    { type: "custom", customType: "agents-in-the-cloud.turn-timing", timestamp: new Date(8000).toISOString(), data: timing },
   ]));
   expect(transcript.find(item => item.type === "working")).toMatchObject({ timing });
 });
@@ -59,7 +59,7 @@ test("addressed delayed summaries cannot attach to a newer steering turn", () =>
   const transcript = buildTranscript(recordsFromSessionEntries([
     { type: "message", id: "old", timestamp: new Date(100).toISOString(), message: { role: "user", content: "go" } },
     { type: "message", id: "new", timestamp: new Date(300).toISOString(), message: { role: "user", content: "steer" } },
-    { type: "custom", customType: "atelier.turn-timing", timestamp: new Date(350).toISOString(), data: { ...timing, turnEntryId: "old", outcome: "completed" } },
+    { type: "custom", customType: "agents-in-the-cloud.turn-timing", timestamp: new Date(350).toISOString(), data: { ...timing, turnEntryId: "old", outcome: "completed" } },
   ]));
   expect(transcript.find(item => item.key === "old:working")).toMatchObject({ timing, completedAt: 300 });
   expect(transcript.find(item => item.key === "new:working")).not.toHaveProperty("timing");
@@ -70,7 +70,7 @@ test("timing closes a turn even without an assistant answer and restores termina
   for (const outcome of ["completed", "stopped"] as const) {
     const transcript = buildTranscript(recordsFromSessionEntries([
       { type: "message", id: "u", timestamp: new Date(100).toISOString(), message: { role: "user", content: "go" } },
-      { type: "custom", customType: "atelier.turn-timing", timestamp: new Date(900).toISOString(), data: { ...timing, turnEntryId: "u", outcome } },
+      { type: "custom", customType: "agents-in-the-cloud.turn-timing", timestamp: new Date(900).toISOString(), data: { ...timing, turnEntryId: "u", outcome } },
     ]));
     expect(transcript[1]).toMatchObject({ key: "u:working", timing, [outcome === "completed" ? "completedAt" : "stoppedAt"]: 800 });
   }

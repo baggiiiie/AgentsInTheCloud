@@ -1,4 +1,4 @@
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 import type { WorkspaceCreationContext, WorkspaceDockerPlan, WorkspaceInitInstruction } from "./types.ts";
 
 export interface WorkspaceCreatedEvent {
@@ -69,8 +69,8 @@ export interface WorkspaceImageConfigureEvent {
   dockerfile?: string;
 }
 
-declare module "@atelier/core" {
-  interface AtelierEventMap {
+declare module "@agents-in-the-cloud/core" {
+  interface AgentsInTheCloudEventMap {
     agent_provider_default_changed: { providerId: string };
     workspace_image_configure: WorkspaceImageConfigureEvent;
     workspace_source_prepare: WorkspaceSourcePrepareEvent;

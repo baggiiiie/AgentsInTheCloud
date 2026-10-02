@@ -1,6 +1,6 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { Icons } from "@atelier/design-system/icons";
-import { domId, escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { agentPath, type AgentRenderContext } from "./render-context.ts";
 import { currentNotificationTurn } from "./turn-notifications.ts";
 

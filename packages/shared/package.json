@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/shared",
+  "name": "@agents-in-the-cloud/shared",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,7 +8,7 @@
     "./theme": "./src/theme-setting.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

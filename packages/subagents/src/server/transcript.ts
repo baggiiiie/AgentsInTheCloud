@@ -1,4 +1,4 @@
-import { type AgentTranscriptSnapshot, type AgentTranscriptAnchor, type AgentTranscriptAddition, type AgentDelegationTranscript, type TranscriptItem } from "@atelier/agent/server";
+import { type AgentTranscriptSnapshot, type AgentTranscriptAnchor, type AgentTranscriptAddition, type AgentDelegationTranscript, type TranscriptItem } from "@agents-in-the-cloud/agent/server";
 import { subagentSnapshot, subscribeSubagentChanges } from "./subagents.ts";
 import { inheritedContextEntryType } from "./fork-history.ts";
 import { agentPath } from "./subagent-protocol.ts";

@@ -1,14 +1,14 @@
 #!/bin/bash
 # Bootstrap the container, then hand PID 1 and service supervision to systemd.
 set -euo pipefail
-mkdir -p /.atelier /run/systemd
-rm -f /.atelier/ready
+mkdir -p /.agents-in-the-cloud /run/systemd
+rm -f /.agents-in-the-cloud/ready
 printf 'docker\n' > /run/systemd/container
 # System services do not inherit PID 1's environment. Preserve the workspace's
 # supplied environment, including multiline values, without shell evaluation.
 python3 - <<'PY'
 import os
-with open('/.atelier/environment', 'w', opener=lambda path, flags: os.open(path, flags, 0o600)) as file:
+with open('/.agents-in-the-cloud/environment', 'w', opener=lambda path, flags: os.open(path, flags, 0o600)) as file:
     for key, value in os.environ.items():
         # Each service gets its identity from systemd, not the root bootstrap.
         if key in {"HOME", "USER", "LOGNAME", "SHELL"}:
@@ -18,5 +18,5 @@ with open('/.atelier/environment', 'w', opener=lambda path, flags: os.open(path,
             file.write(f'{key}="{escaped}"\n')
 PY
 systemctl enable docker.socket
-if [ -f /etc/systemd/system/atelier-gateway.service ]; then systemctl enable atelier-gateway.service; fi
+if [ -f /etc/systemd/system/agents-in-the-cloud-gateway.service ]; then systemctl enable agents-in-the-cloud-gateway.service; fi
 exec /sbin/init

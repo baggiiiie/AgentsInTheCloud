@@ -1,11 +1,11 @@
-import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@atelier/agent/server";
-import { ids, listWorkspaceAgentConversations } from "@atelier/agent/server";
-import type { AtelierEventBus } from "@atelier/core";
-import { requestAcceptsJson, type JsonValue } from "@atelier/core";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { Icons } from "@atelier/design-system/icons";
-import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } from "@atelier/shared";
-import { createLivePresentation, escapeHtml as h } from "@atelier/shared";
+import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/agent/server";
+import { ids, listWorkspaceAgentConversations } from "@agents-in-the-cloud/agent/server";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { requestAcceptsJson, type JsonValue } from "@agents-in-the-cloud/core";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
+import { createLivePresentation, escapeHtml as h } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentPath } from "./subagent-protocol.ts";
@@ -23,7 +23,7 @@ export const subagentsWorkViewAdapter: WorkspaceModuleWorkViewAdapter = {
   },
   identity: () => "workspace",
   render({ workspaceId }) {
-    return `<section class="subagents-view" data-controller="subagents" data-subagents-workspace-id-value="${h(workspaceId)}" data-action="atelier:workspace-agent-selected@document->subagents#sync atelier:workspace-pane-visible@document->subagents#sync atelier:workspace-pane-hidden@document->subagents#sync visibilitychange@document->subagents#sync agent:turn-reveal->subagents#loaded toggle->subagents#toggle:capture">
+    return `<section class="subagents-view" data-controller="subagents" data-subagents-workspace-id-value="${h(workspaceId)}" data-action="agents-in-the-cloud:workspace-agent-selected@document->subagents#sync agents-in-the-cloud:workspace-pane-visible@document->subagents#sync agents-in-the-cloud:workspace-pane-hidden@document->subagents#sync visibilitychange@document->subagents#sync agent:turn-reveal->subagents#loaded toggle->subagents#toggle:capture">
       <div class="subagents-scroll"><div id="subagents-content-${h(workspaceId)}" data-turbo-permanent></div></div>
     </section>`;
   },
@@ -68,7 +68,7 @@ function renderSubagentTree(workspaceId: string, rootId: string, agents: Subagen
 }
 
 /** Publish the tree while preserving independently subscribed child transcripts. */
-export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void, events?: AtelierEventBus): Promise<AgentLivePresentationSubscription> {
+export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void, events?: AgentsInTheCloudEventBus): Promise<AgentLivePresentationSubscription> {
   const roots = await listWorkspaceAgentConversations(workspaceId);
   if (!roots.some((root) => root.conversationId === rootId)) throw new Error("Subagent root not found");
   const coordinator = await getSubagents(workspaceId, events);

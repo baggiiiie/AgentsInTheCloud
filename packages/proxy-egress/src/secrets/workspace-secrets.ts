@@ -1,6 +1,6 @@
-import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@atelier/core";
-import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts, projectSecretAllowsPath } from "@atelier/projects";
-import { getWorkspaceInit, type WorkspaceInitInstruction } from "@atelier/workspace";
+import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
+import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts, projectSecretAllowsPath } from "@agents-in-the-cloud/projects";
+import { getWorkspaceInit, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { matchHostname } from "./patterns.ts";
 import { isWorkspaceDestinationAllowed } from "./workspace-destinations.ts";
 import { createHttpHooks, type RequestTransformHttpHooks, type SecretRequestTransform, type SecretDefinition } from "./placeholder-hooks.ts";

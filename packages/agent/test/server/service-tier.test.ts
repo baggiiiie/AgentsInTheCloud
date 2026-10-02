@@ -46,9 +46,9 @@ describe("agent service tiers", () => {
 
   test("restores the latest provider-specific value from the active branch", () => {
     const entries = [
-      { type: "custom" as const, id: "1", parentId: null, timestamp: "", customType: "atelier.service-tier", data: { provider: "openai-codex", serviceTier: "priority" } },
-      { type: "custom" as const, id: "2", parentId: "1", timestamp: "", customType: "atelier.service-tier", data: { provider: "other", serviceTier: "priority" } },
-      { type: "custom" as const, id: "3", parentId: "2", timestamp: "", customType: "atelier.service-tier", data: { provider: "openai-codex", serviceTier: "default" } },
+      { type: "custom" as const, id: "1", parentId: null, timestamp: "", customType: "agents-in-the-cloud.service-tier", data: { provider: "openai-codex", serviceTier: "priority" } },
+      { type: "custom" as const, id: "2", parentId: "1", timestamp: "", customType: "agents-in-the-cloud.service-tier", data: { provider: "other", serviceTier: "priority" } },
+      { type: "custom" as const, id: "3", parentId: "2", timestamp: "", customType: "agents-in-the-cloud.service-tier", data: { provider: "openai-codex", serviceTier: "default" } },
     ];
     expect(serviceTierFromBranch(entries, "openai-codex")).toBe("default");
     expect(serviceTierFromBranch(entries, "other")).toBe("priority");

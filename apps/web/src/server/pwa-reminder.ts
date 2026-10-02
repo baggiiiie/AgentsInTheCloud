@@ -1,9 +1,9 @@
-import { activityButtonHtml } from "@atelier/design-system/activity-button";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml } from "@atelier/shared";
+import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 // Menu paths checked against the linked vendor documentation on 2026-09-08.
 const guides = [
@@ -35,7 +35,7 @@ const guides = [
     source: "https://support.google.com/chrome/answer/9658361?hl=en&co=GENIE.Platform%3DAndroid",
     steps: [
       "Tap ⋮ → Install and create shortcut → Install.",
-      "Follow the prompts, then open Atelier from your apps.",
+      "Follow the prompts, then open AgentsInTheCloud from your apps.",
     ],
   },
   {
@@ -45,7 +45,7 @@ const guides = [
     source: "https://support.apple.com/en-us/104996",
     steps: [
       "Choose File → Add to Dock → Add.",
-      "Open Atelier from the Dock. Requires macOS Sonoma 14 or newer.",
+      "Open AgentsInTheCloud from the Dock. Requires macOS Sonoma 14 or newer.",
     ],
   },
   {
@@ -65,13 +65,13 @@ const guides = [
     source: "https://support.google.com/chrome/answer/9658361?hl=en&co=GENIE.Platform%3DDesktop",
     steps: [
       "Choose ⋮ → Cast, save, and share → Install page as app…",
-      "Follow the prompts, then open Atelier from your apps.",
+      "Follow the prompts, then open AgentsInTheCloud from your apps.",
     ],
   },
   {
     id: "other",
     menu: "Supported browser",
-    item: "Open Atelier → Install",
+    item: "Open AgentsInTheCloud → Install",
     steps: [
       "For the verified steps, open this address in Chrome or Edge on desktop, Chrome on Android, or Safari on iPhone/iPad.",
       "Use the browser’s Install app option (Safari: Share → Add to Home Screen).",
@@ -88,8 +88,8 @@ export function renderPwaReminder(): string {
     variant: "secondary",
     state: "initial",
     iconOnly: true,
-    initialLabel: "Install Atelier as an app",
-    activeLabel: "Install Atelier as an app",
+    initialLabel: "Install AgentsInTheCloud as an app",
+    activeLabel: "Install AgentsInTheCloud as an app",
     initialContent: { kind: "html", html: Icons.Exclamation },
     activeContent: { kind: "html", html: Icons.Exclamation },
     attributesHtml: 'data-pwa-reminder-target="button" data-action="click->pwa-reminder#open"',
@@ -115,9 +115,9 @@ export function renderPwaReminder(): string {
   </section>`).join("");
   const dialog = dialogHtml({
     element: { attributesHtml: 'data-pwa-reminder-target="dialog"' },
-    iconHtml: Icons.Atelier,
-    titleCaption: "Install Atelier as an app",
-    bodyHtml: `<div class="pwa-reminder-body"><p>Open Atelier in its own window and launch it from your home screen or apps.</p>${body}</div>`,
+    iconHtml: Icons.AgentsInTheCloud,
+    titleCaption: "Install AgentsInTheCloud as an app",
+    bodyHtml: `<div class="pwa-reminder-body"><p>Open AgentsInTheCloud in its own window and launch it from your home screen or apps.</p>${body}</div>`,
     footerHtml: footer,
   });
   return `<div data-controller="pwa-reminder" data-action="storage@window->pwa-reminder#refresh focus@window->pwa-reminder#refresh" hidden>${button}${dialog}</div>`;

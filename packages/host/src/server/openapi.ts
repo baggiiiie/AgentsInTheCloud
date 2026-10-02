@@ -1,6 +1,6 @@
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 const response = { "200": { description: "Host operation result. Use Accept: application/json for automation; the UI receives server-rendered HTML." } };
-const origin = { name: "Origin", in: "header", required: true, schema: { type: "string" }, description: "Must equal the public Atelier origin. Required for privileged mutations and terminal WebSocket upgrades." };
+const origin = { name: "Origin", in: "header", required: true, schema: { type: "string" }, description: "Must equal the public AgentsInTheCloud origin. Required for privileged mutations and terminal WebSocket upgrades." };
 const id = { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^host-[a-f0-9-]{36}$" } };
 export const hostOpenApiPaths = {
   "/host": { get: { summary: "Inspect System host availability or open the Host panel", responses: response } },

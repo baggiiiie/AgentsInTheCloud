@@ -1,30 +1,30 @@
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rename, rm } from "node:fs/promises";
-import { atelierDataPath, createProcessFileLock, dockerHostAtelierDataPath, getAtelierRuntimeContext, requireDocker } from "@atelier/core";
-import { ensureDefaultWorkspaceImage } from "@atelier/workspace-image";
+import { agentsInTheCloudDataPath, createProcessFileLock, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, requireDocker } from "@agents-in-the-cloud/core";
+import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { WorkspaceDockerMount } from "./types.ts";
 
 const withHomeLock = createProcessFileLock({
-  lockDir: () => atelierDataPath(getAtelierRuntimeContext(), "home.lock"),
+  lockDir: () => agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "home.lock"),
   label: "shared home initialization",
 });
 
 /** Publish a complete home once; deleted defaults are never restored on later starts. */
 export async function ensureSharedHome(): Promise<void> {
-  const runtime = getAtelierRuntimeContext();
-  const home = atelierDataPath(runtime, "home");
+  const runtime = getAgentsInTheCloudRuntimeContext();
+  const home = agentsInTheCloudDataPath(runtime, "home");
   if (existsSync(home)) return;
   // Image acquisition can take minutes; don't hold the short-lived filesystem lock.
   const image = await ensureDefaultWorkspaceImage();
   await withHomeLock(async () => {
     if (existsSync(home)) return;
-    const staging = await mkdtemp(atelierDataPath(runtime, ".home-seed-"));
-    const container = `atelier-home-seed-${crypto.randomUUID()}`;
+    const staging = await mkdtemp(agentsInTheCloudDataPath(runtime, ".home-seed-"));
+    const container = `agents-in-the-cloud-home-seed-${crypto.randomUUID()}`;
     try {
       await requireDocker(["create", "--name", container, "--entrypoint", "/bin/true", image]);
       try {
         // docker cp assigns files to the invoking host user, rather than the image UID.
-        await requireDocker(["cp", `${container}:/opt/atelier/home-defaults/.`, staging]);
+        await requireDocker(["cp", `${container}:/opt/agents-in-the-cloud/home-defaults/.`, staging]);
       } finally {
         await requireDocker(["rm", container]);
       }
@@ -38,13 +38,13 @@ export async function ensureSharedHome(): Promise<void> {
 
 export async function workspaceHomeMounts(workspaceId: string): Promise<WorkspaceDockerMount[]> {
   await ensureSharedHome();
-  const runtime = getAtelierRuntimeContext();
-  const mounts: WorkspaceDockerMount[] = [{ type: "bind", source: dockerHostAtelierDataPath(runtime, "home"), target: "/home/atelier" }];
+  const runtime = getAgentsInTheCloudRuntimeContext();
+  const mounts: WorkspaceDockerMount[] = [{ type: "bind", source: dockerHostAgentsInTheCloudDataPath(runtime, "home"), target: "/home/agents-in-the-cloud" }];
   for (const path of [".local/share", ".local/state", ".cache"]) {
     // Pre-create mountpoints as the host user, not as Docker's root user.
-    await mkdir(atelierDataPath(runtime, "home", path), { recursive: true });
-    await mkdir(atelierDataPath(runtime, "workspaces", workspaceId, "home-local", path), { recursive: true, mode: 0o700 });
-    mounts.push({ type: "bind", source: dockerHostAtelierDataPath(runtime, "workspaces", workspaceId, "home-local", path), target: `/home/atelier/${path}` });
+    await mkdir(agentsInTheCloudDataPath(runtime, "home", path), { recursive: true });
+    await mkdir(agentsInTheCloudDataPath(runtime, "workspaces", workspaceId, "home-local", path), { recursive: true, mode: 0o700 });
+    mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(runtime, "workspaces", workspaceId, "home-local", path), target: `/home/agents-in-the-cloud/${path}` });
   }
   return mounts;
 }

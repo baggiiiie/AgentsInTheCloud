@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-// Optional dev tool: bun run apps/web/scripts/surface-lighting-tuner.ts <Atelier workspace URL>
+// Optional dev tool: bun run apps/web/scripts/surface-lighting-tuner.ts <AgentsInTheCloud workspace URL>
 // Runs outside the app. The JSON snapshot and lighting-role overrides live beside this file.
-import { escapeHtml } from '@atelier/shared';
+import { escapeHtml } from '@agents-in-the-cloud/shared';
 import { Type } from 'typebox';
 import { Value } from 'typebox/value';
 import startingSettings from './surface-lighting-tuner/settings.json';
@@ -9,7 +9,7 @@ import startingSettings from './surface-lighting-tuner/settings.json';
 const destination = Bun.argv[2];
 if (!destination) throw new Error('Usage: bun run apps/web/scripts/surface-lighting-tuner.ts http://localhost:3000/workspaces/<id>');
 const workspaceUrl = new URL(destination);
-if (!/^\/workspaces\/[^/]+$/.test(workspaceUrl.pathname)) throw new Error('Pass a workspace URL, not an Atelier settings or home URL.');
+if (!/^\/workspaces\/[^/]+$/.test(workspaceUrl.pathname)) throw new Error('Pass a workspace URL, not an AgentsInTheCloud settings or home URL.');
 const origin = workspaceUrl.origin;
 const workspaceResponse = await fetch(new URL(workspaceUrl.pathname, origin), { headers: { Accept: 'application/json' } });
 if (!workspaceResponse.ok) throw new Error(`Workspace lookup failed (${workspaceResponse.status}): ${await workspaceResponse.text()}`);

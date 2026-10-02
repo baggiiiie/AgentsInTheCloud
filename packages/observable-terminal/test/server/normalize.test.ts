@@ -36,7 +36,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("interactive attachments configure tmux-owned scrollback before attaching", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 80, rows: 24, socketName: "isolated" });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 80, rows: 24, socketName: "isolated" });
     const bridge = JSON.parse(args.at(-1)!);
     expect(bridge.args).toEqual([
       "-L", "isolated",
@@ -52,7 +52,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("read-only attachments do not configure scrollback", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 80, rows: 24, readonly: true });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 80, rows: 24, readonly: true });
     expect(JSON.parse(args.at(-1)!).args).toEqual(["attach-session", "-r", "-t", "s"]);
   });
 
@@ -72,7 +72,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("builds readonly fixed-size attach arguments", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 120, rows: 30, readonly: true, fixedSize: true });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 120, rows: 30, readonly: true, fixedSize: true });
     expect(args).toContain("-i");
     expect(args).not.toContain("-it");
     const bridge = JSON.parse(args.at(-1)!);

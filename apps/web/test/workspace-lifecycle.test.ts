@@ -1,16 +1,16 @@
-import { createPiModelRuntime, setConfiguredModels } from "@atelier/llm/server";
-import { addProject, isGitProjectInit } from "@atelier/projects";
+import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
+import { addProject, isGitProjectInit } from "@agents-in-the-cloud/projects";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   createTestApp,
   deferred,
   post,
   postForm,
-  temporaryAtelierDataDir,
+  temporaryAgentsInTheCloudDataDir,
   type ProvisionWorkspaceOptions,
 } from "./support/test-web-app.ts";
 
-const dataDir = temporaryAtelierDataDir();
+const dataDir = temporaryAgentsInTheCloudDataDir();
 beforeEach(dataDir.setUp);
 let configuredRuntime = false;
 afterEach(async () => {
@@ -298,7 +298,7 @@ describe("workspace lifecycle", () => {
 });
 
 test("deleting a preparing workspace through JSON cancels its command before destruction", async () => {
-  const { runCommand } = await import("@atelier/core");
+  const { runCommand } = await import("@agents-in-the-cloud/core");
   const stopped = deferred();
   const destroyed = deferred();
   let laterStep = false;

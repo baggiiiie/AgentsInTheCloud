@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { getAtelierRuntimeContext, resetAtelierRuntimeContextForTests } from "@atelier/core";
+import { getAgentsInTheCloudRuntimeContext, resetAgentsInTheCloudRuntimeContextForTests } from "@agents-in-the-cloud/core";
 
-test.skipIf(process.platform !== "darwin")("Docker containers reach a native macOS Atelier through host.docker.internal", () => {
-  resetAtelierRuntimeContextForTests();
-  expect(getAtelierRuntimeContext().dockerBridgeHost).toBe("host.docker.internal");
-  resetAtelierRuntimeContextForTests();
+test.skipIf(process.platform !== "darwin")("Docker containers reach a native macOS AgentsInTheCloud through host.docker.internal", () => {
+  resetAgentsInTheCloudRuntimeContextForTests();
+  expect(getAgentsInTheCloudRuntimeContext().dockerBridgeHost).toBe("host.docker.internal");
+  resetAgentsInTheCloudRuntimeContextForTests();
 });

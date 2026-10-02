@@ -1,12 +1,12 @@
 // Wire contract with workspace-image/workspace-image/gateway/main.go.
 export const workspaceGatewayPort = 2999;
-export const workspaceGatewayHostHeader = "x-atelier-gateway-host";
-export const workspaceGatewayTokenHeader = "x-atelier-gateway-token";
-export const workspaceGatewayPortHeader = "x-atelier-gateway-port";
-export const workspaceGatewayProtocolHeader = "x-atelier-gateway-protocol";
+export const workspaceGatewayHostHeader = "x-agents-in-the-cloud-gateway-host";
+export const workspaceGatewayTokenHeader = "x-agents-in-the-cloud-gateway-token";
+export const workspaceGatewayPortHeader = "x-agents-in-the-cloud-gateway-port";
+export const workspaceGatewayProtocolHeader = "x-agents-in-the-cloud-gateway-protocol";
 
 // Response-only marker, stripped from app responses by the gateway.
-export const workspaceGatewayErrorHeader = "x-atelier-gateway-error";
+export const workspaceGatewayErrorHeader = "x-agents-in-the-cloud-gateway-error";
 
 export function isWorkspaceAppPort(port: number): boolean {
   return Number.isInteger(port) && port >= 1 && port <= 65535 && port !== workspaceGatewayPort;

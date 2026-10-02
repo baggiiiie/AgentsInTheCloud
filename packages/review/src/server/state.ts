@@ -1,5 +1,5 @@
-import type { JsonValue } from "@atelier/core";
-import { createWorkspaceMetadataState } from "@atelier/workspace";
+import type { JsonValue } from "@agents-in-the-cloud/core";
+import { createWorkspaceMetadataState } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { ReviewSide } from "../model.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/update",
+  "name": "@agents-in-the-cloud/update",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,9 +8,9 @@
     "./client": "./src/client/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

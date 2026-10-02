@@ -1,6 +1,6 @@
-import { renderStreamingMarkdownSnapshot } from "@atelier/markdown";
-import type { ModelRef } from "@atelier/llm/server";
-import { escapeHtml } from "@atelier/shared";
+import { renderStreamingMarkdownSnapshot } from "@agents-in-the-cloud/markdown";
+import type { ModelRef } from "@agents-in-the-cloud/llm/server";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, renderMarkdownRow, transcriptActionItemHtml, transcriptRow } from "./render-markup.ts";
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";

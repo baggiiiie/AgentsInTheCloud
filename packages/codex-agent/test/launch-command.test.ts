@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shellQuote } from "@atelier/core";
+import { shellQuote } from "@agents-in-the-cloud/core";
 import { codexLaunchScript } from "../src/server/launch-command.ts";
 
 let home: string;
@@ -20,13 +20,13 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="atelier"', "-c", "notice.hide_full_access_warning=true", "-c", 'cli_auth_credentials_store="file"'];
+const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="agents-in-the-cloud"', "-c", "notice.hide_full_access_warning=true", "-c", 'cli_auth_credentials_store="file"'];
 
 test("reuses home Codex and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const text = `--help 'quoted' $(touch ${home}/injected)\nsecond line`;
-  const notes = "[Attached file copied into the workspace at /tmp/atelier-attachments/my file.txt]";
-  const image = "/tmp/atelier-attachments/image 1.png";
+  const notes = "[Attached file copied into the workspace at /tmp/agents-in-the-cloud-attachments/my file.txt]";
+  const image = "/tmp/agents-in-the-cloud-attachments/image 1.png";
   const [code, output] = await run(codexLaunchScript({ ...empty, text, attachmentNotes: [notes] }, [image]));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--image", image, "--", `${text}\n\n${notes}`]);
@@ -88,12 +88,12 @@ test("registers session-local turn boundary notifications", async () => {
   expect(args).toContain(`hooks={UserPromptSubmit=[{hooks=[{type="command",command=${JSON.stringify(`sh ${shellQuote(command)} started`)}}]}]}`);
 });
 
-test("installs the Atelier syntax theme in CODEX_HOME with terminal palette colors", async () => {
+test("installs the AgentsInTheCloud syntax theme in CODEX_HOME with terminal palette colors", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const [code] = await run(`CODEX_HOME=${shellQuote(`${home}/session-codex`)}\n${codexLaunchScript(empty, [])}`);
   expect(code).toBe(0);
-  const theme = await readFile(`${home}/session-codex/themes/atelier.tmTheme`, "utf8");
-  // Inline code uses palette slot 12 (bright blue), Atelier's accent.
+  const theme = await readFile(`${home}/session-codex/themes/agents-in-the-cloud.tmTheme`, "utf8");
+  // Inline code uses palette slot 12 (bright blue), AgentsInTheCloud's accent.
   expect(theme).toContain("<string>markup.inline.raw.string.markdown, markup.raw.inline.markdown</string><key>settings</key><dict><key>foreground</key><string>#0c000000</string>");
 });
 

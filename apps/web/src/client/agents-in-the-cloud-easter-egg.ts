@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 
-export class AtelierEasterEggController extends Controller<HTMLElement> {
+export class AgentsInTheCloudEasterEggController extends Controller<HTMLElement> {
   static targets = ["rest", "actor"];
   declare readonly restTarget: HTMLElement;
   declare readonly actorTarget: SVGSVGElement;
@@ -21,7 +21,7 @@ export class AtelierEasterEggController extends Controller<HTMLElement> {
   }
 
   finish(event: AnimationEvent): void {
-    if (event.animationName === "atelier-easter-egg-journey") this.reset();
+    if (event.animationName === "agents-in-the-cloud-easter-egg-journey") this.reset();
   }
 
   reset(): void {

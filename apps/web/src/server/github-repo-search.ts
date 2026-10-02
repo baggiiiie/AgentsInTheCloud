@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { discoverHostGitHubToken } from "@atelier/proxy-egress";
-import { escapeHtml, looksLikeProjectSpec } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { discoverHostGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { escapeHtml, looksLikeProjectSpec } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 

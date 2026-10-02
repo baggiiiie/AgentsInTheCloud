@@ -1,7 +1,7 @@
-import { transcriptSlot } from "@atelier/cli-agent/server";
-import { themeAppearance, type AtelierTheme } from "@atelier/shared/theme";
+import { transcriptSlot } from "@agents-in-the-cloud/cli-agent/server";
+import { themeAppearance, type AgentsInTheCloudTheme } from "@agents-in-the-cloud/shared/theme";
 
-export const claudeThemeName = "atelier";
+export const claudeThemeName = "agents-in-the-cloud";
 
 // Claude's own diff and selection backgrounds; the palette has no role for them.
 const pinnedBackgrounds = {
@@ -29,13 +29,13 @@ const slot = (index: number) => `ansi256(${index})`;
 
 /**
  * Claude's markdown ignores overrides and reads the base theme, whose inline code
- * is bright blue: Atelier's accent. Atelier's palette assigns the same roles in
+ * is bright blue: AgentsInTheCloud's accent. AgentsInTheCloud's palette assigns the same roles in
  * every theme, so dark-ansi also suits light themes; only pinned backgrounds differ.
  */
-export function claudeAtelierTheme(theme: AtelierTheme) {
+export function claudeAgentsInTheCloudTheme(theme: AgentsInTheCloudTheme) {
   const { muted, surface, text } = transcriptSlot;
   return {
-    name: "Atelier",
+    name: "AgentsInTheCloud",
     base: "dark-ansi",
     overrides: {
       subtle: slot(muted),

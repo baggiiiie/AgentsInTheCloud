@@ -2,8 +2,8 @@ import { expect, test } from "bun:test";
 
 const installer = await Bun.file(new URL("./install.sh", import.meta.url)).text();
 
-function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean; uninstallAnswer?: string; uninstallFails?: boolean; uninstallRequestFails?: boolean; inventoryFails?: boolean; volumeOnly?: boolean; volumeRemovalFails?: boolean; initiallyStopped?: boolean } = {}, args: string[] = []) {
-  const logPath = `/tmp/atelier-install-test-${crypto.randomUUID()}.log`;
+function run(options: { systemState?: "restarting" | "exited"; nonRoot?: boolean; denySudo?: boolean; mac?: boolean; wsl?: boolean; installed?: boolean; old?: boolean; legacyAtelier?: boolean; pullFails?: boolean; appFails?: boolean; retryUpdateRequest?: boolean; rejectUpdateRequest?: boolean; pendingHealth?: boolean; missingFilesystem?: boolean; loadable?: boolean; uninstallAnswer?: string; uninstallFails?: boolean; uninstallRequestFails?: boolean; inventoryFails?: boolean; volumeOnly?: boolean; volumeRemovalFails?: boolean; initiallyStopped?: boolean } = {}, args: string[] = []) {
+  const logPath = `/tmp/agents-in-the-cloud-install-test-${crypto.randomUUID()}.log`;
   const mock = `
 mktemp() { echo "${logPath}"; }
 sleep() { command sleep 0.01; }
@@ -29,16 +29,17 @@ docker() {
   case "$1 \${2:-}" in
     'container inspect')
       case "$3" in
-        atelier-system) return ${options.installed ? 0 : 1} ;;
-        atelier) return ${options.old ? 0 : 1} ;;
+        agents-in-the-cloud-system) return ${options.installed ? 0 : 1} ;;
+        agents-in-the-cloud) return ${options.old ? 0 : 1} ;;
+        atelier-system|atelier) return ${options.legacyAtelier ? 0 : 1} ;;
       esac ;;
     'pull '*) return ${options.pullFails ? 1 : 0} ;;
-    'volume ls') if [ "$volume_present" -eq 1 ] && [ ! -e "${logPath}.volume-removed" ]; then echo atelier-system; fi; return 0 ;;
+    'volume ls') if [ "$volume_present" -eq 1 ] && [ ! -e "${logPath}.volume-removed" ]; then echo agents-in-the-cloud-system; fi; return 0 ;;
     'volume rm')
       if [ "${options.volumeRemovalFails ? 1 : 0}" -eq 1 ]; then return 1; fi
       touch "${logPath}.volume-removed"; return 0 ;;
-    'ps -a') if [ "$container_present" -eq 1 ] && [ ! -e "${logPath}.container-removed" ]; then echo atelier-system; fi; return 0 ;;
-    'rm atelier-system') touch "${logPath}.container-removed"; return 0 ;;
+    'ps -a') if [ "$container_present" -eq 1 ] && [ ! -e "${logPath}.container-removed" ]; then echo agents-in-the-cloud-system; fi; return 0 ;;
+    'rm agents-in-the-cloud-system') touch "${logPath}.container-removed"; return 0 ;;
     'exec --user')
       if [[ "$*" == *http://supervisor/uninstall* ]]; then
         if [[ "$*" == *'method:"POST"'* ]]; then return ${options.uninstallRequestFails ? 1 : 0}; fi
@@ -48,7 +49,7 @@ docker() {
       if [[ "$*" == *3001/status* ]]; then
         printf '${options.uninstallFails ? "failed\\nvolume is in use" : "complete\\nManaged resources deleted"}\\n'; return 0
       fi ;;
-    'exec atelier-system')
+    'exec agents-in-the-cloud-system')
       if [[ "$*" == *3001/update-channel* ]]; then
         if [ "${options.rejectUpdateRequest ? 1 : 0}" -eq 1 ]; then return 2; fi
         if [ "${options.retryUpdateRequest ? 1 : 0}" -eq 1 ] && [ ! -e "${logPath}.update-attempted" ]; then
@@ -68,7 +69,7 @@ docker() {
           printf 'starting\\nAn activity the installer has never heard of\\n42\\n'
           return
         fi
-        printf '${options.appFails ? 'failed\\nApp health failed\\n\\n\\n\\n\\nApp exited' : 'ready\\nAtelier is ready\\n\\nhttps://app.example/custom-path\\n\\n\\n'}\\n'
+        printf '${options.appFails ? 'failed\\nApp health failed\\n\\n\\n\\n\\nApp exited' : 'ready\\nAgentsInTheCloud is ready\\n\\nhttps://app.example/custom-path\\n\\n\\n'}\\n'
         return
       fi ;;
     'logs --tail') echo 'supervisor startup failed: io.weight unavailable';;
@@ -77,7 +78,7 @@ docker() {
 }
 `;
   const script = installer
-    .replace("tee /etc/modules-load.d/atelier-system.conf", "tee /dev/null")
+    .replace("tee /etc/modules-load.d/agents-in-the-cloud-system.conf", "tee /dev/null")
     // Mock terminal availability and answers; these tests exercise Docker orchestration.
     .replace('{ [ -t 0 ]; } 2>/dev/null <"$prompt_input"', "true")
     .replace(
@@ -99,18 +100,18 @@ test("fresh install launches privileged System with persistent named volume and 
   const result = run({}, ["--system-image", "test/system:v1", "--app-image", "test/app:v1"]);
   expect(result.status).toBe(0);
   expect(result.output).toContain("DOCKER pull test/system:v1");
-  expect(result.output).toContain("--name atelier-system --hostname atelier-system --privileged --cgroupns=host --restart unless-stopped --stop-timeout 120 --tmpfs /run --mount source=atelier-system,target=/data --publish 127.0.0.1::3080 test/system:v1 --app-image test/app:v1 --access-mode tailscale");
+  expect(result.output).toContain("--name agents-in-the-cloud-system --hostname agents-in-the-cloud-system --privileged --cgroupns=host --restart unless-stopped --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1::3080 test/system:v1 --app-image test/app:v1 --access-mode tailscale");
   expect(result.output).not.toContain("DOCKER stop");
-  expect(result.output).toContain("DOCKER exec atelier-system bun -e");
+  expect(result.output).toContain("DOCKER exec agents-in-the-cloud-system bun -e");
 });
 
 test("replacement downloads before stopping and retains volume", () => {
   const result = run({ installed: true });
   expect(result.status).toBe(0);
   const commands = result.output;
-  expect(commands.indexOf("DOCKER pull")).toBeLessThan(commands.indexOf("DOCKER stop --time 120 atelier-system"));
-  expect(commands.indexOf("DOCKER stop")).toBeLessThan(commands.indexOf("DOCKER rm atelier-system"));
-  expect(commands).toContain("--mount source=atelier-system,target=/data");
+  expect(commands.indexOf("DOCKER pull")).toBeLessThan(commands.indexOf("DOCKER stop --time 120 agents-in-the-cloud-system"));
+  expect(commands.indexOf("DOCKER stop")).toBeLessThan(commands.indexOf("DOCKER rm agents-in-the-cloud-system"));
+  expect(commands).toContain("--mount source=agents-in-the-cloud-system,target=/data");
   expect(commands).not.toContain("volume rm");
 });
 
@@ -147,7 +148,7 @@ test("invalid action is rejected before Docker changes", () => {
 test("missing filesystem driver fails before image pull or System replacement", () => {
   const result = run({ installed: true, missingFilesystem: true });
   expect(result.status).not.toBe(0);
-  expect(result.output).toContain("does not have erofs, which Atelier requires");
+  expect(result.output).toContain("does not have erofs, which AgentsInTheCloud requires");
   expect(result.output).not.toContain("DOCKER pull");
   expect(result.output).not.toContain("DOCKER stop");
 });
@@ -164,7 +165,7 @@ test("supervisor failure stops System without removing its container or data", (
   const result = run({ appFails: true });
   expect(result.status).not.toBe(0);
   expect(result.output).toContain("3001/status");
-  expect(result.output).toContain("DOCKER stop --time 120 atelier-system");
+  expect(result.output).toContain("DOCKER stop --time 120 agents-in-the-cloud-system");
   expect(result.output).not.toContain("DOCKER rm");
   expect(result.output).not.toContain("volume rm");
 });
@@ -232,7 +233,7 @@ for (const state of ["restarting", "exited"] as const) {
     test(`${action} stops waiting and shows container logs when System is ${state}`, () => {
       const result = run({ installed: true, systemState: state }, ["--action", action]);
       expect(result.status).toBe(1);
-      expect(result.output).toContain(`Atelier services are ${state}`);
+      expect(result.output).toContain(`AgentsInTheCloud services are ${state}`);
       expect(result.output).toContain("supervisor startup failed: io.weight unavailable");
       expect(result.output).not.toContain("Waiting for the supervisor");
       expect(result.output).not.toContain("http://127.0.0.1:3001/status");
@@ -244,7 +245,7 @@ for (const action of ["open", "connect"]) {
   test(`${action} stops an existing System when its status reports failure`, () => {
     const result = run({ installed: true, appFails: true }, ["--action", action]);
     expect(result.status).toBe(1);
-    expect(result.output).toContain("DOCKER stop --time 120 atelier-system");
+    expect(result.output).toContain("DOCKER stop --time 120 agents-in-the-cloud-system");
     expect(result.output).not.toContain("DOCKER rm");
   });
 }
@@ -267,7 +268,7 @@ test("update retries an unavailable supervisor even when the saved app failed", 
 test("update fails explicitly when the supervisor rejects the update request", () => {
   const result = run({ installed: true, rejectUpdateRequest: true }, ["--action", "update"]);
   expect(result.status).not.toBe(0);
-  expect(result.output).toContain("Could not request the Atelier app update");
+  expect(result.output).toContain("Could not request the AgentsInTheCloud app update");
   expect(result.output).not.toContain("Open https://");
 });
 
@@ -300,14 +301,14 @@ test("uninstall cancellation warns with the exact inventory and deletes nothing"
 });
 
 test("confirmed uninstall delegates cleanup, polls status, then removes only System and its volume", () => {
-  const result = run({ installed: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  const result = run({ installed: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD" }, ["--uninstall"]);
   expect(result.status).toBe(0);
   expect(result.output).toContain("Uninstalled. System and all installation data have been removed");
-  expect(result.output).toContain("DOCKER exec --user root atelier-system");
-  expect(result.output).toContain("/run/atelier-system/uninstall.sock");
-  expect(result.output).toContain("DOCKER stop --time 120 atelier-system");
-  expect(result.output).toContain("DOCKER rm atelier-system");
-  expect(result.output).toContain("DOCKER volume rm atelier-system");
+  expect(result.output).toContain("DOCKER exec --user root agents-in-the-cloud-system");
+  expect(result.output).toContain("/run/agents-in-the-cloud-system/uninstall.sock");
+  expect(result.output).toContain("DOCKER stop --time 120 agents-in-the-cloud-system");
+  expect(result.output).toContain("DOCKER rm agents-in-the-cloud-system");
+  expect(result.output).toContain("DOCKER volume rm agents-in-the-cloud-system");
   // Background run_quiet commands are captured in the log after foreground output.
   expect(result.output.indexOf("http://supervisor/uninstall")).toBeLessThan(result.output.indexOf("DOCKER stop --time 120"));
   expect(result.output).not.toContain("DOCKER system prune");
@@ -316,7 +317,7 @@ test("confirmed uninstall delegates cleanup, polls status, then removes only Sys
 
 for (const option of ["uninstallFails", "uninstallRequestFails", "inventoryFails"] as const) {
   test(`${option} retains the outer System container and volume`, () => {
-    const result = run({ installed: true, uninstallAnswer: "DELETE ATELIER", [option]: true }, ["--uninstall"]);
+    const result = run({ installed: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD", [option]: true }, ["--uninstall"]);
     expect(result.status).toBe(1);
     expect(result.output).not.toContain("DOCKER stop");
     expect(result.output).not.toContain("DOCKER rm");
@@ -327,22 +328,22 @@ for (const option of ["uninstallFails", "uninstallRequestFails", "inventoryFails
 test("uninstall restarts a stopped supervisor to obtain its inventory, without downloading anything", () => {
   const result = run({ installed: true, initiallyStopped: true, uninstallAnswer: "no" }, ["--uninstall"]);
   expect(result.status).toBe(0);
-  expect(result.output).toContain("DOCKER start atelier-system");
+  expect(result.output).toContain("DOCKER start agents-in-the-cloud-system");
   expect(result.output).toContain("8 workspaces");
   expect(result.output).not.toContain("DOCKER pull");
 });
 
 test("uninstall can finish volume removal after System was already removed, with explicit unknown-count warning", () => {
-  const result = run({ volumeOnly: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  const result = run({ volumeOnly: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD" }, ["--uninstall"]);
   expect(result.status).toBe(0);
   expect(result.output).toContain("Workspace count unavailable");
   expect(result.output).not.toContain("0 workspaces");
-  expect(result.output).toContain("DOCKER volume rm atelier-system");
+  expect(result.output).toContain("DOCKER volume rm agents-in-the-cloud-system");
   expect(result.output).not.toContain("DOCKER exec");
 });
 
 test("uninstall does not claim success if installation volume removal fails", () => {
-  const result = run({ volumeOnly: true, volumeRemovalFails: true, uninstallAnswer: "DELETE ATELIER" }, ["--uninstall"]);
+  const result = run({ volumeOnly: true, volumeRemovalFails: true, uninstallAnswer: "DELETE AGENTSINTHECLOUD" }, ["--uninstall"]);
   expect(result.status).toBe(1);
   expect(result.output).toContain("Deleting installation storage failed");
   expect(result.output).not.toContain("Uninstalled. System");
@@ -354,5 +355,22 @@ test("uninstall is a no-op when no System container or volume remains", () => {
   expect(result.output).toContain("Nothing to uninstall");
   expect(result.output).not.toContain("DOCKER run");
   expect(result.output).not.toContain("DOCKER pull");
-  expect(result.output).not.toContain("Type DELETE ATELIER");
+  expect(result.output).not.toContain("Type DELETE AGENTSINTHECLOUD");
+});
+
+
+test("beta installer refuses Atelier without adopting or deleting its resources", () => {
+  const result = run({ legacyAtelier: true }, ["--action", "install"]);
+  expect(result.status).not.toBe(0);
+  expect(result.output).toContain("Use the Atelier installer with --uninstall first");
+  expect(result.output).not.toContain("DOCKER run");
+  expect(result.output).not.toContain("DOCKER rm");
+  expect(result.output).not.toContain("DOCKER volume rm");
+});
+
+test("new-product uninstall does not remove a legacy Atelier installation", () => {
+  const result = run({ legacyAtelier: true }, ["--uninstall"]);
+  expect(result.status).toBe(0);
+  expect(result.output).not.toContain("DOCKER rm atelier");
+  expect(result.output).not.toContain("DOCKER volume rm atelier");
 });

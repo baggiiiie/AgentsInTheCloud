@@ -1,8 +1,8 @@
 import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
-import type { DeleteCurrentWorkspaceResult } from "@atelier/shared";
-import { AtelierCoreError } from "@atelier/core";
-import { isGitProjectInit, projectSecretPathPermissionSchema, projectWorkspaceInitWithSettings, projectWorkspaceSettingsSchema, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, type GitProjectInitInstruction, type ProjectWorkspaceSettings } from "@atelier/projects";
-import { getWorkspaceInit, type WorkspaceInitInstruction, type WorkspaceProvisionStep } from "@atelier/workspace";
+import type { DeleteCurrentWorkspaceResult } from "@agents-in-the-cloud/shared";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
+import { isGitProjectInit, projectSecretPathPermissionSchema, projectWorkspaceInitWithSettings, projectWorkspaceSettingsSchema, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, type GitProjectInitInstruction, type ProjectWorkspaceSettings } from "@agents-in-the-cloud/projects";
+import { getWorkspaceInit, type WorkspaceInitInstruction, type WorkspaceProvisionStep } from "@agents-in-the-cloud/workspace";
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { createTmuxBashTool } from "./bash-tmux.ts";
@@ -50,14 +50,14 @@ export function createOnboardingTools(workspaceId: string, conversationId: strin
   const loadInit = deps.getWorkspaceInit ?? getWorkspaceInit;
   async function project() {
     const init = await loadInit(workspaceId);
-    if (!isGitProjectInit(init)) throw new AtelierCoreError("project_required", "This workspace does not belong to a project");
+    if (!isGitProjectInit(init)) throw new AgentsInTheCloudCoreError("project_required", "This workspace does not belong to a project");
     return init;
   }
   async function requireOwnedWorkspace(targetId: string, action: string) {
     const source = await project();
     const target = await loadInit(targetId);
     if (targetId === workspaceId || !isGitProjectInit(target) || target.projectId !== source.projectId || target.createdBy?.workspaceId !== workspaceId || target.createdBy.conversationId !== conversationId) {
-      throw new AtelierCoreError("workspace_access_denied", `You may only ${action} another workspace created by this agent conversation for its own project`);
+      throw new AgentsInTheCloudCoreError("workspace_access_denied", `You may only ${action} another workspace created by this agent conversation for its own project`);
     }
   }
   const bashFactory = deps.createBashTool ?? createTmuxBashTool;
@@ -65,7 +65,7 @@ export function createOnboardingTools(workspaceId: string, conversationId: strin
   return [
     defineTool({
       name: "read_project_settings", label: "Read project settings",
-      description: "Read your workspace's project configuration and revision, including secret metadata and placeholders but never secret values. Repository identity is read-only. An empty Dockerfile uses the repository .atelier/Dockerfile if present, otherwise the default image. To bypass repository customization, supply a Dockerfile containing only FROM atelier-workspace.",
+      description: "Read your workspace's project configuration and revision, including secret metadata and placeholders but never secret values. Repository identity is read-only. An empty Dockerfile uses the repository .agents-in-the-cloud/Dockerfile if present, otherwise the default image. To bypass repository customization, supply a Dockerfile containing only FROM agents-in-the-cloud-workspace.",
       parameters: Type.Object({}, { additionalProperties: false }),
       execute: async () => result(await readProjectWorkspaceSettings((await project()).projectId)),
     }),

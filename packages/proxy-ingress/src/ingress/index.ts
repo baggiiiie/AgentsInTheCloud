@@ -4,7 +4,7 @@ import { createLocalOriginPublisher, type ParentOriginPublisher } from "./parent
 import { adaptLocalAppResponse, localAppHost, translateLocalAppOrigin } from "./local-app.ts";
 import { backendTransport } from "./backend-transport.ts";
 import type { ServerWebSocket } from "bun";
-import { workspaceGatewayErrorHeader, isWorkspaceAppPort, parseWorkspacePortAppKey, workspacePortAppKey, stripHopByHopHeaders, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceHttpAppBackend } from "@atelier/shared";
+import { workspaceGatewayErrorHeader, isWorkspaceAppPort, parseWorkspacePortAppKey, workspacePortAppKey, stripHopByHopHeaders, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceHttpAppBackend } from "@agents-in-the-cloud/shared";
 import { createMemoryOriginIdentityStore, type OriginIdentityStore } from "./origin-identity.ts";
 import { closeWebSocket, maxSocketBufferedBytes, forwardToUpstream } from "./websocket.ts";
 import {
@@ -90,8 +90,8 @@ interface OriginLease {
   target?: string;
 }
 
-const originContextHeader = "x-atelier-origin-context";
-const publicOriginHeader = "x-atelier-public-origin";
+const originContextHeader = "x-agents-in-the-cloud-origin-context";
+const publicOriginHeader = "x-agents-in-the-cloud-public-origin";
 export * from "./parent.ts";
 export * from "./workspace-sockets.ts";
 export * from "./tailscale-serve.ts";
@@ -144,7 +144,7 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
   }
 
   async function startLease(key: string, app: WorkspaceAppRef, protocol: "http" | "https"): Promise<OriginLease> {
-    const scope = publisher.kind === "atelier" ? "nested" : "public";
+    const scope = publisher.kind === "agents-in-the-cloud" ? "nested" : "public";
     const range = publicRange;
     const assignment = await identityStore.assignedPort(app, range, protocol);
     const port = assignment.port;
@@ -345,7 +345,7 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
 async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBackend, request: Request) {
   let headers = stripHopByHopHeaders(request.headers, ["host"]);
   // Give apps one coherent local origin, including frameworks that prefer
-  // forwarded headers to Host. Public routing identity is Atelier metadata only.
+  // forwarded headers to Host. Public routing identity is AgentsInTheCloud metadata only.
   const localHost = localAppHost(backend);
   headers.set("host", localHost);
   headers.set("x-forwarded-host", localHost);
@@ -353,12 +353,12 @@ async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBa
   headers.set("x-forwarded-port", backend.target.port || (backend.target.protocol === "https:" ? "443" : "80"));
   headers.delete("forwarded");
   headers.set(publicOriginHeader, appPublicOrigin(lease, request));
-  headers.delete("x-atelier-parent-origin");
-  headers.delete("x-atelier-parent-workspace");
+  headers.delete("x-agents-in-the-cloud-parent-origin");
+  headers.delete("x-agents-in-the-cloud-parent-workspace");
   const receivingOrigin = receivingAppOrigin(lease, request);
   const sameOrigin = receivingOrigin !== undefined && headers.get("origin") === receivingOrigin;
   const originTranslation = receivingOrigin === undefined ? undefined : translateLocalAppOrigin(backend, headers, receivingOrigin);
-  // Attest the decision to nested Atelier. A foreign Origin could coincidentally
+  // Attest the decision to nested AgentsInTheCloud. A foreign Origin could coincidentally
   // equal a nested listener's localhost address; it must stay foreign at that hop.
   headers.set(originContextHeader, sameOrigin ? headers.get("origin")! : "null");
   if (backend.adaptRequestHeaders) headers = await backend.adaptRequestHeaders(headers, request);
@@ -450,10 +450,10 @@ function finishRequest(lease: OriginLease): void {
 }
 
 export function publicWorkspaceAppOrigin(request: Request): string {
-  return publicAtelierOrigin(request);
+  return publicAgentsInTheCloudOrigin(request);
 }
 
-function publicAtelierOrigin(request: Request): string {
+function publicAgentsInTheCloudOrigin(request: Request): string {
   const context = publicRequestContext(request);
   return `${context.protocol}://${context.host}`;
 }

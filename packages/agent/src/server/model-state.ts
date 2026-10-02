@@ -1,5 +1,5 @@
 import { getConfiguredAgentModels } from "./model-preferences.ts";
-import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@atelier/llm/server";
+import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@agents-in-the-cloud/llm/server";
 
 export interface AgentModelOptionView {
   provider: string;

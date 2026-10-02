@@ -1,4 +1,4 @@
-import { isWorkspacePaneVisible, type WorkspaceClientApplication, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { isWorkspacePaneVisible, type WorkspaceClientApplication, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 type EditorRefreshDetail = { workspaceId: string };
 
 function createFileEditorNavigationController(Controller: WorkspaceClientControllerConstructor): WorkspaceClientControllerConstructor {
@@ -26,7 +26,7 @@ function createFilesRefreshSignalController(Controller: WorkspaceClientControlle
     static values = { workspaceId: String, generation: Number };
     declare readonly workspaceIdValue: string;
     generationValueChanged(): void {
-      window.dispatchEvent(new CustomEvent<EditorRefreshDetail>("atelier:files-refresh", { detail: { workspaceId: this.workspaceIdValue } }));
+      window.dispatchEvent(new CustomEvent<EditorRefreshDetail>("agents-in-the-cloud:files-refresh", { detail: { workspaceId: this.workspaceIdValue } }));
     }
   };
 }
@@ -36,10 +36,10 @@ export function installFileEditorControllers(application: WorkspaceClientApplica
   let loading: Promise<void> | undefined;
   application.register("file-editor", class extends Controller {
     connect(): void {
-      document.addEventListener("atelier:workspace-pane-visible", this.activate);
+      document.addEventListener("agents-in-the-cloud:workspace-pane-visible", this.activate);
       this.activate();
     }
-    disconnect(): void { document.removeEventListener("atelier:workspace-pane-visible", this.activate); }
+    disconnect(): void { document.removeEventListener("agents-in-the-cloud:workspace-pane-visible", this.activate); }
     private readonly activate = (): void => {
       if (!isWorkspacePaneVisible(this.element)) return;
       loading ??= import("./file-editor.ts").then(({ createFileEditorController }) => {

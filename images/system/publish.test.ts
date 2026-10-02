@@ -58,7 +58,7 @@ for (const local of ["amd64", "arm64"]) {
       expect(args).not.toContain("--builder");
     }
     const merge = calls.find(({ args }) => args.includes("imagetools") && args.includes("create"))!;
-    expect(merge.args.slice(-2)).toEqual(["amd64", "arm64"].map(arch => `ghcr.io/lucasmeijer/atelier-system@${digest(arch)}`));
+    expect(merge.args.slice(-2)).toEqual(["amd64", "arm64"].map(arch => `ghcr.io/lucasmeijer/agents-in-the-cloud-system@${digest(arch)}`));
     expect(calls.some(({ args }) => args.some(arg => /binfmt|qemu|:latest|:stable/.test(arg)))).toBe(false);
     expect(calls.find(({ args }) => args.includes("login"))?.input).toBe("test-package-token");
     expect(calls.flatMap(call => call.args)).not.toContain("test-package-token");

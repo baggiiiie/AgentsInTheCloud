@@ -1,11 +1,11 @@
-import { type AtelierEventBus } from "@atelier/core";
+import { type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { maybeNameAgentFromPrompt } from "./agent-title-suggestion.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 import { getWorkspaceAgentRuntime } from "./runtime.ts";
 import { type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 export interface AgentRouteOptions {
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
   getRuntime?: typeof getWorkspaceAgentRuntime;
   suggestTitleFromPrompt?: typeof maybeNameAgentFromPrompt;
 }

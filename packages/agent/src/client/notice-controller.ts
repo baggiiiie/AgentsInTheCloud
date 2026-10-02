@@ -1,4 +1,4 @@
-import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 
 export function createAgentNoticeController(Controller: StimulusControllerConstructor) {
   return class AgentNoticeController extends Controller {

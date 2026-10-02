@@ -110,7 +110,7 @@ func TestForwarding(t *testing.T) {
 		if r.Header.Get("X-Forwarded-Host") != r.Host || r.Header.Get("X-Forwarded-Proto") != "https" {
 			t.Error("forwarded metadata lost")
 		}
-		if r.Header.Get("X-Atelier-Parent-Origin") != "https://outer.example" {
+		if r.Header.Get("X-AgentsInTheCloud-Parent-Origin") != "https://outer.example" {
 			t.Error("nested metadata lost")
 		}
 		body, err := io.ReadAll(r.Body)
@@ -133,7 +133,7 @@ func TestForwarding(t *testing.T) {
 	r.Header.Set("Cookie", "session=app")
 	r.Header.Set("X-Forwarded-Host", r.Host)
 	r.Header.Set("X-Forwarded-Proto", "https")
-	r.Header.Set("X-Atelier-Parent-Origin", "https://outer.example")
+	r.Header.Set("X-AgentsInTheCloud-Parent-Origin", "https://outer.example")
 	r.Header.Set("Connection", "X-Hop")
 	r.Header.Set("X-Hop", "remove")
 	w := httptest.NewRecorder()

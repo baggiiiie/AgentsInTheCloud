@@ -1,4 +1,4 @@
-import { isJsonObject } from "@atelier/core";
+import { isJsonObject } from "@agents-in-the-cloud/core";
 import type { AgentModelRequestTransform } from "./delegation.ts";
 
 /** Pi invokes conversion then payload preparation serially for each model request.

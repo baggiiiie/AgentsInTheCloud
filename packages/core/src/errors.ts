@@ -1,12 +1,12 @@
 import type { JsonObject } from "./json.ts";
 
-export interface AtelierError {
+export interface AgentsInTheCloudError {
   code: string;
   message: string;
   details?: JsonObject;
 }
 
-export class AtelierCoreError extends Error {
+export class AgentsInTheCloudCoreError extends Error {
   readonly code: string;
   readonly details?: JsonObject;
 
@@ -17,6 +17,6 @@ export class AtelierCoreError extends Error {
   }
 }
 
-export function invalidArguments(message: string): AtelierCoreError {
-  return new AtelierCoreError("invalid_arguments", message);
+export function invalidArguments(message: string): AgentsInTheCloudCoreError {
+  return new AgentsInTheCloudCoreError("invalid_arguments", message);
 }

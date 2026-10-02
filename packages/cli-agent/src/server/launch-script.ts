@@ -1,5 +1,5 @@
-import { shellQuote } from "@atelier/core";
-import { workspaceRoot } from "@atelier/workspace";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 
 /** Install once in shared home, then launch in tmux with visible startup diagnostics. */
 export function cliLaunchScript(options: { executable: string; label: string; npmPackage: string; version?: string; installDirectory?: string; args: string[]; setup?: string }): string {
@@ -34,8 +34,8 @@ cd ${shellQuote(workspaceRoot)}
 }
 
 /**
- * Shell lines for `setup` that write a file Atelier owns, such as an agent theme.
- * Rewritten on every launch so changes ship with Atelier. `path` is a shell expression.
+ * Shell lines for `setup` that write a file AgentsInTheCloud owns, such as an agent theme.
+ * Rewritten on every launch so changes ship with AgentsInTheCloud. `path` is a shell expression.
  */
 export function writeFileScript(path: string, content: string): string {
   return `mkdir -p "$(dirname ${path})"

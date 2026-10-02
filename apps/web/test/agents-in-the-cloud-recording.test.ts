@@ -6,9 +6,9 @@ import {
 	DEFAULT_HUMAN_TIMINGS,
 	buildFfmpegArgs,
 	normalizeTimings,
-	recordAtelierDemo,
+	recordAgentsInTheCloudDemo,
 	recordingPaths,
-} from "../demo/recording/atelier-recording.ts";
+} from "../demo/recording/agents-in-the-cloud-recording.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -16,7 +16,7 @@ afterAll(async () => {
 	await Promise.all(temporaryDirectories.map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
-describe("Atelier recording helpers", () => {
+describe("AgentsInTheCloud recording helpers", () => {
 	test("normalizes partial timing overrides and rejects invalid values", () => {
 		expect(normalizeTimings({ keyDelayMs: 12, afterActionMs: 0 })).toEqual({
 			...DEFAULT_HUMAN_TIMINGS,
@@ -61,13 +61,13 @@ describe("Atelier recording helpers", () => {
 });
 
 test("a failed scenario preserves diagnostics and rethrows the original failure", async () => {
-	const artifactRoot = await mkdtemp(join(tmpdir(), "atelier-recording-failure-"));
+	const artifactRoot = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-recording-failure-"));
 	temporaryDirectories.push(artifactRoot);
 	const originalFailure = new Error("intentional scenario failure");
 
 	let caught: unknown;
 	try {
-		await recordAtelierDemo(
+		await recordAgentsInTheCloudDemo(
 			{
 				name: "failure-fixture",
 				artifactRoot,

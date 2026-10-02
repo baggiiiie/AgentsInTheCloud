@@ -1,6 +1,6 @@
-import { designSystemStaticFiles } from "@atelier/design-system/assets";
-import type { StaticFileContribution } from "@atelier/shared";
-import { workspaceProvisioningStaticFiles } from "@atelier/workspace/server/provisioning";
+import { designSystemStaticFiles } from "@agents-in-the-cloud/design-system/assets";
+import type { StaticFileContribution } from "@agents-in-the-cloud/shared";
+import { workspaceProvisioningStaticFiles } from "@agents-in-the-cloud/workspace/server/provisioning";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 
 export type StaticFileEntry = StaticFileContribution;

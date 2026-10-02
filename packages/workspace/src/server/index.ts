@@ -2,26 +2,26 @@ import { ensureSharedHome } from "../home.ts";
 import { fileURLToPath } from "node:url";
 import { syncWorkspaceDocs } from "./workspace-docs.ts";
 import {
-  atelierDataPath,
-  dockerHostAtelierDataPath,
-  getAtelierRuntimeContext,
-} from "@atelier/core";
-import type { WorkspaceModule } from "@atelier/shared";
+  agentsInTheCloudDataPath,
+  dockerHostAgentsInTheCloudDataPath,
+  getAgentsInTheCloudRuntimeContext,
+} from "@agents-in-the-cloud/core";
+import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
 
 const repositoryRoot = fileURLToPath(new URL("../../../../", import.meta.url));
-const docsMountPath = "/opt/atelier/docs";
+const docsMountPath = "/opt/agents-in-the-cloud/docs";
 
-export const atelierServerModule: WorkspaceModule = {
+export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "workspace",
   async initialize({ events }) {
     await ensureSharedHome();
-    const runtime = getAtelierRuntimeContext();
-    await syncWorkspaceDocs(repositoryRoot, atelierDataPath(runtime, "docs"));
+    const runtime = getAgentsInTheCloudRuntimeContext();
+    await syncWorkspaceDocs(repositoryRoot, agentsInTheCloudDataPath(runtime, "docs"));
     events.on("workspace_plan_prepare", ({ plan }) => {
       if (plan.mounts.some((mount) => mount.target === docsMountPath)) return;
       plan.mounts.push({
         type: "bind",
-        source: dockerHostAtelierDataPath(runtime, "docs"),
+        source: dockerHostAgentsInTheCloudDataPath(runtime, "docs"),
         target: docsMountPath,
         readonly: true,
       });

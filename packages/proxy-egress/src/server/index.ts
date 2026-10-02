@@ -1,5 +1,5 @@
-import { listWorkspaces } from "@atelier/workspace";
-import type { WorkspaceModule } from "@atelier/shared";
+import { listWorkspaces } from "@agents-in-the-cloud/workspace";
+import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { ensureWorkspaceEgressProxy, registerWorkspaceProxyEvents } from "../egress/egress-proxy.ts";
 
 export const proxyEgressServerModule: WorkspaceModule = {
@@ -10,7 +10,7 @@ export const proxyEgressServerModule: WorkspaceModule = {
   },
 };
 
-export { proxyEgressServerModule as atelierServerModule };
+export { proxyEgressServerModule as agentsInTheCloudServerModule };
 export {
   registerWorkspaceSubscriptionSecrets,
   registerWorkspaceRequestTransform,

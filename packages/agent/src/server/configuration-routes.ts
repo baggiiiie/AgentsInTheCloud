@@ -1,6 +1,6 @@
-import { AtelierCoreError, readJsonObject, requestAcceptsJson } from "@atelier/core";
-import { turboStreamResponse } from "@atelier/shared";
-import { parseModelRef, setAgentModelThinkingLevel } from "@atelier/llm/server";
+import { AgentsInTheCloudCoreError, readJsonObject, requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { parseModelRef, setAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { parseAgentServiceTier } from "./service-tier.ts";
 
@@ -11,7 +11,7 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     const value = json ? (await readJsonObject(request)).model : (await request.formData()).get("model");
     const model = parseModelRef(String(value ?? ""));
     if (!model) {
-      if (json) throw new AtelierCoreError("invalid_arguments", "valid model is required");
+      if (json) throw new AgentsInTheCloudCoreError("invalid_arguments", "valid model is required");
       return turboStreamResponse("");
     }
     const runtime = await requireAgentRuntime(params[0], params[1], options);
@@ -33,7 +33,7 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     const value = json ? (await readJsonObject(request)).level : (await request.formData()).get("level");
     const level = String(value ?? "");
     if (!level) {
-      if (json) throw new AtelierCoreError("invalid_arguments", "level is required");
+      if (json) throw new AgentsInTheCloudCoreError("invalid_arguments", "level is required");
       return turboStreamResponse("");
     }
     const runtime = await requireAgentRuntime(params[0], params[1], options);

@@ -1,1 +1,1 @@
-export { browserWorkspaceModule, browserWorkspaceModule as atelierServerModule } from "./web.ts";
+export { browserWorkspaceModule, browserWorkspaceModule as agentsInTheCloudServerModule } from "./web.ts";

@@ -12,14 +12,14 @@
   ],
   "files": [
     {
-      "from": "workspace-image/atelier-desktop.py",
-      "to": "/usr/local/bin/atelier-desktop",
+      "from": "workspace-image/agents-in-the-cloud-desktop.py",
+      "to": "/usr/local/bin/agents-in-the-cloud-desktop",
       "mode": "0755",
       "afterRun": true
     },
     {
       "from": "workspace-image/openbox.xml",
-      "to": "/opt/atelier/desktop/openbox.xml",
+      "to": "/opt/agents-in-the-cloud/desktop/openbox.xml",
       "afterRun": true
     }
   ],

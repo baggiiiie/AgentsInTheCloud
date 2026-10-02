@@ -23,11 +23,11 @@ import (
 
 // Keep in sync with packages/shared/src/workspace-gateway.ts.
 const gatewayPort = 2999
-const hostHeader = "X-Atelier-Gateway-Host"
-const tokenHeader = "X-Atelier-Gateway-Token"
-const portHeader = "X-Atelier-Gateway-Port"
-const protocolHeader = "X-Atelier-Gateway-Protocol"
-const errorHeader = "X-Atelier-Gateway-Error"
+const hostHeader = "X-AgentsInTheCloud-Gateway-Host"
+const tokenHeader = "X-AgentsInTheCloud-Gateway-Token"
+const portHeader = "X-AgentsInTheCloud-Gateway-Port"
+const protocolHeader = "X-AgentsInTheCloud-Gateway-Protocol"
+const errorHeader = "X-AgentsInTheCloud-Gateway-Error"
 
 func targetPort(value string) (int, error) {
 	for _, c := range value {
@@ -118,8 +118,8 @@ func newGateway(token string, transport http.RoundTripper) http.Handler {
 
 func main() {
 	listen := flag.String("listen", fmt.Sprintf("0.0.0.0:%d", gatewayPort), "gateway listener (port 0 for protocol tests)")
-	tokenFile := flag.String("token-file", "/etc/atelier-workspace-gateway-token", "workspace credential file")
-	readyFile := flag.String("ready-file", "/.atelier/ready", "startup readiness marker")
+	tokenFile := flag.String("token-file", "/etc/agents-in-the-cloud-workspace-gateway-token", "workspace credential file")
+	readyFile := flag.String("ready-file", "/.agents-in-the-cloud/ready", "startup readiness marker")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatal("unexpected gateway arguments")

@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 export type ToggleData = Record<string, string | number | boolean | undefined>;
 export type ToggleVariant = "button" | "text" | "text-subtle";

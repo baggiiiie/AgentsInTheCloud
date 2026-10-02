@@ -10,11 +10,11 @@ test("project Dockerfile persists, survives repository edits, validates and clea
     const file = join(dir, "projects.json");
     const { project } = await addProject("/tmp/example", file);
     expect(project.dockerfile).toBeUndefined();
-    const dockerfile = "FROM atelier-workspace\nRUN echo custom\n";
+    const dockerfile = "FROM agents-in-the-cloud-workspace\nRUN echo custom\n";
     await setProjectDockerfile(project.id, dockerfile, file);
     await updateProject(project.id, { name: "Renamed", spec: "/tmp/example" }, file);
     expect((await listProjects(file)).projects[0]!.dockerfile).toBe(dockerfile);
-    await expect(setProjectDockerfile(project.id, "FROM ubuntu", file)).rejects.toThrow("FROM atelier-workspace");
+    await expect(setProjectDockerfile(project.id, "FROM ubuntu", file)).rejects.toThrow("FROM agents-in-the-cloud-workspace");
     expect((await listProjects(file)).projects[0]!.dockerfile).toBe(dockerfile);
     await setProjectDockerfile(project.id, " \n", file);
     expect((await listProjects(file)).projects[0]!.dockerfile).toBeUndefined();

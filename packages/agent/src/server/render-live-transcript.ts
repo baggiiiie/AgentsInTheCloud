@@ -1,4 +1,4 @@
-import { escapeHtml, liveCollection, type LiveRegion } from "@atelier/shared";
+import { escapeHtml, liveCollection, type LiveRegion } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, type AgentRenderContext } from "./render-context.ts";
 import { renderModelContextEntries, renderTranscriptItem, type AgentModelContextView } from "./render-transcript.ts";
 import type { TranscriptItem, WorkingTranscriptItem } from "./transcript.ts";

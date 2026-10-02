@@ -1,10 +1,10 @@
-import { escapeHtml } from "@atelier/shared";
-import { inlineDesignSystemCss } from "@atelier/design-system/styles/server";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { inlineDesignSystemCss } from "@agents-in-the-cloud/design-system/styles/server";
 import type { DesktopStatus } from "./runtime.ts";
 
 let assets: Promise<{ script: string; css: string }> | undefined;
 
-// The viewer lives on its workspace ingress origin, not Atelier's UI origin.
+// The viewer lives on its workspace ingress origin, not AgentsInTheCloud's UI origin.
 // Bundle once per server process so noVNC and Stimulus need no CDN or workspace install.
 function viewerAssets() {
   return assets ??= (async () => {

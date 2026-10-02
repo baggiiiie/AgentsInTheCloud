@@ -1,12 +1,12 @@
 import { posix } from "node:path";
-import { workspaceFileOpenUrl } from "@atelier/shared";
+import { workspaceFileOpenUrl } from "@agents-in-the-cloud/shared";
 
-interface AtelierFilePosition {
+interface AgentsInTheCloudFilePosition {
   line?: number;
   column?: number;
 }
 
-export function atelierFileHref(workspaceId: string, rawHref: string, sourcePath?: string): string | undefined {
+export function agentsInTheCloudFileHref(workspaceId: string, rawHref: string, sourcePath?: string): string | undefined {
   let url: URL;
   try {
     url = new URL(rawHref);
@@ -21,7 +21,7 @@ export function atelierFileHref(workspaceId: string, rawHref: string, sourcePath
     if (!relativePath) return undefined;
     return workspaceFileOpenUrl(workspaceId, posix.resolve(posix.dirname(sourcePath), relativePath));
   }
-  if (url.protocol !== "atelier:" || url.hostname !== "file") return undefined;
+  if (url.protocol !== "agents-in-the-cloud:" || url.hostname !== "file") return undefined;
 
   let path: string;
   try {
@@ -29,7 +29,7 @@ export function atelierFileHref(workspaceId: string, rawHref: string, sourcePath
   } catch {
     return undefined;
   }
-  const position: AtelierFilePosition = {};
+  const position: AgentsInTheCloudFilePosition = {};
   for (const name of ["line", "column"] as const) {
     const value = url.searchParams.get(name);
     if (value && /^\d+$/.test(value)) position[name] = Number(value);

@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/prompt",
+  "name": "@agents-in-the-cloud/prompt",
   "private": true,
   "type": "module",
   "exports": {
@@ -7,10 +7,10 @@
     "./client": "./src/client/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/transcription": "workspace:*",
-    "@atelier/workspace": "workspace:*"
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/transcription": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*"
   }
 }

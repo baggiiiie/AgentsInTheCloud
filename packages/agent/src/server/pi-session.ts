@@ -5,19 +5,19 @@ import { observeExtensionStatusEvents, type ExtensionStatusEvent } from "./exten
 import { attachModelRequestPipeline } from "./model-request-pipeline.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { shellQuote } from "@atelier/core";
-import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import { execWorkspaceCommand, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { createAgentSession, SessionManager, SettingsManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
-import { createPiModelRuntime } from "@atelier/llm/server";
+import { createPiModelRuntime } from "@agents-in-the-cloud/llm/server";
 import type { WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
 import { compactionKeepRecentTokens } from "./runtime-status.ts";
 import { AgentServiceTierState, modelRuntimeWithServiceTiers, supportsFastMode, type AgentServiceTier } from "./service-tier.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
-import { createAtelierResourceLoader, prepareAppendedAtelierInstructions } from "./system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader, prepareAppendedAgentsInTheCloudInstructions } from "./system-prompt.ts";
 import { createWorkspaceAgentTools } from "./tools.ts";
 import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import type { AgentToolDefinitionView } from "./render-transcript.ts";
@@ -38,7 +38,7 @@ interface InitialSessionSettings {
 }
 
 async function loadWorkspaceAgentsFiles(workspaceId: string): Promise<Array<{ path: string; content: string }>> {
-  const agentsPaths = [`${workspaceRoot}/AGENTS.md`, `${workspaceRoot}/.atelier/AGENTS.md`];
+  const agentsPaths = [`${workspaceRoot}/AGENTS.md`, `${workspaceRoot}/.agents-in-the-cloud/AGENTS.md`];
   const agentsFiles: Array<{ path: string; content: string }> = [];
 
   for (const path of agentsPaths) {
@@ -73,7 +73,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
     loadWorkspaceSkills(agent.workspaceId),
   ]);
   const preparation = await agentDelegation?.prepare({ agent, events: options.events });
-  const appendSystemPrompt = await prepareAppendedAtelierInstructions(options.events, agent.workspaceId, agent.conversationId, preparation?.prompt);
+  const appendSystemPrompt = await prepareAppendedAgentsInTheCloudInstructions(options.events, agent.workspaceId, agent.conversationId, preparation?.prompt);
   const sessionSettings = { compaction: { enabled: true, keepRecentTokens: compactionKeepRecentTokens } };
   if (defaultModel) Object.assign(sessionSettings, { defaultProvider: defaultModel.provider, defaultModel: defaultModel.id });
   const sessionManager = SessionManager.open(agent.path, dirname(agent.path), workspaceRoot);
@@ -92,7 +92,7 @@ export async function createPiSession(agent: WorkspaceAgentConversationInfo, opt
     modelRuntime: modelRuntimeWithServiceTiers(modelRuntime, serviceTiers),
     model: initial.model ?? (inheritedModel ? modelRuntime.getModel(inheritedModel.provider, inheritedModel.id) : undefined),
     thinkingLevel: initial.thinkingLevel ?? preparation?.thinkingLevel,
-    resourceLoader: createAtelierResourceLoader(agentsFiles, () => [
+    resourceLoader: createAgentsInTheCloudResourceLoader(agentsFiles, () => [
       ...appendSystemPrompt,
       ...(promptSession ? preparation?.modelPrompt?.(promptSession.model?.id, promptSession.thinkingLevel) ?? [] : []),
     ], skillResources),

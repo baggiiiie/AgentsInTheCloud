@@ -1,7 +1,7 @@
-import type { JsonValue } from "@atelier/core";
-import { Icons } from "@atelier/design-system/icons";
-import { turboStreamResponse, type WorkspaceModule } from "@atelier/shared";
-import { workspaceWorkHostPath } from "@atelier/workspace";
+import type { JsonValue } from "@agents-in-the-cloud/core";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { turboStreamResponse, type WorkspaceModule } from "@agents-in-the-cloud/shared";
+import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { isReviewDiffHighlighting, isReviewDiffOverflow, reviewCommentsPrompt, type ReviewSide } from "../model.ts";
@@ -213,4 +213,4 @@ export const reviewWorkspaceModule: WorkspaceModule = {
   },
 };
 
-export { reviewWorkspaceModule as atelierServerModule };
+export { reviewWorkspaceModule as agentsInTheCloudServerModule };

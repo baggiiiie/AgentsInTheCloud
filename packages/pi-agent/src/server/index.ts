@@ -1,7 +1,7 @@
-import { createCliAgentModule } from "@atelier/cli-agent/server";
-import { createPiModelRuntime } from "@atelier/llm/server";
-import { registerWorkspaceRequestTransform } from "@atelier/proxy-egress/server";
-import { providerBrandIconHtml, type WorkspaceModule } from "@atelier/shared";
+import { createCliAgentModule } from "@agents-in-the-cloud/cli-agent/server";
+import { createPiModelRuntime } from "@agents-in-the-cloud/llm/server";
+import { registerWorkspaceRequestTransform } from "@agents-in-the-cloud/proxy-egress/server";
+import { providerBrandIconHtml, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { installPiCliConfiguration } from "./pi-cli.ts";
 import { createPiCliCredentialTransform, piCliCredentialHosts } from "./pi-cli-bridge.ts";
 import { requirePiModels } from "./auth.ts";
@@ -22,7 +22,7 @@ const cliModule = createCliAgentModule({
   loadTranscriptImage: loadPiTranscriptImage,
 });
 
-export const atelierServerModule: WorkspaceModule = {
+export const agentsInTheCloudServerModule: WorkspaceModule = {
   ...cliModule,
   initialize(context) {
     cliModule.initialize!(context);

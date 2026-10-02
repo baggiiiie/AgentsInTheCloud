@@ -1,10 +1,10 @@
 import { Type, type Static } from "typebox";
 
 /** Persisted immediately after the initiating entry, before any steering can arrive. */
-export const turnStartEntryType = "atelier.turn-start";
+export const turnStartEntryType = "agents-in-the-cloud.turn-start";
 export const turnStartSchema = Type.Object({ turnEntryId: Type.String(), startedAt: Type.Number() });
 
-export const turnTimingEntryType = "atelier.turn-timing";
+export const turnTimingEntryType = "agents-in-the-cloud.turn-timing";
 export const turnTimingSchema = Type.Object({
   elapsedMs: Type.Number({ minimum: 0 }),
   toolMs: Type.Number({ minimum: 0 }),

@@ -1,14 +1,14 @@
 /// <reference lib="dom" />
 
 import {
-  atelierObservableTerminalTheme,
+  agentsInTheCloudObservableTerminalTheme,
   createObservableTerminalViewer,
   observableWebSocketUrl,
   TerminalTouchFocus,
   createTerminalKeyBarController,
   type ObservableTerminalViewer,
-} from "@atelier/observable-terminal/client";
-import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@atelier/shared";
+} from "@agents-in-the-cloud/observable-terminal/client";
+import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { terminalViewKey } from "../shared.ts";
 
 function createTerminalSessionPickerController(Controller: WorkspaceClientControllerConstructor) {
@@ -51,7 +51,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
           websocketUrl: observableWebSocketUrl(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/views/${encodeURIComponent(terminalViewKey(this.idValue))}/ws`),
           fontFamily: style.getPropertyValue("--font-mono"),
           fontSize: Number.parseFloat(style.getPropertyValue("--text-code")),
-          theme: atelierObservableTerminalTheme(),
+          theme: agentsInTheCloudObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
           transformInput: (data) => this.transformAccessoryInput(data),
         });
@@ -68,7 +68,7 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
       this.resetAccessoryKeys();
     }
 
-    theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
+    theme(): void { this.viewer?.setTheme(agentsInTheCloudObservableTerminalTheme()); }
 
     connect(): void {
       if (isWorkspacePaneVisible(this.element)) {

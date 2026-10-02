@@ -1,11 +1,11 @@
-import { syntaxSlot, transcriptSlot } from "@atelier/cli-agent/server";
+import { syntaxSlot, transcriptSlot } from "@agents-in-the-cloud/cli-agent/server";
 
-export const piThemeName = "atelier";
+export const piThemeName = "agents-in-the-cloud";
 
 const { accent, bright, danger, decorative, muted, success, surface, text, warning } = transcriptSlot;
 
 /** Pi's theme: every color is a palette slot, so it follows the viewer's theme. */
-export function piAtelierTheme() {
+export function piAgentsInTheCloudTheme() {
   return {
     name: piThemeName,
     colors: {

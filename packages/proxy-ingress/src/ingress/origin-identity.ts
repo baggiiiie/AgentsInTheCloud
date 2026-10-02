@@ -2,8 +2,8 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import type { WorkspaceAppRef } from "@atelier/shared";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import type { WorkspaceAppRef } from "@agents-in-the-cloud/shared";
 import type { PortRange } from "./tailscale-serve.ts";
 
 export interface OriginAssignment { port: number; fresh: boolean }
@@ -63,7 +63,7 @@ function store(read: () => Promise<State>, write: (state: State) => Promise<void
   };
 }
 
-export function createFileOriginIdentityStore(path = atelierDataPath(getAtelierRuntimeContext(), "proxy", "origin-identities.json")): OriginIdentityStore {
+export function createFileOriginIdentityStore(path = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "proxy", "origin-identities.json")): OriginIdentityStore {
   const lock = serialize();
   return store(async () => {
     let text: string;

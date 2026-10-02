@@ -4,9 +4,9 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { clearWorkspaceGitHubToken, createAtelierEventBus, setWorkspaceGitHubToken } from "@atelier/core";
-import { addProject, cachedProjectSourcePath, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, type GitProjectInitInstruction } from "@atelier/projects";
-import type { WorkspaceDockerPlan } from "@atelier/workspace";
+import { clearWorkspaceGitHubToken, createAgentsInTheCloudEventBus, setWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
+import { addProject, cachedProjectSourcePath, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
+import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const proc = Bun.spawn(command, { cwd: options.cwd, stdout: "pipe", stderr: "pipe" });
@@ -20,7 +20,7 @@ async function run(command: string[], options: { cwd?: string } = {}): Promise<{
 }
 
 async function createRemote(): Promise<{ root: string; remote: string; seed: string }> {
-  const root = await mkdtemp(join(tmpdir(), "atelier-source-test-"));
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-source-test-"));
   const seed = join(root, "seed");
   const remote = join(root, "repo.git");
   await run(["git", "init", "-b", "main", seed]);
@@ -59,7 +59,7 @@ describe("workspace source preparation", () => {
   beforeEach(async () => {
     previousDataDir = process.env.ATELIER_DATA_DIR;
     previousGitHubToken = process.env.GH_TOKEN;
-    dataDir = await mkdtemp(join(tmpdir(), "atelier-data-test-"));
+    dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-data-test-"));
     tempRoots.push(dataDir);
     process.env.ATELIER_DATA_DIR = dataDir;
     delete process.env.GH_TOKEN;
@@ -76,7 +76,7 @@ describe("workspace source preparation", () => {
   });
 
   test("prepares unborn default and explicit branches without creating commits", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-empty-source-test-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-empty-source-test-"));
     tempRoots.push(root);
     const remote = join(root, "repo.git");
     await run(["git", "init", "--bare", "-b", "main", remote]);
@@ -95,19 +95,19 @@ describe("workspace source preparation", () => {
         expect(metadata.resolvedCommit).toBeNull();
         expect(metadata.effectiveBranch).toBe(branch ?? "main");
 
-        const events = createAtelierEventBus();
+        const events = createAgentsInTheCloudEventBus();
         registerProjectWorkspaceInitEvents(events);
         const init: GitProjectInitInstruction = { type: "project.git", projectId: project.id, name: project.id, gitUrl: remote, branch, sessionShareKey: project.id };
         const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
         await events.emit("workspace_plan_prepare", { workspaceId, init, workHostPath: source.worktreePath, workContainerPath: "/work", plan });
-        expect(plan.labels["com.atelier.source-commit"]).toBeUndefined();
-        expect(plan.labels["com.atelier.source-template"]).toBe(source.templateKey);
+        expect(plan.labels["com.agents-in-the-cloud.source-commit"]).toBeUndefined();
+        expect(plan.labels["com.agents-in-the-cloud.source-template"]).toBe(source.templateKey);
       }
     }
   });
 
   test("uses the first pushed commit for later workspaces while the original stays unborn", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-empty-source-test-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-empty-source-test-"));
     tempRoots.push(root);
     const remote = join(root, "repo.git");
     await run(["git", "init", "--bare", "-b", "main", remote]);
@@ -161,11 +161,11 @@ describe("workspace source preparation", () => {
     const fixture = await createRemote();
     tempRoots.push(fixture.root);
     const project = (await addProject(`${fixture.remote}#main`)).project;
-    const contextPath = join(".atelier", "transcription-context");
+    const contextPath = join(".agents-in-the-cloud", "transcription-context");
     const cachedPath = join(await cachedProjectSourcePath(project.id), contextPath);
     expect(await Bun.file(cachedPath).exists()).toBe(false);
 
-    await mkdir(join(fixture.seed, ".atelier"));
+    await mkdir(join(fixture.seed, ".agents-in-the-cloud"));
     await writeFile(join(fixture.seed, contextPath), "Claude Code\n");
     await run(["git", "add", contextPath], { cwd: fixture.seed });
     await run(["git", "commit", "-m", "Add vocabulary"], { cwd: fixture.seed });
@@ -191,7 +191,7 @@ describe("workspace source preparation", () => {
     const fixture = await createRemote();
     tempRoots.push(fixture.root);
     const realGit = (await run(["which", "git"])).stdout.trim();
-    const fakeBin = await mkdtemp(join(tmpdir(), "atelier-fake-git-"));
+    const fakeBin = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-fake-git-"));
     tempRoots.push(fakeBin);
     const tokenLog = join(fakeBin, "tokens.log");
     const fakeGit = join(fakeBin, "git");
@@ -272,7 +272,7 @@ describe("workspace source preparation", () => {
   });
 
   test("adds a shared /persistent bind mount for workspaces from the same saved project", async () => {
-    const events = createAtelierEventBus();
+    const events = createAgentsInTheCloudEventBus();
     registerProjectWorkspaceInitEvents(events);
     const planFor = async (workspaceId: string, projectId: string): Promise<WorkspaceDockerPlan> => {
       const init: GitProjectInitInstruction = { type: "project.git", projectId, name: projectId, gitUrl: `https://example.test/${projectId}.git`, branch: null, sessionShareKey: projectId };
@@ -310,7 +310,7 @@ describe("workspace source preparation", () => {
       createdAt: new Date().toISOString(),
     }));
 
-    const events = createAtelierEventBus();
+    const events = createAgentsInTheCloudEventBus();
     registerProjectWorkspaceInitEvents(events);
     const init: GitProjectInitInstruction = { type: "project.git", projectId: "project", name: "Project", gitUrl: "https://example.test/project.git", branch: null, sessionShareKey: "project" };
     const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };

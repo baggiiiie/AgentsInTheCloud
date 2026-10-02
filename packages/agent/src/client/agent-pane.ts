@@ -1,5 +1,5 @@
-import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { setActivityButtonState } from "@agents-in-the-cloud/design-system/activity-button/client";
+import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
@@ -8,7 +8,7 @@ import { TranscriptNavigation } from "./transcript-navigation.ts";
 type TurboSubmitEndEvent = CustomEvent<{ success: boolean; fetchResponse?: { response: Response } }>;
 
 declare global {
-  interface Window { AtelierCable?: import("@atelier/shared").AtelierCableClient; }
+  interface Window { AgentsInTheCloudCable?: import("@agents-in-the-cloud/shared").AgentsInTheCloudCableClient; }
 }
 
 interface AgentPaneControllerInstance {
@@ -184,7 +184,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private subscribe(): void {
       this.element.dataset.agentPresentationReady = "false";
       if (this.hasBeenReady) this.setReconnecting(true);
-      this.cableSubscription = window.AtelierCable?.subscribe(
+      this.cableSubscription = window.AgentsInTheCloudCable?.subscribe(
         CableTopics.agent(this.workspaceIdValue, this.conversationIdValue),
         { onReady: this.cableReady, onDisconnected: this.cableDisconnected },
       );
@@ -332,7 +332,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
         this.setInputValue("");
         localStorage.removeItem(this.composerTextStorageKey);
       }
-      if (event.detail.fetchResponse?.response.headers.get("x-atelier-attachment-draft-consumed") === "true") {
+      if (event.detail.fetchResponse?.response.headers.get("x-agents-in-the-cloud-attachment-draft-consumed") === "true") {
         const consumed = new Set(submission?.attachmentIds ?? []);
         this.formTarget.querySelectorAll<HTMLInputElement>('input[name="attachment"]').forEach((input) => {
           if (consumed.has(input.value)) input.closest(".agent-chip")!.remove();

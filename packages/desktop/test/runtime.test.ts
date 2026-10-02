@@ -1,8 +1,8 @@
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 import { expect, test } from "bun:test";
 import { createDesktopRuntime } from "../src/server/runtime.ts";
 
-const running: import("../src/server/runtime.ts").RunningDesktop = { phase: "running", pid: 123, display: ":99", xauthority: "/home/atelier/.local/state/atelier-desktop/Xauthority", cdpUrl: "http://127.0.0.1:9222", width: 800, height: 900 };
+const running: import("../src/server/runtime.ts").RunningDesktop = { phase: "running", pid: 123, display: ":99", xauthority: "/home/agents-in-the-cloud/.local/state/agents-in-the-cloud-desktop/Xauthority", cdpUrl: "http://127.0.0.1:9222", width: 800, height: 900 };
 function result(status: JsonObject, exitCode = 0) { return { exitCode, stdout: JSON.stringify(status), stderr: "", durationMs: 1 }; }
 
 test("desktop operations use the workspace-owned runtime, returning live connection details", async () => {
@@ -10,7 +10,7 @@ test("desktop operations use the workspace-owned runtime, returning live connect
   const runtime = createDesktopRuntime(async (workspace, command) => { calls.push([workspace, command]); return result(running); });
   expect(await runtime.start("workspace")).toEqual(running);
   expect(await runtime.status("workspace")).toEqual(running);
-  expect(calls).toEqual([ ["workspace", ["atelier-desktop", "start"]], ["workspace", ["atelier-desktop", "status"]] ]);
+  expect(calls).toEqual([ ["workspace", ["agents-in-the-cloud-desktop", "start"]], ["workspace", ["agents-in-the-cloud-desktop", "status"]] ]);
 });
 
 test("failed startup never returns CDP details as if ready", async () => {
@@ -20,8 +20,8 @@ test("failed startup never returns CDP details as if ready", async () => {
 });
 
 test("missing workspace image dependency is surfaced", async () => {
-  const runtime = createDesktopRuntime(async () => ({ exitCode: 127, stdout: "", stderr: "atelier-desktop: command not found", durationMs: 1 }));
-  await expect(runtime.start("workspace")).rejects.toThrow("Recreate this workspace with the current workspace image. atelier-desktop: command not found");
+  const runtime = createDesktopRuntime(async () => ({ exitCode: 127, stdout: "", stderr: "agents-in-the-cloud-desktop: command not found", durationMs: 1 }));
+  await expect(runtime.start("workspace")).rejects.toThrow("Recreate this workspace with the current workspace image. agents-in-the-cloud-desktop: command not found");
 });
 
 test("invalid runtime output is not silently treated as stopped", async () => {

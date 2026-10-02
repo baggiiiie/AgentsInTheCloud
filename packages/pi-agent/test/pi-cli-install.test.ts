@@ -9,18 +9,18 @@ test("Pi configuration installation refreshes managed fields atomically and pres
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
       import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-      const workspace = await import("@atelier/workspace");
-      const config = await import("@atelier/llm/server");
+      const workspace = await import("@agents-in-the-cloud/workspace");
+      const config = await import("@agents-in-the-cloud/llm/server");
       const directory = process.env.HOME + "/.pi/agent";
       await mkdir(directory, { recursive: true });
       await writeFile(directory + "/settings.json", JSON.stringify({ theme: "light", enabledModels: ["old/model"], transport: "websocket" }));
       const model = { provider: "custom", id: "test", name: "Test", api: "openai-completions", baseUrl: "https://model.example/v1", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 10000, maxTokens: 1000 };
       let favorites = [{ provider: "custom", id: "test", label: "Favorite" }];
-      mock.module("@atelier/llm/server", () => ({ ...config,
+      mock.module("@agents-in-the-cloud/llm/server", () => ({ ...config,
         createPiModelRuntime: async () => ({ getAvailable: async () => [model], getAuth: async () => ({ auth: { apiKey: "real-secret-never-copy" } }) }),
         getConfiguredModels: async () => favorites,
       }));
-      mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (_id, script, options) => {
+      mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (_id, script, options) => {
         const process = Bun.spawn(["sh", "-c", script], { stdin: new Blob([options.stdin]), stdout: "pipe", stderr: "pipe" });
         const [exitCode, stdout, stderr] = await Promise.all([process.exited, new Response(process.stdout).text(), new Response(process.stderr).text()]);
         return { exitCode, stdout, stderr, durationMs: 0 };

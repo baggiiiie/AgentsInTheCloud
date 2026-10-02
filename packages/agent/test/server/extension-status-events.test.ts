@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { createAgentSession, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { observeExtensionStatusEvents, type ExtensionStatusEvent } from "../../src/server/extension-status-events.ts";
-import { createAtelierResourceLoader } from "../../src/server/system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader } from "../../src/server/system-prompt.ts";
 
 test("extension status observation preserves dispatch, connector warnings, baseline registrations, and cleanup", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "atelier-mcp-observer-"));
-  const resourceLoader = createAtelierResourceLoader();
+  const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-mcp-observer-"));
+  const resourceLoader = createAgentsInTheCloudResourceLoader();
   const { session } = await createAgentSession({
     cwd: dir, agentDir: dir, resourceLoader,
     sessionManager: SessionManager.inMemory(dir),

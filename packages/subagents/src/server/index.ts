@@ -1,15 +1,15 @@
 import { preserveLegacySubagentHistories } from "./history-store.ts";
-import { Icons } from "@atelier/design-system/icons";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import type { WorkspaceModule } from "@atelier/shared";
-import { listWorkspaceAgentConversations } from "@atelier/agent/server";
+import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
+import { listWorkspaceAgentConversations } from "@agents-in-the-cloud/agent/server";
 export { subagentsDelegation } from "./delegation.ts";
 import { getSubagents, subscribeSubagentTreeCreated } from "./subagents.ts";
 import { subagentsWorkView, subagentsWorkViewAdapter, handleSubagentRequest, subscribeSubagentTree } from "./subagent-view.ts";
 import { subagentsOpenApiPaths } from "./openapi.ts";
 
-export const atelierServerModule: WorkspaceModule = {
+export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "subagents",
   async initialize(context) {
     await preserveLegacySubagentHistories();

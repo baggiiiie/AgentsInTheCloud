@@ -1,7 +1,7 @@
-import { actionItemElement, actionItemHtml } from "@atelier/design-system/action-item";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, isApplePlatform, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@atelier/shared";
+import { actionItemElement, actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml, isApplePlatform, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { submitFormWithFirstButton } from "./form-submission.ts";
 import { clientHooks, type PaletteResult } from "./workspace-client-hooks.ts";
@@ -9,7 +9,7 @@ import { registerWorkspaceControllers, residencyController, workspaceNavigationC
 
 type WorkspaceCommandRegistration = Omit<WorkspaceClientCommand, "run">;
 
-class AtelierShortcutsController extends Controller<HTMLElement> {
+class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
   private shortcutOverlayTimer: ReturnType<typeof setTimeout> | undefined;
   private shortcutOverlay: HTMLElement | undefined;
   private shortcutOverlayPointerInside = false;
@@ -24,9 +24,9 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
   connect(): void {
     this.registerBuiltinCommands();
     clientHooks.registerPaletteProvider({
-      id: "atelier.commands",
+      id: "agents-in-the-cloud.commands",
       search: () => this.currentCommands()
-        .filter((command) => command.id !== "atelier.open-palette")
+        .filter((command) => command.id !== "agents-in-the-cloud.open-palette")
         .map((command) => ({
           id: `command:${command.id}`,
           title: command.label,
@@ -37,15 +37,15 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
         })),
     });
     clientHooks.registerPaletteProvider({
-      id: "atelier.workspaces",
+      id: "agents-in-the-cloud.workspaces",
       search: ({ fuzzyScore }) => this.workspacePaletteItems(fuzzyScore),
     });
     clientHooks.registerPaletteProvider({
-      id: "atelier.destinations",
+      id: "agents-in-the-cloud.destinations",
       search: ({ fuzzyScore }) => this.workspaceDestinationPaletteItems(fuzzyScore),
     });
     // Listen at window capture so we get first chance at shortcuts that focused
-    // Atelier-owned widgets (not iframes) might otherwise consume.
+    // AgentsInTheCloud-owned widgets (not iframes) might otherwise consume.
     window.addEventListener("keydown", this.keydown, true);
     window.addEventListener("keyup", this.keyup, true);
     window.addEventListener("blur", this.shortcutBlur);
@@ -131,14 +131,14 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
       run: () => this.openAdjacentWorkView(1),
     });
     clientHooks.registerCommand({
-      id: "atelier.open-palette",
+      id: "agents-in-the-cloud.open-palette",
       label: "Open palette",
       scope: "global",
       binding: "Meta+Alt+KeyK",
       run: () => this.openPalette(),
     });
     clientHooks.registerCommand({
-      id: "atelier.open-settings",
+      id: "agents-in-the-cloud.open-settings",
       label: "Open settings",
       scope: "global",
       run: () => this.openSettingsDialog(),
@@ -382,8 +382,8 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
       iconHtml: Icons.Search,
       titleCaption: "Command palette",
       bodyHtml: `<label>Search commands, workspaces, and destinations
-        <input class="text-field palette-input" id="atelier-palette-input" type="search" role="combobox" spellcheck="false" autocomplete="off" aria-label="Search command palette" aria-autocomplete="list" aria-controls="atelier-palette-results" aria-expanded="true">
-      </label><div class="palette-results action-list" id="atelier-palette-results" role="listbox" aria-label="Command palette results"></div>`,
+        <input class="text-field palette-input" id="agents-in-the-cloud-palette-input" type="search" role="combobox" spellcheck="false" autocomplete="off" aria-label="Search command palette" aria-autocomplete="list" aria-controls="agents-in-the-cloud-palette-results" aria-expanded="true">
+      </label><div class="palette-results action-list" id="agents-in-the-cloud-palette-results" role="listbox" aria-label="Command palette results"></div>`,
     });
     // SAFETY: dialogHtml always renders a native dialog as its root.
     const dialog = template.content.firstElementChild as HTMLDialogElement;
@@ -450,9 +450,9 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
       kind: "single",
       label: { kind: "text", text: item.title },
       trailingHtml: item.badge ? `<kbd class="palette-item-meta">${escapeHtml(item.badge)}</kbd>` : "",
-      element: { tag: "button", attributesHtml: `id="atelier-palette-option-${index}" type="button" data-palette-index="${index}" role="option" aria-selected="${index === this.paletteIndex ? "true" : "false"}"` },
+      element: { tag: "button", attributesHtml: `id="agents-in-the-cloud-palette-option-${index}" type="button" data-palette-index="${index}" role="option" aria-selected="${index === this.paletteIndex ? "true" : "false"}"` },
     })).join("");
-    const activeId = `atelier-palette-option-${this.paletteIndex}`;
+    const activeId = `agents-in-the-cloud-palette-option-${this.paletteIndex}`;
     this.paletteInput!.setAttribute("aria-activedescendant", activeId);
     results.querySelector<HTMLElement>(`#${activeId}`)?.scrollIntoView({ block: "nearest" });
   }
@@ -596,6 +596,6 @@ class AtelierShortcutsController extends Controller<HTMLElement> {
 
 export function registerWorkspaceShortcutsController(): void {
   registerWorkspaceControllers({
-    "atelier-shortcuts": AtelierShortcutsController,
+    "agents-in-the-cloud-shortcuts": AgentsInTheCloudShortcutsController,
   });
 }

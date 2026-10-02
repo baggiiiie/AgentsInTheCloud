@@ -1,9 +1,9 @@
-import { activityButtonHtml } from "@atelier/design-system/activity-button";
-import { buttonHtml } from "@atelier/design-system/button";
-import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@atelier/llm/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@atelier/prompt/server";
-import { transcriptionComposerController } from "@atelier/transcription/server";
-import { domId, escapeHtml } from "@atelier/shared";
+import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@agents-in-the-cloud/llm/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
+import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { configuredModelOptionViews, launchComposerThinkingSettings, selectAvailableConfiguredModel } from "./model-state.ts";
 import { agentConversationKey, agentPath, ids, type AgentRenderContext } from "./render-context.ts";

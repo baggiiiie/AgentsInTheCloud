@@ -17,7 +17,7 @@ async function generateContext(fixture: string) {
 }
 
 async function generateInCheckout() {
-  const fixture = await mkdtemp(join(tmpdir(), "atelier-image-context-"));
+  const fixture = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-image-context-"));
   temporaryRoots.push(fixture);
   await cp(join(root, "packages"), join(fixture, "packages"), { recursive: true });
   return generateContext(fixture);
@@ -25,16 +25,16 @@ async function generateInCheckout() {
 
 describe("workspace image content identity", () => {
   test("validates generated metadata before consumers use it", () => {
-    expect(parseWorkspaceImageMetadata({ tag: "atelier-workspace:abc", modules: ["base"] })).toEqual({
-      tag: "atelier-workspace:abc",
+    expect(parseWorkspaceImageMetadata({ tag: "agents-in-the-cloud-workspace:abc", modules: ["base"] })).toEqual({
+      tag: "agents-in-the-cloud-workspace:abc",
       modules: ["base"],
     });
     expect(() => parseWorkspaceImageMetadata({ tag: 42, modules: ["base"] })).toThrow();
-    expect(() => parseWorkspaceImageMetadata({ tag: "atelier-workspace:abc" })).toThrow();
+    expect(() => parseWorkspaceImageMetadata({ tag: "agents-in-the-cloud-workspace:abc" })).toThrow();
   });
 
   test.each([
-    ["systemd bootstrap script", "packages/workspace-image/rootfs/usr/local/bin/atelier-workspace-init", "files/base/rootfs/usr/local/bin/atelier-workspace-init", "#"],
+    ["systemd bootstrap script", "packages/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "files/base/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "#"],
   ])("%s is packaged and changes the default image identity", async (_name, sourcePath, packagedPath, comment) => {
     const before = await generateInCheckout();
     const source = join(before.fixture, sourcePath);
@@ -93,8 +93,8 @@ describe("workspace image layer ordering", () => {
   });
 
   test.each([
-    ["packages/workspace-image/rootfs/usr/local/bin/atelier-workspace-init", "files/base/rootfs/usr/local/bin/atelier-workspace-init"],
-    ["packages/vscode/workspace-image/rootfs/usr/local/bin/atelier-start-vscode", "files/vscode/workspace-image/rootfs/usr/local/bin/atelier-start-vscode"],
+    ["packages/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "files/base/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init"],
+    ["packages/vscode/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-start-vscode", "files/vscode/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-start-vscode"],
   ])("copies runtime script %s only after module setup", async (sourcePath, packagedPath) => {
     const before = await generateInCheckout();
     const copy = `COPY ${JSON.stringify(packagedPath)}`;
@@ -102,7 +102,7 @@ describe("workspace image layer ordering", () => {
     await appendFile(join(before.fixture, sourcePath), "\n# cache boundary probe\n");
     const after = await generateContext(before.fixture);
     expect(after.metadata).not.toBe(before.metadata);
-    expect(after.dockerfile.split("LABEL com.atelier.workspace-image.signature=")[0]).toBe(before.dockerfile.split("LABEL com.atelier.workspace-image.signature=")[0]);
+    expect(after.dockerfile.split("LABEL com.agents-in-the-cloud.workspace-image.signature=")[0]).toBe(before.dockerfile.split("LABEL com.agents-in-the-cloud.workspace-image.signature=")[0]);
     expect(await readFile(join(after.output, packagedPath), "utf8")).toContain("# cache boundary probe");
   });
 });

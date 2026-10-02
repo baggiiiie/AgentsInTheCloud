@@ -1,6 +1,6 @@
-# Automating Atelier
+# Automating AgentsInTheCloud
 
-Atelier's web UI operations also provide compact JSON representations for agents and scripts. They are the same operations used by the Turbo UI, not a separate REST implementation.
+AgentsInTheCloud's web UI operations also provide compact JSON representations for agents and scripts. They are the same operations used by the Turbo UI, not a separate REST implementation.
 
 ## Discovery
 
@@ -47,7 +47,7 @@ Project settings has a browser-navigable surface that agents can pass directly t
 /projects/:projectId/settings?section=environment
 ```
 
-Supported sections are `repository`, `secrets`, `ssh-keys`, `environment`, `dockerfile`, `preload-images`, and `danger`. Direct navigation renders the complete Atelier shell, opens Project settings, expands configurable sections when selected, and scrolls the selected section into view.
+Supported sections are `repository`, `secrets`, `ssh-keys`, `environment`, `dockerfile`, `preload-images`, and `danger`. Direct navigation renders the complete AgentsInTheCloud shell, opens Project settings, expands configurable sections when selected, and scrolls the selected section into view.
 
 Use `GET /projects` with `Accept: application/json` to discover the project ID before constructing the presentation URL.
 
@@ -58,7 +58,7 @@ Other browser-navigable surfaces are:
 /projects/:projectId/workspaces/new     # New workspace for a project
 /projects/new                           # Add a project
 /usage                                  # Provider-reported limits
-/settings                               # Atelier settings
+/settings                               # AgentsInTheCloud settings
 /settings?section=models                # A specific settings section
 /settings/development                   # Development settings
 /design-system-catalogue.html           # Live component catalogue (HTML)
@@ -71,7 +71,7 @@ The settings section is a registered settings contribution ID, such as `theme`, 
 Creation is asynchronous and returns `202 Accepted` immediately. The response’s
 `workspace.url` and `Location` header are origin-relative paths, like workspace
 detail URLs. Resolve them against the public request URL to preserve HTTPS
-when Atelier runs behind a TLS-terminating proxy:
+when AgentsInTheCloud runs behind a TLS-terminating proxy:
 
 ```sh
 created=$(curl -sS -X POST http://localhost:3000/workspaces \
@@ -102,12 +102,12 @@ saved image preload list. Failure retains the container for repair and presents
 `POST /workspaces/:id/provisioning/continue?action=retry` to retry runtime preparation,
 or omit the query parameter to explicitly bypass the failure. Bypassing makes the
 workspace enter `runningPhase` while retaining its preparation warning. Until startup completes,
-the workspace shows its checklist instead of its Agents or Work views. Atelier and
+the workspace shows its checklist instead of its Agents or Work views. AgentsInTheCloud and
 other workspaces remain available throughout.
 
 The list and detail responses include optional `issues` entries with `kind` and
-`message`. Image inspection runs independently at Atelier startup. Readiness checks
-run again when a workspace resumes or Atelier restarts; bypassing a failure does not
+`message`. Image inspection runs independently at AgentsInTheCloud startup. Readiness checks
+run again when a workspace resumes or AgentsInTheCloud restarts; bypassing a failure does not
 permanently disable checks. Existing workspaces keep their saved preload references
 when project settings change.
 

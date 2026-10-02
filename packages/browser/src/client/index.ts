@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import type { WorkspaceClientControllerConstructor, WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor, WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 function createBrowserAddressController(Controller: WorkspaceClientControllerConstructor): WorkspaceClientControllerConstructor {
   return class BrowserAddressController extends Controller {
@@ -51,4 +51,4 @@ const browserClientModule: WorkspaceClientModule = {
   },
 };
 
-export { browserClientModule as atelierClientModule };
+export { browserClientModule as agentsInTheCloudClientModule };

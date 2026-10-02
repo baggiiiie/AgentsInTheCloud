@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { addProject, createProjectSecret, listProjectSecrets, projectSecretRoutingRevision, revealProjectSecrets } from "@atelier/projects";
-import { createTestApp, postJson, temporaryAtelierDataDir } from "./support/test-web-app.ts";
+import { addProject, createProjectSecret, listProjectSecrets, projectSecretRoutingRevision, revealProjectSecrets } from "@agents-in-the-cloud/projects";
+import { createTestApp, postJson, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 
-const data = temporaryAtelierDataDir();
+const data = temporaryAgentsInTheCloudDataDir();
 beforeEach(data.setUp);
 afterEach(data.tearDown);
 

@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/transcription",
+  "name": "@agents-in-the-cloud/transcription",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,12 +8,12 @@
     "./client": "./src/client/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/observable-terminal": "workspace:*",
-    "@atelier/projects": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/workspace": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/observable-terminal": "workspace:*",
+    "@agents-in-the-cloud/projects": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

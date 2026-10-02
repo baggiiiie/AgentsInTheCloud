@@ -1,13 +1,13 @@
 /// <reference lib="dom" />
 
 import type { DiffLineAnnotation, FileDiff, FileDiffMetadata, SelectedLineRange } from "@pierre/diffs";
-import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { buttonElement, type ButtonVariant } from "@atelier/design-system/button";
-import { Icons } from "@atelier/design-system/icons";
-import { setToggleValue, type ToggleChangeEvent } from "@atelier/design-system/toggle/client";
-import { isWorkspacePaneVisible, phoneLayoutMediaQuery, type WorkspaceClientModule } from "@atelier/shared";
+import { setActivityButtonState } from "@agents-in-the-cloud/design-system/activity-button/client";
+import { buttonElement, type ButtonVariant } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { setToggleValue, type ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
+import { isWorkspacePaneVisible, phoneLayoutMediaQuery, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { isReviewDiffHighlighting, isReviewDiffOverflow, reviewCommentsPrompt, type ReviewCommentModel, type ReviewDiffHighlighting, type ReviewDiffLayout, type ReviewDiffOverflow, type ReviewViewport } from "../model.ts";
-import { reviewDiffOptions } from "@atelier/syntax/diff-options";
+import { reviewDiffOptions } from "@agents-in-the-cloud/syntax/diff-options";
 
 type StimulusControllerConstructor = new (...args: never[]) => { element: Element };
 
@@ -156,8 +156,8 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       this.restoreDraft();
       this.pane = this.element.closest<HTMLElement>('[data-workspace-pane-role="work"]')!;
       this.resident = this.element.closest<HTMLElement>(".workspace-detail-resident")!;
-      this.pane.addEventListener("atelier:workspace-pane-visible", this.becameVisible);
-      this.pane.addEventListener("atelier:workspace-pane-hidden", this.becameHidden);
+      this.pane.addEventListener("agents-in-the-cloud:workspace-pane-visible", this.becameVisible);
+      this.pane.addEventListener("agents-in-the-cloud:workspace-pane-hidden", this.becameHidden);
       if (isWorkspacePaneVisible(this.element)) this.becameVisible();
     }
 
@@ -166,8 +166,8 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       this.element.removeEventListener("turbo:before-morph-attribute", this.beforeMorphAttribute);
       this.element.removeEventListener("turbo:morph-element", this.afterMorphElement);
       this.viewportMedia.removeEventListener("change", this.viewportChanged);
-      this.pane.removeEventListener("atelier:workspace-pane-visible", this.becameVisible);
-      this.pane.removeEventListener("atelier:workspace-pane-hidden", this.becameHidden);
+      this.pane.removeEventListener("agents-in-the-cloud:workspace-pane-visible", this.becameVisible);
+      this.pane.removeEventListener("agents-in-the-cloud:workspace-pane-hidden", this.becameHidden);
       this.visible = false;
       for (const instance of this.instances) instance.cleanUp();
       this.instances = [];
@@ -358,7 +358,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
 
     private async hydrateHost(host: HTMLElement): Promise<void> {
       if (this.hydratedHosts.has(host)) return;
-      const [{ FileDiff }] = await Promise.all([import("@pierre/diffs"), import("@atelier/syntax/pierre")]);
+      const [{ FileDiff }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (!host.isConnected || this.hydratedHosts.has(host)) return;
       this.hydratedHosts.add(host);
       this.hydrateDiff(host, FileDiff);
@@ -635,7 +635,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       this.draft = JSON.parse(raw) as DraftModel;
     }
 
-    private get draftKey(): string { return `atelier.review.draft:${this.workspaceIdValue}`; }
+    private get draftKey(): string { return `agents-in-the-cloud.review.draft:${this.workspaceIdValue}`; }
   };
 }
 
@@ -663,7 +663,7 @@ function createDeletionReviewController(Controller: StimulusControllerConstructo
 
     private async hydrateHost(host: HTMLElement): Promise<void> {
       if (this.hydratedHosts.has(host)) return;
-      const [{ FileDiff }] = await Promise.all([import("@pierre/diffs"), import("@atelier/syntax/pierre")]);
+      const [{ FileDiff }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (!host.isConnected || this.hydratedHosts.has(host)) return;
       this.hydratedHosts.add(host);
       const { model, container, prerenderedHTML } = serverRenderedDiff(host);
@@ -682,4 +682,4 @@ export const reviewClientModule: WorkspaceClientModule = {
   },
 };
 
-export { reviewClientModule as atelierClientModule };
+export { reviewClientModule as agentsInTheCloudClientModule };

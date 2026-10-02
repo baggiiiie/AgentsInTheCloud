@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { addProject, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, isGitProjectInit } from "@atelier/projects";
-import { createTestApp, deferred, temporaryAtelierDataDir, postJson, type ProvisionWorkspaceOptions } from "./support/test-web-app.ts";
+import { addProject, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, writeProjectWorkspaceSettings, isGitProjectInit } from "@agents-in-the-cloud/projects";
+import { createTestApp, deferred, temporaryAgentsInTheCloudDataDir, postJson, type ProvisionWorkspaceOptions } from "./support/test-web-app.ts";
 
-const data = temporaryAtelierDataDir();
+const data = temporaryAgentsInTheCloudDataDir();
 beforeEach(data.setUp);
 afterEach(data.tearDown);
 
@@ -76,7 +76,7 @@ describe("project onboarding launch", () => {
     const configuration = await init();
     const before = await readProjectWorkspaceSettings(configuration.projectId);
     const saved = await writeProjectWorkspaceSettings(configuration.projectId, before.settingsRevision, {
-      dockerfile: "FROM atelier-workspace\nRUN exit 1", preloadImages: ["missing-image:broken"], environment: [{ name: "PATH", value: "/broken" }],
+      dockerfile: "FROM agents-in-the-cloud-workspace\nRUN exit 1", preloadImages: ["missing-image:broken"], environment: [{ name: "PATH", value: "/broken" }],
     });
     const provisioned = deferred<ProvisionWorkspaceOptions>();
     const { app, registry } = createTestApp({ provision: async (_id, options) => { provisioned.resolve(options); } });
@@ -88,7 +88,7 @@ describe("project onboarding launch", () => {
     expect(isGitProjectInit(options.init)).toBe(true);
     if (!isGitProjectInit(options.init)) throw new Error("Expected project init");
     expect(options.init).toMatchObject({ projectId: configuration.projectId, gitUrl: configuration.gitUrl, branch: configuration.branch,
-      settings: { dockerfile: "FROM atelier-workspace", preloadImages: [], environment: [] } });
+      settings: { dockerfile: "FROM agents-in-the-cloud-workspace", preloadImages: [], environment: [] } });
     expect(options.init.createdBy).toBeUndefined();
     expect(options.context?.projectOnboarding).toBe(true);
     expect(options.context?.agent?.initialPrompt).toContain(before.project.name);

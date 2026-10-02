@@ -238,7 +238,7 @@ export const entries: CatalogueEntry[] = [
             kind: "results",
             label: "Example suggestions",
             attributesHtml: 'id="motion-suggestions" hidden',
-            contentHtml: ["atelier/design-system", "atelier/workspace"]
+            contentHtml: ["agents-in-the-cloud/design-system", "agents-in-the-cloud/workspace"]
               .map((text) =>
                 actionItemHtml({
                   kind: "single",
@@ -710,7 +710,7 @@ export const entries: CatalogueEntry[] = [
         render: () =>
           copyButtonHtml({
             label: "Copy example",
-            copyText: "Copied from Atelier design system",
+            copyText: "Copied from AgentsInTheCloud design system",
           }) +
           copyButtonHtml({
             label: "Copy command",
@@ -928,7 +928,7 @@ export const entries: CatalogueEntry[] = [
     title: "Panel",
     when: "A bounded surface with a continuous outline, soft upper-left rim reflection and faint localized background light, fixed chrome and flexible body. Dialog composes this; workspace panes use it directly.",
     contract:
-      "Supply semantic element tag, trusted header/body and optional footer. Use an outer layout container for dimensions. bodyLayout: padded/full-bleed and bodyOverflow: scroll/contained are the supported body behaviors. No root or body classes. panel__title uses normal body text and accepts a leading icon; strong.panel__title adds emphasis for the Atelier identity.",
+      "Supply semantic element tag, trusted header/body and optional footer. Use an outer layout container for dimensions. bodyLayout: padded/full-bleed and bodyOverflow: scroll/contained are the supported body behaviors. No root or body classes. panel__title uses normal body text and accepts a leading icon; strong.panel__title adds emphasis for the AgentsInTheCloud identity.",
     imports: { panel: "panelHtml", icons: "Icons" },
     examples: [
       {
@@ -963,7 +963,7 @@ export const entries: CatalogueEntry[] = [
             label: "Repositories",
             contentHtml: actionItemHtml({
               kind: "single",
-              label: { kind: "text", text: "atelier/design-system" },
+              label: { kind: "text", text: "agents-in-the-cloud/design-system" },
               element: {
                 tag: "div",
                 attributesHtml: 'role="option" aria-selected="false"',
@@ -1071,7 +1071,7 @@ export const entries: CatalogueEntry[] = [
     title: "Icons",
     when: "Shared decorative vocabulary. Use icon-only Button for standalone icon actions.",
     contract:
-      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. atelierLogoPathsHtml exports the same logo geometry without a nested SVG viewport for animated scenes using 24×24 user units. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
+      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudLogoPathsHtml exports the same logo geometry without a nested SVG viewport for animated scenes using 24×24 user units. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
     imports: { icons: "Icons" },
     examples: [
       {

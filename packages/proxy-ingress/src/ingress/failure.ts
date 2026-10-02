@@ -1,4 +1,4 @@
-import type { WorkspaceAppRef } from "@atelier/shared";
+import type { WorkspaceAppRef } from "@agents-in-the-cloud/shared";
 
 export class UnknownWorkspaceAppError extends Error {
   constructor(public readonly app: WorkspaceAppRef) {
@@ -22,7 +22,7 @@ export class WorkspaceUpstreamError extends Error {
   }
 }
 
-/** A transport failure on the Atelier-to-workspace hop, not the app hop. */
+/** A transport failure on the AgentsInTheCloud-to-workspace hop, not the app hop. */
 export class WorkspaceConnectionError extends Error {
   constructor(cause: unknown) {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
@@ -32,7 +32,7 @@ export class WorkspaceConnectionError extends Error {
 
 export class WorkspaceAuthenticationError extends Error {
   constructor() {
-    super("Atelier’s workspace connection credentials were rejected");
+    super("AgentsInTheCloud’s workspace connection credentials were rejected");
     this.name = "WorkspaceAuthenticationError";
   }
 }

@@ -6,7 +6,7 @@ import {
   createWorkspacePresentationStore,
   type WorkspaceWorkViewContribution,
   type WorkspacePresentationStore,
-} from "@atelier/workspace";
+} from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -46,7 +46,7 @@ describe("Workspace presentation", () => {
   let presentation: WorkspacePresentationStore;
 
   beforeEach(async () => {
-    dataDir = await mkdtemp(join(tmpdir(), "atelier-presentation-"));
+    dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-presentation-"));
     presentation = createWorkspacePresentationStore({ dataDir, workViewContributions });
   });
 

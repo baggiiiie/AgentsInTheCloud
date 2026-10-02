@@ -1,5 +1,5 @@
 // Settled prototype: Open views is the sole mobile navigation model.
-const prototypeStateKey = "atelier-dark-foundation-desktop-v4";
+const prototypeStateKey = "agents-in-the-cloud-dark-foundation-desktop-v4";
 history.scrollRestoration = "manual";
 window.scrollTo(0, 0);
 const prototypeUrl = new URL(location.href);
@@ -14,7 +14,7 @@ const defaultViewOrder = [
   "terminal",
 ];
 const defaultExpandedProjects = {
-  atelier: true,
+  "agents-in-the-cloud": true,
   fastpaperwork: false,
   wayfinder: true,
   sandbox: true,
@@ -1013,7 +1013,7 @@ function showOnboardingStep(index) {
   const back = document.querySelector('[data-action="onboarding-back"]');
   const next = document.querySelector('[data-action="onboarding-next"]');
   back.hidden = onboardingStep === 0;
-  next.textContent = onboardingStep === 2 ? "Start using Atelier" : "Continue";
+  next.textContent = onboardingStep === 2 ? "Start using AgentsInTheCloud" : "Continue";
 }
 
 function syncOnboardingChecklist() {
@@ -1040,7 +1040,7 @@ function selectProject(project) {
   projectMenu.hidden = true;
 }
 
-function openNewWorkspace(project = "atelier") {
+function openNewWorkspace(project = "agents-in-the-cloud") {
   selectProject(project);
   newWorkspaceDialog.showModal();
   document.querySelector("[data-workspace-prompt]").focus();
@@ -1436,7 +1436,7 @@ document.addEventListener("click", (event) => {
     attachment.hidden = false;
     const textarea = control.closest(".composer").querySelector("textarea");
     textarea.value =
-      "Review the file at /tmp/atelier-uploads/reference.pdf";
+      "Review the file at /tmp/agents-in-the-cloud-uploads/reference.pdf";
     textarea.focus();
     updateStateNote("Attachment added · prompt receives its workspace path only");
   }
@@ -1465,7 +1465,7 @@ document.addEventListener("click", (event) => {
   }
   if (control.dataset.action === "navigator-copy-url") {
     navigator.clipboard
-      .writeText(`atelier://workspace/redesign-tabs/${interaction.activeView}`)
+      .writeText(`agents-in-the-cloud://workspace/redesign-tabs/${interaction.activeView}`)
       .then(() => updateStateNote("File URL copied"));
   }
   if (control.dataset.action === "navigator-delete") {
@@ -1602,14 +1602,14 @@ addEventListener("keydown", (event) => {
   }
   if (event.metaKey && !event.altKey && event.key.toLowerCase() === "n") {
     event.preventDefault();
-    openNewWorkspace("atelier");
+    openNewWorkspace("agents-in-the-cloud");
   }
   if (event.metaKey && !event.altKey && event.key.toLowerCase() === "k") {
     event.preventDefault();
     openSearch();
   }
   if (newWorkspaceDialog.open && event.metaKey && event.altKey) {
-    if (event.code === "Quote") selectProject("atelier");
+    if (event.code === "Quote") selectProject("agents-in-the-cloud");
     if (event.code === "Semicolon") selectProject("none");
   }
   if (newWorkspaceDialog.open && event.metaKey && event.key === "Enter") {

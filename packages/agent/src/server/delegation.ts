@@ -1,5 +1,5 @@
 import type { AgentTranscriptSnapshot } from "./transcript-contributions.ts";
-import { AtelierCoreError, type AtelierEventBus, type JsonObject } from "@atelier/core";
+import { AgentsInTheCloudCoreError, type AgentsInTheCloudEventBus, type JsonObject } from "@agents-in-the-cloud/core";
 import type { AgentSession, SessionManager, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import type { AgentRenderContext } from "./render-context.ts";
 import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "./session-store.ts";
@@ -7,7 +7,7 @@ import type { ToolView, TranscriptItem, TranscriptRecord } from "./transcript.ts
 
 export interface AgentDelegationContext {
   agent: WorkspaceAgentConversationInfo;
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
 }
 
 /** Created for each conversion, retained through provider serialization and request preparation.
@@ -54,7 +54,7 @@ export interface AgentToolPresentation {
 
 export interface AgentDelegation {
   prepare(context: AgentDelegationContext): Promise<AgentSessionPreparation> | AgentSessionPreparation;
-  resolveConversation(workspaceId: string, conversationId: string, events?: AtelierEventBus): Promise<WorkspaceAgentConversationInfo | undefined>;
+  resolveConversation(workspaceId: string, conversationId: string, events?: AgentsInTheCloudEventBus): Promise<WorkspaceAgentConversationInfo | undefined>;
   /** After the closed runtime stops, before archival. Not called for plain unloading. */
   closingConversation(workspaceId: string, conversationId: string): Promise<void>;
   /** Runs before any runtime in the workspace is disposed. */
@@ -71,10 +71,10 @@ export function configureAgentDelegation(delegation: AgentDelegation | undefined
   agentDelegation = delegation;
 }
 
-export async function resolveAgentConversation(workspaceId: string, conversationId: string, events?: AtelierEventBus): Promise<WorkspaceAgentConversationInfo> {
+export async function resolveAgentConversation(workspaceId: string, conversationId: string, events?: AgentsInTheCloudEventBus): Promise<WorkspaceAgentConversationInfo> {
   const root = (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === conversationId);
   if (root) return root;
   const child = await agentDelegation?.resolveConversation(workspaceId, conversationId, events);
   if (child) return child;
-  throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+  throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
 }

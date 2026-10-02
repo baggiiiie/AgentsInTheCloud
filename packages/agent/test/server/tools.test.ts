@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "typebox";
 import {
-  createAtelierControlTools,
+  createAgentsInTheCloudControlTools,
   createWorkspaceAgentTools,
   executeDeleteCurrentWorkspace,
   normalizeWorkspacePath,
@@ -31,7 +31,7 @@ describe("workspace agent tools", () => {
 
     try {
       expect(createWorkspaceAgentTools("abc").find((tool) => tool.name === "present")?.description).toContain("artifact-preview:");
-      expect(createAtelierControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("artifact-preview:");
+      expect(createAgentsInTheCloudControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("artifact-preview:");
     } finally {
       unregister();
     }

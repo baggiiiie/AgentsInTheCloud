@@ -1,9 +1,9 @@
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import { turboStream, turboStreamResponse } from "@atelier/shared";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
 
-function completionPath(): string { return atelierDataPath(getAtelierRuntimeContext(), "onboarding-completed"); }
+function completionPath(): string { return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "onboarding-completed"); }
 
 export async function onboardingCompleted(): Promise<boolean> {
   return Bun.file(completionPath()).exists();

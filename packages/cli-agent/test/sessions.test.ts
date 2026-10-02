@@ -9,7 +9,7 @@ async function scenario(script: string): Promise<void> {
   try {
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
-      const workspace = await import("@atelier/workspace");
+      const workspace = await import("@agents-in-the-cloud/workspace");
       const calls = [];
       const launches = [];
       const preparations = [];
@@ -17,12 +17,12 @@ async function scenario(script: string): Promise<void> {
       let preparationError;
       let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
-      mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
-      const agentServer = await import("@atelier/agent/server");
+      mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
+      const agentServer = await import("@agents-in-the-cloud/agent/server");
       const slugRequests = [];
       let suggestedSlug;
       let slugDelay;
-      mock.module("@atelier/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
+      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",
@@ -53,7 +53,7 @@ test("creation materializes images and passes input and settings to the adapter 
   await provider.launch.prepareWorkspace("initial", { agent: settings });
   const [tab] = await list("initial");
   expect(calls).toHaveLength(4);
-  const image = "/tmp/atelier-attachments/example-" + tab.id + "/0.png";
+  const image = "/tmp/agents-in-the-cloud-attachments/example-" + tab.id + "/0.png";
   expect(calls[0][1]).toContain(image);
   expect(calls[0][2]).toEqual({ stdin: "aW1hZ2U=" });
   expect(calls[3][1]).toContain("tmux -N new-session");
@@ -81,7 +81,7 @@ test("CLI composer /name renames the tab without sending text to the terminal", 
   const id = await provider.create({ workspaceId: "rename" });
   const route = module.routes[0].handle;
   const url = new URL("http://localhost/workspaces/rename/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("rename", "example:" + id) }) });
   const explicit = await route(form("/name manual-title"), url);
   expect(explicit.status).toBe(204);
@@ -100,7 +100,7 @@ test("a late automatic title cannot replace a manual CLI /name", () => scenario(
   const [{ id }] = await list("race");
   while (!slugRequests.length) await Bun.sleep(1);
   const url = new URL("http://localhost/workspaces/race/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const response = await module.routes[0].handle(new Request(url, { method: "POST", body: new URLSearchParams({ text: "/name manual-title", attachmentDraft: agentAttachmentDraftId("race", "example:" + id) }) }), url);
   expect(response.status).toBe(204);
   slugDelay.resolve();
@@ -113,7 +113,7 @@ test("a late automatic title cannot replace a manual CLI /name", () => scenario(
 test("CLI composer /name uses the saved prompt when no title is supplied", () => scenario(`
   const id = await provider.create({ workspaceId: "context" });
   const url = new URL("http://localhost/workspaces/context/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("context", "example:" + id) }) });
   expect((await module.routes[0].handle(form("Investigate the timeout"), url)).status).toBe(200);
   suggestedSlug = "investigate-timeout";
@@ -275,9 +275,9 @@ test("failed startup releases readiness waiters but rejects socket admission", (
 `));
 
 test("authenticated turn boundaries identify the exact CLI session and close revokes it", () => scenario(`
-  const { createAtelierEventBus } = await import("@atelier/core");
-  const { configureAgentMcp, handleAgentMcpRequest, subscribeWorkspaceAgentBusy } = await import("@atelier/agent/server");
-  const events = createAtelierEventBus();
+  const { createAgentsInTheCloudEventBus } = await import("@agents-in-the-cloud/core");
+  const { configureAgentMcp, handleAgentMcpRequest, subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  const events = createAgentsInTheCloudEventBus();
   const finished = [];
   const busy = [];
   const attention = [];
@@ -314,7 +314,7 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
 `));
 
 test("startup failure revokes credentials issued before adapter preparation", () => scenario(`
-  const { handleAgentMcpRequest } = await import("@atelier/agent/server");
+  const { handleAgentMcpRequest } = await import("@agents-in-the-cloud/agent/server");
   let token;
   adapter.prepareSession = async (_workspaceId, _sessionId, mcp) => {
     token = mcp.token;

@@ -4,28 +4,28 @@ export interface AgentSystemPromptPrepareEvent {
   lines: string[];
 }
 
-export interface AtelierHostStartedEvent {
+export interface AgentsInTheCloudHostStartedEvent {
   workspaces: Array<{ id: string; parked: boolean }>;
 }
 
-export interface AtelierEventMap {
+export interface AgentsInTheCloudEventMap {
   agent_system_prompt_prepare: AgentSystemPromptPrepareEvent;
-  atelier_host_started: AtelierHostStartedEvent;
+  agents_in_the_cloud_host_started: AgentsInTheCloudHostStartedEvent;
 }
 
-export type AtelierEventHandler<K extends keyof AtelierEventMap> = (event: AtelierEventMap[K]) => void | Promise<void>;
+export type AgentsInTheCloudEventHandler<K extends keyof AgentsInTheCloudEventMap> = (event: AgentsInTheCloudEventMap[K]) => void | Promise<void>;
 
-export interface AtelierEventBus {
-  on<K extends keyof AtelierEventMap>(eventName: K, handler: AtelierEventHandler<K>): () => void;
-  emit<K extends keyof AtelierEventMap>(eventName: K, event: AtelierEventMap[K]): Promise<void>;
+export interface AgentsInTheCloudEventBus {
+  on<K extends keyof AgentsInTheCloudEventMap>(eventName: K, handler: AgentsInTheCloudEventHandler<K>): () => void;
+  emit<K extends keyof AgentsInTheCloudEventMap>(eventName: K, event: AgentsInTheCloudEventMap[K]): Promise<void>;
 }
 
-export function createAtelierEventBus(): AtelierEventBus {
-  const handlers = new Map<keyof AtelierEventMap, Set<AtelierEventHandler<any>>>();
+export function createAgentsInTheCloudEventBus(): AgentsInTheCloudEventBus {
+  const handlers = new Map<keyof AgentsInTheCloudEventMap, Set<AgentsInTheCloudEventHandler<any>>>();
 
   return {
     on(eventName, handler) {
-      const eventHandlers = handlers.get(eventName) ?? new Set<AtelierEventHandler<typeof eventName>>();
+      const eventHandlers = handlers.get(eventName) ?? new Set<AgentsInTheCloudEventHandler<typeof eventName>>();
       handlers.set(eventName, eventHandlers);
       eventHandlers.add(handler);
       return () => eventHandlers.delete(handler);

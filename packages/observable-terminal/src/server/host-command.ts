@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { shellQuote, commandSignal, runCommand, killCommandGroup, withCommandSignal } from "@atelier/core";
+import { shellQuote, commandSignal, runCommand, killCommandGroup, withCommandSignal } from "@agents-in-the-cloud/core";
 import { observableTerminalCols, observableTerminalEnvironment, observableTerminalHistoryLimit, observableTerminalRows } from "./constants.ts";
 import { buildKillSessionCommand, buildObservableSessionCommand, buildSetRemainOnExitCommand } from "./tmux.ts";
 

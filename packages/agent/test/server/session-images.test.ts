@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 async function makeSession(): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "atelier-session-images-"));
+  dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-session-images-"));
   const path = join(dir, "session.jsonl");
   await writeFile(path, `${JSON.stringify({
     type: "message",

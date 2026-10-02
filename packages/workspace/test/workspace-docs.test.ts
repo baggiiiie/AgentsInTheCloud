@@ -7,7 +7,7 @@ import { syncWorkspaceDocs } from "../src/server/workspace-docs.ts";
 let root: string;
 let destination: string;
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "atelier-docs-"));
+  root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-docs-"));
   destination = join(root, "installed");
   await mkdir(join(root, "docs/deploy-in-workspace"), { recursive: true });
   await mkdir(join(root, "packages/without-docs"), { recursive: true });
@@ -21,11 +21,11 @@ async function source(path: string, content: string): Promise<void> {
 }
 
 test("deploys shared and package documentation with relative paths and read-only files", async () => {
-  await source("docs/deploy-in-workspace/atelier.md", "Shared guide");
+  await source("docs/deploy-in-workspace/agents-in-the-cloud.md", "Shared guide");
   await source("packages/inline-content/deploy-in-workspace/inline-content.md", "Rich guide");
   await source("packages/example/deploy-in-workspace/examples/usage.md", "Nested guide");
   await syncWorkspaceDocs(root, destination);
-  expect(await readFile(join(destination, "atelier.md"), "utf8")).toBe("Shared guide");
+  expect(await readFile(join(destination, "agents-in-the-cloud.md"), "utf8")).toBe("Shared guide");
   expect(await readFile(join(destination, "inline-content.md"), "utf8")).toBe("Rich guide");
   expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Nested guide");
   expect((await stat(join(destination, "inline-content.md"))).mode & 0o777).toBe(0o444);

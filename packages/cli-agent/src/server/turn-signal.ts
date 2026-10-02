@@ -1,6 +1,6 @@
-import { shellQuote } from "@atelier/core";
+import { shellQuote } from "@agents-in-the-cloud/core";
 
-/** Turn boundary reported to Atelier: a started turn marks the conversation busy, a finished one requests attention for it. */
+/** Turn boundary reported to AgentsInTheCloud: a started turn marks the conversation busy, a finished one requests attention for it. */
 export type TurnBoundary = "started" | "finished";
 
 /** Every session gets one signal script, invoked as `sh <script> <boundary>`. */

@@ -1,10 +1,10 @@
-import { Icons } from "@atelier/design-system/icons";
-import { AtelierCoreError } from "@atelier/core";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { buttonHtml } from "@atelier/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { contentText } from "@earendil-works/pi-ai";
 import type { SessionEntry, SessionManager, SessionTreeNode } from "@earendil-works/pi-coding-agent";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 interface VisibleTreeNode {
   node: SessionTreeNode;
@@ -254,7 +254,7 @@ interface AgentTreeRuntime {
 export async function handleAgentTreeRequest(request: Request, url: URL, suffix: string, runtime: () => Promise<AgentTreeRuntime>): Promise<Response | undefined> {
   if (suffix === "/summary" && request.method === "GET") {
     const entry = url.searchParams.get("entry") ?? "";
-    if (!entry) throw new AtelierCoreError("invalid_arguments", "tree entry is required");
+    if (!entry) throw new AgentsInTheCloudCoreError("invalid_arguments", "tree entry is required");
     return new Response(renderAgentTreeSummaryMenu(entry), { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (suffix === "/label" && request.method === "POST") {
@@ -262,7 +262,7 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
     const entry = String(form.get("entry") ?? "");
     const label = String(form.get("label") ?? "");
     const operation = form.get("operation");
-    if (!entry || !label.trim() || (operation !== "add" && operation !== "remove")) throw new AtelierCoreError("invalid_arguments", "tree entry, label, and valid operation are required");
+    if (!entry || !label.trim() || (operation !== "add" && operation !== "remove")) throw new AgentsInTheCloudCoreError("invalid_arguments", "tree entry, label, and valid operation are required");
     (await runtime()).labelTreeEntry(entry, label, operation);
     return new Response(null, { status: 204 });
   }
@@ -273,9 +273,9 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
   if (suffix === "" && request.method === "POST") {
     const form = await request.formData();
     const entry = String(form.get("entry") ?? "");
-    if (!entry) throw new AtelierCoreError("invalid_arguments", "tree entry is required");
+    if (!entry) throw new AgentsInTheCloudCoreError("invalid_arguments", "tree entry is required");
     const summaryMode = String(form.get("summaryMode") ?? "none");
-    if (summaryMode !== "none" && summaryMode !== "summary" && summaryMode !== "custom") throw new AtelierCoreError("invalid_arguments", "valid summary mode is required");
+    if (summaryMode !== "none" && summaryMode !== "summary" && summaryMode !== "custom") throw new AgentsInTheCloudCoreError("invalid_arguments", "valid summary mode is required");
     const editorText = await (await runtime()).navigateTree(entry, {
       summarize: summaryMode !== "none",
       customInstructions: summaryMode === "custom" ? String(form.get("customInstructions") ?? "") : undefined,

@@ -1,11 +1,11 @@
-import { response } from "@atelier/shared/http";
-import { requestAcceptsJson } from "@atelier/core";
-import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@atelier/llm/server";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { comparisonRingHtml } from "@atelier/design-system/comparison-ring";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@atelier/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
+import { requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@agents-in-the-cloud/llm/server";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
 
 function jsonResponse<Body extends object>(body: Body, status = 200): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -14,7 +14,7 @@ function jsonResponse<Body extends object>(body: Body, status = 200): Response {
 export function renderUsagePaneAction(): string {
   const button = usageButtonHtml();
   const actions = [
-    "atelier:usage:refreshed@document->usage-button#refresh",
+    "agents-in-the-cloud:usage:refreshed@document->usage-button#refresh",
     "visibilitychange@document->usage-button#refresh",
     "focus@window->usage-button#refresh",
   ].join(" ");

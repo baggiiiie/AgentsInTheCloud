@@ -1,13 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { shellQuote } from "@atelier/core";
-import { resolveWorkspaceImage } from "@atelier/workspace-image";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import { resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import { attachHostObservableTerminal, attachObservableTerminal, buildObservableSessionCommand, type ObservableTerminalConnection } from "../../src/server/index.ts";
 
 const integration = process.env.ATELIER_OBSERVABLE_TERMINAL_INTEGRATION === "1" ? describe : describe.skip;
 
 for (const remote of [false, true]) {
   integration(`${remote ? "Docker" : "host"} terminal lifecycle`, () => {
-    const container = `atelier-terminal-test-${crypto.randomUUID()}`;
+    const container = `agents-in-the-cloud-terminal-test-${crypto.randomUUID()}`;
     const sessions: string[] = [];
     const connections: ObservableTerminalConnection[] = [];
 
@@ -18,7 +18,7 @@ for (const remote of [false, true]) {
       return stdout.trim();
     }
     const run = (script: string) => command(remote
-      ? ["docker", "exec", "--user", "atelier", container, "sh", "-lc", script]
+      ? ["docker", "exec", "--user", "agents-in-the-cloud", container, "sh", "-lc", script]
       : ["sh", "-lc", script]);
     async function until(read: () => Promise<string>, expected: string): Promise<void> {
       let actual = "";

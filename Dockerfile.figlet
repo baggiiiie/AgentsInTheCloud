@@ -1,4 +1,4 @@
-FROM atelier-custom-workspace
+FROM agents-in-the-cloud-custom-workspace
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends figlet \

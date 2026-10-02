@@ -7,7 +7,7 @@ import { ensureLeafCertificate, ensureMitmCa } from "../src/egress/mitm-ca.ts";
 let dataDir = "";
 
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), "atelier-mitm-ca-test-"));
+  dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-mitm-ca-test-"));
 });
 
 afterEach(async () => {
@@ -26,7 +26,7 @@ function certificateExpiration(certPath: string): number {
 }
 
 async function caAndLeaf() {
-  const ca = await ensureMitmCa({ atelierDataDir: dataDir, dockerHostAtelierDataDir: dataDir, dockerBridgeHost: "127.0.0.1" });
+  const ca = await ensureMitmCa({ agentsInTheCloudDataDir: dataDir, dockerHostAgentsInTheCloudDataDir: dataDir, dockerBridgeHost: "127.0.0.1" });
   const leaf = await ensureLeafCertificate(ca, "api.github.com");
   return { ca, leaf };
 }
@@ -55,9 +55,9 @@ describe("MITM leaf certificates", () => {
   });
 
   test.skipIf(process.platform !== "linux")("create a leaf when the CA directory is on a different filesystem from the system temporary directory", async () => {
-    const crossDeviceDataDir = await mkdtemp("/dev/shm/atelier-mitm-ca-test-");
+    const crossDeviceDataDir = await mkdtemp("/dev/shm/agents-in-the-cloud-mitm-ca-test-");
     try {
-      const ca = await ensureMitmCa({ atelierDataDir: crossDeviceDataDir, dockerHostAtelierDataDir: crossDeviceDataDir, dockerBridgeHost: "127.0.0.1" });
+      const ca = await ensureMitmCa({ agentsInTheCloudDataDir: crossDeviceDataDir, dockerHostAgentsInTheCloudDataDir: crossDeviceDataDir, dockerBridgeHost: "127.0.0.1" });
       const leaf = await ensureLeafCertificate(ca, "api.github.com");
       expect(certificateExpiration(leaf.certPath) - Date.now()).toBeGreaterThan(6 * 24 * 60 * 60 * 1000);
     } finally {

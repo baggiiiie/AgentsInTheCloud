@@ -1,19 +1,19 @@
 {
-  "name": "@atelier/pi-agent",
+  "name": "@agents-in-the-cloud/pi-agent",
   "private": true,
   "type": "module",
   "exports": {
     "./server": "./src/server/index.ts"
   },
   "dependencies": {
-    "@atelier/agent": "workspace:*",
-    "@atelier/core": "workspace:*",
-    "@atelier/llm": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/workspace": "workspace:*",
+    "@agents-in-the-cloud/agent": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/llm": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*",
     "@earendil-works/pi-coding-agent": "catalog:",
-    "@atelier/cli-agent": "workspace:*",
-    "@atelier/proxy-egress": "workspace:*",
+    "@agents-in-the-cloud/cli-agent": "workspace:*",
+    "@agents-in-the-cloud/proxy-egress": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
     "typebox": "^1.0.57"
   }

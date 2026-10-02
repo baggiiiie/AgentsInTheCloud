@@ -1,7 +1,7 @@
-import { readJsonObject, requestAcceptsJson } from "@atelier/core";
-import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments } from "@atelier/prompt/server";
+import { readJsonObject, requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { maybeNameAgentFromPrompt, setAgentSessionTitle, suggestSessionSlug } from "./agent-title-suggestion.ts";
-import { turboStreamResponse } from "@atelier/shared";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { expandPromptTemplate, parseCompactCommand } from "./prompt-templates.ts";
 import { runAgentSessionNameCommand } from "./session-name-command.ts";
@@ -75,7 +75,7 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   await removeStagedAttachments(attachmentDraft, attachmentIds);
   if (reviewCommentIds.length) await options.events?.emit("workspace_agent_prompt_submitted", { workspaceId, reviewCommentIds });
   await removeInitialPromptDraft(workspaceId, conversationId);
-  const acceptedHeaders = { "x-atelier-attachment-draft-consumed": "true" };
+  const acceptedHeaders = { "x-agents-in-the-cloud-attachment-draft-consumed": "true" };
   return json
     ? Response.json({ agent: { conversationId, state: "running" } }, { status: 202, headers: acceptedHeaders })
     : turboStreamResponse("", { headers: acceptedHeaders });

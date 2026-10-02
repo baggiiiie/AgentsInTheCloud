@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -29,7 +29,7 @@ const settingsSchema = Type.Object({
 });
 
 function settingsPath(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "transcription.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "transcription.json");
 }
 
 export function isTranscriptionModelId(value: string): value is TranscriptionModelId {

@@ -1,9 +1,9 @@
-import { registerWorkspacePresenter } from "@atelier/agent/server";
-import { buttonHtml } from "@atelier/design-system/button";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { Icons } from "@atelier/design-system/icons";
-import { domId, escapeHtml, type WorkspaceModule, type WorkspaceWorkViewPresentation } from "@atelier/shared";
-import { createWorkspaceMetadataState, workspacePortBackend } from "@atelier/workspace";
+import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { domId, escapeHtml, type WorkspaceModule, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
+import { createWorkspaceMetadataState, workspacePortBackend } from "@agents-in-the-cloud/workspace";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { createDesktopPresenter } from "./agent-tool.ts";
@@ -19,7 +19,7 @@ const presentation: WorkspaceWorkViewPresentation = {
   availability: { phase: "live" },
 };
 
-export const atelierServerModule: WorkspaceModule = {
+export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "desktop",
   staticFiles: { "/desktop.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   workViews: [{

@@ -3,17 +3,17 @@ import { registerLiveSurfaces } from "./live-surface.ts";
 
 import { Application as StimulusApplication, Controller as StimulusController } from "@hotwired/stimulus";
 // Turbo does not publish TypeScript declarations, but Bun resolves and bundles its browser module.
-import { registerDesignSystemControllers } from "@atelier/design-system/client";
+import { registerDesignSystemControllers } from "@agents-in-the-cloud/design-system/client";
 import {
   installSoftwareKeyboardTracking,
-  type AtelierCableClient,
+  type AgentsInTheCloudCableClient,
   type WorkspaceClientControllerConstructor,
-} from "@atelier/shared";
-import { createProvisionTerminalController } from "@atelier/workspace/client";
+} from "@agents-in-the-cloud/shared";
+import { createProvisionTerminalController } from "@agents-in-the-cloud/workspace/client";
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import * as Turbo from "@hotwired/turbo";
 import { AccessSettingsController } from "./access-settings.ts";
-import { AtelierEasterEggController } from "./atelier-easter-egg.ts";
+import { AgentsInTheCloudEasterEggController } from "./agents-in-the-cloud-easter-egg.ts";
 import { KeyboardViewportController } from "./keyboard-viewport.ts";
 import { PwaReminderController } from "./pwa-reminder.ts";
 import { registerWorkspaceAppFrameController } from "./workspace-app-frame.ts";
@@ -33,7 +33,7 @@ import { registerWorkspaceShortcutsController } from "./workspace-shortcuts.ts";
 declare global {
   interface Window {
     Turbo?: { renderStreamMessage(html: string): void };
-    AtelierCable?: AtelierCableClient;
+    AgentsInTheCloudCable?: AgentsInTheCloudCableClient;
   }
 }
 
@@ -58,7 +58,7 @@ registerWorkspaceControllers({
   "keyboard-viewport": KeyboardViewportController,
   "access-settings": AccessSettingsController,
   "pwa-reminder": PwaReminderController,
-  "atelier-easter-egg": AtelierEasterEggController,
+  "agents-in-the-cloud-easter-egg": AgentsInTheCloudEasterEggController,
   "workspace-presentation": createWorkspacePresentationController(Controller, application, clientHooks),
 });
 registerWorkspaceNavigationControllers();

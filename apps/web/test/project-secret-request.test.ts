@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectSecret, deleteProjectSecret, listProjectSecrets, readProjectWorkspaceSettings, revealProjectSecrets, updateProjectSecret, setProjectSecretValue, projectSecretRoutingRevision } from "@atelier/projects";
+import { addProject, createProjectSecret, deleteProjectSecret, listProjectSecrets, readProjectWorkspaceSettings, revealProjectSecrets, updateProjectSecret, setProjectSecretValue, projectSecretRoutingRevision } from "@agents-in-the-cloud/projects";
 import { createProjectSecretRequester } from "../src/server/project-secret-request.ts";
 
 const request = { envName: "NPM_TOKEN", hostPattern: "registry.npmjs.org", purpose: "Install private dependencies" };
@@ -12,7 +12,7 @@ describe("secure project secret requests", () => {
   let previous: string | undefined;
   let projectId: string;
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "atelier-secret-request-"));
+    dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-secret-request-"));
     previous = process.env.ATELIER_DATA_DIR;
     process.env.ATELIER_DATA_DIR = dir;
     projectId = (await addProject("https://github.com/example/app.git")).project.id;
@@ -41,7 +41,7 @@ describe("secure project secret requests", () => {
     expect(result.status === "saved" && result.settingsRevision).not.toBe(initial.settingsRevision);
     expect(JSON.stringify([result, updates])).not.toContain("very-private-token");
     const secret = (await listProjectSecrets(projectId))[0]!;
-    const requestUrl = new URL(updates[0].details.secretRequestUrl, "http://atelier.local");
+    const requestUrl = new URL(updates[0].details.secretRequestUrl, "http://agents-in-the-cloud.local");
     expect(requestUrl.pathname).toBe(`/projects/${projectId}/secrets/${secret.id}/value`);
     expect(requestUrl.searchParams.get("purpose")).toBe(request.purpose);
   });

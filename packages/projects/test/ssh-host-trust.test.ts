@@ -3,12 +3,12 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { createServer, createConnection, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectSshKey, deleteProjectSshKey, projectWorkspaceInit, registerProjectWorkspaceInitEvents, setProjectSshKnownHosts, getProjectSshKnownHosts } from "@atelier/projects";
+import { addProject, createProjectSshKey, deleteProjectSshKey, projectWorkspaceInit, registerProjectWorkspaceInitEvents, setProjectSshKnownHosts, getProjectSshKnownHosts } from "@agents-in-the-cloud/projects";
 import { prepareWorkspaceSshTrust, workspaceGitSshCommand } from "../src/ssh-host-trust.ts";
 import { unknownSshHost, sshHostTrustFailure, scanSshHost, trustScannedSshHost } from "../src/ssh-trust-recovery.ts";
 import { requestWorkspaceSshTrust, workspaceSshTrustRequests, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged } from "../src/ssh-trust-broker.ts";
-import { createAtelierEventBus } from "@atelier/core";
-import type { WorkspaceDockerPlan } from "@atelier/workspace";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 import { stopProjectSshAgents, registerProjectSshAgentWorkspaceEvents } from "../src/ssh-agent.ts";
 
 let root: string;
@@ -21,7 +21,7 @@ async function run(command: string[], cwd?: string): Promise<string> {
   return stdout;
 }
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "atelier-ssh-transport-"));
+  root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-ssh-transport-"));
   previousDataDir = process.env.ATELIER_DATA_DIR;
   process.env.ATELIER_DATA_DIR = join(root, "data");
 });
@@ -183,7 +183,7 @@ test("real SSH cloning and nested submodules require verified host trust and val
   }
   const project = (await addProject(url(parent.remote))).project;
   const storedKey = await createProjectSshKey(project.id, login.privateKey);
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   registerProjectWorkspaceInitEvents(events);
   registerProjectSshAgentWorkspaceEvents(events);
   const prepare = async (workspaceId: string, gitUrl = project.gitUrl) => {
@@ -211,9 +211,9 @@ test("real SSH cloning and nested submodules require verified host trust and val
   const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
   await events.emit("workspace_plan_prepare", { ...source, plan });
   expect((await stat(socket)).ino).toBe(beforePlan.ino);
-  expect(plan.env.SSH_AUTH_SOCK).toBe("/run/atelier-ssh-agent/agent.sock");
-  expect(plan.env.GIT_SSH_COMMAND).toContain("/run/atelier-ssh-agent/known_hosts");
-  expect(plan.mounts).toContainEqual({ type: "bind", source: agentDirectory, target: "/run/atelier-ssh-agent", readonly: true });
+  expect(plan.env.SSH_AUTH_SOCK).toBe("/run/agents-in-the-cloud-ssh-agent/agent.sock");
+  expect(plan.env.GIT_SSH_COMMAND).toContain("/run/agents-in-the-cloud-ssh-agent/known_hosts");
+  expect(plan.mounts).toContainEqual({ type: "bind", source: agentDirectory, target: "/run/agents-in-the-cloud-ssh-agent", readonly: true });
   await events.emit("workspace_deleted", { workspaceId: source.workspaceId });
   expect(await Bun.file(socket).exists()).toBe(false);
   const mixed = await prepare("non-ssh-main", parent.remote);

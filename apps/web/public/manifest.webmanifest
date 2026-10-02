@@ -1,7 +1,7 @@
 {
-  "name": "Atelier",
-  "short_name": "Atelier",
-  "description": "Atelier, made for humans",
+  "name": "AgentsInTheCloud",
+  "short_name": "AgentsInTheCloud",
+  "description": "AgentsInTheCloud, made for humans",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

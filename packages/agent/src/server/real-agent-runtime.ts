@@ -1,5 +1,5 @@
-import { AtelierCoreError, isJsonObject } from "@atelier/core";
-import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesProviderSubscription, getAgentModelThinkingLevel } from "@atelier/llm/server";
+import { AgentsInTheCloudCoreError, isJsonObject } from "@agents-in-the-cloud/core";
+import { anthropicSubscriptionUnavailableReason, hasConnectedModelProvider, recordSubscriptionInference, usesProviderSubscription, getAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
 import { contentText, type UserMessage } from "@earendil-works/pi-ai";
 import type { AgentSessionEvent, CompactionEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 import { BaseAgentRuntime } from "./base-agent-runtime.ts";
@@ -674,7 +674,7 @@ export class RealAgentRuntime extends BaseAgentRuntime {
     this.followingSetupDefaults = false;
     const model = this.session.modelRuntime.getModel(provider, modelId);
     if (!model) throw new Error(`Model not available: ${provider}/${modelId}`);
-    if (provider === "anthropic" && await usesProviderSubscription(this.session.modelRuntime, "anthropic")) throw new AtelierCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
+    if (provider === "anthropic" && await usesProviderSubscription(this.session.modelRuntime, "anthropic")) throw new AgentsInTheCloudCoreError("invalid_arguments", anthropicSubscriptionUnavailableReason);
     await this.session.setModel(model);
     this.ctx.model = this.currentModel();
     const remembered = await getAgentModelThinkingLevel("builtin", { provider, id: modelId });

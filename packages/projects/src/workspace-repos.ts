@@ -1,5 +1,5 @@
-import { AtelierCoreError, collectUnpushedCommits, shellQuote, type UnpushedCommit, type AtelierEventBus, type JsonObject } from "@atelier/core";
-import { execWorkspaceShell, workspaceRoot } from "@atelier/workspace";
+import { AgentsInTheCloudCoreError, collectUnpushedCommits, shellQuote, type UnpushedCommit, type AgentsInTheCloudEventBus, type JsonObject } from "@agents-in-the-cloud/core";
+import { execWorkspaceShell, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { isGitProjectInit, recordWorkspaceCreation } from "./project.ts";
 import { registerGitIdentityWorkspaceEvents } from "./git-identity.ts";
 import { registerProjectWorkspaceInitEvents } from "./workspace-source.ts";
@@ -22,7 +22,7 @@ function parsePorcelainPaths(output: string): string[] {
 async function inspectRepositoryDeleteSafety(id: string, path: string, repoName: string): Promise<WorkspaceDeleteSafetyIssue | null> {
   const quotedPath = shellQuote(path);
   const status = await execWorkspaceShell(id, `git -C ${quotedPath} status --porcelain=v1 -z`);
-  if (status.exitCode !== 0) throw new AtelierCoreError("git_error", status.stderr.trim() || `could not check status for ${repoName}`);
+  if (status.exitCode !== 0) throw new AgentsInTheCloudCoreError("git_error", status.stderr.trim() || `could not check status for ${repoName}`);
   const unpushedCommits = await collectUnpushedCommits((args) => execWorkspaceShell(id, `git -C ${quotedPath} ${args.map(shellQuote).join(" ")}`));
   const issue = { repo: repoName, uncommittedPaths: parsePorcelainPaths(status.stdout), unpushedCommits };
   return issue.uncommittedPaths.length || issue.unpushedCommits.length ? issue : null;
@@ -34,7 +34,7 @@ async function inspectWorkspaceDeleteSafety(id: string): Promise<WorkspaceDelete
   if (repo.exitCode !== 0) return [];
 
   const submodules = await execWorkspaceShell(id, `git -C ${quotedRoot} submodule foreach --quiet --recursive 'printf "%s\\0" "$displaypath"'`);
-  if (submodules.exitCode !== 0) throw new AtelierCoreError("git_error", submodules.stderr.trim() || "could not enumerate workspace submodules");
+  if (submodules.exitCode !== 0) throw new AgentsInTheCloudCoreError("git_error", submodules.stderr.trim() || "could not enumerate workspace submodules");
   const repositories = [
     { path: workspaceRoot, name: "work" },
     ...submodules.stdout.split("\0").filter(Boolean).map((path) => ({ path: `${workspaceRoot}/${path}`, name: path })),
@@ -47,7 +47,7 @@ async function inspectWorkspaceDeleteSafety(id: string): Promise<WorkspaceDelete
   return issues;
 }
 
-export function registerProjectWorkspaceEvents(events: AtelierEventBus): void {
+export function registerProjectWorkspaceEvents(events: AgentsInTheCloudEventBus): void {
   registerProjectWorkspaceInitEvents(events);
   registerGitIdentityWorkspaceEvents(events);
   events.on("workspace_created", async ({ init }) => {

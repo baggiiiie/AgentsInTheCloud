@@ -1,4 +1,4 @@
-import type { WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { createTranscriptionComposerController } from "./transcription-controller.ts";
 import { SharedMicrophone } from "./microphone.ts";
 
@@ -14,7 +14,7 @@ function activeTranscriptionButton(): HTMLButtonElement | null {
     .find((button) => button.getClientRects().length > 0) ?? null;
 }
 
-export const atelierClientModule: WorkspaceClientModule = {
+export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "transcription",
   install({ application, Controller, hooks }) {
     application.register("transcription-composer", createTranscriptionComposerController(Controller, sharedMicrophone));

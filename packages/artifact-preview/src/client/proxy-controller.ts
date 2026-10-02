@@ -1,4 +1,4 @@
-import { workspaceProxyUrl, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
+import { workspaceProxyUrl, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 
 export function createArtifactPreviewProxyController(Controller: StimulusControllerConstructor) {
   return class ArtifactPreviewProxyController extends Controller {

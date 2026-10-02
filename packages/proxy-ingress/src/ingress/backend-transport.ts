@@ -5,7 +5,7 @@ import {
   workspaceGatewayProtocolHeader,
   workspaceGatewayTokenHeader,
   type WorkspaceHttpAppBackend,
-} from "@atelier/shared";
+} from "@agents-in-the-cloud/shared";
 
 /** Keep workspace routing credentials out of browser traffic and app requests. */
 export function backendTransport(backend: WorkspaceHttpAppBackend, headers: Headers) {

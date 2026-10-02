@@ -2,13 +2,13 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, listProjects, updateProject } from "@atelier/projects";
+import { addProject, listProjects, updateProject } from "@agents-in-the-cloud/projects";
 import { recordWorkspaceCreation } from "../src/project.ts";
 
 let directory: string;
 let file: string;
 beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), "atelier-project-recency-"));
+  directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-recency-"));
   file = join(directory, "projects.json");
 });
 afterEach(async () => { await rm(directory, { recursive: true, force: true }); });

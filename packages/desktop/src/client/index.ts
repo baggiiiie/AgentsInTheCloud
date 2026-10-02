@@ -1,4 +1,4 @@
-import type { WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { Value } from "typebox/value";
 import { desktopViewerMessage } from "../messages.ts";
 
@@ -9,7 +9,7 @@ const clipboardFeedbackLabels = {
 };
 type ClipboardState = "remote" | keyof typeof clipboardFeedbackLabels;
 
-export const atelierClientModule: WorkspaceClientModule = {
+export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "desktop",
   install({ application, Controller, hooks }) {
     class DesktopPaneController extends Controller {
@@ -49,7 +49,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         // The canonical iframe URL redirects to an assigned ingress origin.
         // This non-sensitive request discovers it; replies must prove possession
         // of the per-frame token before we pin and check that origin.
-        this.frameTarget.contentWindow?.postMessage({ type: "atelier:desktop:status-request" }, "*");
+        this.frameTarget.contentWindow?.postMessage({ type: "agents-in-the-cloud:desktop:status-request" }, "*");
       }
 
       receive(event: MessageEvent): void {
@@ -58,9 +58,9 @@ export const atelierClientModule: WorkspaceClientModule = {
         if (!Value.Check(desktopViewerMessage, data) || !this.frameTarget.dataset.statusToken || data.token !== this.frameTarget.dataset.statusToken) return;
         if (this.viewerOrigin && event.origin !== this.viewerOrigin) return;
         this.viewerOrigin = event.origin;
-        if (data.type === "atelier:desktop:status") {
+        if (data.type === "agents-in-the-cloud:desktop:status") {
           this.show(data.phase, data.detail);
-        } else if (data.type === "atelier:desktop:clipboard") {
+        } else if (data.type === "agents-in-the-cloud:desktop:clipboard") {
           // VNC can echo text we just sent; that doesn't make it a remote copy.
           if (data.text !== this.clipboardInputTarget.value) {
             this.cancelClipboardSend();
@@ -89,7 +89,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.cancelClipboardSend();
         this.setClipboardState("sending");
         this.frameTarget.contentWindow!.postMessage({
-          type: "atelier:desktop:clipboard-set",
+          type: "agents-in-the-cloud:desktop:clipboard-set",
           token: this.frameTarget.dataset.statusToken,
           text: this.clipboardInputTarget.value,
         }, this.viewerOrigin!);

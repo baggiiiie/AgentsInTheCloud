@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { actionItemHtml, type ActionItemLabel, type ActionItemElement } from "../action-item/action-item-html.ts";
 import { attributesHtml } from "../html.ts";
 

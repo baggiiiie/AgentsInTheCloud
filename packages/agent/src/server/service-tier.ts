@@ -1,13 +1,13 @@
-import { getAgentProviderServiceTier, setAgentProviderServiceTier } from "@atelier/llm/server";
-import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
-import type { AgentServiceTier } from "@atelier/shared";
+import { getAgentProviderServiceTier, setAgentProviderServiceTier } from "@agents-in-the-cloud/llm/server";
+import { isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
+import type { AgentServiceTier } from "@agents-in-the-cloud/shared";
 import type { ModelRuntime, SessionEntry, SessionManager } from "@earendil-works/pi-coding-agent";
 
 
-export type { AgentServiceTier } from "@atelier/shared";
+export type { AgentServiceTier } from "@agents-in-the-cloud/shared";
 
 const fastModeProvider = "openai-codex";
-const serviceTierEntryType = "atelier.service-tier";
+const serviceTierEntryType = "agents-in-the-cloud.service-tier";
 type AgentServiceTierSource = JsonValue | FormDataEntryValue | undefined;
 
 export function supportsFastMode(provider: string | undefined): boolean {

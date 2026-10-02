@@ -26,8 +26,8 @@ test("exports native Pi and Codex sessions beside built-in sessions, without con
   const root = await setup();
   const local = join(root, "workspaces", "workspace", "home-local", ".local", "share");
   await source(join(local, "pi", "sessions", "tab", "-work", "native-pi.jsonl"), "pi turn 1\n");
-  await source(join(local, "atelier-agents", "tab", "codex", "sessions", "2026", "rollout-123.jsonl"), "codex turn 1\n");
-  await source(join(local, "atelier-agents", "tab", "codex", "config.toml"), "secret");
+  await source(join(local, "agents-in-the-cloud-agents", "tab", "codex", "sessions", "2026", "rollout-123.jsonl"), "codex turn 1\n");
+  await source(join(local, "agents-in-the-cloud-agents", "tab", "codex", "config.toml"), "secret");
   const shared = join(root, "session-shares", "team-project");
   await exportCliHistory("workspace", "pi", "tab", "named-task");
   await exportCliHistory("workspace", "codex", "tab", "named-task");

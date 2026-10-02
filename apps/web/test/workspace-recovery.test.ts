@@ -1,5 +1,5 @@
 import { expect, test, spyOn } from "bun:test";
-import { createWorkspaceProvisioning } from "@atelier/workspace";
+import { createWorkspaceProvisioning } from "@agents-in-the-cloud/workspace";
 import { recoverWorkspaces } from "../src/server/workspace-recovery.ts";
 import { createWorkspaceRegistry } from "../src/server/workspace-registry.ts";
 

@@ -1,10 +1,10 @@
 import qrcode from "qrcode-generator";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { domId, escapeHtml, isWorkspaceLoopbackHost, type WorkspaceWorkViewPresentation } from "@atelier/shared";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { domId, escapeHtml, isWorkspaceLoopbackHost, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { browserFrameId, type WorkspaceBrowserView } from "./state.ts";
 
 export function browserWorkViewPresentation(view: WorkspaceBrowserView): WorkspaceWorkViewPresentation {

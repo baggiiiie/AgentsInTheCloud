@@ -1,5 +1,5 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 /** Render standalone artifacts and URL previews referenced in Markdown. */
 
@@ -25,7 +25,7 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 function renderFullscreenFrame(title: string, iframeHtml: string, newTabLinkHtml: string): string {
-  return `<span class="agent-media-frame" data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="media" data-atelier-fullscreen-title-value="${escapeHtml(title)}"><span class="agent-media-frame-bar"><span>${escapeHtml(title)}</span><span class="agent-media-frame-actions">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="atelier-fullscreen#open"' })}<span class="agent-media-frame-sep" aria-hidden="true">–</span>${newTabLinkHtml}</span></span>${iframeHtml}</span>`;
+  return `<span class="agent-media-frame" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(title)}"><span class="agent-media-frame-bar"><span>${escapeHtml(title)}</span><span class="agent-media-frame-actions">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="agents-in-the-cloud-fullscreen#open"' })}<span class="agent-media-frame-sep" aria-hidden="true">–</span>${newTabLinkHtml}</span></span>${iframeHtml}</span>`;
 }
 
 function embedLiteral(target: string): string {
@@ -40,10 +40,10 @@ function renderFileEmbed(workspaceId: string, path: string): string {
   const proxy = workspaceProxyController(workspaceId, "file", path);
 
   if (imageExtensions.has(ext)) {
-    return `<img class="agent-media-img" data-controller="artifact-preview-proxy atelier-fullscreen" data-atelier-fullscreen-mode-value="media" data-atelier-fullscreen-title-value="${escapeHtml(name)}" data-artifact-preview-proxy-workspace-id-value="${escapeHtml(workspaceId)}" data-artifact-preview-proxy-app-key-value="file" data-artifact-preview-proxy-path-value="${escapeHtml(path)}" alt="${escapeHtml(name)}" loading="lazy">`;
+    return `<img class="agent-media-img" data-controller="artifact-preview-proxy agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(name)}" data-artifact-preview-proxy-workspace-id-value="${escapeHtml(workspaceId)}" data-artifact-preview-proxy-app-key-value="file" data-artifact-preview-proxy-path-value="${escapeHtml(path)}" alt="${escapeHtml(name)}" loading="lazy">`;
   }
   if (videoExtensions.has(ext)) {
-    return `<video class="agent-media-video" data-controller="artifact-preview-proxy atelier-fullscreen" data-atelier-fullscreen-mode-value="media" data-atelier-fullscreen-title-value="${escapeHtml(name)}" data-artifact-preview-proxy-workspace-id-value="${escapeHtml(workspaceId)}" data-artifact-preview-proxy-app-key-value="file" data-artifact-preview-proxy-path-value="${escapeHtml(path)}" controls preload="metadata"></video>`;
+    return `<video class="agent-media-video" data-controller="artifact-preview-proxy agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(name)}" data-artifact-preview-proxy-workspace-id-value="${escapeHtml(workspaceId)}" data-artifact-preview-proxy-app-key-value="file" data-artifact-preview-proxy-path-value="${escapeHtml(path)}" controls preload="metadata"></video>`;
   }
   if (ext === "html" || ext === "htm") {
     const iframe = `<iframe data-controller="artifact-preview-proxy artifact-preview-html" data-artifact-preview-proxy-workspace-id-value="${escapeHtml(workspaceId)}" data-artifact-preview-proxy-app-key-value="file" data-artifact-preview-proxy-path-value="${escapeHtml(path)}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;

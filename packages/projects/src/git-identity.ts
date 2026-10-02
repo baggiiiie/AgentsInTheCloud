@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { getAtelierRuntimeContext, invalidArguments, shellQuote, type AtelierEventBus } from "@atelier/core";
+import { getAgentsInTheCloudRuntimeContext, invalidArguments, shellQuote, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -19,7 +19,7 @@ const gitIdentityStoreSchema = Type.Object({
 
 type GitIdentityStore = Static<typeof gitIdentityStoreSchema>;
 
-export function gitIdentitySettingsFile(dataDir = getAtelierRuntimeContext().atelierDataDir): string {
+export function gitIdentitySettingsFile(dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {
   return join(dataDir, "project-settings.json");
 }
 
@@ -104,7 +104,7 @@ export async function clearGitIdentity(file = gitIdentitySettingsFile()): Promis
   await writeStore(file, {});
 }
 
-export function registerGitIdentityWorkspaceEvents(events: AtelierEventBus): void {
+export function registerGitIdentityWorkspaceEvents(events: AgentsInTheCloudEventBus): void {
   events.on("workspace_plan_prepare", async ({ plan }) => {
     const identity = await getGitIdentity();
     if (!identity) return;

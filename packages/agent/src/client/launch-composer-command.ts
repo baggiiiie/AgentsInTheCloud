@@ -1,4 +1,4 @@
-import { recentWorkspaceProjectStorageKey, type WorkspaceClientHooks } from "@atelier/shared";
+import { recentWorkspaceProjectStorageKey, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 
 export function registerLaunchComposerCommand(hooks: WorkspaceClientHooks): void {
   hooks.registerCommand({

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { getCustomModelsJson, loginPiOAuthProvider, setCustomModelsJson } from "../../src/server/pi-config-models.ts";
 let dataDir: string;
 beforeEach(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), "atelier-llm-models-"));
+  dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-llm-models-"));
   process.env.ATELIER_DATA_DIR = dataDir;
 });
 afterEach(async () => {

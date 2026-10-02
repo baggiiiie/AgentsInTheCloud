@@ -1,11 +1,11 @@
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import { cancelWorkspaceSshTrust, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged, requestWorkspaceSshTrust, workspaceSshTrustRequests } from "@atelier/projects";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { cancelWorkspaceSshTrust, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged, requestWorkspaceSshTrust, workspaceSshTrustRequests } from "@agents-in-the-cloud/projects";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createTestApp, temporaryAtelierDataDir } from "./support/test-web-app.ts";
+import { createTestApp, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 
-const dataDir = temporaryAtelierDataDir();
+const dataDir = temporaryAgentsInTheCloudDataDir();
 beforeEach(dataDir.setUp);
 afterEach(dataDir.tearDown);
 
@@ -26,7 +26,7 @@ for (const initiallyVisible of [false, true]) {
     const { registry } = createTestApp();
     const id = crypto.randomUUID();
     await registry.seed([{ id, title: "SSH attention" }]);
-    const directory = atelierDataPath(getAtelierRuntimeContext(), "ssh-agents", id);
+    const directory = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "ssh-agents", id);
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, "known_hosts"), "");
     if (initiallyVisible) registry.setVisibility("browser", { workspaceId: id, surfaceKeys: [] });

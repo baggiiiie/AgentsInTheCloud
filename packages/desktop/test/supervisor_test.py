@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-spec = importlib.util.spec_from_file_location("desktop", Path(__file__).parent.parent / "workspace-image/atelier-desktop.py")
+spec = importlib.util.spec_from_file_location("desktop", Path(__file__).parent.parent / "workspace-image/agents-in-the-cloud-desktop.py")
 desktop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(desktop)
 

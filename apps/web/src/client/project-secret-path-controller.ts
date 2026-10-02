@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
-import { setToggleValue } from "@atelier/design-system/toggle/client";
-import { projectSecretAllowsPath } from "@atelier/projects/secret-path-policy";
+import { setToggleValue } from "@agents-in-the-cloud/design-system/toggle/client";
+import { projectSecretAllowsPath } from "@agents-in-the-cloud/projects/secret-path-policy";
 
 /** New-secret defaults follow the host until the user explicitly picks a permission. */
 export class ProjectSecretPathController extends Controller<HTMLFormElement> {

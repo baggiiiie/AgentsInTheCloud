@@ -1,4 +1,4 @@
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { expect, test } from "bun:test";
 import { RealAgentRuntime } from "../../src/server/real-agent-runtime.ts";
@@ -30,7 +30,7 @@ function harness() {
     subscribe(next: (event: any) => void) { listener = next; return () => {}; },
     async abort() { session.isStreaming = false; },
   };
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   let finished = 0;
   events.on("workspace_agent_turn_finished", () => { finished++; });
   const runtime = new PersistedRuntime({ workspaceId: "persisted-lifecycle", conversationId: crypto.randomUUID(),

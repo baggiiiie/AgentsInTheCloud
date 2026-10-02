@@ -1,13 +1,13 @@
 {
-  "name": "@atelier/subagents",
+  "name": "@agents-in-the-cloud/subagents",
   "private": true,
   "type": "module",
   "exports": { "./server": "./src/server/index.ts", "./client": "./src/client/index.ts" },
   "dependencies": {
-    "@atelier/agent": "workspace:*",
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/agent": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
     "@earendil-works/pi-coding-agent": "catalog:",
     "typebox": "^1.0.57"

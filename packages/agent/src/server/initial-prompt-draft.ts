@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -10,7 +10,7 @@ const initialPromptDraftSchema = Type.Object({
 });
 
 function initialPromptDraftWorkspacePath(workspaceId: string): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "agent-initial-prompt-drafts", workspaceId);
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "agent-initial-prompt-drafts", workspaceId);
 }
 
 function initialPromptDraftPath(workspaceId: string, conversationId: string): string {

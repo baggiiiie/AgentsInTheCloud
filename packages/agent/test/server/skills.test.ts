@@ -19,22 +19,22 @@ describe("workspace skills", () => {
     });
   });
 
-  test("prefers Atelier skills over standard and Pi compatibility locations", async () => {
+  test("prefers AgentsInTheCloud skills over standard and Pi compatibility locations", async () => {
     const result = await workspaceSkillsFromFiles([
       { path: "/work/.pi/skills/review/SKILL.md", content: "---\ndescription: Pi review\n---\nPi" },
       { path: "/work/.agents/skills/review/SKILL.md", content: "---\ndescription: Standard review\n---\nStandard" },
-      { path: "/work/.atelier/skills/review/SKILL.md", content: "---\ndescription: Atelier review\n---\nAtelier" },
+      { path: "/work/.agents-in-the-cloud/skills/review/SKILL.md", content: "---\ndescription: AgentsInTheCloud review\n---\nAgentsInTheCloud" },
     ]);
 
     expect(result.skills).toHaveLength(1);
-    expect(result.skills[0]).toMatchObject({ description: "Atelier review", body: "Atelier" });
+    expect(result.skills[0]).toMatchObject({ description: "AgentsInTheCloud review", body: "AgentsInTheCloud" });
     expect(result.diagnostics).toHaveLength(2);
     expect(result.diagnostics.every((diagnostic) => diagnostic.type === "collision")).toBe(true);
   });
 
   test("rejects skills without the description required by the Agent Skills specification", async () => {
     const result = await workspaceSkillsFromFiles([{
-      path: "/work/.atelier/skills/review/SKILL.md",
+      path: "/work/.agents-in-the-cloud/skills/review/SKILL.md",
       content: "# Review\nNo frontmatter",
     }]);
 
@@ -42,7 +42,7 @@ describe("workspace skills", () => {
     expect(result.diagnostics).toEqual([{
       type: "warning",
       message: "description is required",
-      path: "/work/.atelier/skills/review/SKILL.md",
+      path: "/work/.agents-in-the-cloud/skills/review/SKILL.md",
     }]);
   });
 });

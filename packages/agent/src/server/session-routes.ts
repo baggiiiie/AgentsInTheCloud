@@ -1,5 +1,5 @@
-import { requestAcceptsJson } from "@atelier/core";
-import { turboStreamResponse } from "@atelier/shared";
+import { requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { invalidateAgentView, matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 import { sessionImageEndpoint } from "./session-images.ts";

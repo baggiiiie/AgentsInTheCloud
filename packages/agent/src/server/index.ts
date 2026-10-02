@@ -33,7 +33,7 @@ export { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
 export { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
 export { expandPromptTemplate } from "./prompt-templates.ts";
 export { runAgentSessionNameCommand } from "./session-name-command.ts";
-export { agentWorkspaceModule, agentWorkspaceModule as atelierServerModule, workspaceAgentTabProvider } from "./web.ts";
+export { agentWorkspaceModule, agentWorkspaceModule as agentsInTheCloudServerModule, workspaceAgentTabProvider } from "./web.ts";
 export {
   createDeleteCurrentWorkspaceTool,
   createWorkspaceAgentTools,

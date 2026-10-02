@@ -3,7 +3,7 @@ import { $ } from "bun";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shellQuote, withCommandSignal } from "@atelier/core";
+import { shellQuote, withCommandSignal } from "@agents-in-the-cloud/core";
 import {
   attachHostObservableTerminal,
   buildCapturePaneCommand,
@@ -30,7 +30,7 @@ maybe("observable terminal integration", () => {
   });
 
   test("fixed-size sessions keep carriage-return progress readable", async () => {
-    const session = `atelier-observable-test-${Date.now()}`;
+    const session = `agents-in-the-cloud-observable-test-${Date.now()}`;
     sessions.push(session);
     const fixture = `import sys, time\nprint("Cloning into 'repo'...")\nfor i in range(1, 101):\n    sys.stderr.write(f"remote: Counting objects: {i:3}% ({i}/100)\\r")\n    sys.stderr.flush()\n    time.sleep(0.005)\nsys.stderr.write("remote: Counting objects: 100% (100/100), done.\\n")`;
     await sh(buildObservableSessionCommand({ session, cwd: process.cwd(), command: `python3 -c ${shellQuote(fixture)}`, fixedSize: true, remainOnExit: true }));
@@ -45,7 +45,7 @@ maybe("observable terminal integration", () => {
   });
 
   test("fixed-size sessions report stable dimensions", async () => {
-    const session = `atelier-observable-test-${Date.now()}`;
+    const session = `agents-in-the-cloud-observable-test-${Date.now()}`;
     sessions.push(session);
     await sh(buildObservableSessionCommand({ session, cwd: process.cwd(), command: "sleep 5", fixedSize: true, remainOnExit: true }));
     const size = (await sh(`tmux display-message -p -t ${session} '#{pane_width}x#{pane_height}'`)).trim();
@@ -54,7 +54,7 @@ maybe("observable terminal integration", () => {
 
   test("host readonly attach works when parent TERM is dumb", async () => {
     const originalTerm = process.env.TERM;
-    const session = `atelier-observable-test-${Date.now()}`;
+    const session = `agents-in-the-cloud-observable-test-${Date.now()}`;
     sessions.push(session);
     process.env.TERM = "dumb";
     try {
@@ -95,7 +95,7 @@ maybe("observable command cancellation", () => {
   test("cancellation stops the command group rather than just the terminal viewer", async () => {
     const directory = await mkdtemp(join(tmpdir(), "observable-cancel-"));
     const controller = new AbortController();
-    const session = `atelier-observable-cancel-${crypto.randomUUID().slice(0, 8)}`;
+    const session = `agents-in-the-cloud-observable-cancel-${crypto.randomUUID().slice(0, 8)}`;
     try {
       const pending = withCommandSignal(controller.signal, () => runHostObservableCommand({
         session, cwd: directory,

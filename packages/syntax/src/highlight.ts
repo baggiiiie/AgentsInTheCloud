@@ -32,12 +32,12 @@ import typescript from "@shikijs/langs/typescript";
 import vue from "@shikijs/langs/vue";
 import xml from "@shikijs/langs/xml";
 import yaml from "@shikijs/langs/yaml";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { shaderLanguageFromExtension } from "./shader-languages.ts";
 import { parserHighlightSpans } from "./parser-highlighting.ts";
 import { HighlightCache } from "./highlight-cache.ts";
 
-const theme = createCssVariablesTheme({ name: "atelier-fragment", variablePrefix: "--syntax-", fontStyle: false });
+const theme = createCssVariablesTheme({ name: "agents-in-the-cloud-fragment", variablePrefix: "--syntax-", fontStyle: false });
 theme.tokenColors?.push(
   { scope: ["constant.numeric"], settings: { foreground: "var(--syntax-number)" } },
   { scope: ["variable", "variable.other", "variable.language"], settings: { foreground: "var(--syntax-variable)" } },
@@ -115,7 +115,7 @@ function highlightUncached(code: string, language: string | undefined): Highligh
     fragments.push(escapeHtml(code.slice(end)));
     return { html: fragments.join(""), language };
   }
-  const lines = highlighter.codeToTokens(code, { lang: language, theme: "atelier-fragment" }).tokens;
+  const lines = highlighter.codeToTokens(code, { lang: language, theme: "agents-in-the-cloud-fragment" }).tokens;
   const html = lines.map((tokens) => tokens.map((token) => {
     const escaped = escapeHtml(token.content);
     const role = token.color?.match(colorRole)?.[1];

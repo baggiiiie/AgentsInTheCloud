@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { createAgentSession, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { observeProviderLimits, providerLimit, type ProviderLimit } from "../../src/server/provider-limits.ts";
-import { createAtelierResourceLoader } from "../../src/server/system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader } from "../../src/server/system-prompt.ts";
 
 test("rate-limit cooldowns require explicit, valid response metadata", () => {
   const now = Date.UTC(2020, 0, 1);
@@ -24,9 +24,9 @@ test("rate-limit cooldowns require explicit, valid response metadata", () => {
 });
 
 test("response observation preserves Pi callbacks, clears on success, and unsubscribes pending work", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "atelier-provider-limit-"));
+  const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-provider-limit-"));
   const { session } = await createAgentSession({
-    cwd: dir, agentDir: dir, resourceLoader: createAtelierResourceLoader(),
+    cwd: dir, agentDir: dir, resourceLoader: createAgentsInTheCloudResourceLoader(),
     sessionManager: SessionManager.inMemory(dir), settingsManager: SettingsManager.inMemory(), tools: [],
   });
   const responses: number[] = [];

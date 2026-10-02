@@ -1,5 +1,5 @@
 import { agentDelegation } from "./delegation.ts";
-import { AtelierCoreError } from "@atelier/core";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { createRealRuntime } from "./real-agent-runtime.ts";
 import type { WorkspaceAgentRuntime, WorkspaceAgentRuntimeOptions } from "./runtime-types.ts";
 import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
@@ -38,9 +38,9 @@ export async function removeWorkspaceAgentRuntimes(workspaceId: string): Promise
 }
 
 export function getWorkspaceAgentRuntime(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentRuntimeOptions = {}): Promise<WorkspaceAgentRuntime> {
-  if (removedWorkspaceIds.has(agent.workspaceId)) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${agent.workspaceId}`);
+  if (removedWorkspaceIds.has(agent.workspaceId)) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${agent.workspaceId}`);
   const key = runtimeKey(agent.workspaceId, agent.conversationId);
-  if (closedConversationKeys.has(key)) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${agent.conversationId}`);
+  if (closedConversationKeys.has(key)) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${agent.conversationId}`);
   let runtime = runtimes.get(key);
   if (!runtime) {
     runtime = createRealRuntime(agent, options).catch((error) => {

@@ -1,17 +1,17 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { Icons } from "@atelier/design-system/icons";
-import { progressButtonHtml } from "@atelier/design-system/progress-button";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { transientFeedbackHtml } from "@atelier/design-system/transient-feedback";
-import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { progressButtonHtml } from "@agents-in-the-cloud/design-system/progress-button";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { transientFeedbackHtml } from "@agents-in-the-cloud/design-system/transient-feedback";
+import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@agents-in-the-cloud/shared";
 import { isReleaseChannel, type ReleaseChannel } from "./channels.ts";
 import { detectSelfUpdateRuntime, prepareUpdate, type PreparedUpdate, type PullProgress, type SelfUpdateRuntime } from "./docker.ts";
 import { fetchChannelImageMetadata, repository, type ImageMetadata } from "./registry.ts";
 import { readStoredReleaseChannel, writeStoredReleaseChannel } from "./settings-store.ts";
 import { requestSupervisorUpdate } from "./supervisor.ts";
 
-const updateSidebarContributionId = "atelier-update";
+const updateSidebarContributionId = "agents-in-the-cloud-update";
 const pollIntervalMs = 5 * 60 * 1000;
 
 export type UpdateState = "idle" | "checking" | "available" | "pulling" | "ready_to_restart" | "failed" | "restarting";
@@ -45,7 +45,7 @@ export class UpdateManager {
   private percent: number | undefined;
   private error: string | undefined;
   private target: ImageMetadata | undefined;
-  private releaseChannel: ReleaseChannel = "stable";
+  private releaseChannel: ReleaseChannel = "beta";
   private pullPromise: Promise<void> | undefined;
   private prepared: PreparedUpdate | undefined;
   private progressMessage: string | undefined;
@@ -58,7 +58,7 @@ export class UpdateManager {
   async initialize(context: WorkspaceServerModuleContext): Promise<void> {
     this.context = context;
     this.runtime = await (this.deps.detectRuntime ?? detectSelfUpdateRuntime)();
-    this.releaseChannel = await this.deps.readChannel?.() ?? "stable";
+    this.releaseChannel = await this.deps.readChannel?.() ?? "beta";
     this.updateSidebar();
     if (!this.runtime) return;
     await this.checkNow().catch((error) => console.error("Update check failed", error));
@@ -113,7 +113,7 @@ export class UpdateManager {
   }
 
   async setReleaseChannel(channel: ReleaseChannel): Promise<void> {
-    if (!this.runtime) throw new Error("Atelier is not running in a System-managed installation");
+    if (!this.runtime) throw new Error("AgentsInTheCloud is not running in a System-managed installation");
     if (this.switchingChannel || this.pullPromise || this.restarting) throw new Error("Cannot switch release channels while an update is in progress");
     if (channel === this.releaseChannel) return await this.checkNow();
     this.switchingChannel = true;
@@ -131,7 +131,7 @@ export class UpdateManager {
   }
 
   startPull(): Promise<void> {
-    if (!this.runtime) throw new UpdateConflictError("Atelier is not running in a System-managed installation");
+    if (!this.runtime) throw new UpdateConflictError("AgentsInTheCloud is not running in a System-managed installation");
     if (this.switchingChannel) throw new UpdateConflictError("Release channel change is in progress");
     if (this.pullPromise) return this.pullPromise;
     if (!this.target || (this.state !== "available" && this.state !== "failed")) {
@@ -159,7 +159,7 @@ export class UpdateManager {
   }
 
   async restart(): Promise<void> {
-    if (!this.runtime) throw new UpdateConflictError("Atelier is not running in a System-managed installation");
+    if (!this.runtime) throw new UpdateConflictError("AgentsInTheCloud is not running in a System-managed installation");
     if (this.switchingChannel || this.restarting) throw new UpdateConflictError("An update is already in progress");
     if (this.state !== "ready_to_restart" || !this.prepared) throw new UpdateConflictError("No prepared update is ready to restart");
     this.restarting = true;
@@ -197,8 +197,8 @@ function renderCheckForm(): string {
 
 function renderDownloadControl(snapshot: StateSnapshot): string {
   const content = {
-    initialContent: { kind: "text" as const, text: "Download Atelier" },
-    progressContent: { kind: "text" as const, text: "Download Atelier" },
+    initialContent: { kind: "text" as const, text: "Download AgentsInTheCloud" },
+    progressContent: { kind: "text" as const, text: "Download AgentsInTheCloud" },
     variant: "primary" as const,
     type: "submit" as const,
   };
@@ -227,7 +227,7 @@ function renderRestartFeedback(surface: UpdateControlSurface, message?: string):
   return transientFeedbackHtml({
     element: { tag: "div",  attributesHtml: `id="${restartFeedbackId(surface)}"` },
     initialContent: { kind: "html", html: restartFormHtml(surface) },
-    feedbackContent: { kind: "html", html: `<span class="transient-feedback__status update-restart-error">Could not restart Atelier: ${escapeHtml(message ?? "")}</span>` },
+    feedbackContent: { kind: "html", html: `<span class="transient-feedback__status update-restart-error">Could not restart AgentsInTheCloud: ${escapeHtml(message ?? "")}</span>` },
     state: message === undefined ? "initial" : "feedback",
   });
 }
@@ -266,13 +266,14 @@ function renderUpdateSettings(updateManager: UpdateManager, checked = false): st
     value: snapshot.releaseChannel,
     form: { action: "/settings/update-channel" },
     options: [
-      { value: "stable", label: "Stable", disabled },
-      { value: "latest", label: "Latest", disabled },
+      { value: "beta", label: "Beta", disabled },
+      { value: "stable", label: "Stable", disabled: true },
+      { value: "latest", label: "Latest", disabled: true },
     ],
   });
   const description = snapshot.selfUpdatable
-    ? "Stable is the default; Latest follows the newest builds."
-    : "Updates are available when Atelier runs inside Atelier System.";
+    ? "This beta installation follows the Beta channel."
+    : "Updates are available when AgentsInTheCloud runs inside AgentsInTheCloud System.";
   return `<section class="settings-sec update-settings-control" id="settings-sec-update"><div><h2>Updates</h2><p class="settings-sub">${description}</p></div><div class="update-settings-actions">${control}${channel}</div>${renderError(snapshot)}</section>`;
 }
 
@@ -289,7 +290,7 @@ const updateSettingsContribution: SettingsContribution = {
 
 function renderSidebarRow(snapshot: StateSnapshot): string {
   if (!snapshot.selfUpdatable || snapshot.state === "idle" || snapshot.state === "checking") return "";
-  return `<section class="update-sidebar-section"><div id="update_sidebar_row" class="update-sidebar-row"><p>${snapshot.state === "failed" ? "Atelier update needs attention." : "There's a new version of Atelier!"}</p>${renderUpdateControl(snapshot, "sidebar")}${renderError(snapshot)}</div></section>`;
+  return `<section class="update-sidebar-section"><div id="update_sidebar_row" class="update-sidebar-row"><p>${snapshot.state === "failed" ? "AgentsInTheCloud update needs attention." : "There's a new version of AgentsInTheCloud!"}</p>${renderUpdateControl(snapshot, "sidebar")}${renderError(snapshot)}</div></section>`;
 }
 
 function renderError(snapshot: StateSnapshot): string {
@@ -300,7 +301,7 @@ function renderError(snapshot: StateSnapshot): string {
 
 export function createUpdateRouteHandler(updateManager: UpdateManager): (request: Request, url: URL) => Promise<Response | undefined> {
   return async (request, url) => {
-    if (request.method === "POST" && (url.pathname.startsWith("/update/") || url.pathname === "/settings/update-channel") && !updateManager.snapshot().selfUpdatable) return new Response("Updates require Atelier System", { status: 409 });
+    if (request.method === "POST" && (url.pathname.startsWith("/update/") || url.pathname === "/settings/update-channel") && !updateManager.snapshot().selfUpdatable) return new Response("Updates require AgentsInTheCloud System", { status: 409 });
     if (url.pathname === "/update/dismiss-error" && request.method === "POST") {
       updateManager.clearError();
       return turboStreamResponse("");
@@ -328,7 +329,7 @@ export function createUpdateRouteHandler(updateManager: UpdateManager): (request
     if (url.pathname === "/update/restart" && request.method === "POST") {
       try {
         await updateManager.restart();
-        return new Response(null, { status: 204, headers: { "x-atelier-reload": "true" } });
+        return new Response(null, { status: 204, headers: { "x-agents-in-the-cloud-reload": "true" } });
       } catch (error) {
         const surface = url.searchParams.get("surface");
         if (surface !== "settings" && surface !== "sidebar") return new Response("Missing update control surface", { status: 400 });
@@ -340,8 +341,8 @@ export function createUpdateRouteHandler(updateManager: UpdateManager): (request
   };
 }
 
-export const atelierServerModule: WorkspaceModule = {
-  id: "atelier-update",
+export const agentsInTheCloudServerModule: WorkspaceModule = {
+  id: "agents-in-the-cloud-update",
   settingsContributions: [updateSettingsContribution],
   staticFiles: {
     "/update-client.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },

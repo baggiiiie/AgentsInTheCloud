@@ -6,25 +6,25 @@ import { Value } from "typebox/value";
 import { authenticateRegistry, commandRunner, ensureBuilders, inspectImage, inspectPlatform, platforms, type Run } from "./release-support.ts";
 import { acquireReleaseLock } from "./release-lock.ts";
 
-const image = "ghcr.io/lucasmeijer/atelier";
+const image = "ghcr.io/lucasmeijer/agents-in-the-cloud";
 const root = resolve(import.meta.dir, "..");
-export const usage = `Release Atelier from the current origin/main commit.
+export const usage = `Release AgentsInTheCloud beta from the current origin/rename-agents-in-the-cloud commit.
 
-  bun run release             Publish latest
-  bun run release --stable    Publish latest and stable
+  bun run release             Publish beta only
   bun run release --check     Check Git, local/SSH Docker builders and both architectures; publish nothing
 
---check may be combined with --stable. Working files are never released or reset.
+Stable/latest publishing is disabled until cutover. Working files are never released or reset.
 Requires ATELIER_RELEASE_HELPER=[user@]hostname with noninteractive SSH and Docker access.
 Uses the existing GH_PACKAGE_TOKEN for publishing. Logs/status live under Git's
-common directory in atelier-releases/<run-id>/. See docs/releases.md.
+common directory in agents-in-the-cloud-releases/<run-id>/. See docs/releases.md.
 `;
 
 export function parseReleaseArgs(args: string[]) {
   for (const arg of args) {
-    if (!["--stable", "--check", "--help", "-h"].includes(arg)) throw new Error(`Unknown release option: ${arg}`);
+    if (arg === "--stable") throw new Error("Stable publishing is disabled on the AgentsInTheCloud beta branch");
+    if (!["--check", "--help", "-h"].includes(arg)) throw new Error(`Unknown release option: ${arg}`);
   }
-  return { stable: args.includes("--stable"), check: args.includes("--check"), help: args.includes("--help") || args.includes("-h") };
+  return { check: args.includes("--check"), help: args.includes("--help") || args.includes("-h") };
 }
 
 type ChannelState = "pending" | "promoting" | "published" | "failed";
@@ -38,7 +38,7 @@ export interface ReleaseStatus {
   commit?: string;
   builder?: string;
   digest?: string;
-  channels: Partial<Record<"latest" | "stable", ChannelState>>;
+  channels: Partial<Record<"beta", ChannelState>>;
   error?: string;
 }
 const preloadSchema = Type.Array(Type.String({ pattern: "@sha256:[a-f0-9]{64}$" }), { minItems: 1 });
@@ -60,7 +60,7 @@ export async function verifyRevision(run: Run, ref: string, commit: string): Pro
 }
 
 export async function promoteChannels(run: Run, status: ReleaseStatus, save: () => void): Promise<void> {
-  for (const channel of ["latest", "stable"] as const) {
+  for (const channel of ["beta"] as const) {
     if (status.channels[channel] === undefined) continue;
     status.phase = `Promote ${channel}`;
     status.channels[channel] = "promoting";
@@ -82,8 +82,8 @@ export async function promoteChannels(run: Run, status: ReleaseStatus, save: () 
 
 export async function release(options: ReturnType<typeof parseReleaseArgs>, run: Run, status: ReleaseStatus, save: () => void, directory: string): Promise<void> {
   const phase = (text: string) => { status.phase = text; save(); };
-  phase("Resolve origin/main");
-  await run(["git", "fetch", "origin", "refs/heads/main"]);
+  phase("Resolve origin/rename-agents-in-the-cloud");
+  await run(["git", "fetch", "origin", "refs/heads/rename-agents-in-the-cloud"]);
   status.commit = (await run(["git", "rev-parse", "FETCH_HEAD^{commit}"])).stdout.trim();
   save();
   phase("Check local and SSH native builders");
@@ -106,7 +106,7 @@ export async function release(options: ReturnType<typeof parseReleaseArgs>, run:
     await run(["git", "worktree", "add", "--detach", checkout, status.commit]);
     try {
       phase("Build and upload commit images (no channel updates)");
-      await run(["bun", join(root, "scripts/build-atelier-image.ts"), "--push", "--no-latest", "--tag", `sha-${status.commit}`, "--builder", builders.local, "--helper-context", builders.remote, "--native-platform", builders.nativePlatform, "--platform", platforms.join(","), "--progress", "plain"], { cwd: checkout, stream: true });
+      await run(["bun", join(root, "scripts/build-agents-in-the-cloud-image.ts"), "--push", "--no-latest", "--tag", `sha-${status.commit}`, "--builder", builders.local, "--helper-context", builders.remote, "--native-platform", builders.nativePlatform, "--platform", platforms.join(","), "--progress", "plain"], { cwd: checkout, stream: true });
     } finally {
       await run(["git", "worktree", "remove", "--force", checkout]);
     }
@@ -114,24 +114,24 @@ export async function release(options: ReturnType<typeof parseReleaseArgs>, run:
   phase("Verify both architectures and revision labels");
   status.digest = await verifyRevision(run, ref, status.commit);
   save();
-  // Avoid promoting a build that was overtaken by new main commits while building.
-  phase("Confirm main has not moved");
-  const head = (await run(["git", "ls-remote", "origin", "refs/heads/main"])).stdout.split(/\s+/)[0];
-  if (head !== status.commit) throw new Error("origin/main moved during this release. Commit image is uploaded; rerun to release the new main.");
+  // Avoid promoting a build that was overtaken by new rename branch commits while building.
+  phase("Confirm rename branch has not moved");
+  const head = (await run(["git", "ls-remote", "origin", "refs/heads/rename-agents-in-the-cloud"])).stdout.split(/\s+/)[0];
+  if (head !== status.commit) throw new Error("origin/rename-agents-in-the-cloud moved during this release. Commit image is uploaded; rerun to release the new branch head.");
   await promoteChannels(run, status, save);
   status.state = "published";
   phase(`Published ${Object.keys(status.channels).join(" + ")} — ${status.digest}`);
 }
 
 async function main(options: ReturnType<typeof parseReleaseArgs>, common: string): Promise<void> {
-  const directory = join(common, "atelier-releases", `${new Date().toISOString().replaceAll(":", "-")}-${process.pid}`);
+  const directory = join(common, "agents-in-the-cloud-releases", `${new Date().toISOString().replaceAll(":", "-")}-${process.pid}`);
   mkdirSync(directory, { recursive: true });
   const logPath = join(directory, "release.log");
   const statusPath = join(directory, "status.json");
   const started = Date.now();
   const status: ReleaseStatus = {
     state: "running", phase: "Starting", startedAt: new Date(started).toISOString(), updatedAt: new Date(started).toISOString(), elapsedSeconds: 0,
-    check: options.check, channels: options.stable ? { latest: "pending", stable: "pending" } : { latest: "pending" },
+    check: options.check, channels: { beta: "pending" },
   };
   const output = (text: string) => { process.stdout.write(text); appendFileSync(logPath, text); };
   let lastPhase = "";
@@ -145,8 +145,8 @@ async function main(options: ReturnType<typeof parseReleaseArgs>, common: string
       lastPhase = status.phase;
     }
   };
-  output(`Atelier release${options.check ? " CHECK (no publishing)" : ""}: ${Object.keys(status.channels).join(" + ")}\nLog: ${logPath}\nStatus: ${statusPath}\n`);
-  writeFileSync(join(common, "atelier-releases", "last-run.txt"), `${directory}\n`);
+  output(`AgentsInTheCloud release${options.check ? " CHECK (no publishing)" : ""}: ${Object.keys(status.channels).join(" + ")}\nLog: ${logPath}\nStatus: ${statusPath}\n`);
+  writeFileSync(join(common, "agents-in-the-cloud-releases", "last-run.txt"), `${directory}\n`);
   save();
   const heartbeat = setInterval(save, 5000);
   const commands = commandRunner(root, output);
@@ -188,7 +188,7 @@ if (import.meta.main) {
       if (git.exitCode !== 0) throw new Error(git.stderr.toString());
       const common = git.stdout.toString().trim();
       if (worker) {
-        const unlock = acquireReleaseLock(join(common, "atelier-release.lock"));
+        const unlock = acquireReleaseLock(join(common, "agents-in-the-cloud-release.lock"));
         if (!unlock) {
           process.exitCode = 75;
         } else {

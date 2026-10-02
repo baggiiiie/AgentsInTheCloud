@@ -1,10 +1,10 @@
 import { copyFile, mkdir, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
-import { createKeyedOperationQueue, getAtelierRuntimeContext } from "@atelier/core";
-import type { GitProjectInitInstruction } from "@atelier/projects";
-import { isGitProjectInit } from "@atelier/projects";
-import type { WorkspaceInitInstruction } from "@atelier/workspace";
+import { createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import type { GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
+import { isGitProjectInit } from "@agents-in-the-cloud/projects";
+import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -19,15 +19,15 @@ export interface WorkspaceAgentConversationInfo {
 // Unprefixed files are historical built-in sessions written before the provider prefix.
 const sharedAgentFilePattern = /^(?:builtin--)?([a-z0-9][a-z0-9-]*)--([a-zA-Z0-9][a-zA-Z0-9_.-]*)--agent-([1-9]\d*)--([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.jsonl$/;
 export const projectlessSessionShareKey = "projectless";
-export const sessionShareMountPath = "/atelier/session-share";
+export const sessionShareMountPath = "/agents-in-the-cloud/session-share";
 export const untitledAgentConversationTitle = "Untitled";
 const serializeConversationOperation = createKeyedOperationQueue();
 
-function workspaceMetadataInitPath(workspaceId: string, dataDir = getAtelierRuntimeContext().atelierDataDir): string {
+function workspaceMetadataInitPath(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {
   return join(dataDir, "workspaces", workspaceId, "metadata", "init.json");
 }
 
-async function workspaceProjectInit(workspaceId: string, dataDir = getAtelierRuntimeContext().atelierDataDir): Promise<GitProjectInitInstruction | undefined> {
+async function workspaceProjectInit(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): Promise<GitProjectInitInstruction | undefined> {
   const file = Bun.file(workspaceMetadataInitPath(workspaceId, dataDir));
   if (!(await file.exists())) return undefined;
   const init: unknown = JSON.parse(await file.text());
@@ -56,11 +56,11 @@ export function sessionShareKeyForInit(init: WorkspaceInitInstruction | undefine
   return sessionShareKeySlug(key);
 }
 
-export async function workspaceSessionShareKey(workspaceId: string, dataDir = getAtelierRuntimeContext().atelierDataDir): Promise<string> {
+export async function workspaceSessionShareKey(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): Promise<string> {
   return sessionShareKeyForInit(await workspaceProjectInit(workspaceId, dataDir));
 }
 
-export function sessionShareDir(shareKey: string, dataDir = getAtelierRuntimeContext().atelierDataDir): string {
+export function sessionShareDir(shareKey: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {
   return join(dataDir, "session-shares", sessionShareKeySlug(shareKey));
 }
 
@@ -100,10 +100,10 @@ async function touch(path: string): Promise<void> {
 interface ConversationRecord { conversationId: string; label: string; title: string }
 const conversationsSchema = Type.Object({ conversations: Type.Array(Type.Object({ conversationId: Type.String(), label: Type.String(), title: Type.String() })) });
 function conversationMetadataPath(workspaceId: string): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "metadata", "agent-conversations.json");
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata", "agent-conversations.json");
 }
 function conversationSessionPath(workspaceId: string, conversationId: string): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "agent-sessions", `${conversationId}.jsonl`);
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "agent-sessions", `${conversationId}.jsonl`);
 }
 async function conversationRecords(workspaceId: string): Promise<ConversationRecord[]> {
   const content = await readFile(conversationMetadataPath(workspaceId), "utf8").catch((error: NodeJS.ErrnoException) => {
@@ -115,7 +115,7 @@ async function conversationRecords(workspaceId: string): Promise<ConversationRec
 async function saveConversationRecords(workspaceId: string, records: ConversationRecord[]): Promise<void> {
   const path = conversationMetadataPath(workspaceId);
   const temporary = `${path}.tmp-${randomUUID()}`;
-  await mkdir(join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "metadata"), { recursive: true });
+  await mkdir(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata"), { recursive: true });
   await writeFile(temporary, JSON.stringify({ conversations: records }));
   await rename(temporary, path);
 }
@@ -155,7 +155,7 @@ async function archivePublishedHistory(agent: WorkspaceAgentConversationInfo): P
 async function createWorkspaceAgentConversation(workspaceId: string, label: string): Promise<WorkspaceAgentConversationInfo> {
   const conversationId = randomUUID();
   const path = conversationSessionPath(workspaceId, conversationId);
-  await mkdir(join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "agent-sessions"), { recursive: true });
+  await mkdir(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "agent-sessions"), { recursive: true });
   const agent = { workspaceId, conversationId, label, title: untitledAgentConversationTitle, path };
   await touch(path);
   await persistConversation(agent);

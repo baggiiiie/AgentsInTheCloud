@@ -19,7 +19,7 @@ import {
 let dir: string | undefined;
 
 async function dataDir(): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "atelier-agent-test-"));
+  dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-agent-test-"));
   process.env.ATELIER_DATA_DIR = dir;
   return dir;
 }

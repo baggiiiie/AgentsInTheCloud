@@ -1,9 +1,9 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { hasAvailableBuiltinAgentModel } from "@atelier/agent/server";
-import { atelierDataPath, getAtelierRuntimeContext, invalidArguments, type AtelierEventBus } from "@atelier/core";
-import { createPiModelRuntime, usesProviderSubscription } from "@atelier/llm/server";
-import type { WorkspaceAgentProvider } from "@atelier/shared";
+import { hasAvailableBuiltinAgentModel } from "@agents-in-the-cloud/agent/server";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, invalidArguments, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { createPiModelRuntime, usesProviderSubscription } from "@agents-in-the-cloud/llm/server";
+import type { WorkspaceAgentProvider } from "@agents-in-the-cloud/shared";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 
 export function registeredAgentProviders(): readonly WorkspaceAgentProvider[] { return workspaceModules.flatMap((module) => module.agentProvider ? [module.agentProvider] : []); }
@@ -15,7 +15,7 @@ export function agentProvider(id: string): WorkspaceAgentProvider {
 }
 
 function preferencePath() {
-  return atelierDataPath(getAtelierRuntimeContext(), "default-agent-provider.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "default-agent-provider.json");
 }
 
 export async function defaultAgentProvider(): Promise<WorkspaceAgentProvider> {
@@ -31,7 +31,7 @@ export async function defaultAgentProvider(): Promise<WorkspaceAgentProvider> {
   return provider;
 }
 
-export async function rememberAgentProvider(id: string, events?: AtelierEventBus): Promise<void> {
+export async function rememberAgentProvider(id: string, events?: AgentsInTheCloudEventBus): Promise<void> {
   agentProvider(id);
   const path = preferencePath();
   await mkdir(dirname(path), { recursive: true });

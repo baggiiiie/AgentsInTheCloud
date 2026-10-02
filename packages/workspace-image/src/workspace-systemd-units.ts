@@ -1,12 +1,12 @@
 /** Installed in the workspace image; provisioning and standalone tests share these. */
 export function workspaceRuntimeUnits() {
   return {
-    "atelier-tmux.service": `[Unit]
-Description=Atelier workspace terminal workloads
+    "agents-in-the-cloud-tmux.service": `[Unit]
+Description=AgentsInTheCloud workspace terminal workloads
 [Service]
 Type=exec
-User=atelier
-EnvironmentFile=/.atelier/environment
+User=agents-in-the-cloud
+EnvironmentFile=/.agents-in-the-cloud/environment
 WorkingDirectory=/work
 # -D keeps the server in the foreground and disables exit-empty. Use the
 # default socket so ordinary tmux commands share this managed server.
@@ -24,27 +24,27 @@ Restart=always
 RestartSec=1s
 TimeoutStopSec=10s
 `,
-    "atelier-init.service": `[Unit]
-Description=Atelier workspace initialization
+    "agents-in-the-cloud-init.service": `[Unit]
+Description=AgentsInTheCloud workspace initialization
 [Service]
 Type=oneshot
-EnvironmentFile=/.atelier/environment
+EnvironmentFile=/.agents-in-the-cloud/environment
 WorkingDirectory=/work
-ExecStart=/bin/sh /.atelier/init.sh
+ExecStart=/bin/sh /.agents-in-the-cloud/init.sh
 RemainAfterExit=yes
 TimeoutStartSec=infinity
 `,
-    "atelier-gateway.service": `[Unit]
-Description=Atelier workspace gateway
-Requires=atelier-init.service
-After=atelier-init.service
+    "agents-in-the-cloud-gateway.service": `[Unit]
+Description=AgentsInTheCloud workspace gateway
+Requires=agents-in-the-cloud-init.service
+After=agents-in-the-cloud-init.service
 StartLimitIntervalSec=60s
 StartLimitBurst=5
 [Service]
-EnvironmentFile=/.atelier/environment
+EnvironmentFile=/.agents-in-the-cloud/environment
 WorkingDirectory=/work
-ExecStart=/usr/local/bin/atelier-workspace-gateway
-ExecStopPost=/usr/bin/rm -f /.atelier/ready
+ExecStart=/usr/local/bin/agents-in-the-cloud-workspace-gateway
+ExecStopPost=/usr/bin/rm -f /.agents-in-the-cloud/ready
 Restart=on-failure
 RestartSec=2s
 KillMode=mixed
@@ -53,7 +53,7 @@ TimeoutStopSec=30s
 WantedBy=multi-user.target
 `,
     "docker.socket": `[Unit]
-Description=Atelier Docker API socket
+Description=AgentsInTheCloud Docker API socket
 [Socket]
 ListenStream=/run/docker.sock
 SocketMode=0660
@@ -64,7 +64,7 @@ RemoveOnStop=yes
 WantedBy=sockets.target
 `,
     "docker.service": `[Unit]
-Description=Atelier workspace Docker daemon
+Description=AgentsInTheCloud workspace Docker daemon
 Requires=docker.socket containerd.service
 After=docker.socket containerd.service
 StartLimitIntervalSec=60s
@@ -72,7 +72,7 @@ StartLimitBurst=5
 [Service]
 Type=notify
 # System services do not inherit the workspace shell's proxy environment.
-EnvironmentFile=/.atelier/environment
+EnvironmentFile=/.agents-in-the-cloud/environment
 ExecStart=/usr/local/bin/dockerd --live-restore
 Restart=on-failure
 RestartSec=2s
@@ -84,7 +84,7 @@ TasksMax=infinity
 LimitNOFILE=infinity
 `,
     "containerd.service": `[Unit]
-Description=Atelier workspace containerd
+Description=AgentsInTheCloud workspace containerd
 [Service]
 Type=notify
 ExecStart=/usr/local/bin/containerd --config /etc/containerd/config.toml

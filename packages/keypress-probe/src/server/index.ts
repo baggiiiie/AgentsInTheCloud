@@ -1,14 +1,14 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 
 const settingsPath = "/settings/keypress-probe";
 const settingsSectionId = "settings-sec-keypress-probe";
 
 function keypressProbeSettingsFile(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "keypress-probe-settings.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "keypress-probe-settings.json");
 }
 
 async function isKeypressProbeEnabled(): Promise<boolean> {
@@ -23,7 +23,7 @@ async function setKeypressProbeEnabled(enabled: boolean): Promise<void> {
 }
 
 function renderKeypressProbe(): string {
-  return `<aside class="keypress-probe" data-controller="keypress-probe" aria-live="polite" title="Shows keyboard events Atelier can capture in this browser context; browser/OS/iframe-reserved shortcuts will not appear.">
+  return `<aside class="keypress-probe" data-controller="keypress-probe" aria-live="polite" title="Shows keyboard events AgentsInTheCloud can capture in this browser context; browser/OS/iframe-reserved shortcuts will not appear.">
     <div class="keypress-probe-head"><strong>Keys</strong><span data-keypress-probe-target="count">0</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Clear keys" }, attributesHtml: 'data-action="keypress-probe#clear"' })}</div>
     <ol data-keypress-probe-target="list"><li class="empty">Press keys… browser/iframe-reserved combos will not appear.</li></ol>
   </aside>`;
@@ -49,7 +49,7 @@ async function renderKeypressProbeSettings(): Promise<string> {
     <div class="settings-development-action">
       <div class="settings-development-copy">
         <div>Shortcut probe</div>
-        <p>Show a local keyboard-event overlay in workspaces. Events are not stored; browser, OS, and iframe-reserved shortcuts may not reach Atelier.</p>
+        <p>Show a local keyboard-event overlay in workspaces. Events are not stored; browser, OS, and iframe-reserved shortcuts may not reach AgentsInTheCloud.</p>
       </div>
       <div class="settings-development-control">${toggle}</div>
     </div>
@@ -83,4 +83,4 @@ const keypressProbeWorkspaceModule: WorkspaceModule = {
   },
 };
 
-export { keypressProbeWorkspaceModule as atelierServerModule };
+export { keypressProbeWorkspaceModule as agentsInTheCloudServerModule };

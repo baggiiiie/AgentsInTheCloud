@@ -1,11 +1,11 @@
-import { AtelierCoreError } from "@atelier/core";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { setTimeout as delay } from "node:timers/promises";
-import { createProjectSecret, listProjectSecrets, projectSecretRoutingRevision, projectSecretPlaceholder, readProjectWorkspaceSettings, type ProjectSecretSummary } from "@atelier/projects";
-import type { OnboardingToolDependencies, SecretValueRequest } from "@atelier/agent/server";
+import { createProjectSecret, listProjectSecrets, projectSecretRoutingRevision, projectSecretPlaceholder, readProjectWorkspaceSettings, type ProjectSecretSummary } from "@agents-in-the-cloud/projects";
+import type { OnboardingToolDependencies, SecretValueRequest } from "@agents-in-the-cloud/agent/server";
 
 function requireMatchingSecret(secret: ProjectSecretSummary, expectedRoutingRevision: string): void {
   if (projectSecretRoutingRevision(secret) !== expectedRoutingRevision) {
-    throw new AtelierCoreError("project_secret_configuration_conflict", `Secret ${secret.envName} already has different host restrictions, URL path permissions, or placeholder settings. Stored hosts: ${secret.hostPattern}; stored placeholder: ${secret.placeholder ?? projectSecretPlaceholder(secret.envName)}. Review project secrets rather than replacing its value for a different destination.`);
+    throw new AgentsInTheCloudCoreError("project_secret_configuration_conflict", `Secret ${secret.envName} already has different host restrictions, URL path permissions, or placeholder settings. Stored hosts: ${secret.hostPattern}; stored placeholder: ${secret.placeholder ?? projectSecretPlaceholder(secret.envName)}. Review project secrets rather than replacing its value for a different destination.`);
   }
 }
 

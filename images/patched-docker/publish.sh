@@ -9,7 +9,7 @@ if [[ -n $(git -C "$context" status --porcelain -- .) ]]; then
     exit 1
 fi
 revision=$(git -C "$context" rev-parse HEAD)
-image="ghcr.io/lucasmeijer/atelier-docker:sha-${revision}"
+image="ghcr.io/lucasmeijer/agents-in-the-cloud-docker:sha-${revision}"
 "$context/build.sh" "$image" --push \
     --label "org.opencontainers.image.revision=${revision}" "$@"
 docker buildx imagetools inspect "$image"

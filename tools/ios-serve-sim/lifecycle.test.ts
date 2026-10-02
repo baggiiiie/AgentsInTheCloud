@@ -1,4 +1,4 @@
-import { shellQuote } from "@atelier/core";
+import { shellQuote } from "@agents-in-the-cloud/core";
 import { expect, test } from 'bun:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

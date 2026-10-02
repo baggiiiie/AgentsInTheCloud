@@ -1,4 +1,4 @@
-import { focusLikelyOpensSoftwareKeyboard, isApplePlatform, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { focusLikelyOpensSoftwareKeyboard, isApplePlatform, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 
 /** Append the platform's send shortcut to the composer placeholder; the server cannot know the viewer's platform. */
 export function createComposerSendHintController(Controller: WorkspaceClientControllerConstructor) {

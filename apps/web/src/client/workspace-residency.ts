@@ -1,4 +1,4 @@
-import { phoneLayoutMediaQuery } from "@atelier/shared";
+import { phoneLayoutMediaQuery } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { liveSurfaceReady, prepareLiveSurface, releaseLiveSurface } from "./live-surface.ts";
 import { controllerForElement, registerWorkspaceControllers, workspaceNavigationController } from "./workspace-controller-registry.ts";
@@ -22,27 +22,27 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
   private retained = new Set<HTMLElement>();
 
   connect(): void {
-    document.addEventListener("atelier:workspace-pane-changed", this.changed);
+    document.addEventListener("agents-in-the-cloud:workspace-pane-changed", this.changed);
     this.element.addEventListener("live:ready", this.changed);
     document.addEventListener("live:connection", this.changed);
-    document.addEventListener("atelier:workspace-pane-visible", this.reportVisibility);
-    document.addEventListener("atelier:workspace-pane-hidden", this.reportVisibility);
+    document.addEventListener("agents-in-the-cloud:workspace-pane-visible", this.reportVisibility);
+    document.addEventListener("agents-in-the-cloud:workspace-pane-hidden", this.reportVisibility);
     document.addEventListener("visibilitychange", this.reportVisibility);
-    document.addEventListener("atelier:mobile-workspace-pane-changed", this.reportVisibility);
+    document.addEventListener("agents-in-the-cloud:mobile-workspace-pane-changed", this.reportVisibility);
     window.addEventListener("popstate", this.historyChanged);
     this.historyChanged();
   }
   disconnect(): void {
     this.selection++;
-    document.removeEventListener("atelier:workspace-pane-changed", this.changed);
+    document.removeEventListener("agents-in-the-cloud:workspace-pane-changed", this.changed);
     this.element.removeEventListener("live:ready", this.changed);
     document.removeEventListener("live:connection", this.changed);
-    document.removeEventListener("atelier:workspace-pane-visible", this.reportVisibility);
-    document.removeEventListener("atelier:workspace-pane-hidden", this.reportVisibility);
+    document.removeEventListener("agents-in-the-cloud:workspace-pane-visible", this.reportVisibility);
+    document.removeEventListener("agents-in-the-cloud:workspace-pane-hidden", this.reportVisibility);
     document.removeEventListener("visibilitychange", this.reportVisibility);
-    document.removeEventListener("atelier:mobile-workspace-pane-changed", this.reportVisibility);
+    document.removeEventListener("agents-in-the-cloud:mobile-workspace-pane-changed", this.reportVisibility);
     window.removeEventListener("popstate", this.historyChanged);
-    window.AtelierCable?.reportVisibility({ surfaceKeys: [] });
+    window.AgentsInTheCloudCable?.reportVisibility({ surfaceKeys: [] });
   }
   residentTargetConnected(resident: HTMLElement): void {
     if (resident.dataset.workspaceId === this.intended && !resident.classList.contains("visible")) void this.selectWorkspace(this.intended!, location.href, "none");
@@ -68,7 +68,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     await prepareLiveSurface(resident);
     if (selection !== this.selection) return;
     const presentation = resident.querySelector<HTMLElement>("[data-controller~='workspace-presentation']");
-    presentation?.dispatchEvent(new CustomEvent("atelier:workspace-residency-visible", { detail: { selectedFromList: this.selectedFromList } }));
+    presentation?.dispatchEvent(new CustomEvent("agents-in-the-cloud:workspace-residency-visible", { detail: { selectedFromList: this.selectedFromList } }));
     this.selectedFromList = false;
     if (presentation) {
       const controller = controllerForElement<{ prepareIntendedSurfaces(): Promise<void>; focusSelectedAgent(): void }>(presentation, "workspace-presentation");
@@ -102,7 +102,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
   }
   private hideResidents(): void {
     for (const resident of this.residentTargets) {
-      if (resident.classList.contains("visible")) resident.querySelector("[data-controller~='workspace-presentation']")?.dispatchEvent(new Event("atelier:workspace-residency-hidden"));
+      if (resident.classList.contains("visible")) resident.querySelector("[data-controller~='workspace-presentation']")?.dispatchEvent(new Event("agents-in-the-cloud:workspace-residency-hidden"));
       resident.classList.remove("visible");
     }
   }
@@ -150,7 +150,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
       const resident = this.residentTargets.find(item => item.dataset.workspaceId === row.dataset.workspaceEntryId);
       row.dataset.workspacePreloadState = resident && this.prepared(resident) ? "preloaded" : "unloaded";
     });
-    const next = document.querySelector<HTMLButtonElement>("#fixed_shell_atelier_next_attention");
+    const next = document.querySelector<HTMLButtonElement>("#fixed_shell_agents-in-the-cloud_next_attention");
     if (next) {
       next.disabled = this.oldestAttentionWorkspaceId() === undefined;
       next.toggleAttribute("data-preloaded-attention", document.querySelector('[data-workspace-entry-id][data-workspace-attention-at][data-workspace-preload-state="preloaded"]') !== null);
@@ -163,7 +163,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     const hidden = document.hidden || (window.matchMedia(phoneLayoutMediaQuery).matches && this.element.closest(".is-mobile-workspace-pane-open") !== null);
     const resident = this.residentTargets.find(item => item.dataset.workspaceId === workspaceId);
     const surfaceKeys = !hidden && resident ? [...resident.querySelectorAll<HTMLElement>('[data-workspace-surface-visible="true"]')].map(pane => `${pane.dataset.workspacePaneRole === "agent" ? "agent:" : ""}${pane.dataset.workspacePaneId}`) : [];
-    window.AtelierCable?.reportVisibility({ workspaceId: hidden ? undefined : workspaceId, surfaceKeys });
+    window.AgentsInTheCloudCable?.reportVisibility({ workspaceId: hidden ? undefined : workspaceId, surfaceKeys });
   };
   private readonly historyChanged = (): void => {
     const id = location.pathname.match(/^\/workspaces\/([^/]+)$/)?.[1];

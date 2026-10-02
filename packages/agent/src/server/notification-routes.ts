@@ -1,7 +1,7 @@
-import { requestAcceptsJson } from "@atelier/core";
+import { requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { turboStream, turboStreamResponse } from "@atelier/shared";
+import { turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { notificationFeedbackId, notificationFrameId, renderNotificationControl, renderNotificationFeedback } from "./render-notification.ts";
 import { matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
 import { currentNotificationTurn, setTurnNotification } from "./turn-notifications.ts";

@@ -5,11 +5,11 @@ const GiB = 1024 ** 3;
 export function resourcePolicy(memory: number, pids: number) {
   if (memory < 3 * GiB)
     throw new Error(
-      "Atelier System requires at least 3 GiB effective memory for management and workloads",
+      "AgentsInTheCloud System requires at least 3 GiB effective memory for management and workloads",
     );
   if (pids < 2048)
     throw new Error(
-      "Atelier System requires an effective process limit of at least 2048",
+      "AgentsInTheCloud System requires an effective process limit of at least 2048",
     );
   const reserve = Math.min(4 * GiB, Math.max(GiB, Math.ceil(memory * 0.2)));
   const max = Math.floor(memory - reserve);
@@ -126,11 +126,11 @@ export async function initializeResources() {
     policy,
     effectiveMemory: memory,
   };
-  await mkdir("/run/atelier-system", { recursive: true });
-  await writeFile("/run/atelier-system/resources.json", JSON.stringify(result));
+  await mkdir("/run/agents-in-the-cloud-system", { recursive: true });
+  await writeFile("/run/agents-in-the-cloud-system/resources.json", JSON.stringify(result));
   const config = JSON.parse(await readFile("/etc/docker/daemon.json", "utf8"));
   config["cgroup-parent"] = result.workloadsCgroupParent;
   config["exec-opts"] = ["native.cgroupdriver=cgroupfs"];
-  await writeFile("/run/atelier-system/daemon.json", JSON.stringify(config));
+  await writeFile("/run/agents-in-the-cloud-system/daemon.json", JSON.stringify(config));
   return result;
 }

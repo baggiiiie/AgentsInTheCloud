@@ -2,9 +2,9 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shellQuote } from "@atelier/core";
+import { shellQuote } from "@agents-in-the-cloud/core";
 import { piLaunchScript } from "../src/server/launch-command.ts";
-import { piAtelierExtensionPath } from "../src/server/mcp.ts";
+import { piAgentsInTheCloudExtensionPath } from "../src/server/mcp.ts";
 
 let home: string;
 beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "pi-launch-")); });
@@ -21,13 +21,13 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--approve", "--offline", "--use-theme", "atelier", "--tui-mode", "regular", "--session-dir", "/home/atelier/.local/share/pi/sessions"];
+const baseArgs = ["--approve", "--offline", "--use-theme", "agents-in-the-cloud", "--tui-mode", "regular", "--session-dir", "/home/agents-in-the-cloud/.local/share/pi/sessions"];
 
 test("passes initial prompt, images, file notes, provider and Pi thinking level literally", async () => {
   await executable(binary(), 'printf "%s\\0" "$@"');
   const text = `--help 'quoted' $(touch ${home}/injected)\nsecond line`;
-  const notes = "File: /tmp/atelier-attachments/my file.txt";
-  const image = "/tmp/atelier-attachments/image 1.png";
+  const notes = "File: /tmp/agents-in-the-cloud-attachments/my file.txt";
+  const image = "/tmp/agents-in-the-cloud-attachments/image 1.png";
   const [code, output] = await run(piLaunchScript({ ...empty, text, attachmentNotes: [notes] }, [image], { model: "anthropic::claude", thinkingLevel: "minimal" }));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--provider", "anthropic", "--model", "claude", "--thinking", "minimal", "--", `@${image}`, `${text}\n\n${notes}`]);
@@ -76,21 +76,21 @@ test("installation and startup failures keep their exit codes and diagnostics", 
   expect(startupOutput).toContain("Pi failed (exit 7)");
 });
 
-test("loads the session's Atelier extension", async () => {
+test("loads the session's AgentsInTheCloud extension", async () => {
   await executable(binary(), 'printf "%s\\0" "$@"');
   const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
   const [code, output] = await run(piLaunchScript(empty, [], {}, session));
   expect(code).toBe(0);
-  expect(output.split("\0")).toContain(piAtelierExtensionPath(session));
-  expect(output.split("\0")).toContain(`/home/atelier/.local/share/pi/sessions/${sessionId}`);
+  expect(output.split("\0")).toContain(piAgentsInTheCloudExtensionPath(session));
+  expect(output.split("\0")).toContain(`/home/agents-in-the-cloud/.local/share/pi/sessions/${sessionId}`);
 });
 
-test("installs an Atelier theme drawn from the terminal palette", async () => {
+test("installs an AgentsInTheCloud theme drawn from the terminal palette", async () => {
   await executable(binary(), 'printf "%s\\0" "$@"');
   const [code] = await run(piLaunchScript(empty, []));
   expect(code).toBe(0);
-  const theme = JSON.parse(await readFile(`${home}/.pi/agent/themes/atelier.json`, "utf8"));
-  expect(theme.name).toBe("atelier");
+  const theme = JSON.parse(await readFile(`${home}/.pi/agent/themes/agents-in-the-cloud.json`, "utf8"));
+  expect(theme.name).toBe("agents-in-the-cloud");
   expect(Object.keys(theme.colors).length).toBeGreaterThan(0);
   for (const color of Object.values(theme.colors)) expect(Number.isInteger(color) && Number(color) < 16).toBe(true);
 });
@@ -99,9 +99,9 @@ test("installs an Atelier theme drawn from the terminal palette", async () => {
 test("native resume restores the exact conversation with no submitted prompt", async () => {
   await executable(binary(), 'printf "%s\\0" "$@"');
   const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
-  const [code, output] = await run(piLaunchScript(empty, [], {}, session, "/home/atelier/.local/share/pi/sessions/tab/saved.jsonl"));
+  const [code, output] = await run(piLaunchScript(empty, [], {}, session, "/home/agents-in-the-cloud/.local/share/pi/sessions/tab/saved.jsonl"));
   expect(code).toBe(0);
   const args = output.split("\0").slice(0, -1);
-  expect(args.join(" ")).toContain(["--session", "/home/atelier/.local/share/pi/sessions/tab/saved.jsonl"].join(" "));
+  expect(args.join(" ")).toContain(["--session", "/home/agents-in-the-cloud/.local/share/pi/sessions/tab/saved.jsonl"].join(" "));
   expect(args.at(-1)).toBe("--");
 });

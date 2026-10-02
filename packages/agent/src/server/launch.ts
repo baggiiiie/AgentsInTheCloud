@@ -1,10 +1,10 @@
 import { reconcileAgentModelPreferences } from "./model-preferences.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { invalidArguments, type JsonObject } from "@atelier/core";
-import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@atelier/llm/server";
-import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@atelier/shared";
-import { listStagedAttachments } from "@atelier/prompt/server";
+import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
+import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
+import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@agents-in-the-cloud/shared";
+import { listStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { hasAvailableBuiltinAgentModel, resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { renderLaunchComposerSettings } from "./render-composer.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";

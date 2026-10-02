@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-server_data_dir="${ATELIER_VSCODE_SERVER_DATA_DIR:-/.atelier/vscode/server-data}"
-defaults_dir="${ATELIER_VSCODE_DEFAULTS_DIR:-/opt/atelier/vscode-defaults}"
-extensions_dir="${ATELIER_VSCODE_EXTENSIONS_DIR:-/opt/atelier/vscode-extensions}"
+server_data_dir="${ATELIER_VSCODE_SERVER_DATA_DIR:-/.agents-in-the-cloud/vscode/server-data}"
+defaults_dir="${ATELIER_VSCODE_DEFAULTS_DIR:-/opt/agents-in-the-cloud/vscode-defaults}"
+extensions_dir="${ATELIER_VSCODE_EXTENSIONS_DIR:-/opt/agents-in-the-cloud/vscode-extensions}"
 
 seed_file() {
   src="$1"
@@ -32,4 +32,4 @@ else
   set -- "$@" --default-folder "${ATELIER_VSCODE_DEFAULT_FOLDER:-/work}"
 fi
 
-exec /opt/atelier/vscode-server/bin/code-server "$@" --extensions-dir "$extensions_dir"
+exec /opt/agents-in-the-cloud/vscode-server/bin/code-server "$@" --extensions-dir "$extensions_dir"

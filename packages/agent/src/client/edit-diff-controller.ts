@@ -1,4 +1,4 @@
-import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 
 export function createAgentEditDiffController(Controller: StimulusControllerConstructor) {
   return class AgentEditDiffController extends Controller {
@@ -14,7 +14,7 @@ export function createAgentEditDiffController(Controller: StimulusControllerCons
     }
 
     private async render(): Promise<void> {
-      const [{ FileDiff }, { toolDiffOptions }] = await Promise.all([import("@pierre/diffs"), import("@atelier/syntax/pierre")]);
+      const [{ FileDiff }, { toolDiffOptions }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (!this.element.isConnected) return;
       // SAFETY: This private script is serialized by editDiffHtml from FileDiffMetadata[].
       const diffs = JSON.parse(this.modelTarget.textContent ?? "[]") as Array<import("@pierre/diffs").FileDiffMetadata>;

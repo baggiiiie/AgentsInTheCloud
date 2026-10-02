@@ -1,8 +1,8 @@
-import { composerAttachmentAttributes, renderComposerBody } from "@atelier/prompt/server";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { popupHtml } from "@atelier/design-system/popup";
-import { transcriptionComposerController } from "@atelier/transcription/server";
-import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentProvider } from "@atelier/shared";
+import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
+import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentProvider } from "@agents-in-the-cloud/shared";
 
 /** Host-owned launch composer content. */
 export interface AgentLaunchPresentation {

@@ -1,6 +1,6 @@
-import type { JsonObject } from "@atelier/core";
-import type { TranscriptRecord } from "@atelier/agent/server";
-import type { AgentLaunchFooterContext, AgentWorkspaceParameters, WorkspaceAgentInput } from "@atelier/shared";
+import type { JsonObject } from "@agents-in-the-cloud/core";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import type { AgentLaunchFooterContext, AgentWorkspaceParameters, WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 
 /** Identity of the session being launched, so adapters can address their session-local files. */
 export interface CliAgentSession {

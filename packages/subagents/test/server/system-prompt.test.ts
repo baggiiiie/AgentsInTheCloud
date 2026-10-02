@@ -38,11 +38,11 @@ test("models without role text or a recognized GPT identifier use bundled Codex 
 
 test("Pi rebuilds model contributions without retaining the previous model's role text", async () => {
   const { createAgentSession, ModelRuntime, SessionManager, SettingsManager } = await import("@earendil-works/pi-coding-agent");
-  const { createAtelierResourceLoader } = await import("../../../agent/src/server/system-prompt.ts");
+  const { createAgentsInTheCloudResourceLoader } = await import("../../../agent/src/server/system-prompt.ts");
   const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
-  const dir = await mkdtemp(join(tmpdir(), "atelier-model-prompt-"));
+  const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-model-prompt-"));
   let active: import("@earendil-works/pi-coding-agent").AgentSession | undefined;
   try {
     const authPath = join(dir, "auth.json");
@@ -53,13 +53,13 @@ test("Pi rebuilds model contributions without retaining the previous model's rol
     const { session } = await createAgentSession({
       cwd: dir, agentDir: dir, modelRuntime, model: astra, thinkingLevel: "medium",
       sessionManager: SessionManager.inMemory(), settingsManager: SettingsManager.inMemory(), tools: [],
-      resourceLoader: createAtelierResourceLoader([], () => ["Atelier identity",
+      resourceLoader: createAgentsInTheCloudResourceLoader([], () => ["AgentsInTheCloud identity",
         ...(active ? delegationPrompt(active.model?.id, active.thinkingLevel, "subagent") : [])]),
     });
     active = session;
     session.setActiveToolsByName(session.getActiveToolNames());
     expect(session.systemPrompt).toContain("Always put proper spaces between words and/or numbers.");
-    expect(session.systemPrompt).toContain("Atelier identity");
+    expect(session.systemPrompt).toContain("AgentsInTheCloud identity");
     expect(session.systemPrompt).toContain(upstream.defaults.explicit);
     await session.setModel(base);
     session.setActiveToolsByName(session.getActiveToolNames());

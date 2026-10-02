@@ -1,7 +1,7 @@
-import { setTextInputValue } from "@atelier/shared";
+import { setTextInputValue } from "@agents-in-the-cloud/shared";
 
 export function agentComposerTextStorageKey(workspaceId: string, conversationId: string): string {
-  return `atelier.agentComposerText:${JSON.stringify([workspaceId, conversationId])}`;
+  return `agents-in-the-cloud.agentComposerText:${JSON.stringify([workspaceId, conversationId])}`;
 }
 
 export function agentComposerPrimaryAction(busy: boolean, text: string, attachmentCount: number): "abort" | "send" | "steer" {

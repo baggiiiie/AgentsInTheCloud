@@ -4,11 +4,11 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
 const configSchema = Type.Object({ url: Type.String(), token: Type.String(), turnSignalCommand: Type.String() });
-type AtelierMcpConfig = Static<typeof configSchema>;
+type AgentsInTheCloudMcpConfig = Static<typeof configSchema>;
 
 /** Pi owns MCP discovery, execution, and instructions; we only wire up the session. */
-export function registerPiAtelier(pi: ExtensionAPI, config: AtelierMcpConfig): void {
-  pi.registerMcpServer("atelier", {
+export function registerPiAgentsInTheCloud(pi: ExtensionAPI, config: AgentsInTheCloudMcpConfig): void {
+  pi.registerMcpServer("agents-in-the-cloud", {
     url: config.url,
     headers: { Authorization: `Bearer ${config.token}` },
     exposure: "codemode",
@@ -24,7 +24,7 @@ export function registerPiAtelier(pi: ExtensionAPI, config: AtelierMcpConfig): v
   pi.on("agent_end", () => signalTurn("finished"));
 }
 
-export default async function piAtelierExtension(pi: ExtensionAPI): Promise<void> {
+export default async function piAgentsInTheCloudExtension(pi: ExtensionAPI): Promise<void> {
   const config = Value.Parse(configSchema, JSON.parse(await readFile(new URL("./config.json", import.meta.url), "utf8")));
-  registerPiAtelier(pi, config);
+  registerPiAgentsInTheCloud(pi, config);
 }

@@ -1,12 +1,12 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { Icons } from "@atelier/design-system/icons";
-import { panelHtml } from "@atelier/design-system/panel";
-import { popupHtml } from "@atelier/design-system/popup";
-import { tabHtml, tabStripHtml } from "@atelier/design-system/tab-strip";
-import { domId, escapeHtml } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
+import { tabHtml, tabStripHtml } from "@agents-in-the-cloud/design-system/tab-strip";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import type { WorkspacePresentation } from "./workspace-presentation.ts";
 import { barButton, behaviorTurboStream, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
 
@@ -108,7 +108,7 @@ function renderAgentEmpty(presentation: WorkspacePresentation): string {
 }
 
 function renderAgentPaneSlot(workspaceId: string, agent: AgentPaneContribution, active: boolean): string {
-  return `<section id="${agentPaneSlotDomId(workspaceId, agent.id)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="agent" data-workspace-pane-id="${escapeHtml(agent.id)}" data-atelier-fullscreen-view-key="${escapeHtml(agent.id)}" data-workspace-logically-visible="false" tabindex="-1"><div class="fixed-shell-live-body" id="${agentContentId(workspaceId, agent.id)}" data-turbo-permanent>${agent.bodyHtml ?? ""}</div></section>`;
+  return `<section id="${agentPaneSlotDomId(workspaceId, agent.id)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="agent" data-workspace-pane-id="${escapeHtml(agent.id)}" data-agents-in-the-cloud-fullscreen-view-key="${escapeHtml(agent.id)}" data-workspace-logically-visible="false" tabindex="-1"><div class="fixed-shell-live-body" id="${agentContentId(workspaceId, agent.id)}" data-turbo-permanent>${agent.bodyHtml ?? ""}</div></section>`;
 }
 
 function renderAgentActions(presentation: WorkspacePresentation): string {

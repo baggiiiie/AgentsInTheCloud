@@ -1,5 +1,5 @@
-import { withCommandSignal } from "@atelier/core";
-import type { WorkspaceProvisioning, WorkspaceProvisionRun } from "@atelier/workspace";
+import { withCommandSignal } from "@agents-in-the-cloud/core";
+import type { WorkspaceProvisioning, WorkspaceProvisionRun } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceRegistry } from "./workspace-registry.ts";
 
 interface WorkspaceReadinessOperations {

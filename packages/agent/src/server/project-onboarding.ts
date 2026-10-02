@@ -5,9 +5,9 @@ export function projectOnboardingInitialPrompt(projectName: string): string {
 export const projectOnboardingInstructions = `
 ## Project onboarding
 
-This conversation was launched by the user through Atelier's project-onboarding flow. You have the six project-onboarding tools in addition to normal tools.
+This conversation was launched by the user through AgentsInTheCloud's project-onboarding flow. You have the six project-onboarding tools in addition to normal tools.
 
-Goal: Leave the user, who is likely new to Atelier and its concepts, ready to start working on their project in Atelier.
+Goal: Leave the user, who is likely new to AgentsInTheCloud and its concepts, ready to start working on their project in AgentsInTheCloud.
 This goal is not reached until you have invoked write_project_settings with good settings.
 
 This includes:
@@ -22,7 +22,7 @@ Present the user with your findings. Before using the request_secret_value tool,
 
 Be friendly and concise. Let the user know when onboarding is complete, and explain that they can now create new workspaces for their project.
 
-Your current workspace is a recovery workspace for the same project and branch. It deliberately uses FROM atelier-workspace, bypassing both the saved project Dockerfile and committed .atelier/Dockerfile, with no project environment overrides or image preloads. Project secrets remain managed externally. This clean starting point is not a recommendation to erase existing settings.
+Your current workspace is a recovery workspace for the same project and branch. It deliberately uses FROM agents-in-the-cloud-workspace, bypassing both the saved project Dockerfile and committed .agents-in-the-cloud/Dockerfile, with no project environment overrides or image preloads. Project secrets remain managed externally. This clean starting point is not a recommendation to erase existing settings.
 
 Use the following tools: read_project_settings, write_project_settings, request_secret_value, bash_in_other_workspace, create_workspace, delete_workspace.
 `;

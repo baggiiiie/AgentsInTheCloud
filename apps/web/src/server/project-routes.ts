@@ -1,14 +1,14 @@
-import { AtelierCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@atelier/core";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { transientFeedbackHtml } from "@atelier/design-system/transient-feedback";
-import { warningBannerHtml } from "@atelier/design-system/warning-banner";
+import { AgentsInTheCloudCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@agents-in-the-cloud/core";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { transientFeedbackHtml } from "@agents-in-the-cloud/design-system/transient-feedback";
+import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import {
   addProject, createProjectEnvironmentVariable,
   createProjectSecret,
@@ -26,14 +26,14 @@ import {
   updateProject,
   updateProjectEnvironmentVariable, updateProjectSecret,
   type ProjectEnvironmentVariable, type ProjectSecretInput, type ProjectSecretSummary, type ProjectSshKeySummary, type ProjectSummary,
-} from "@atelier/projects";
-import { publicWorkspaceAppOrigin } from "@atelier/proxy-ingress";
-import { domId, escapeHtml, turboStreamResponse } from "@atelier/shared";
+} from "@agents-in-the-cloud/projects";
+import { publicWorkspaceAppOrigin } from "@agents-in-the-cloud/proxy-ingress";
+import { domId, escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
 import { jsonResponse } from "./http-responses.ts";
-import { replace, response, update, wantsStream } from "@atelier/shared/http";
+import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 const jsonStringSchema = Type.String();
 const jsonBooleanSchema = Type.Boolean();
@@ -111,7 +111,7 @@ export function createProjectRoutes(deps: {
 
   function projectDockerfileEditor(project: ProjectSummary, section?: ProjectSettingsSection): string {
     const example = [
-      "FROM atelier-workspace",
+      "FROM agents-in-the-cloud-workspace",
       "",
       "# Build against PostgreSQL and connect to your development database",
       "RUN apt-get update \\",
@@ -123,13 +123,13 @@ export function createProjectRoutes(deps: {
       "WORKDIR /work",
     ].join("\n");
     const fields = `<div class="project-dockerfile-form">
-      <div class="project-configuration-head"><p>You may paste your dockerfile here or commit it at <code>.atelier/Dockerfile</code> so others can use it too.</p></div>
+      <div class="project-configuration-head"><p>You may paste your dockerfile here or commit it at <code>.agents-in-the-cloud/Dockerfile</code> so others can use it too.</p></div>
       <form method="post" action="/projects/${encodeURIComponent(project.id)}/dockerfile" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving">
         <textarea class="textarea" aria-label="Custom Dockerfile" name="dockerfile" rows="12" spellcheck="false" autocomplete="off" placeholder="${escapeHtml(example)}">${escapeHtml(project.dockerfile ?? "")}</textarea>
       </form>
     </div>`;
     return `<section class="project-configuration-list" id="${domId("project_dockerfile", project.id)}"${revealSection(section, "dockerfile")}>
-      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a <code>./.atelier/Dockerfile</code> to install the system dependencies your project’s workspaces need.</p></div>
+      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a <code>./.agents-in-the-cloud/Dockerfile</code> to install the system dependencies your project’s workspaces need.</p></div>
       ${projectConfigurationDisclosure("Custom Dockerfile", fields, section === "dockerfile")}
     </section>`;
   }
@@ -205,7 +205,7 @@ export function createProjectRoutes(deps: {
 
   function projectSecretEditor(project: ProjectSummary, secrets: ProjectSecretSummary[], section?: ProjectSettingsSection): string {
     return `<section class="project-configuration-list project-secrets" id="${domId("project_secrets", project.id)}"${revealSection(section, "secrets")}>
-      <div class="project-configuration-head"><h3>Secrets</h3><p>Secrets let your agents connect to services without seeing your passwords or API keys.</p><p>Agents see a placeholder. Atelier intercepts network requests to services you specify and replaces the placeholder with the real secret.</p></div>
+      <div class="project-configuration-head"><h3>Secrets</h3><p>Secrets let your agents connect to services without seeing your passwords or API keys.</p><p>Agents see a placeholder. AgentsInTheCloud intercepts network requests to services you specify and replaces the placeholder with the real secret.</p></div>
       ${collapsedSecretWarning(project, secrets)}
       ${projectConfigurationDisclosure("Configure secrets", projectSecretFields(project, secrets), section === "secrets" || secrets.some(secretNeedsValue))}
     </section>`;
@@ -289,8 +289,8 @@ export function createProjectRoutes(deps: {
           <div class="project-edit-config">${projectSecretEditor(project, secrets, section)}${projectSshKeyEditor(project, sshKeys, knownHosts, section)}${projectEnvironmentEditor(project, environment, section)}${projectDockerfileEditor(project, section)}${projectPreloadImagesEditor(project, section)}</div>
           <section class="project-edit-danger-zone"${revealSection(section, "danger")}>${projectConfigurationDisclosure("Danger zone", `<div class="project-edit-danger">${projectDeleteControl(project.id)}</div>`, section === "danger")}</section>
           <section class="project-configuration-list">
-            <div class="project-configuration-head"><h3>Atelier instance URL</h3><p>The external URL for this Atelier instance.</p></div>
-            <div class="project-instance-url"><a href="${escapeHtml(instanceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(instanceUrl)}</a>${copyButtonHtml({ label: "Copy Atelier instance URL", copyText: instanceUrl })}</div>
+            <div class="project-configuration-head"><h3>AgentsInTheCloud instance URL</h3><p>The external URL for this AgentsInTheCloud instance.</p></div>
+            <div class="project-instance-url"><a href="${escapeHtml(instanceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(instanceUrl)}</a>${copyButtonHtml({ label: "Copy AgentsInTheCloud instance URL", copyText: instanceUrl })}</div>
           </section>
         </div>
       </div>
@@ -337,7 +337,7 @@ export function createProjectRoutes(deps: {
   async function projectById(id: string): Promise<ProjectSummary> {
     const { projects } = await listProjects();
     const project = projects.find((candidate) => candidate.id === id);
-    if (!project) throw new AtelierCoreError("project_not_found", `project not found: ${id}`);
+    if (!project) throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${id}`);
     return project;
   }
 
@@ -373,7 +373,7 @@ export function createProjectRoutes(deps: {
     try {
       project = (await addProject(gitUrl)).project;
     } catch (error) {
-      if (!(error instanceof AtelierCoreError && error.code === "project_exists")) throw error;
+      if (!(error instanceof AgentsInTheCloudCoreError && error.code === "project_exists")) throw error;
       const specification = parseProjectSpec(gitUrl);
       const projects = (await listProjects()).projects;
       project = projects.find((candidate) => candidate.gitUrl === specification.gitUrl && candidate.branch === specification.branch)!;
@@ -464,7 +464,7 @@ export function createProjectRoutes(deps: {
   async function secretValueModal(projectId: string, secretId: string, purpose?: string): Promise<string> {
     const project = await projectById(projectId);
     const secret = (await listProjectSecrets(projectId)).find((secret) => secret.id === secretId);
-    if (!secret) throw new AtelierCoreError("project_secret_not_found", "Project secret not found");
+    if (!secret) throw new AgentsInTheCloudCoreError("project_secret_not_found", "Project secret not found");
     const formId = "project-secret-value-form";
     return dialogHtml({
       element: { id: "project-editor-modal", attributesHtml: 'data-dialog-auto-show data-secret-value-dialog' },
@@ -610,7 +610,7 @@ export function createProjectRoutes(deps: {
     const byName = projects.filter((project) => project.name === reference);
     if (byName.length === 1) return byName[0]!;
     if (byName.length > 1) throw invalidArguments(`project name is ambiguous: ${reference}`);
-    throw new AtelierCoreError("project_not_found", `project not found: ${reference}`);
+    throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${reference}`);
   }
 
   async function createProjectAgentWorkspaceEndpoint(projectId: string, request: Request): Promise<Response> {

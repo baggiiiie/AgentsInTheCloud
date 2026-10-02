@@ -1,6 +1,6 @@
 import { createAgentNotificationsController } from "./notifications-controller.ts";
 import { createUsageControllers } from "./usage-controllers.ts";
-import type { WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { createAgentPaneController, registerAgentPaneVisibilityHooks } from "./agent-pane.ts";
 import { createAgentCompletionsController, registerPromptTemplateCommands } from "./completions-controller.ts";
 import { createAgentEditDiffController } from "./edit-diff-controller.ts";

@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { expect, test } from "bun:test";
 import { createAgentSession, SessionManager, SettingsManager, type CacheWarmingDecisionEvent } from "@earendil-works/pi-coding-agent";
 import { observeCacheWarmingDecisions, type CacheWarmingDecisionOutcome } from "../../src/server/cache-warming-decisions.ts";
-import { createAtelierResourceLoader } from "../../src/server/system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader } from "../../src/server/system-prompt.ts";
 
 test("warming observation preserves final policy actions, overrides, and subscription lifetime", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "atelier-warming-observer-"));
+  const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-warming-observer-"));
   const { session } = await createAgentSession({
-    cwd: dir, agentDir: dir, resourceLoader: createAtelierResourceLoader(),
+    cwd: dir, agentDir: dir, resourceLoader: createAgentsInTheCloudResourceLoader(),
     sessionManager: SessionManager.inMemory(dir), settingsManager: SettingsManager.inMemory(), tools: [],
   });
   const runner = session.extensionRunner;

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { acquireFileLock, AtelierCoreError, getAtelierRuntimeContext } from "@atelier/core";
+import { acquireFileLock, AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -99,7 +99,7 @@ const gitProjectInitSchema = Type.Object({
 
 export type GitProjectInitInstruction = Static<typeof gitProjectInitSchema>;
 
-declare module "@atelier/workspace" {
+declare module "@agents-in-the-cloud/workspace" {
   interface WorkspaceInitInstructionMap {
     "project.git": GitProjectInitInstruction;
   }
@@ -110,7 +110,7 @@ const projectStoreSchema = Type.Object({
   lastProjectlessWorkspaceCreatedAt: Type.Optional(Type.Number()),
 });
 
-export function projectsFile(dataDir = getAtelierRuntimeContext().atelierDataDir): string {
+export function projectsFile(dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {
   return join(dataDir, "projects.json");
 }
 
@@ -119,7 +119,7 @@ export function projectNameFromGitUrl(url: string): string {
   const last = basename(trimmed);
   const withoutGit = last.endsWith(".git") ? last.slice(0, -4) : last;
   const safe = withoutGit.replace(/[^a-zA-Z0-9._-]/g, "-");
-  if (!safe || safe === "." || safe === "..") throw new AtelierCoreError("invalid_git_url", `could not derive project name from ${url}`);
+  if (!safe || safe === "." || safe === "..") throw new AgentsInTheCloudCoreError("invalid_git_url", `could not derive project name from ${url}`);
   return safe;
 }
 
@@ -135,7 +135,7 @@ export function formatProjectSpec(project: Pick<ProjectSummary, "gitUrl" | "bran
 
 export function parseProjectSpec(spec: string): { gitUrl: string; branch: string | null } {
   const trimmed = spec.trim();
-  if (!trimmed) throw new AtelierCoreError("invalid_git_url", "git url is required");
+  if (!trimmed) throw new AgentsInTheCloudCoreError("invalid_git_url", "git url is required");
 
   const normalized = /^github\.com\//i.test(trimmed) ? `https://${trimmed}` : trimmed;
   const [gitUrl, branch] = normalized.split(/#(.+)/, 2).map((part) => part.trim());
@@ -188,7 +188,7 @@ export async function updateProjectStore<Result>(file: string, mutate: (store: P
 
 export function findProjectRecord(store: ProjectStore, projectId: string): ProjectRecord {
   const project = store.projects.find((candidate) => candidate.id === projectId);
-  if (!project) throw new AtelierCoreError("project_not_found", `project not found: ${projectId}`);
+  if (!project) throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${projectId}`);
   return project;
 }
 
@@ -255,7 +255,7 @@ export async function addProject(spec: string, file = projectsFile()): Promise<A
   const id = projectId(gitUrl, branch);
   return await updateProjectStore(file, (store) => {
     if (store.projects.some((project) => project.id === id || (project.gitUrl === gitUrl && project.branch === branch))) {
-      throw new AtelierCoreError("project_exists", `project already exists: ${formatProjectSpec({ gitUrl, branch })}`);
+      throw new AgentsInTheCloudCoreError("project_exists", `project already exists: ${formatProjectSpec({ gitUrl, branch })}`);
     }
     const baseName = projectNameFromGitUrl(gitUrl);
     const name = store.projects.some((project) => project.gitUrl === gitUrl)
@@ -282,12 +282,12 @@ export async function recordWorkspaceCreation(projectId: string | undefined, cre
 export async function updateProject(id: string, values: { name: string; spec: string }, file = projectsFile()): Promise<UpdateProjectResult> {
   return await updateProjectStore(file, (store) => {
     const project = store.projects.find((candidate) => candidate.id === id);
-    if (!project) throw new AtelierCoreError("project_not_found", `project not found: ${id}`);
+    if (!project) throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${id}`);
     const name = values.name.trim();
-    if (!name) throw new AtelierCoreError("invalid_arguments", "project name is required");
+    if (!name) throw new AgentsInTheCloudCoreError("invalid_arguments", "project name is required");
     const { gitUrl, branch } = parseProjectSpec(values.spec);
     if (store.projects.some((candidate) => candidate.id !== id && candidate.gitUrl === gitUrl && candidate.branch === branch)) {
-      throw new AtelierCoreError("project_exists", `project already exists: ${formatProjectSpec({ gitUrl, branch })}`);
+      throw new AgentsInTheCloudCoreError("project_exists", `project already exists: ${formatProjectSpec({ gitUrl, branch })}`);
     }
     project.name = name;
     project.gitUrl = gitUrl;
@@ -300,7 +300,7 @@ export async function updateProject(id: string, values: { name: string; spec: st
 export async function deleteProject(id: string, file = projectsFile()): Promise<DeleteProjectResult> {
   return await updateProjectStore(file, (store) => {
     const project = store.projects.find((candidate) => candidate.id === id);
-    if (!project) throw new AtelierCoreError("project_not_found", `project not found: ${id}`);
+    if (!project) throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${id}`);
     store.projects = store.projects.filter((candidate) => candidate.id !== id);
     return { project: projectSummary(project) };
   });
@@ -315,8 +315,8 @@ export function isGitProjectInit(init: unknown): init is GitProjectInitInstructi
 }
 
 export function validateProjectDockerfile(dockerfile: string): void {
-  if (dockerfile.trim() && dockerfile.split("\n")[0]!.trim() !== "FROM atelier-workspace") {
-    throw new AtelierCoreError("invalid_arguments", "Dockerfile must start with FROM atelier-workspace");
+  if (dockerfile.trim() && dockerfile.split("\n")[0]!.trim() !== "FROM agents-in-the-cloud-workspace") {
+    throw new AgentsInTheCloudCoreError("invalid_arguments", "Dockerfile must start with FROM agents-in-the-cloud-workspace");
   }
 }
 
@@ -332,7 +332,7 @@ export async function setProjectDockerfile(id: string, dockerfile: string, file 
 
 export function validateProjectPreloadImage(image: string): void {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._:/@+-]*$/.test(image) || image.includes("://")) {
-    throw new AtelierCoreError("invalid_arguments", `Invalid image reference: ${image || "(empty)"}`);
+    throw new AgentsInTheCloudCoreError("invalid_arguments", `Invalid image reference: ${image || "(empty)"}`);
   }
 }
 

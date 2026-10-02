@@ -1,6 +1,6 @@
 node_modules/
-.atelier-data/
-.atelier-workspace-image-context/
+.agents-in-the-cloud-data/
+.agents-in-the-cloud-workspace-image-context/
 /artifacts/
 .DS_Store
 apps/web/public/*.js

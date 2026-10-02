@@ -1,10 +1,10 @@
 import { basename, extname } from "node:path";
-import { recordAtelierDemo } from "./atelier-recording.ts";
+import { recordAgentsInTheCloudDemo } from "./agents-in-the-cloud-recording.ts";
 
 const outputPath = process.argv[2] ?? "/work/artifacts/recording-harness-example.mp4";
 const name = basename(outputPath, extname(outputPath));
 
-const report = await recordAtelierDemo(
+const report = await recordAgentsInTheCloudDemo(
 	{
 		name,
 		outputPath,
@@ -20,7 +20,7 @@ const report = await recordAtelierDemo(
 				#result { color: #3157d5; font-weight: 700; }
 			</style>
 			<main>
-				<h1>Atelier recording harness</h1>
+				<h1>AgentsInTheCloud recording harness</h1>
 				<label>Demo title <input aria-label="Demo title"></label>
 				<button>Preview title</button>
 				<p id="result"></p>

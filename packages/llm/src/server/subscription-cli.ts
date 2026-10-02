@@ -1,22 +1,22 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { shellQuote } from "@atelier/core";
-import { registerWorkspaceResponseTransform, registerWorkspaceSubscriptionSecrets } from "@atelier/proxy-egress/server";
-import { execWorkspaceCommand, listWorkspaces } from "@atelier/workspace";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import { registerWorkspaceResponseTransform, registerWorkspaceSubscriptionSecrets } from "@agents-in-the-cloud/proxy-egress/server";
+import { execWorkspaceCommand, listWorkspaces } from "@agents-in-the-cloud/workspace";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { SubscriptionUsageError } from "./subscription-usage.ts";
 import { recordSubscriptionInference } from "./recent-subscription-activity.ts";
 import { usesProviderSubscription } from "./subscription.ts";
 
-const codexToken = "atelier-subscription-codex-access";
-const codexAccount = "atelier-subscription-codex-account";
-const anthropicToken = "atelier-subscription-anthropic-access";
+const codexToken = "agents-in-the-cloud-subscription-codex-access";
+const codexAccount = "agents-in-the-cloud-subscription-codex-account";
+const anthropicToken = "agents-in-the-cloud-subscription-anthropic-access";
 
 export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>): void {
   async function subscriptionToken(provider: string): Promise<string> {
     const auth = await (await getRuntime()).getAuth(provider);
-    if (auth?.source !== "OAuth" || !auth.auth.apiKey) throw new Error(`Connect a ${provider} subscription in Atelier to use this CLI.`);
+    if (auth?.source !== "OAuth" || !auth.auth.apiKey) throw new Error(`Connect a ${provider} subscription in AgentsInTheCloud to use this CLI.`);
     return auth.auth.apiKey;
   }
   async function usesConnectedSubscription(request: Request, provider: "anthropic" | "openai-codex"): Promise<boolean> {
@@ -44,7 +44,7 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     const inference = url.pathname === "/v1/messages" && request.method === "POST";
     const hasLimits = response.headers.has("anthropic-ratelimit-unified-status");
     if (!inference && !hasLimits) return response;
-    // Only Atelier's connected subscription, not a login made inside the workspace.
+    // Only AgentsInTheCloud's connected subscription, not a login made inside the workspace.
     if (!(await usesConnectedSubscription(request, "anthropic"))) return response;
     try {
       if (hasLimits) anthropicUsageSource.observe(response.headers);
@@ -95,9 +95,9 @@ export async function maskCodexAccountDiscovery(response: Response, accountId: s
 // Far-future timestamps keep the CLIs from trying to refresh these non-credentials.
 export function subscriptionCliFiles(): Array<{ provider: string; path: string; content: string; marker: string }> {
   const idToken = [Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url"), Buffer.from(JSON.stringify({
-    email: "subscription@atelier.local",
+    email: "subscription@agents-in-the-cloud.local",
     "https://api.openai.com/auth": { chatgpt_account_id: codexAccount },
-  })).toString("base64url"), "atelier"].join(".");
+  })).toString("base64url"), "agents-in-the-cloud"].join(".");
   return [
     { provider: "openai-codex", path: ".codex/auth.json", marker: codexToken, content: JSON.stringify({
       auth_mode: "chatgpt", OPENAI_API_KEY: null,
@@ -106,7 +106,7 @@ export function subscriptionCliFiles(): Array<{ provider: string; path: string; 
     }) },
     { provider: "anthropic", path: ".claude/.credentials.json", marker: anthropicToken, content: JSON.stringify({
       // An empty refresh token means revoked/expired to Claude Code. Null means
-      // there is no local refresh credential; Atelier owns token refresh instead.
+      // there is no local refresh credential; AgentsInTheCloud owns token refresh instead.
       claudeAiOauth: { accessToken: anthropicToken, refreshToken: null, expiresAt: 4070908800000, scopes: ["user:inference", "user:profile"] },
     }) },
   ];
@@ -115,7 +115,7 @@ export function subscriptionCliFiles(): Array<{ provider: string; path: string; 
 export async function installSubscriptionCli(workspaceId: string, runtime: ModelRuntime): Promise<void> {
   for (const file of subscriptionCliFiles()) {
     const connected = await usesProviderSubscription(runtime, file.provider);
-    const path = shellQuote(`/home/atelier/${file.path}`);
+    const path = shellQuote(`/home/agents-in-the-cloud/${file.path}`);
     const result = await execWorkspaceCommand(workspaceId, ["sh", "-c", `set -eu
 umask 077
 ${connected ? `if [ ! -e ${path} ] || grep -qF ${shellQuote(file.marker)} ${path}; then

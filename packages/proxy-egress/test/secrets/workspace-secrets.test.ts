@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectSecret, updateProjectSecret, deleteProjectSecret, type GitProjectInitInstruction } from "@atelier/projects";
+import { addProject, createProjectSecret, updateProjectSecret, deleteProjectSecret, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
 import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearWorkspaceGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setWorkspaceGitHubToken } from "../../src/secrets/workspace-secrets.ts";
 
 function projectInit(projectId: string): GitProjectInitInstruction {
@@ -17,7 +17,7 @@ describe("workspace secrets", () => {
   beforeEach(async () => {
     previousDataDir = process.env.ATELIER_DATA_DIR;
     previousGitHubToken = process.env.GH_TOKEN;
-    dataDir = await mkdtemp(join(tmpdir(), "atelier-workspace-secrets-"));
+    dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-secrets-"));
     process.env.ATELIER_DATA_DIR = dataDir;
     delete process.env.GH_TOKEN;
   });
@@ -151,7 +151,7 @@ describe("workspace secrets", () => {
     expect(await context.hooks.isIpAllowed!({ hostname: "example.com", ip: "93.184.215.14", family: 4, port: 443, protocol: "https" })).toBe(true);
   });
 
-  test("passes an inherited placeholder onward for nested Atelier", async () => {
+  test("passes an inherited placeholder onward for nested AgentsInTheCloud", async () => {
     process.env.GH_TOKEN = "ATELIER_PROXY_READY_GH_TOKEN";
 
     const context = await createWorkspaceSecretContext("test-workspace");

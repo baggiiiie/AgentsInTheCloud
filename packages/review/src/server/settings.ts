@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import {
@@ -20,7 +20,7 @@ const settingsSchema = Type.Object({
 });
 
 function settingsPath(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "review-settings.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "review-settings.json");
 }
 
 export function isReviewDiffLayout(value: string): value is ReviewDiffLayout {

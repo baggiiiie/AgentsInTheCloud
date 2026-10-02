@@ -8,7 +8,7 @@ import { ensureMitmCa } from "../src/egress/mitm-ca.ts";
 import { createHttpHooks } from "../src/secrets/placeholder-hooks.ts";
 
 test("HTTP redirect reflection is scrubbed at the wire boundary, after response transforms, with the body unchanged", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-header-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-header-test-"));
   const secret = "fake-github-credential";
   const placeholder = "ATELIER_PROXY_READY_GH_TOKEN";
   const hooks = createHttpHooks({
@@ -20,7 +20,7 @@ test("HTTP redirect reflection is scrubbed at the wire boundary, after response 
     },
   });
   const socketPath = join(directory, "egress.sock");
-  const ca = await ensureMitmCa({ atelierDataDir: directory, dockerHostAtelierDataDir: directory, dockerBridgeHost: "127.0.0.1" });
+  const ca = await ensureMitmCa({ agentsInTheCloudDataDir: directory, dockerHostAgentsInTheCloudDataDir: directory, dockerBridgeHost: "127.0.0.1" });
   let calls = 0;
   const proxy = await startWorkspaceEgressProxy({ socketPath, ca,
     getContext: async () => ({ workspaceId: "test", hooks: hooks.httpHooks, env: hooks.env, secrets: hooks.secrets }),

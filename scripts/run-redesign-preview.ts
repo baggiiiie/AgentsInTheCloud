@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
 import { resolve } from "node:path";
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 
-const previewNamespace = "atelier-redesign-preview";
-const previewTitle = "Atelier redesign preview";
-const retiredPreviewFile = "/work/preview/atelier-redesign.md";
+const previewNamespace = "agents-in-the-cloud-redesign-preview";
+const previewTitle = "AgentsInTheCloud redesign preview";
+const retiredPreviewFile = "/work/preview/agents-in-the-cloud-redesign.md";
 const previewTerminalTitle = "Terminal";
 const baseUrl = "http://127.0.0.1:3000";
 const repoRoot = resolve(new URL("..", import.meta.url).pathname);
@@ -38,11 +38,11 @@ async function post<T>(path: string, body: JsonObject = {}): Promise<T> {
 async function waitForServer(server?: ReturnType<typeof Bun.spawn>): Promise<void> {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
-    if (server && server.exitCode !== null) throw new Error(`Atelier dev server exited with code ${server.exitCode}`);
+    if (server && server.exitCode !== null) throw new Error(`AgentsInTheCloud dev server exited with code ${server.exitCode}`);
     if ((await fetch(`${baseUrl}/up`).catch(() => undefined))?.ok) return;
     await Bun.sleep(250);
   }
-  throw new Error(`Atelier did not become ready at ${baseUrl} within 120 seconds`);
+  throw new Error(`AgentsInTheCloud did not become ready at ${baseUrl} within 120 seconds`);
 }
 
 async function workspace(): Promise<WorkspaceState> {

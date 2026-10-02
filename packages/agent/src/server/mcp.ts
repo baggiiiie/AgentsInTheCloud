@@ -1,26 +1,26 @@
-import type { AtelierEventBus } from "@atelier/core";
-import { execWorkspaceShell } from "@atelier/workspace";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { execWorkspaceShell } from "@agents-in-the-cloud/workspace";
 import { authenticateAgentRequest, createAgentMcpCredentials } from "./mcp-credentials.ts";
 import { createAgentMcpServer } from "./mcp-server.ts";
-import { createAtelierControlTools } from "./tools.ts";
+import { createAgentsInTheCloudControlTools } from "./tools.ts";
 import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import { agentConversationKey } from "./render-context.ts";
 import { publishWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
-import { prepareAppendedAtelierInstructions, sharedAtelierInstructions } from "./system-prompt.ts";
+import { prepareAppendedAgentsInTheCloudInstructions, sharedAgentsInTheCloudInstructions } from "./system-prompt.ts";
 
 async function agentMcpInstructions(workspaceId: string, agentId: string): Promise<string> {
-  return [sharedAtelierInstructions, ...await prepareAppendedAtelierInstructions(events, workspaceId, agentId)].join("\n\n");
+  return [sharedAgentsInTheCloudInstructions, ...await prepareAppendedAgentsInTheCloudInstructions(events, workspaceId, agentId)].join("\n\n");
 }
 
 let credentials: ReturnType<typeof createAgentMcpCredentials> | undefined;
 function credentialStore() { return credentials ??= createAgentMcpCredentials(); }
-let events: AtelierEventBus | undefined;
+let events: AgentsInTheCloudEventBus | undefined;
 const mcp = createAgentMcpServer({
   authenticate: (token) => credentialStore().authenticate(token),
-  tools: ({ workspaceId, agentId }) => [...createAtelierControlTools(workspaceId, { events }), ...createRegisteredOnboardingTools(workspaceId, agentId)],
+  tools: ({ workspaceId, agentId }) => [...createAgentsInTheCloudControlTools(workspaceId, { events }), ...createRegisteredOnboardingTools(workspaceId, agentId)],
   instructions: ({ workspaceId, agentId }) => agentMcpInstructions(workspaceId, agentId),
 });
-export function configureAgentMcp(eventBus: AtelierEventBus): void {
+export function configureAgentMcp(eventBus: AgentsInTheCloudEventBus): void {
   events = eventBus;
   eventBus.on("workspace_deleting", async ({ workspaceId }) => {
     credentialStore().revokeWorkspace(workspaceId);
@@ -46,20 +46,20 @@ export async function prepareAgentMcp(workspaceId: string, agentId: string) {
 (
   flock 9
   if ! curl --noproxy '*' --max-time 2 --silent http://127.0.0.1:2988/health | grep -qx ok; then
-    nohup socat TCP4-LISTEN:2988,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/run/atelier-parent/ingress.sock > /tmp/atelier-mcp.log 2>&1 < /dev/null 9>&- &
+    nohup socat TCP4-LISTEN:2988,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/run/agents-in-the-cloud-parent/ingress.sock > /tmp/agents-in-the-cloud-mcp.log 2>&1 < /dev/null 9>&- &
   fi
-) 9>/tmp/atelier-mcp.lock
+) 9>/tmp/agents-in-the-cloud-mcp.lock
 for attempt in $(seq 1 50); do
   if curl --noproxy '*' --max-time 2 --silent http://127.0.0.1:2988/health | grep -qx ok; then exit 0; fi
   sleep .1
 done
-cat /tmp/atelier-mcp.log >&2
+cat /tmp/agents-in-the-cloud-mcp.log >&2
 exit 1`);
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Could not start workspace MCP relay");
   return { url: "http://127.0.0.1:2988/mcp", token: credentialStore().issue({ workspaceId, agentId }) };
 }
 
-/** CLI agents run outside Atelier's runtime, so their turn boundaries arrive as authenticated loopback requests. */
+/** CLI agents run outside AgentsInTheCloud's runtime, so their turn boundaries arrive as authenticated loopback requests. */
 async function handleTurnBoundary(request: Request, workspaceId: string | undefined, started: boolean): Promise<Response> {
   const identity = authenticateAgentRequest(request, credentialStore().authenticate, workspaceId);
   if (identity instanceof Response) return identity;

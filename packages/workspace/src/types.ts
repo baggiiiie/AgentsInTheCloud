@@ -1,4 +1,4 @@
-export type { WorkspaceCreationContext } from "@atelier/shared";
+export type { WorkspaceCreationContext } from "@agents-in-the-cloud/shared";
 
 export interface WorkspaceInitInstructionMap {}
 

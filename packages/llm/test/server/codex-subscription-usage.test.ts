@@ -1,4 +1,4 @@
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 import { expect, test } from "bun:test";
 import { fetchCodexSubscriptionUsage } from "../../src/server/codex-subscription-usage.ts";
 

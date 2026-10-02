@@ -1,6 +1,6 @@
-import { shellQuote } from "@atelier/core";
-import type { WorkspaceServerSocketSession } from "@atelier/shared";
-import { execWorkspaceShell, workspaceContainerName, workspaceRoot } from "@atelier/workspace";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import type { WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { execWorkspaceShell, workspaceContainerName, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import {
   createObservableTerminalSocket,
   buildCapturePaneCommand,
@@ -14,7 +14,7 @@ import {
   observableTerminalRows,
   stripObservablePaneFraming,
   stripTerminalControls,
-} from "@atelier/observable-terminal/server";
+} from "@agents-in-the-cloud/observable-terminal/server";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -33,7 +33,7 @@ import { Type } from "typebox";
  * tool result is captured from tmux's rendered scrollback and active screen.
  */
 
-export const agentTmuxPrefix = "atelier-agent-";
+export const agentTmuxPrefix = "agents-in-the-cloud-agent-";
 
 /** Fixed terminal size for agent bash commands (a normal desktop terminal). */
 export const agentTermCols = observableTerminalCols;
@@ -125,7 +125,7 @@ export function createTmuxBashTool(
       const guards = shellExport({ EDITOR: "true", GIT_EDITOR: "true", VISUAL: "true", GIT_PAGER: "cat", PAGER: "cat", GIT_TERMINAL_PROMPT: 0 });
       // Encourage color even when a tool second-guesses the PTY. NO_COLOR must
       // be removed because it is the standard opt-out and may be inherited from
-      // the Atelier process. NINJA_STATUS has no boolean color switch, so give
+      // the AgentsInTheCloud process. NINJA_STATUS has no boolean color switch, so give
       // direct Ninja invocations an explicitly colored progress prefix.
       const colorEnv = `unset NO_COLOR; ${shellExport({ ...forcedColorEnvironment, COLUMNS: agentTermCols, LINES: agentTermRows })}`;
       const ninjaStatus = "export NINJA_STATUS=$(printf '\\033[36m[%%f/%%t %%p]\\033[0m ')";
@@ -239,7 +239,7 @@ export function createAgentTermSocketSession(url: URL): WorkspaceServerSocketSes
     // Inline terminals must never resize the agent's fixed-size command pane.
     cols: agentTermCols,
     rows: agentTermRows,
-    user: "atelier",
+    user: "agents-in-the-cloud",
     readonly: true,
     fixedSize: true,
   });

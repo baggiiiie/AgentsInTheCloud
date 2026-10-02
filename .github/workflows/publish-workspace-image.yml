@@ -3,7 +3,7 @@ name: Publish default workspace image
 on:
   push:
     branches:
-      - main
+      - rename-agents-in-the-cloud
   workflow_dispatch:
 
 permissions:
@@ -11,12 +11,12 @@ permissions:
   packages: write
 
 concurrency:
-  group: publish-workspace-image-main
+  group: publish-workspace-image-beta
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/rename-agents-in-the-cloud'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +31,12 @@ jobs:
           set -euo pipefail
           context="$RUNNER_TEMP/workspace-image"
           bun packages/workspace-image/scripts/build-context.mjs "$context"
-          tag=$(jq -er '.tag | select(startswith("atelier-workspace:")) | ltrimstr("atelier-workspace:")' "$context/metadata.json")
-          repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/atelier-workspace"
+          tag=$(jq -er '.tag | select(startswith("agents-in-the-cloud-workspace:")) | ltrimstr("agents-in-the-cloud-workspace:")' "$context/metadata.json")
+          repository="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/agents-in-the-cloud-workspace"
           {
             echo "context=$context"
             echo "ref=$repository:$tag"
-            echo "alias=$repository:latest-main"
+            echo "alias=$repository:beta"
           } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-qemu-action@v3
@@ -80,7 +80,7 @@ jobs:
           tags: ${{ steps.image.outputs.ref }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            com.atelier.workspace-image.kind=default
+            com.agents-in-the-cloud.workspace-image.kind=default
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
