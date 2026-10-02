@@ -1,18 +1,17 @@
-import type { WorkspaceHttpAppBackend } from "@atelier/shared";
+import { isWorkspaceLoopbackHost, localhostSubdomain, type WorkspaceHttpAppBackend } from "@atelier/shared";
 
-function localHostname(hostname: string): boolean {
-  return ["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(hostname.toLowerCase());
-}
-
-/** Only the current local app; never turn a redirect into publication of another port. */
-export function isSameLocalApp(target: URL, candidate: URL): boolean {
-  return localHostname(target.hostname) && localHostname(candidate.hostname)
+/** Only the current local app; never turn a redirect into publication of another port or *.localhost app. */
+export function isSameLocalApp(backend: WorkspaceHttpAppBackend, candidate: URL): boolean {
+  const { target } = backend;
+  return isWorkspaceLoopbackHost(target.hostname) && isWorkspaceLoopbackHost(candidate.hostname)
+    && localhostSubdomain(candidate.hostname) === backend.appHost
     && target.protocol === candidate.protocol && target.port === candidate.port
     && !candidate.username && !candidate.password;
 }
 
-export function localAppHost(target: URL): string {
-  return `localhost:${target.port || (target.protocol === "https:" ? "443" : "80")}`;
+export function localAppHost(backend: WorkspaceHttpAppBackend): string {
+  const { target } = backend;
+  return `${backend.appHost ?? "localhost"}:${target.port || (target.protocol === "https:" ? "443" : "80")}`;
 }
 
 export interface LocalAppOriginTranslation {
@@ -23,7 +22,7 @@ export interface LocalAppOriginTranslation {
 /** Translate only this hop's same-origin requests, never missing, opaque, or foreign Origins. */
 export function translateLocalAppOrigin(backend: WorkspaceHttpAppBackend, headers: Headers, receivingOrigin: string): LocalAppOriginTranslation | undefined {
   if (headers.get("origin") !== receivingOrigin) return undefined;
-  const upstream = new URL(`${backend.target.protocol}//${localAppHost(backend.target)}`).origin;
+  const upstream = new URL(`${backend.target.protocol}//${localAppHost(backend)}`).origin;
   headers.set("origin", upstream);
   return { receiving: receivingOrigin, upstream };
 }
@@ -47,8 +46,10 @@ export function adaptLocalAppResponse(backend: WorkspaceHttpAppBackend, response
   }
   const location = headers.get("location");
   if (location) {
-    const destination = URL.parse(location, backend.target);
-    if (destination && isSameLocalApp(backend.target, destination)) {
+    const base = new URL(backend.target);
+    base.host = localAppHost(backend);
+    const destination = URL.parse(location, base);
+    if (destination && isSameLocalApp(backend, destination)) {
       // Concatenate so a path beginning with // cannot replace the public authority.
       headers.set("location", `${publicOrigin}${destination.pathname}${destination.search}${destination.hash}`);
     }
@@ -60,7 +61,7 @@ export function adaptLocalAppResponse(backend: WorkspaceHttpAppBackend, response
       headers.append("set-cookie", cookie.split(";").filter((attribute, index) => {
         if (index === 0) return true;
         const match = attribute.match(/^\s*domain\s*=\s*\.?([^\s;]+)\s*$/i);
-        return !match || !localHostname(match[1]!);
+        return !match || !isWorkspaceLoopbackHost(match[1]!);
       }).join(";"));
     }
   }

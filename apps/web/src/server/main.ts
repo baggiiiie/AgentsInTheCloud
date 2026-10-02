@@ -274,7 +274,7 @@ for (const module of workspaceModules) {
     invalidateWorkspace: workspaceId => app.invalidateWorkspace(workspaceId),
     deleteCurrentWorkspace: (workspaceId, force) => app.deleteCurrentWorkspaceFromAgent(workspaceId, force),
     registerSocketHandler: (handler) => socketHandlers.push(handler),
-    publishWorkspacePort: (workspaceId, port, protocol) => workspaceIngress.publishPort(workspaceId, port, protocol),
+    publishWorkspacePort: (workspaceId, port, protocol, hostname) => workspaceIngress.publishPort(workspaceId, port, protocol, hostname),
     registerWorkspaceAppResolver: (resolver) => workspaceAppResolvers.push(resolver),
     registerProvisioningHook: (hook) => provisioningHooks.push(hook),
     onWorkspaceRemoved: (handler) => workspaceRemovedHandlers.push(handler),

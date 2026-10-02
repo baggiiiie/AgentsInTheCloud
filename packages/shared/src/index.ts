@@ -237,6 +237,8 @@ export interface WorkspaceAppRef {
 export interface WorkspaceHttpAppBackend {
   kind: "http";
   target: URL;
+  /** Host the app expects, such as a *.localhost subdomain; defaults to localhost. */
+  appHost?: string;
   gateway?: WorkspaceGateway;
   adaptRequestHeaders?(headers: Headers, request: Request): Promise<Headers> | Headers;
   adaptResponse?(response: Response, request: Request): Promise<Response> | Response;
@@ -330,7 +332,7 @@ export interface WorkspaceServerModuleContext {
   invalidateWorkspace(workspaceId: string): void;
   deleteCurrentWorkspace(workspaceId: string, force: boolean): Promise<DeleteCurrentWorkspaceResult>;
   registerSocketHandler(handler: WorkspaceServerSocketHandler): void;
-  publishWorkspacePort(workspaceId: string, port: number, protocol?: "http" | "https"): Promise<string>;
+  publishWorkspacePort(workspaceId: string, port: number, protocol?: "http" | "https", hostname?: string): Promise<string>;
   registerWorkspaceAppResolver(resolver: WorkspaceServerAppResolver): void;
   registerProvisioningHook(hook: WorkspaceServerProvisioningHook): void;
   onWorkspaceRemoved(handler: (workspaceId: string) => void | Promise<void>): void;

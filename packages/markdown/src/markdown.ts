@@ -3,7 +3,7 @@ import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { buttonHtml } from "@atelier/design-system/button";
 import MarkdownIt from "markdown-it";
 import { atelierFileHref } from "./atelier-markdown.ts";
-import { escapeHtml, isWorkspaceAppPort, workspaceProxyUrl } from "@atelier/shared";
+import { escapeHtml, isWorkspaceAppPort, isWorkspaceLoopbackHost, workspacePortAppKey, workspaceProxyUrl } from "@atelier/shared";
 import { renderMarkdownDiff } from "@atelier/syntax/markdown-diff";
 import { highlightCodeHtml } from "@atelier/syntax";
 
@@ -105,11 +105,10 @@ markdown.renderer.rules.image = (tokens, index, options, environment: MarkdownEn
 function workspaceLocalPreviewHref(workspaceId: string, href: string): string | undefined {
   let url: URL;
   try { url = new URL(href); } catch { return undefined; }
-  const hostname = url.hostname.toLowerCase();
-  if (!["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"].includes(hostname)) return undefined;
+  if (!isWorkspaceLoopbackHost(url.hostname)) return undefined;
   const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
   if (!isWorkspaceAppPort(port) || url.protocol !== "http:") return undefined;
-  return workspaceProxyUrl(workspaceId, `port-${port}`, `${url.pathname}${url.search}${url.hash}`);
+  return workspaceProxyUrl(workspaceId, workspacePortAppKey(port, url.hostname), `${url.pathname}${url.search}${url.hash}`);
 }
 
 function withoutFrontmatter(text: string): string {

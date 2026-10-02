@@ -94,6 +94,7 @@ describe("renderMarkdown", () => {
     const html = renderMarkdown("work-1", "[app](http://localhost:3004/path?x=1#top)");
     expect(html).toContain(`href="/workspaces/work-1/ports/3004/path?x=1#top"`);
     expect(html).toContain(`target="_blank"`);
+    expect(renderMarkdown("work-1", "[app](http://agents.localhost:3004/path)")).toContain(`href="/workspaces/work-1/apps/port-3004%40agents.localhost/path"`);
   });
 
   test("opens HTTP links in a new tab and rejects unsafe links", () => {

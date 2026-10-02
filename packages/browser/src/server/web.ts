@@ -1,20 +1,20 @@
 import { registerWorkspacePresenter } from "@atelier/agent/server";
 import { invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject, type JsonValue } from "@atelier/core";
 import { Icons } from "@atelier/design-system/icons";
-import { turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@atelier/shared";
+import { isWorkspaceLoopbackHost, turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@atelier/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { createBrowserPresenter } from "./agent-tool.ts";
-import { browserWorkViewPresentation, isWorkspaceLoopbackHost, renderBrowserWorkViewBody } from "./render.ts";
+import { browserWorkViewPresentation, renderBrowserWorkViewBody } from "./render.ts";
 import type { WorkspaceBrowserView } from "./state.ts";
 import { createWorkspaceBrowserView, deleteWorkspaceBrowserState, deleteWorkspaceBrowserView, getWorkspaceBrowserView, listWorkspaceBrowserViews, setWorkspaceBrowserTarget } from "./state.ts";
 
-let publishWorkspacePort: (workspaceId: string, port: number, protocol?: "http" | "https") => Promise<string>;
+let publishWorkspacePort: (workspaceId: string, port: number, protocol?: "http" | "https", hostname?: string) => Promise<string>;
 async function previewUrl(workspaceId: string, view: WorkspaceBrowserView): Promise<string> {
   if (!view.targetUrl) return "";
   const target = new URL(view.targetUrl);
   if (!isWorkspaceLoopbackHost(target.hostname)) return target.toString();
-  const origin = await publishWorkspacePort(workspaceId, Number(target.port || (target.protocol === "https:" ? 443 : 80)), target.protocol === "https:" ? "https" : "http");
+  const origin = await publishWorkspacePort(workspaceId, Number(target.port || (target.protocol === "https:" ? 443 : 80)), target.protocol === "https:" ? "https" : "http", target.hostname);
   return `${origin}${target.pathname}${target.search}${target.hash}`;
 }
 

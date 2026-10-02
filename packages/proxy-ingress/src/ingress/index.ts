@@ -4,7 +4,7 @@ import { createLocalOriginPublisher, type ParentOriginPublisher } from "./parent
 import { adaptLocalAppResponse, localAppHost, translateLocalAppOrigin } from "./local-app.ts";
 import { backendTransport } from "./backend-transport.ts";
 import type { ServerWebSocket } from "bun";
-import { workspaceGatewayErrorHeader, isWorkspaceAppPort, stripHopByHopHeaders, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceHttpAppBackend } from "@atelier/shared";
+import { workspaceGatewayErrorHeader, isWorkspaceAppPort, parseWorkspacePortAppKey, workspacePortAppKey, stripHopByHopHeaders, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceHttpAppBackend } from "@atelier/shared";
 import { createMemoryOriginIdentityStore, type OriginIdentityStore } from "./origin-identity.ts";
 import { closeWebSocket, maxSocketBufferedBytes, forwardToUpstream } from "./websocket.ts";
 import {
@@ -43,7 +43,7 @@ export interface IngressStatus {
 
 export interface WorkspaceIngress {
   initialize(): Promise<void>;
-  publishPort(workspaceId: string, port: number, protocol?: "http" | "https"): Promise<string>;
+  publishPort(workspaceId: string, port: number, protocol?: "http" | "https", hostname?: string): Promise<string>;
   openCanonical(app: WorkspaceAppRef, pathAndSearch: string): Promise<Response>;
   stopWorkspace(workspaceId: string): Promise<void>;
   stopAll(): Promise<void>;
@@ -117,11 +117,12 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
   }
 
   async function resolveBackend(app: WorkspaceAppRef, requestUrl: URL, protocol: "http" | "https" = "http"): Promise<WorkspaceAppBackend> {
-    const port = app.appKey.match(/^port-(\d+)$/);
+    const port = parseWorkspacePortAppKey(app.appKey);
     const backend = port && options.resolvePort
-      ? await options.resolvePort(app.workspaceId, Number(port[1]), protocol, requestUrl)
+      ? await options.resolvePort(app.workspaceId, port.port, protocol, requestUrl)
       : await options.resolveApp(app, requestUrl);
     if (!backend) throw new UnknownWorkspaceAppError(app);
+    if (port?.host && backend.kind === "http") return { ...backend, appHost: port.host };
     return backend;
   }
 
@@ -285,11 +286,11 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
       }
     },
 
-    async publishPort(workspaceId, port, protocol = "http") {
+    async publishPort(workspaceId, port, protocol = "http", hostname) {
       if (!isWorkspaceAppPort(port)) throw new Error("port must be an integer from 1 to 65535, excluding the workspace gateway");
       if (protocol !== "http" && protocol !== "https") throw new Error("protocol must be http or https");
       await options.resolveWorkspace(workspaceId);
-      return (await ensureLease({ workspaceId, appKey: `port-${port}` }, protocol)).origin;
+      return (await ensureLease({ workspaceId, appKey: workspacePortAppKey(port, hostname) }, protocol)).origin;
     },
 
     async openCanonical(app, pathAndSearch) {
@@ -345,7 +346,7 @@ async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBa
   let headers = stripHopByHopHeaders(request.headers, ["host"]);
   // Give apps one coherent local origin, including frameworks that prefer
   // forwarded headers to Host. Public routing identity is Atelier metadata only.
-  const localHost = localAppHost(backend.target);
+  const localHost = localAppHost(backend);
   headers.set("host", localHost);
   headers.set("x-forwarded-host", localHost);
   headers.set("x-forwarded-proto", backend.target.protocol.slice(0, -1));

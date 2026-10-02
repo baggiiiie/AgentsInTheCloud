@@ -85,3 +85,19 @@ test("changing System mode republishes existing listener without closing old rou
     }
   } finally { await ingress.stopAll(); backend.stop(true); }
 });
+
+test("a *.localhost publication gets its own origin and forwards its host to the app", async () => {
+  const hosts: string[] = [];
+  const upstream = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(request) { hosts.push(request.headers.get("host")!); return new Response("ok"); } });
+  const ingress = createWorkspaceIngress({
+    hostname: "127.0.0.1", resolveWorkspace() {}, resolveApp() { return undefined; },
+    resolvePort: (_workspaceId, port, _protocol, url) => ({ kind: "http", target: new URL(`http://127.0.0.1:${port}${url.pathname}`) }),
+  });
+  try {
+    const plain = await ingress.publishPort("workspace", upstream.port!);
+    const subdomain = await ingress.publishPort("workspace", upstream.port!, "http", "agents.localhost");
+    expect(subdomain).not.toBe(plain);
+    for (const origin of [plain, subdomain]) expect(await (await fetch(origin.replace("localhost", "127.0.0.1"))).text()).toBe("ok");
+    expect(hosts).toEqual([`localhost:${upstream.port}`, `agents.localhost:${upstream.port}`]);
+  } finally { await ingress.stopAll(); upstream.stop(true); }
+});
