@@ -7,7 +7,8 @@ import { createOnboardingCapabilities, onboardingToolDefinitions, registeredOnbo
 function agentsInTheCloudConversation(records: readonly DurableConversationRecord[], id: ConversationId): string {
   const record = records.find((record) => record.durableId === id);
   if (!record) throw new Error(`No AgentsInTheCloud conversation registered for Durable conversation ${id}`);
-  return record.conversationId;
+  // Delegated work acts under the root’s already-established workspace authority.
+  return record.rootId ?? record.conversationId;
 }
 
 /** One registry serves every conversation; authorization uses the calling conversation's committed AgentsInTheCloud identity. */
@@ -17,7 +18,7 @@ export function createDurableOnboardingExtension(
   operations: (workspaceId: string) => BashOperations = workspaceBashOperations,
 ) {
   const remote = createReceiptBashExtension({
-    name: "agents-in-the-cloud.remote-bash", taskName: "agents-in-the-cloud.remote-bash-operation", tool: remoteBashToolDefinition,
+    name: "atelier.remote-bash", taskName: "atelier.remote-bash-operation", tool: remoteBashToolDefinition,
     async prepare(args, tx, id) {
       const catalog = await tx.doc(WorkspaceConversations);
       const capabilities = createOnboardingCapabilities(workspaceId, agentsInTheCloudConversation(catalog.conversations, id), deps);
@@ -40,7 +41,7 @@ export function createDurableOnboardingExtension(
     });
   }
   return defineExtension({
-    name: "agents-in-the-cloud.onboarding",
+    name: "atelier.onboarding",
     tools: [
       capability("readProjectSettings", "safe"),
       capability("writeProjectSettings"),

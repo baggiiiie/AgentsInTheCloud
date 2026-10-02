@@ -26,6 +26,9 @@ export class ConversationPresentation {
   readonly readOnly: boolean;
   private presentation!: DurableConversationPresentation;
   private readonly transcriptListeners = new Map<AgentLivePresentationListener, { unsubscribe(): void }>();
+  private unsubscribeWork!: () => void;
+  private unsubscribeUsage!: () => void;
+  private descendantCost?: number;
   private unsubscribeStatus!: () => void;
   private unsubscribeSelection!: () => void;
   model?: { provider: string; id: string };
@@ -37,7 +40,7 @@ export class ConversationPresentation {
   private disposed = false;
   private failure?: Error;
   private readonly chrome = createLivePresentation(() => [
-    { target: ids.actions(this), html: renderPromptActions(this, this.isStreaming) },
+    { target: ids.actions(this), html: renderPromptActions(this, this.isStreaming, this.controller.hasStoppableWork) },
     { target: ids.stats(this), html: renderAgentPaneComposerFooter(this, this.stats()), morph: false },
     { target: ids.completionCatalog(this), html: this.catalog },
     { target: notificationControlId(this), html: renderNotificationControl(this, this.isStreaming), action: "replace" },
@@ -54,6 +57,9 @@ export class ConversationPresentation {
     const runtime = new ConversationPresentation(agent, controller, await createPiModelRuntime());
     try {
       runtime.presentation = await DurableConversationPresentation.attach(controller, { ...agent, branchId: String(controller.id) }, BACKGROUND_CONTEXT, () => runtime.committed());
+      runtime.unsubscribeWork = controller.subscribeWork(() => runtime.chrome.invalidate());
+      runtime.unsubscribeUsage = controller.subscribeUsage(() => { void runtime.refreshUsage().catch(error => console.error("Could not refresh descendant usage", error)); });
+      await runtime.refreshUsage();
       runtime.unsubscribeStatus = controller.subscribeStatus(() => runtime.chrome.invalidate());
       runtime.unsubscribeSelection = controller.subscribeSelection(() => runtime.attachSelectedBranch());
       await runtime.committed();
@@ -117,11 +123,15 @@ export class ConversationPresentation {
     const model = this.model && this.modelRuntime.getModel(this.model.provider, this.model.id);
     return model ? getSupportedThinkingLevels(model) : [];
   }
+  private async refreshUsage() {
+    this.descendantCost = await this.controller.descendantCost();
+    if (!this.disposed) this.chrome.invalidate();
+  }
   private stats(): AgentStatsView {
     const usage = this.presentation.state.usage;
     const buckets = [...Object.values(usage.models), ...Object.values(usage.tools)];
     const model = this.model && this.modelRuntime.getModel(this.model.provider, this.model.id);
-    return { nativeBranchUsage: true, contextPercent: model?.contextWindow ? this.contextTokens / model.contextWindow * 100 : null, compactAvailable: !this.isStreaming && Boolean(this.model),
+    return { nativeBranchUsage: true, descendantCost: this.descendantCost, isSubagent: this.controller.isSubagent, contextPercent: model?.contextWindow ? this.contextTokens / model.contextWindow * 100 : null, compactAvailable: !this.isStreaming && Boolean(this.model),
       inputTokens: buckets.reduce((sum, item) => sum + item.input, 0), outputTokens: buckets.reduce((sum, item) => sum + item.output, 0),
       cost: buckets.reduce((sum, item) => sum + item.cost.total, 0), modelName: this.model?.id,
       thinkingLevel: this.thinking, thinkingLevels: this.availableThinkingLevels(), models: this.models.map(model => ({ ...model, selected: model.provider === this.model?.provider && model.id === this.model.id })) };
@@ -133,7 +143,7 @@ export class ConversationPresentation {
     return { unsubscribe: () => { this.transcriptListeners.get(listener)?.unsubscribe(); this.transcriptListeners.delete(listener); chrome.unsubscribe(); } };
   }
   subscribeTurnPresentation(turn: string, branch: string, listener: AgentLivePresentationListener) { this.assertOpen(); return this.presentation.subscribeTurnPresentation(turn, branch, listener); }
-  async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, stats: this.stats(), readOnly: this.readOnly }; }
+  async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, hasStoppableWork: this.controller.hasStoppableWork, stats: this.stats(), readOnly: this.readOnly }; }
   async refreshCompletionCatalog() { if (this.readOnly) return ""; this.catalog = await renderWorkspaceCompletionCatalog(this.workspaceId); this.chrome.invalidate(); return this.catalog; }
   revealTurn(target: string) { return this.presentation.revealTurn(target); }
   userMessages() { return this.presentation.userMessages(); }
@@ -146,6 +156,8 @@ export class ConversationPresentation {
     this.chrome.dispose();
     this.unsubscribeSelection?.();
     this.unsubscribeStatus?.();
+    this.unsubscribeUsage?.();
+    this.unsubscribeWork?.();
     this.publishBusy(false);
     await this.presentation?.dispose();
   }

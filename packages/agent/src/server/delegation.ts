@@ -1,51 +1,10 @@
+import type { Models } from "@earendil-works/pi-ai";
+import type { Extension, Harness, ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import type { AgentTranscriptSnapshot } from "./transcript-contributions.ts";
-import { AgentsInTheCloudCoreError, type AgentsInTheCloudEventBus, type JsonObject } from "@agents-in-the-cloud/core";
-import type { AgentSession, SessionManager, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { AgentsInTheCloudCoreError, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { AgentRenderContext } from "./render-context.ts";
 import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "./session-store.ts";
-import type { ToolView, TranscriptItem, TranscriptRecord } from "./transcript.ts";
-
-export interface AgentDelegationContext {
-  agent: WorkspaceAgentConversationInfo;
-  events?: AgentsInTheCloudEventBus;
-}
-
-/** Created for each conversion, retained through provider serialization and request preparation.
- * A prepared request is NOT a provider acknowledgement. */
-export interface AgentModelRequestTransform {
-  messages?(messages: any[]): any[] | Promise<any[]>;
-  payload?(payload: JsonObject, model: { api: string }): JsonObject | Promise<JsonObject>;
-  prepared?(model: { api: string }): void | Promise<void>;
-}
-
-export interface AgentSessionAttachment {
-  costs?: {
-    snapshot(): Promise<{ cost: number; descendantCost?: number; isSubagent: boolean }>;
-    subscribe(invalidate: () => void): () => void;
-  };
-  createModelRequest?(): AgentModelRequestTransform;
-  dispose(): void | Promise<void>;
-}
-
-export interface AgentDelegationTranscript {
-  snapshot(): AgentTranscriptSnapshot;
-  subscribe(invalidate: () => void): () => void;
-}
-
-export interface AgentSessionPreparation {
-  prompt?: string[];
-  /** Resolved after session restoration and refreshed when model/thinking changes. */
-  modelPrompt?(modelId: string | undefined, thinkingLevel: string): string[];
-  tools?: ToolDefinition<any, any>[];
-  outputSchemas?: ReadonlyMap<string, unknown>;
-  model?: { provider: string; id: string };
-  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
-  /** Called after the durable history is opened, before session construction. */
-  seedHistory?(manager: SessionManager): void;
-  /** Called before the session is exposed to callers or inference can start. */
-  attach?(session: AgentSession): AgentSessionAttachment;
-  transcript?(session: AgentSession): AgentDelegationTranscript;
-}
+import type { ToolView } from "./transcript.ts";
 
 export interface AgentToolPresentation {
   summary(tool: ToolView): string | undefined;
@@ -53,19 +12,15 @@ export interface AgentToolPresentation {
 }
 
 export interface AgentDelegation {
-  prepare(context: AgentDelegationContext): Promise<AgentSessionPreparation> | AgentSessionPreparation;
+  create(models: Models, harness: () => Harness): { extension: Extension; models: Models };
+  transcript(view: ConversationView): AgentTranscriptSnapshot;
+  attributed(entry: EntryRecord): "task" | "message" | undefined;
   resolveConversation(workspaceId: string, conversationId: string, events?: AgentsInTheCloudEventBus): Promise<WorkspaceAgentConversationInfo | undefined>;
-  /** After the closed runtime stops, before archival. Not called for plain unloading. */
-  closingConversation(workspaceId: string, conversationId: string): Promise<void>;
-  /** Runs before any runtime in the workspace is disposed. */
-  removingWorkspace(workspaceId: string): Promise<void>;
-  projectSessionEntry(entry: any): TranscriptRecord[] | undefined;
   toolPresentations?: ReadonlyMap<string, AgentToolPresentation>;
 }
 
-/** One trusted Pi integration, installed by the web composition root before runtimes start.
- * This is not a plugin registry: there is no ordering, merging, or override policy.
- * Pi session/history access is intentional; the integration must not replace host request hooks. */
+/** One optional native integration, installed before workspace owners open.
+ * Execution belongs to the workspace Harness; presentation is passive. */
 export let agentDelegation: AgentDelegation | undefined;
 export function configureAgentDelegation(delegation: AgentDelegation | undefined): void {
   agentDelegation = delegation;

@@ -1,4 +1,3 @@
-import { agentDelegation } from "./delegation.ts";
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { ConversationPresentation } from "./conversation-presentation.ts";
 import { openDurableAgentRuntime, type DurableAgentRuntime } from "./durable-runtime.ts";
@@ -64,7 +63,6 @@ async function removeRuntimes(workspaceId: string): Promise<void> {
   await Promise.allSettled(pending.map(([, runtime]) => runtime));
   const native = existsSync(join(await workspaceDurableJournalDirectory(workspaceId), "main.jsonl"));
   if (native) await (await durableWorkspaceOwner(workspaceId)).delete();
-  await agentDelegation?.removingWorkspace(workspaceId);
   const matching = [...presentations.entries()].filter(([key]) => key.startsWith(`${workspaceId}\u0000`));
   for (const [key] of matching) presentations.delete(key);
   const settled = await Promise.allSettled(matching.map(([, runtime]) => runtime));
@@ -104,7 +102,6 @@ async function closeConversation(workspaceId: string, conversationId: string): P
     await (await existingDurableController(agent))?.close();
   }
   await unloadRuntime(workspaceId, conversationId);
-  await agentDelegation?.closingConversation(workspaceId, conversationId);
 }
 
 /** Stop is allowed while parked; it does not need an execution/UI mount. */

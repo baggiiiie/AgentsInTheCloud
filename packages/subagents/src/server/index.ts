@@ -1,11 +1,68 @@
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
-import { preserveLegacySubagentHistories } from "./history-store.ts";
+import { listWorkspaceAgentConversations, configureAgentDelegation, durableWorkspaceOwner } from "@agents-in-the-cloud/agent/server";
+import { createNativeDelegationExtension } from "./native-runtime.ts";
+import { delegationModels } from "./native-models.ts";
+import { nativeDelegationTranscript } from "./native-transcript.ts";
+import { attributedEntry } from "./native-state.ts";
+import { nativeToolPresentations } from "./native-tool-presentation.ts";
+import { nativeSnapshot } from "./native-view-state.ts";
+import { subagentsWorkView, subagentsWorkViewAdapter, handleSubagentRequest, subscribeSubagentTree } from "./subagent-view.ts";
+import { subagentsOpenApiPaths } from "./openapi.ts";
 
-// Live delegation is paused during the Pi Durable port. Keep only history
-// preservation, so workspace cleanup cannot destroy older child transcripts.
 export const agentsInTheCloudServerModule: WorkspaceModule = {
-  id: "subagent-history",
-  async initialize() {
-    await preserveLegacySubagentHistories();
+  id: "subagents",
+  initialize() {
+    configureAgentDelegation({
+      create(models, harness) { return { extension: createNativeDelegationExtension(harness), models: delegationModels(models, harness) }; },
+      transcript: nativeDelegationTranscript,
+      attributed: attributedEntry,
+      toolPresentations: nativeToolPresentations,
+      async resolveConversation(workspaceId, conversationId) {
+        const record = (await (await durableWorkspaceOwner(workspaceId)).catalog()).find(record => record.parentId && record.conversationId === conversationId);
+        return record ? { ...record, workspaceId, path: "", storage: "durable" } : undefined;
+      },
+    });
   },
+  staticFiles: { "/subagents.css": { url: new URL("../client/subagents.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
+  workViews: [subagentsWorkViewAdapter],
+  openApiPaths: subagentsOpenApiPaths,
+  commands: [{ id: "subagents.open", execute: () => ({ createdWorkView: { type: "subagents" } }) }],
+  cableChannels: [{
+    name: "subagents",
+    subscribe(identifier, listener, events) {
+      if (identifier.channel !== "module" || identifier.name !== "subagents") throw new Error("Invalid Subagents channel");
+      const params = Value.Parse(Type.Object({ conversationId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), identifier.params);
+      return subscribeSubagentTree(identifier.workspaceId, params.conversationId, listener, events);
+    },
+  }],
+  attachToWorkspace() {
+    return { workViews: [subagentsWorkView], commands: [{ id: "subagents.open", label: "Subagents", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Subagents, label: "Subagents" } } }] };
+  },
+  routes: [{
+    async handle(request, url, context) {
+      const reveal = url.pathname.match(/^\/workspaces\/([^/]+)\/subagents\/reveal$/);
+      if (reveal && (request.method === "POST" || request.method === "GET")) {
+        const workspaceId = decodeURIComponent(reveal[1]!);
+        const form = request.method === "GET" ? url.searchParams : await request.formData();
+        const snapshot = await nativeSnapshot(workspaceId);
+        const target = String(form.get("child"));
+        const child = snapshot.agents.find((agent) => agent.id === target);
+        const message = snapshot.messages.find((message) => message.id === String(form.get("message")));
+        if (!message || (message.from !== target && message.to !== target)) return new Response("Subagent message not found", { status: 404 });
+        if (!child) {
+          const roots = await listWorkspaceAgentConversations(workspaceId);
+          if (!roots.some((root) => root.conversationId === target)) return new Response("Agent not found", { status: 404 });
+          const query = new URLSearchParams({ agent: target, agentTarget: message.id });
+          return new Response(null, { status: 303, headers: { location: `/workspaces/${encodeURIComponent(workspaceId)}?${query}` } });
+        }
+        await context.openWorkView(workspaceId, { type: "subagents" });
+        const query = new URLSearchParams({ agent: child.rootId, workView: "subagents:workspace", subagent: child.id, message: message.id });
+        return new Response(null, { status: 303, headers: { location: `/workspaces/${encodeURIComponent(workspaceId)}?${query}` } });
+      }
+      return handleSubagentRequest(request, url, { events: context.events });
+    },
+  }],
 };

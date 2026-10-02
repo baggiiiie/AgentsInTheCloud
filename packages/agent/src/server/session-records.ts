@@ -1,4 +1,3 @@
-import { agentDelegation } from "./delegation.ts";
 import { contentText } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -88,8 +87,6 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
       records.push({ kind: "timing", timing, turnEntryId, outcome, timestamp: entryTimestamp(entry) });
       continue;
     }
-    const contributed = agentDelegation?.projectSessionEntry(entry);
-    if (contributed !== undefined) { records.push(...contributed); continue; }
     if (entry.type === "message") {
       const message = entry.message;
       if (!message) continue;

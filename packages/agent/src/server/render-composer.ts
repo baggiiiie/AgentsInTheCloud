@@ -31,6 +31,7 @@ export interface AgentPaneState {
   readOnly?: boolean;
   transcriptHtml: string;
   busy: boolean;
+  hasStoppableWork?: boolean;
   stats: AgentStatsView;
 }
 
@@ -62,6 +63,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
         attachments,
         initialText,
         busy: state.busy,
+        hasStoppableWork: state.hasStoppableWork,
         stats: state.stats,
         completionCatalogHtml,
       })}
@@ -81,6 +83,7 @@ interface AgentComposerRenderOptions {
   attachments: readonly StagedAttachment[];
   initialText?: string;
   busy: boolean;
+  hasStoppableWork?: boolean;
   stats: AgentStatsView;
   completionCatalogHtml: string;
 }
@@ -92,7 +95,7 @@ function renderAgentCompletionCatalog(ctx: AgentRenderContext, catalog: string):
 function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
   const { ctx, draftId, stats } = options;
   const formId = `agent_pane_composer_${draftId}`;
-  const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy)}</span>`;
+  const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy, options.hasStoppableWork)}</span>`;
   return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
     <div class="composer-surface">
       <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-end->agent-pane#submitted click->agent-pane#focusInput">
@@ -139,14 +142,14 @@ function renderTranscriptEndNavigation(): string {
   return `<div class="agent-transcript-navigation" data-agent-pane-target="transcriptEnd" hidden>${button}</div>`;
 }
 
-export function renderPromptActions(ctx: AgentRenderContext | undefined, busy: boolean): string {
+export function renderPromptActions(ctx: AgentRenderContext | undefined, busy: boolean, hasStoppableWork = busy): string {
   const initialLabel = busy ? "Steer agent" : "Send prompt";
-  const activeLabel = "Agent is working — click to stop";
-  const state = busy ? "active" : "initial";
+  const activeLabel = busy ? "Agent is working — click to stop" : "Subagents are working — click to stop";
+  const state = hasStoppableWork ? "active" : "initial";
   const paneAttrs = ctx
-    ? ` data-agent-pane-target="sendStop" data-agent-busy="${busy}"${busy ? ` data-agent-abort-form-id="${ids.abortForm(ctx)}"` : ""}`
+    ? ` data-agent-pane-target="sendStop" data-agent-busy="${busy}" data-agent-stoppable="${hasStoppableWork}"${hasStoppableWork ? ` data-agent-abort-form-id="${ids.abortForm(ctx)}"` : ""}`
     : "";
-  const actionAttrs = busy && ctx ? `form="${ids.abortForm(ctx)}"` : "";
+  const actionAttrs = hasStoppableWork && ctx ? `form="${ids.abortForm(ctx)}"` : "";
   return activityButtonHtml({
     variant: "primary",
     iconOnly: true,
@@ -180,7 +183,7 @@ ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingFormId}" method="post" 
 ${meter}
 <span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
 <span class="agent-stat" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" title="${stats.nativeBranchUsage ? "This branch cost, including compaction and recorded attempts. Updated when usage commits." : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+<span class="agent-stat" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

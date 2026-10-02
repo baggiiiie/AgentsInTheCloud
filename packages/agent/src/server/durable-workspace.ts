@@ -18,6 +18,10 @@ export type DurableConversationRecord = {
   label: string;
   title: string;
   readOnly?: boolean;
+  /** Delegated collaborators share the journal, not root tab metadata. */
+  parentId?: string;
+  rootId?: string;
+  taskName?: string;
   /** Retained branch IDs; durableId is the selected immutable fork. */
   branches?: ConversationId[];
 };
