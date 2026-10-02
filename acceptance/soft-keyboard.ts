@@ -295,6 +295,38 @@ await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only 
   await Bun.sleep(1200);
 });
 
+await scenario("ios-composer-tap-and-stack", "On the phone itself: a tap anywhere in the composer outside its controls focuses the text; with the keyboard down, long text stacks the buttons 1×4 within the 40% max.", async (recorder) => {
+  await blur();
+  await openComposer();
+  const set = (text: string): Promise<boolean> => page.evaluate<boolean>(`(() => { const i = [...document.querySelectorAll(${JSON.stringify(sel.input)})].find((e) => e.checkVisibility()); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+  await set("");
+  await Bun.sleep(400);
+  const beside = await page.evaluate<{ x: number; y: number } | null>(`(() => {
+    const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
+    const row = pane.querySelector(".composer-quick-launches");
+    const buttons = [...row.querySelectorAll("button")];
+    if (!buttons.length || !row.checkVisibility()) return null;
+    const last = buttons[buttons.length - 1].getBoundingClientRect();
+    return { x: last.right + 20, y: last.top + last.height / 2 + ${sim.screen.height} - innerHeight };
+  })()`);
+  if (beside) {
+    const { after } = await transition(recorder, "tap beside the quick launches", () => sim.tap(beside.x, beside.y));
+    recorder.add(check("A tap outside the controls focuses the text", after.focus.includes("composer-input") && after.keyboard, `focus: ${after.focus}, arranged: ${after.keyboard}`));
+    await tapDone();
+    await Bun.sleep(1200);
+  } else recorder.add(check("Quick launches staged", false, "this workspace has no quick-launch prompt templates"));
+  const stacked = (): Promise<{ stacked: boolean; composer: number; max: number }> => page.evaluate(`(() => { const c = [...document.querySelectorAll(".agent-composer-pane > .composer")].find((e) => e.checkVisibility()); return { stacked: c.classList.contains("composer-stacked"), composer: c.getBoundingClientRect().height, max: document.documentElement.clientHeight * 0.4 }; })()`);
+  const { after } = await transition(recorder, "dictation lands 20 lines", () => set(Array.from({ length: 20 }, (_, index) => `Dictated sentence number ${index + 1}.`).join(" ")), { video: false });
+  const long = await stacked();
+  recorder.add(
+    check("B: long text stacks the buttons", long.stacked && after.buttons.length === 4, `stacked: ${long.stacked}; slots ${after.buttons.join(", ")}`),
+    check("H3: the stacked composer stays within 40%", long.composer <= long.max + 1, `composer ${Math.round(long.composer)}px, max ${Math.round(long.max)}px`),
+  );
+  await set("");
+  await Bun.sleep(400);
+  recorder.add(check("Empty again: 2×2", !(await stacked()).stacked, "unstacked"));
+});
+
 // ─── Pi CLI agent ───────────────────────────────────────────────────────────
 await navigate(piPath, ".cli-agent-body .observable-terminal-host");
 

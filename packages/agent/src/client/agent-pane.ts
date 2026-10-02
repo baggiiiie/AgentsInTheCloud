@@ -233,15 +233,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       }
     }
 
-    focusInput(event: Event): void {
-      // SVG icons inside controls must not turn their clicks into composer focus.
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("button, select, input, a, textarea, .agent-chip")) return;
-      const input = this.inputTarget;
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-    }
-
     private setInputValue(value: string): void {
       setTextInputValue(this.inputTarget, value);
     }

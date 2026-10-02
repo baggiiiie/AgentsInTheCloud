@@ -58,6 +58,8 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 .composer.composer-has-text .composer-quick-launches { display: none; }
 /* A tall composer stacks the buttons, giving the text the second column's width. */
 .composer.composer-stacked .composer-buttons {
+  /* Tight enough to fit under the 40% max on a phone (4 × 62.5px + 10px). */
+  gap: 2px; padding-block: 2px;
   grid-template: "close" var(--composer-control-size) "attach" var(--composer-control-size) "transcribe" var(--composer-control-size) "send" var(--composer-control-size) / var(--composer-control-size);
 }
 .composer-quick-launches:empty { display: none; }

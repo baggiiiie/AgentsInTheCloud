@@ -92,7 +92,7 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
   const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy)}</span>`;
   return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
     <div class="composer-surface">
-      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-start->agent-pane#submitStarted turbo:submit-end->agent-pane#submitted click->agent-pane#focusInput">
+      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-start->agent-pane#submitStarted turbo:submit-end->agent-pane#submitted">
         ${renderComposerBody({
           draft: { id: draftId, rowId: ids.attachRow(ctx), attachments: options.attachments },
           collapsible: true,

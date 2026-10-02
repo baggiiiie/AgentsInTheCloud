@@ -121,6 +121,19 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       if (this.mobile) this.setOpen(true);
     }
 
+    /**
+     * The text field can be short beside the buttons and quick launches: a tap
+     * anywhere in the composer that isn't a control focuses it, caret at the end.
+     */
+    focusText(event: MouseEvent): void {
+      const input = this.input;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!input || input.inert || !target || !this.composer?.contains(target) || target === input) return;
+      if (target.closest("button, a, input, select, textarea, label, summary, .agent-chip, .composer-footer, .agent-completion-menu-host")) return;
+      input.focus({ preventScroll: true });
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
     /** A focused terminal takes the space; the composer collapses and keeps its draft. */
     focused(event: FocusEvent): void {
       if (event.target instanceof Element && event.target.closest(".observable-terminal-host") && this.isOpen) this.close();
