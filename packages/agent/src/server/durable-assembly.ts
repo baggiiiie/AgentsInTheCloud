@@ -1,3 +1,4 @@
+import { durableTiming, type WriteDurableTiming } from "./durable-timing.ts";
 import { durableSubscriptionActivity } from "./durable-accounting.ts";
 import type { Models } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, type AgentChange, type Extension, type HarnessOptions } from "@earendil-works/pi-durable";
@@ -25,10 +26,11 @@ export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick
 }
 
 /** No AgentSession, delegation coordinator, or host-local filesystem environment. */
-export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions = {}): Promise<HarnessOptions> {
+export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions, writeTiming: WriteDurableTiming): Promise<HarnessOptions> {
   const models = await createPiModelRuntime();
   const registry = createDurableWorkspaceRegistry(workspaceId, models, options);
   registry.install(durableSubscriptionActivity(models));
+  registry.install(durableTiming(writeTiming));
   return {
     models,
     registry,

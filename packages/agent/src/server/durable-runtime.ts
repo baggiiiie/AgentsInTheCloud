@@ -1,3 +1,4 @@
+import { durableTimingEntry } from "./durable-timing.ts";
 import { AtelierCoreError } from "@atelier/core";
 import { checkWorkspaceReadiness } from "@atelier/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -38,7 +39,9 @@ export async function openDurableAgentRuntime(
   options: WorkspaceAgentToolOptions = {},
   load: typeof dependencies = dependencies,
 ) {
-  const harnessOptions: HarnessOptions = await load.harness(workspaceId, options);
+  const harnessOptions: HarnessOptions = await load.harness(workspaceId, options, async (id, entry, context) => {
+    await workspace.harness.commit(async tx => { await tx.appendEntry(durableTimingEntry, id, entry); }, context);
+  });
   const workspace = await openDurableWorkspace(directory, workspaceId, harnessOptions);
   const { harness } = workspace;
   const agents = new Map<string, Promise<ReturnType<typeof controller>>>();

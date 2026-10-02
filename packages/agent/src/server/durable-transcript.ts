@@ -1,3 +1,4 @@
+import { durableTimingEntry, DurableTurnTiming } from "./durable-timing.ts";
 import { historyNote } from "@atelier/legacy-converter/entries";
 import { contentText, type Message } from "@earendil-works/pi-ai";
 import { AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
@@ -39,6 +40,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
   const completedTools = new Set<string>();
   const partialTools = new Set<string>();
   const turnEnds = new Map<string, { timestamp: number; completed: boolean }>();
+  const timings = new Map<string, DurableTurnTiming>();
   let turn: string | undefined;
   let pendingBoundary = true;
 
@@ -46,7 +48,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
     if (message.role === "system") return;
     if (message.role === "user") {
       const startsTurn = pendingBoundary || !turn;
-      if (startsTurn) { turn = key; pendingBoundary = false; }
+      if (startsTurn) { turn = key; pendingBoundary = false; timings.set(key, new DurableTurnTiming()); }
       records.push({ kind: "user", id: key, text: contentText(message.content), images: images(message.content, imageEntryId, offset), timestamp: message.timestamp, rewindable: false });
       if (startsTurn) records.push({ kind: "runStart", turnEntryId: key, timestamp: message.timestamp, startedAt: message.timestamp });
     } else if (message.role === "assistant") {
@@ -74,6 +76,10 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
   // ConversationView is already in context order: head marker first, then
   // oldest-to-newest entries. Sorting by ID would misplace compaction summaries.
   for (const entry of view.entries) {
+    if (durableTimingEntry.is(entry)) {
+      if (turn) timings.get(turn)!.add(entry.data);
+      continue;
+    }
     if (historyNote.is(entry)) {
       records.push({ kind: "note", id: String(entry.id), text: entry.data.text, tone: entry.data.tone });
       continue;
@@ -135,12 +141,17 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       if (item.type === "tool") updateTools(item.tool);
       if ((item.type === "text" || item.type === "thinking") && item.key.startsWith(`${partialKey}:`)) item.live = true;
       if (item.type === "working") {
-        item.durationUnavailable = true;
+        const measured = timings.get(item.inputEntryIds?.[0] ?? "");
+        const timing = measured?.summary();
+        item.durationUnavailable = measured?.startedAt === undefined;
+        if (measured?.startedAt !== undefined) item.startedAt = measured.startedAt;
+        if (timing) item.timing = timing;
         const end = turnEnds.get(item.inputEntryIds?.[0] ?? "");
         if (end) {
-          if (end.completed) { item.completedAt = end.timestamp; item.stoppedAt = undefined; }
-          else { item.stoppedAt = end.timestamp; item.completedAt = undefined; }
+          if (end.completed) { item.completedAt = timing ? measured!.endedAt : end.timestamp; item.stoppedAt = undefined; }
+          else { item.stoppedAt = timing ? measured!.endedAt : end.timestamp; item.completedAt = undefined; }
         }
+        if (end && !timing) item.durationUnavailable = true;
         if (live.run && item.inputEntryIds?.includes(turn ?? "")) {
           item.live = true;
           item.completedAt = undefined;
