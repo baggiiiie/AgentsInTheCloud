@@ -1,8 +1,9 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { actionItemHtml } from "@atelier/design-system/action-item";
 import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { escapeHtml } from "@atelier/shared";
+import { AtelierCoreError, getAtelierRuntimeContext } from "@atelier/core";
 import { sessionShareDir, workspaceSessionShareKey } from "./session-store.ts";
 import { durableJournalDirectory } from "./durable-storage.ts";
 import { retainedDurableWorkspaceOwner } from "./durable-owner.ts";
@@ -16,6 +17,14 @@ import type { DurableAgentRuntime } from "./durable-runtime.ts";
 export async function retainedDurableHistories(workspaceId: string) {
   // Validate the external workspace identifier before reading its share metadata.
   durableJournalDirectory("projectless", workspaceId);
+  // A missing init is valid for an existing projectless workspace, but an
+  // arbitrary/missing viewer must not turn into access to the projectless share.
+  // Check retained host metadata only: history must work without Docker/readiness.
+  const metadata = await stat(join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "metadata")).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return undefined;
+    throw error;
+  });
+  if (!metadata?.isDirectory()) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${workspaceId}`);
   const share = await workspaceSessionShareKey(workspaceId);
   const directory = join(sessionShareDir(share), "builtin-durable");
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
