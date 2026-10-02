@@ -126,12 +126,48 @@ test("failed pull leaves existing System untouched", () => {
   expect(result.output).not.toContain("DOCKER run");
 });
 
-test("connect requests System-owned reconnection without downloading or replacing images", () => {
+test("connect enables Tailscale on a running localhost installation without replacing or restarting System", () => {
   const result = run({ installed: true }, ["--action", "connect"]);
   expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER exec agents-in-the-cloud-system bun -e");
+  expect(result.output).toContain("http://127.0.0.1:3001/access");
+  expect(result.output).toContain(" 55123 tailscale");
   expect(result.output).toContain("http://127.0.0.1:3001/connect");
-  expect(result.output).not.toContain("DOCKER pull");
-  expect(result.output).not.toContain("DOCKER stop");
+  expect(result.output.indexOf("3001/access")).toBeLessThan(result.output.indexOf("3001/connect"));
+  for (const command of ["pull", "stop", "rm", "run", "start", "restart"]) {
+    expect(result.output).not.toContain(`DOCKER ${command}`);
+  }
+});
+
+test("connect starts a stopped System before configuring Tailscale access", () => {
+  const result = run({ installed: true, initiallyStopped: true }, ["--action", "connect"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER start agents-in-the-cloud-system");
+  expect(result.output).toContain(" 55123 tailscale");
+  expect(result.output.indexOf("DOCKER start")).toBeLessThan(result.output.indexOf("3001/access"));
+  for (const command of ["pull", "stop", "rm", "run"]) {
+    expect(result.output).not.toContain(`DOCKER ${command}`);
+  }
+});
+
+test("connect honors an explicit localhost access mode", () => {
+  const result = run({ installed: true }, ["--action", "connect", "--access-mode", "localhost"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("http://127.0.0.1:3001/access");
+  expect(result.output).toContain(" 55123 localhost");
+  expect(result.output).not.toContain(" 55123 tailscale");
+});
+
+test("open honors an explicit Tailscale access mode without replacing System", () => {
+  const result = run({ installed: true }, ["--action", "open", "--access-mode", "tailscale"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("DOCKER exec agents-in-the-cloud-system bun -e");
+  expect(result.output).toContain("http://127.0.0.1:3001/access");
+  expect(result.output).toContain(" 55123 tailscale");
+  expect(result.output).not.toContain("3001/connect");
+  for (const command of ["pull", "stop", "rm", "run", "start", "restart"]) {
+    expect(result.output).not.toContain(`DOCKER ${command}`);
+  }
 });
 
 test("old installation is rejected without migration", () => {
@@ -202,15 +238,14 @@ test("desktop defaults local while an explicit access choice overrides the OS", 
 });
 
 
-for (const action of ["open", "connect"]) {
-  test(`${action} does not require local access support from an existing System`, () => {
-    const result = run({ installed: true }, ["--action", action]);
-    expect(result.status).toBe(0);
-    expect(result.output).not.toContain("3080/tcp");
-    expect(result.output).not.toContain("3001/access");
-    expect(result.output).not.toContain("DOCKER stop");
-  });
-}
+test("open without an access choice preserves the existing access mode", () => {
+  const result = run({ installed: true }, ["--action", "open"]);
+  expect(result.status).toBe(0);
+  expect(result.output).not.toContain("3080/tcp");
+  expect(result.output).not.toContain("3001/access");
+  expect(result.output).not.toContain("3001/connect");
+  expect(result.output).not.toContain("DOCKER stop");
+});
 
 
 test("Linux requests sudo itself while Mac and WSL with Docker access do not", () => {

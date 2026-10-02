@@ -120,6 +120,7 @@ Update also installs the newest AgentsInTheCloud app on the installation's selec
   --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/agents-in-the-cloud:latest)
   --access-mode MODE  localhost or tailscale (default selected for this machine)
   --action ACTION     install, update, connect, or open
+                      connect enables Tailscale without replacing an existing installation
   --uninstall         Permanently delete installation data (also supports Atelier System)
   -h, --help          Show help
 
@@ -583,6 +584,7 @@ case "$action" in
       "$system_image" --app-image "$app_image" --access-mode "${access_mode:-tailscale}"
     ;;
   connect)
+    access_mode="${access_mode:-tailscale}"
     if [ "$(docker inspect --format '{{.State.Running}}' "$system_name")" != true ]; then
       stop_on_failure=1
       run_quiet "Starting AgentsInTheCloud services" docker start "$system_name"
@@ -590,7 +592,7 @@ case "$action" in
     ;;
   open) ;;
 esac
-if [ "$action" = install ] || [ "$action" = update ]; then
+if [ "$action" = install ] || [ "$action" = update ] || [ "$action" = connect ] || [ -n "$access_mode" ]; then
   local_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "3080/tcp") 0).HostPort}}' "$system_name")"
   for ((attempt=0; attempt<60; attempt++)); do
     check_system_running
@@ -605,7 +607,7 @@ if [ "$action" = install ] || [ "$action" = update ]; then
     ' "$local_port" "$access_mode" >>"$log_file" 2>&1; then break; fi
     sleep 1
   done
-  [ "$attempt" -lt 60 ] || fail "Could not configure local access"
+  [ "$attempt" -lt 60 ] || fail "Could not configure access"
 fi
 if [ "$action" = update ]; then update_app_channel; fi
 wait_for_system
