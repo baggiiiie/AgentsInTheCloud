@@ -1,33 +1,70 @@
-import { focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, phoneLayoutMediaQuery, type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { changeLayout, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, mobileComposerMediaQuery, type WorkspaceClientControllerConstructor } from "@atelier/shared";
 
-/** Composer visibility is independent of input focus and the software keyboard. */
+/** The composer may grow to this share of the space above the keyboard (or of the window). */
+const composerMaxShare = 0.4;
+const longPressMs = 500;
+
+/**
+ * Composer visibility, height and draft indicator. Every change is applied in
+ * one layout transaction so whatever sits above is pushed up in a single step.
+ */
 export function createAgentComposerController(Controller: WorkspaceClientControllerConstructor) {
   return class AgentComposerController extends Controller {
+    static targets = ["opener"];
     declare readonly element: HTMLElement;
+    declare readonly openerTarget: HTMLButtonElement;
+    declare readonly hasOpenerTarget: boolean;
     private activeSelection = false;
     private pane!: HTMLElement;
+    private longPress?: ReturnType<typeof setTimeout>;
+    private suppressNextClick = false;
 
     connect(): void {
       this.pane = this.element.closest<HTMLElement>('[data-workspace-pane-role="agent"]')!;
+      this.updateDraftIndicator();
       this.selected();
+      this.autosize();
     }
 
     disconnect(): void {
       this.activeSelection = false;
+      clearTimeout(this.longPress);
       this.blurInput();
     }
 
-    private get input(): HTMLTextAreaElement | null {
-      return this.element.querySelector<HTMLTextAreaElement>(".composer .composer-input");
+    private get composer(): HTMLElement | null {
+      return this.element.querySelector<HTMLElement>(":scope > .composer");
     }
 
-    private get staysOpen(): boolean {
-      return this.element.classList.contains("agent-pane") && !window.matchMedia(phoneLayoutMediaQuery).matches;
+    private get input(): HTMLTextAreaElement | null {
+      return this.element.querySelector<HTMLTextAreaElement>(":scope > .composer .composer-input");
+    }
+
+    private get isOpen(): boolean {
+      return this.element.classList.contains("agent-composer-open");
+    }
+
+    private get mobile(): boolean {
+      return window.matchMedia(mobileComposerMediaQuery).matches;
+    }
+
+    /** Programmatic focus cannot raise a soft keyboard, so touch devices wait for a tap. */
+    private get focusesOnOpen(): boolean {
+      return !this.mobile && !focusLikelyOpensSoftwareKeyboard();
     }
 
     private blurInput(): void {
       const active = document.activeElement;
-      if (active instanceof HTMLElement && this.element.contains(active)) active.blur();
+      if (active instanceof HTMLElement && this.composer?.contains(active)) active.blur();
+    }
+
+    private setOpen(open: boolean): void {
+      if (open === this.isOpen) return;
+      changeLayout(() => {
+        if (!open) this.blurInput();
+        this.element.classList.toggle("agent-composer-open", open);
+        this.autosize();
+      });
     }
 
     selected(event?: Event): void {
@@ -36,12 +73,11 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       this.activeSelection = true;
       const input = this.input;
       if (!input) return; // Ended CLI sessions are read-only.
-      const hasDraft = Boolean(input.value.trim() || this.element.querySelector(".agent-chip"));
-      const open = this.staysOpen || hasDraft;
-      this.element.classList.toggle("agent-composer-open", open);
+      // Reading comes first on mobile; desktop starts ready to type.
+      this.setOpen(!this.mobile);
       if (focusLikelyOpensSoftwareKeyboard()) this.blurInput();
       else if (document.hasFocus()) {
-        if (open) input.focus({ preventScroll: true });
+        if (this.isOpen) input.focus({ preventScroll: true });
         else this.element.dispatchEvent(new Event("atelier:workspace-agent-focus"));
       }
     }
@@ -57,26 +93,124 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
     }
 
     reveal(): void {
-      if (!this.element.classList.contains("agent-composer-open")) this.open();
+      this.open();
     }
 
     open(): void {
-      this.element.classList.add("agent-composer-open");
-      if (!focusLikelyOpensSoftwareKeyboard()) this.input!.focus({ preventScroll: true });
+      if (this.suppressNextClick) return;
+      this.setOpen(true);
+      if (this.focusesOnOpen) this.input!.focus({ preventScroll: true });
     }
 
     close(): void {
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && this.element.querySelector(".composer")?.contains(active)) active.blur();
-      this.element.classList.remove("agent-composer-open");
+      this.setOpen(false);
+    }
+
+    /** A prompt was accepted for sending. On mobile the composer and keyboard go away at once. */
+    sending(): void {
+      if (this.mobile) this.close();
     }
 
     sent(): void {
-      if (this.staysOpen) return;
-      this.close();
-      if (!focusLikelyOpensSoftwareKeyboard() && isWorkspacePaneVisible(this.element) && document.hasFocus()) {
-        this.element.dispatchEvent(new Event("atelier:workspace-agent-focus"));
+      this.updateDraftIndicator();
+      if (this.mobile) this.close();
+    }
+
+    /** Sending failed after the mobile composer closed: bring the draft and its error back. */
+    failed(): void {
+      if (this.mobile) this.setOpen(true);
+    }
+
+    /** A focused terminal takes the space; the composer collapses and keeps its draft. */
+    focused(event: FocusEvent): void {
+      if (event.target instanceof Element && event.target.closest(".observable-terminal-host") && this.isOpen) this.close();
+    }
+
+    draftChanged(event: Event): void {
+      if (event.target !== this.input) return;
+      this.autosize();
+      this.updateDraftIndicator();
+    }
+
+    /** The keyboard arrangement changed: the maximum height depends on the space above it. */
+    layout(): void {
+      this.autosize();
+    }
+
+    autosize(): void {
+      const input = this.input;
+      const composer = this.composer;
+      if (!input || !composer || !this.isOpen || !composer.checkVisibility()) return;
+      const root = document.documentElement;
+      const style = getComputedStyle(root);
+      const keyboard = Number.parseFloat(style.getPropertyValue("--software-keyboard-inset") || "0")
+        + Number.parseFloat(style.getPropertyValue("--software-keyboard-top") || "0");
+      const maxComposer = Math.floor((root.clientHeight - keyboard) * composerMaxShare);
+      const current = input.getBoundingClientRect().height;
+      const chrome = composer.getBoundingClientRect().height - current;
+      // Measure at zero height without letting the pane reflow: the input area
+      // keeps its size, so the transcript above cannot clamp its scroll offset.
+      const area = input.parentElement!;
+      const areaHeight = area.style.height;
+      area.style.height = `${area.getBoundingClientRect().height}px`;
+      const inline = input.style.height;
+      input.style.height = "0px";
+      const content = Math.ceil(input.scrollHeight);
+      input.style.height = inline;
+      area.style.height = areaHeight;
+      const minimum = Number.parseFloat(getComputedStyle(input).minHeight) || 0;
+      const limit = Math.max(minimum, maxComposer - chrome);
+      const next = Math.max(minimum, Math.min(content, limit));
+      const overflow = content > limit ? "auto" : "hidden";
+      if (Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
+        changeLayout(() => {
+          input.style.height = `${next}px`;
+          input.style.overflowY = overflow;
+        });
       }
+      // A large paste or transcription lands with the caret in view.
+      if (overflow === "auto" && document.activeElement === input && input.selectionEnd === input.value.length) input.scrollTop = input.scrollHeight;
+    }
+
+    private updateDraftIndicator(): void {
+      if (!this.hasOpenerTarget) return;
+      const input = this.input;
+      const draft = Boolean(input?.value.trim() || this.composer?.querySelector(".agent-chip"));
+      this.openerTarget.parentElement!.toggleAttribute("data-draft", draft);
+    }
+
+    // Holding open-composer opens it and starts dictation while the finger is still down.
+    pressOpener(event: PointerEvent): void {
+      if (event.button !== 0) return;
+      clearTimeout(this.longPress);
+      this.longPress = setTimeout(() => {
+        this.longPress = undefined;
+        this.suppressNextClick = true;
+        this.setOpen(true);
+        this.element.querySelector<HTMLButtonElement>(':scope > .composer [data-transcription-composer-target="button"]')!.click();
+        // The release lands wherever the finger is now, possibly on a composer button.
+        const swallow = (click: MouseEvent): void => { click.preventDefault(); click.stopImmediatePropagation(); };
+        const release = (): void => {
+          document.removeEventListener("pointerup", release, true);
+          document.removeEventListener("pointercancel", release, true);
+          document.addEventListener("click", swallow, true);
+          setTimeout(() => {
+            document.removeEventListener("click", swallow, true);
+            this.suppressNextClick = false;
+          }, 400);
+        };
+        document.addEventListener("pointerup", release, true);
+        document.addEventListener("pointercancel", release, true);
+      }, longPressMs);
+    }
+
+    releaseOpener(): void {
+      clearTimeout(this.longPress);
+      this.longPress = undefined;
+    }
+
+    suppressContextMenu(event: Event): void {
+      event.preventDefault();
     }
   };
 }

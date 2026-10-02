@@ -5,28 +5,51 @@ import { escapeHtml } from "@atelier/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
 
-export const agentComposerActions = "atelier:workspace-pane-visible@document->agent-composer#selected atelier:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sent->agent-composer#sent";
+export const agentComposerActions = "atelier:workspace-pane-visible@document->agent-composer#selected atelier:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sending->agent-composer#sending agent-composer:sent->agent-composer#sent agent-composer:failed->agent-composer#failed input->agent-composer#draftChanged focusin->agent-composer#focused atelier:software-keyboard@document->agent-composer#layout resize@window->agent-composer#autosize agent-composer:resize->agent-composer#autosize";
 
 const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg>';
 
-/** The shared form body; each host owns its form, supplementary UI, and optional footer. */
+/**
+ * The shared form body; each host owns its form, supplementary UI, and optional footer.
+ * Buttons form a 2×2 grid beside the text field: attach and close above, transcribe and send below.
+ */
 export function renderComposerBody(options: {
   draft: { id: string; rowId: string; attachments?: readonly StagedAttachment[] };
   inputHtml: string;
   sendHtml?: string;
   collapsible?: boolean;
+  /** A wrapping row of quick-launch buttons above the footer, filled from the completion catalog. */
+  quickLaunches?: boolean;
 }): string {
   const { draft } = options;
   const send = options.sendHtml ?? buttonHtml({ type: "submit", variant: "primary", content: { kind: "icon-only", iconHtml: sendIcon, label: "Send prompt" }, attributesHtml: "data-popular-button" });
+  const close = options.collapsible
+    ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Close composer" }, attributesHtml: 'data-popular-button data-action="agent-composer#close"' })
+    : "";
   return `<input type="hidden" name="attachmentDraft" value="${escapeHtml(draft.id)}">
     <div class="agent-attach-row" id="${escapeHtml(draft.rowId)}" data-agent-attachments-target="row">${(draft.attachments ?? []).map((attachment) => renderAttachmentChip(attachment, draft.id)).join("")}</div>
-    <div class="composer-input-area">${options.inputHtml}<div class="composer-input-controls">${options.collapsible ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Close composer" }, attributesHtml: 'data-popular-button data-action="agent-composer#close"' }) : ""}${renderTranscriptionComposerControl()}${renderAttachmentPicker("icon-only")}</div></div>
-    <div class="composer-actions"><span class="spacer"></span>${send}</div>
+    <div class="composer-input-area">${options.inputHtml}<div class="composer-buttons">
+      <span class="composer-button composer-attach">${renderAttachmentPicker("icon-only")}</span>
+      <span class="composer-button composer-close">${close}</span>
+      <span class="composer-button composer-transcribe">${renderTranscriptionComposerControl()}</span>
+      <span class="composer-button composer-send">${send}</span>
+    </div></div>
+    ${options.quickLaunches ? '<div class="composer-quick-launches" data-agent-completions-target="quickLaunches"></div>' : ""}
     <p role="status" data-agent-attachments-target="status" hidden></p>`;
 }
 
+/** Buttons overlaid at the bottom right of a transcript or terminal, stacked from the bottom up. */
+export function renderFloatingButtons(innerHtml: string): string {
+  return `<div class="composer-floating-buttons">${innerHtml}</div>`;
+}
+
 export function renderOpenComposerButton(): string {
-  return `<div class="agent-composer-opener">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Keyboard, label: "Open composer" }, attributesHtml: 'data-popular-button data-action="agent-composer#open"' })}</div>`;
+  const button = buttonHtml({
+    type: "button", variant: "secondary",
+    content: { kind: "icon-only", iconHtml: Icons.Keyboard, label: "Open composer" },
+    attributesHtml: 'data-popular-button data-agent-composer-target="opener" data-action="click->agent-composer#open pointerdown->agent-composer#pressOpener pointerup->agent-composer#releaseOpener pointercancel->agent-composer#releaseOpener pointerleave->agent-composer#releaseOpener contextmenu->agent-composer#suppressContextMenu" aria-description="Hold to dictate"',
+  });
+  return `<div class="agent-composer-opener">${button}<span class="status-dot attention agent-composer-draft-dot" aria-hidden="true"></span></div>`;
 }
 
 export function composerAttachmentAttributes(draftId: string, rowId: string, actions = ""): string {
