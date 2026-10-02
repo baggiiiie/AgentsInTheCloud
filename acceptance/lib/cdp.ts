@@ -126,6 +126,20 @@ export class ChromePage {
     return Buffer.from(data, "base64");
   }
 
+  /** The workspace's Chrome has no audio input: give pages a synthetic microphone (a quiet tone). */
+  async fakeMicrophone(): Promise<void> {
+    await this.cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `navigator.mediaDevices.getUserMedia = async () => {
+      const context = new AudioContext();
+      const tone = context.createOscillator();
+      const gain = context.createGain();
+      gain.gain.value = 0.05;
+      const destination = context.createMediaStreamDestination();
+      tone.connect(gain).connect(destination);
+      tone.start();
+      return destination.stream;
+    };` });
+  }
+
   async startTrace(): Promise<void> {
     await this.evaluate<string>(samplerSource);
     await Bun.sleep(120);

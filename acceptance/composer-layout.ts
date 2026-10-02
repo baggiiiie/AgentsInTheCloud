@@ -254,17 +254,19 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
   await Bun.sleep(2500);
   await page.insertText(paste);
   await Bun.sleep(400);
-  const row = await page.evaluate<{ rowHeight: number; chipHeight: number; scrollWidth: number; clientWidth: number; chips: number; composer: number }>(`(() => {
+  const row = await page.evaluate<{ rowHeight: number; chipHeight: number; scrollWidth: number; clientWidth: number; chips: number; composer: number; input: number; inputMin: number }>(`(() => {
     const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
     const row = pane.querySelector(".agent-attach-row");
     const chip = row.querySelector(".agent-chip");
-    return { rowHeight: row.getBoundingClientRect().height, chipHeight: chip.getBoundingClientRect().height, scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, chips: row.children.length, composer: pane.querySelector(":scope > .composer").getBoundingClientRect().height };
+    const input = pane.querySelector(".composer-input");
+    return { rowHeight: row.getBoundingClientRect().height, chipHeight: chip.getBoundingClientRect().height, scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, chips: row.children.length, composer: pane.querySelector(":scope > .composer").getBoundingClientRect().height, input: input.getBoundingClientRect().height, inputMin: Number.parseFloat(getComputedStyle(input).minHeight) };
   })()`);
   await recorder.file("attachments.png", await page.screenshot());
   recorder.add(
     check("H7: thumbnails sit in one row", row.rowHeight <= row.chipHeight + 12, `row ${row.rowHeight}px for chips of ${row.chipHeight}px (${row.chips} chips)`),
     check("H7: the row scrolls sideways", row.scrollWidth > row.clientWidth, `scrollWidth ${row.scrollWidth} > clientWidth ${row.clientWidth}`),
-    check("H7: thumbnails count toward the max height", close(row.composer, max, 2), `composer ${row.composer}, max ${max}`),
+    // The text field gets what is left under the max, never less than its own min height (H2: the 2×2 buttons).
+    check("H7: thumbnails count toward the max height; the text field gets what's left", close(row.input, Math.max(row.inputMin, max - (row.composer - row.input)), 1) && (close(row.composer, max, 2) || close(row.input, row.inputMin, 1)), `composer ${row.composer} (max ${max}); text field ${row.input}, its min ${row.inputMin}, thumbnails/quick launches/footer ${Math.round(row.composer - row.input)}${row.composer > max + 2 ? " — the fixed rows plus the text field's min exceed the max, so the min wins (H2)" : ""}`),
   );
   await page.key("a", { ctrl: true });
   await page.key("Backspace");
@@ -344,15 +346,18 @@ await scenario("mobile-terminal-tab", "D19: focusing a terminal tab and switchin
 
 await page.navigate(builtinUrl, sel.transcript);
 
-await scenario("mobile-D24-long-press", "D24: holding open-composer for about 500ms opens the composer and starts dictation while the finger is still down; releasing does nothing else.", async (recorder) => {
+await scenario("mobile-D24-long-press", "D24: holding open-composer for about 500ms opens the composer and starts dictation while the finger is still down; releasing does nothing else. The workspace's Chrome has no microphone, so the page gets a synthetic one.", async (recorder) => {
+  await page.fakeMicrophone();
+  await page.navigate(builtinUrl, sel.transcript);
   await closeComposer();
   await page.startTrace();
   const t = await page.mark("hold open-composer");
   const release = await page.press(sel.opener);
   await Bun.sleep(800);
-  const holding = await page.evaluate<{ open: boolean; state: string }>(`(() => {
+  const holding = await page.evaluate<{ open: boolean; state: string; label: string }>(`(() => {
     const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
-    return { open: pane.classList.contains("agent-composer-open"), state: pane.querySelector('[data-transcription-composer-target="button"]').dataset.state };
+    const button = pane.querySelector('[data-transcription-composer-target="button"]');
+    return { open: pane.classList.contains("agent-composer-open"), state: button.dataset.state, label: button.title };
   })()`);
   await release();
   await Bun.sleep(600);
@@ -363,7 +368,7 @@ await scenario("mobile-D24-long-press", "D24: holding open-composer for about 50
   recorder.add(
     check("D24: composer opened while holding", holding.open && opened !== undefined, `open while held: ${holding.open}, first open frame at +${opened ? Math.round(opened.t - t) : "—"}ms after the press`),
     check("D24: about 500ms", opened !== undefined && opened.t - t >= 450 && opened.t - t <= 800, `${opened ? Math.round(opened.t - t) : "—"}ms`),
-    check("D24: dictation started while holding", ["loading", "recording", "finishing"].includes(holding.state), `transcribe button state while held: ${holding.state}`),
+    check("D24: dictation started while holding", ["loading", "recording", "finishing"].includes(holding.state), `transcribe button while held: ${holding.state} (${holding.label})`),
     check("D24: releasing changed nothing else", last.composer !== null && !last.focus.includes("composer-input"), `composer ${JSON.stringify(last.composer)}, focus ${last.focus || "body"}`),
   );
   recorder.add(...oneStepChecks(analyseTransition(trace, t, Number.POSITIVE_INFINITY, { endAtContentChange: false })).map((result) => ({ ...result, name: `hold open-composer — ${result.name}` })));
