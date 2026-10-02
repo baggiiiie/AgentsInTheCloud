@@ -1,3 +1,5 @@
+import qrcode from "qrcode-generator";
+import { dialogHtml } from "@atelier/design-system/dialog";
 import { Icons } from "@atelier/design-system/icons";
 import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { buttonHtml } from "@atelier/design-system/button";
@@ -62,6 +64,26 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
       attributesHtml: 'data-browser-address-target="external" target="_blank" rel="noreferrer"',
     })
     : buttonHtml({ type: "button", variant: "secondary", content: externalLinkContent, disabled: true });
+  const qrIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h-3zM18 18h3v3h-3zM12 3v9H3M21 12h-6v3M12 15v6M21 15v-3"/></svg>';
+  const qrButton = buttonHtml({
+    type: "button",
+    variant: "secondary",
+    content: { kind: "icon-only", iconHtml: qrIcon, label: "Open preview on your phone" },
+    disabled: !target,
+    attributesHtml: 'data-action="browser-address#showQr"',
+  });
+  let qrDialog = "";
+  if (target) {
+    const code = qrcode(0, "M");
+    code.addData(previewUrl);
+    code.make();
+    qrDialog = dialogHtml({
+      element: { attributesHtml: 'data-controller="dialog" data-browser-qr-dialog' },
+      iconHtml: qrIcon,
+      titleCaption: "Open on your phone",
+      bodyHtml: `<div class="browser-qr"><div class="browser-qr-code" role="img" aria-label="QR code for this preview">${code.createSvgTag({ cellSize: 4, margin: 16, scalable: true })}</div><a class="browser-qr-url" href="${escapeHtml(previewUrl)}" target="_blank" rel="noreferrer">${escapeHtml(previewUrl)}</a></div>`,
+    });
+  }
   const backButton = buttonHtml({
     type: "button",
     variant: "secondary",
@@ -93,7 +115,9 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
         <div class="browser-navigation">${navigation}</div>
         <input id="${navigationKey}_address" data-turbo-permanent class="browser-address-input text-field" name="url" value="${escapeHtml(view.targetUrl)}" placeholder="http://localhost:3000" spellcheck="false" autocomplete="off" aria-label="Browser URL" data-action="click->browser-address#initializeAddress">
         ${externalLink}
+        ${qrButton}
       </form>
+      ${qrDialog}
       <div class="browser-viewport">
         <iframe id="${navigationKey}_viewport" data-turbo-permanent${frameControllerAttributes} title="Workspace browser preview" loading="lazy" referrerpolicy="no-referrer"></iframe>
       </div>

@@ -13,6 +13,7 @@
     "@atelier/design-system": "workspace:*",
     "@atelier/shared": "workspace:*",
     "@atelier/proxy-ingress": "workspace:*",
+    "qrcode-generator": "2.0.4",
     "typebox": "^1.0.57",
     "@atelier/workspace": "workspace:*"
   }
