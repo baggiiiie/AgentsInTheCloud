@@ -8,7 +8,7 @@ import { acquireReleaseLock } from "./release-lock.ts";
 
 const image = "ghcr.io/lucasmeijer/agents-in-the-cloud";
 const root = resolve(import.meta.dir, "..");
-export const usage = `Release AgentsInTheCloud from the current origin/rename-agents-in-the-cloud commit.
+export const usage = `Release AgentsInTheCloud from the current origin/main commit.
 
   bun run release             Publish latest
   bun run release --stable    Publish latest and stable
@@ -82,8 +82,8 @@ export async function promoteChannels(run: Run, status: ReleaseStatus, save: () 
 
 export async function release(options: ReturnType<typeof parseReleaseArgs>, run: Run, status: ReleaseStatus, save: () => void, directory: string): Promise<void> {
   const phase = (text: string) => { status.phase = text; save(); };
-  phase("Resolve origin/rename-agents-in-the-cloud");
-  await run(["git", "fetch", "origin", "refs/heads/rename-agents-in-the-cloud"]);
+  phase("Resolve origin/main");
+  await run(["git", "fetch", "origin", "refs/heads/main"]);
   status.commit = (await run(["git", "rev-parse", "FETCH_HEAD^{commit}"])).stdout.trim();
   save();
   phase("Check local and SSH native builders");
@@ -114,10 +114,10 @@ export async function release(options: ReturnType<typeof parseReleaseArgs>, run:
   phase("Verify both architectures and revision labels");
   status.digest = await verifyRevision(run, ref, status.commit);
   save();
-  // Avoid promoting a build that was overtaken by new rename branch commits while building.
-  phase("Confirm rename branch has not moved");
-  const head = (await run(["git", "ls-remote", "origin", "refs/heads/rename-agents-in-the-cloud"])).stdout.split(/\s+/)[0];
-  if (head !== status.commit) throw new Error("origin/rename-agents-in-the-cloud moved during this release. Commit image is uploaded; rerun to release the new branch head.");
+  // Avoid promoting a build that was overtaken by new main branch commits while building.
+  phase("Confirm main branch has not moved");
+  const head = (await run(["git", "ls-remote", "origin", "refs/heads/main"])).stdout.split(/\s+/)[0];
+  if (head !== status.commit) throw new Error("origin/main moved during this release. Commit image is uploaded; rerun to release the new branch head.");
   await promoteChannels(run, status, save);
   status.state = "published";
   phase(`Published ${Object.keys(status.channels).join(" + ")} — ${status.digest}`);

@@ -88,7 +88,7 @@ async function scenario(options: { check?: boolean; exists?: boolean; moved?: bo
     const run: Run = async (args, command) => {
       calls.push({ args, cwd: command?.cwd });
       if (args[0] === "git" && args[1] === "rev-parse") return ok(commit);
-      if (args[0] === "git" && args[1] === "ls-remote") return ok(`${options.moved ? "new-commit" : commit}\trefs/heads/rename-agents-in-the-cloud`);
+      if (args[0] === "git" && args[1] === "ls-remote") return ok(`${options.moved ? "new-commit" : commit}\trefs/heads/main`);
       if (args.includes("context") && args.includes("show")) return ok("default");
       if (args.includes("{{json .}}")) {
         const local = args[args.indexOf("--context") + 1] === "default";
@@ -127,7 +127,7 @@ test("check exercises both platforms without registry writes or worktree creatio
   const { calls, current, error } = await scenario({ check: true });
   expect(error).toBeUndefined();
   expect(current.state).toBe("checked");
-  expect(calls[0]!.args).toEqual(["git", "fetch", "origin", "refs/heads/rename-agents-in-the-cloud"]);
+  expect(calls[0]!.args).toEqual(["git", "fetch", "origin", "refs/heads/main"]);
   const probes = calls.filter(({ args }) => args.includes("--load"));
   expect(probes).toHaveLength(2);
   expect(probes[0]!.args.slice(0, 5)).toEqual(["docker", "--context", "default", "buildx", "build"]);
@@ -148,7 +148,7 @@ test("new commit is built in an isolated checkout with no latest tag before veri
   const { calls, current, error } = await scenario({});
   expect(error).toBeUndefined();
   expect(current.state).toBe("published");
-  expect(calls.find(({ args }) => args.includes("ls-remote"))!.args).toEqual(["git", "ls-remote", "origin", "refs/heads/rename-agents-in-the-cloud"]);
+  expect(calls.find(({ args }) => args.includes("ls-remote"))!.args).toEqual(["git", "ls-remote", "origin", "refs/heads/main"]);
   expect(calls.flatMap(({ args }) => args).some(arg => /^ghcr\.io\/lucasmeijer\/atelier(?=[:@])/.test(arg) || arg === "ghcr.io/lucasmeijer/agents-in-the-cloud:stable")).toBe(false);
   const build = calls.find(({ args }) => args[0] === "bun")!;
   expect(build.cwd).toEndWith("/source");
@@ -165,9 +165,9 @@ test("retry reuses uploaded commit instead of rebuilding", async () => {
   expect(calls.some(({ args }) => args[0] === "bun" || args.includes("worktree"))).toBe(false);
 });
 
-test("rename branch moving prevents all channel updates", async () => {
+test("main branch moving prevents all channel updates", async () => {
   const { calls, error } = await scenario({ exists: true, moved: true });
-  expect(String(error)).toContain("origin/rename-agents-in-the-cloud moved");
+  expect(String(error)).toContain("origin/main moved");
   expect(calls.some(({ args }) => args.includes("imagetools") && args.includes("create"))).toBe(false);
 });
 
