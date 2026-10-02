@@ -107,10 +107,10 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 html.software-keyboard-visible :is(.composer-floating-buttons, .agent-composer-pane .composer-attach, .agent-composer-pane .composer-close,
   .agent-composer-pane .composer-transcribe, .agent-composer-pane .composer-quick-launches, .agent-composer-pane .composer-footer) { display: none; }
 html.software-keyboard-visible .agent-composer-pane .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
-/* The text takes the full width and runs underneath send, which sits in the top-right corner. */
+/* The text takes the full width and runs underneath send, which sits in the bottom-right corner. */
 html.software-keyboard-visible .agent-composer-pane .composer-input-area { position: relative; }
 html.software-keyboard-visible .agent-composer-pane .composer-buttons {
-  position: absolute; z-index: 1; top: var(--composer-control-inset); right: var(--composer-control-inset); padding: 0;
+  position: absolute; z-index: 1; bottom: var(--composer-control-inset); right: var(--composer-control-inset); padding: 0;
   grid-template: "send" var(--composer-control-size) / var(--composer-control-size);
 }
 html.software-keyboard-visible .agent-composer-pane .composer-input-area > .composer-input {

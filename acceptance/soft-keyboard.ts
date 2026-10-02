@@ -273,7 +273,7 @@ await scenario("ios-D12-D13-tap-outside", "D12/D13: tapping outside the text fie
   recorder.add(check("Keyboard down", !after.keyboard && !after.focus.includes("composer-input"), `arranged: ${after.keyboard}, focus: ${after.focus || "body"}`));
 });
 
-await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; the full-width text runs under send in the top-right corner.", async (recorder) => {
+await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; the full-width text runs under send in the bottom-right corner.", async (recorder) => {
   await openComposer();
   await tap(sel.input);
   await Bun.sleep(1500);
@@ -285,7 +285,7 @@ await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only 
     return { send: box(pane.querySelector(".composer-send button")), composer: box(pane.querySelector(":scope > .composer")), input: box(pane.querySelector(".composer-input")) };
   })()`);
   recorder.add(
-    check("Send sits in the composer's top-right corner", placement.send[1] >= placement.composer[1] && placement.send[1] - placement.composer[1] <= 12 && close(placement.send[0] + placement.send[2], placement.composer[0] + placement.composer[2] - 4, 8), `send ${JSON.stringify(placement.send.map(Math.round))}, composer ${JSON.stringify(placement.composer.map(Math.round))}`),
+    check("Send sits in the composer's bottom-right corner", placement.send[1] + placement.send[3] <= placement.composer[1] + placement.composer[3] && placement.composer[1] + placement.composer[3] - (placement.send[1] + placement.send[3]) <= 12 && close(placement.send[0] + placement.send[2], placement.composer[0] + placement.composer[2] - 4, 8), `send ${JSON.stringify(placement.send.map(Math.round))}, composer ${JSON.stringify(placement.composer.map(Math.round))}`),
     check("The text takes the composer's full width", close(placement.input[2], placement.composer[2], 2), `text field ${Math.round(placement.input[2])}px wide, composer ${Math.round(placement.composer[2])}px`),
   );
   const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-quick-launches", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-transcribe"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
