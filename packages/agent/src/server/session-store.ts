@@ -79,8 +79,17 @@ async function conversationRecords(workspaceId: string): Promise<ConversationRec
     Value.Assert(conversationsSchema, value);
     return value.conversations;
   }
-  const { convertLegacyConversations } = await import("./legacy-converter.ts");
-  const records = await convertLegacyConversations(workspaceId, value);
+  const { convertLegacyConversations } = await import("@atelier/legacy-converter");
+  const records = await convertLegacyConversations({
+    workspaceId,
+    workspaceDirectory: join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId),
+    shareDirectory: sessionShareDir(await workspaceSessionShareKey(workspaceId)),
+    metadata: content || undefined,
+    destination: async () => {
+      const { durableWorkspaceOwner } = await import("./durable-owner.ts");
+      return durableWorkspaceOwner(workspaceId);
+    },
+  });
   if (content !== undefined || records.length) await saveConversationRecords(workspaceId, records);
   return records;
 }

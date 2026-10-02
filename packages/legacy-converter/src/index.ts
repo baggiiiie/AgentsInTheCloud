@@ -1,14 +1,36 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
 import { contentText } from "@earendil-works/pi-ai";
 import { migrateSessionEntries, type FileEntry } from "@earendil-works/pi-coding-agent";
-import { AssistantEntry, UserEntry, ToolResultEntry, type EntryDraft } from "@earendil-works/pi-durable";
+import { AssistantEntry, UserEntry, ToolResultEntry, type EntryDraft, type ConversationId } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { durableWorkspaceOwner } from "./durable-owner.ts";
-import { sessionShareDir, workspaceSessionShareKey, type ConversationRecord } from "./session-store.ts";
-import { historyNote } from "./durable-transcript.ts";
+import { historyNote } from "./entries.ts";
+
+export interface ConvertedConversation {
+  conversationId: string;
+  label: string;
+  title: string;
+  storage: "durable";
+}
+
+/** The destination must atomically import read-only entries and their identity.
+ * Existing identities must return their original ID without appending entries.
+ */
+export interface HistoryImportDestination {
+  catalog(): Promise<readonly { conversationId: string }[]>;
+  importHistory(identity: Pick<ConvertedConversation, "conversationId" | "label" | "title">, entries: readonly EntryDraft[]): Promise<ConversationId>;
+}
+
+export interface LegacyConversion {
+  workspaceId: string;
+  workspaceDirectory: string;
+  shareDirectory: string;
+  /** Original metadata file contents, parsed only inside the converter. */
+  metadata: string | undefined;
+  /** Open lazily: native-only metadata needs no journal or execution owner. */
+  destination(): Promise<HistoryImportDestination>;
+}
 
 // Only this module understands the pre-Durable metadata and file layouts.
 const oldMetadata = Type.Object({ conversations: Type.Array(Type.Object({
@@ -86,16 +108,15 @@ async function transcript(path: string): Promise<EntryDraft[]> {
  * Journal import precedes metadata replacement. The catalog UUID is the retry marker;
  * a crash in that gap reuses the committed import even if the source is now absent.
  */
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- This is the schema boundary for pre-Durable persisted metadata.
-export async function convertLegacyConversations(workspaceId: string, metadata: unknown): Promise<ConversationRecord[]> {
-  const records = metadata === undefined ? [] : Value.Parse(oldMetadata, metadata).conversations;
-  const directory = sessionShareDir(await workspaceSessionShareKey(workspaceId));
+export async function convertLegacyConversations(options: LegacyConversion): Promise<ConvertedConversation[]> {
+  const { workspaceId, metadata, shareDirectory: directory } = options;
+  const records = metadata === undefined ? [] : Value.Parse(oldMetadata, JSON.parse(metadata)).conversations;
   const files = await readdir(directory).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return [];
     throw error;
   });
   const sources = new Map(records.filter(record => !record.storage).map(record => [record.conversationId, {
-    ...record, path: join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "agent-sessions", `${record.conversationId}.jsonl`),
+    ...record, path: join(options.workspaceDirectory, "agent-sessions", `${record.conversationId}.jsonl`),
   }]));
   for (const name of files) {
     const match = name.match(oldFilename);
@@ -105,7 +126,7 @@ export async function convertLegacyConversations(workspaceId: string, metadata: 
     sources.set(record.conversationId, { ...record, path: join(directory, name) });
   }
   if (sources.size) {
-    const owner = await durableWorkspaceOwner(workspaceId);
+    const owner = await options.destination();
     const catalog = await owner.catalog();
     for (const source of sources.values()) {
       if (!catalog.some(record => record.conversationId === source.conversationId)) {

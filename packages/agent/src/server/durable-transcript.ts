@@ -1,12 +1,10 @@
+import { historyNote } from "@atelier/legacy-converter/entries";
 import { contentText, type Message } from "@earendil-works/pi-ai";
-import { defineEntry, AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
+import { AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { isJsonObject } from "@atelier/core";
 import { buildTranscript, isFinalAssistantMessage, isToolViewDetails, toolDetailsIndicateError, type SessionImageRef, type ToolView, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
-
-/** Display-only history notes, independent of any source file format. */
-export const historyNote = defineEntry<{ text: string; tone: "system" | "summary" }>("atelier.history-note");
 
 /** The native watch is an exact committed frame, not an AgentSession event stream. */
 export function durableViewState(view: ConversationView) {
