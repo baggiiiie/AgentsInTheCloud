@@ -1,7 +1,8 @@
+import { agentDelegation } from "./delegation.ts";
 import { durableTiming, type WriteDurableTiming } from "./durable-timing.ts";
 import { durableSubscriptionActivity } from "./durable-accounting.ts";
 import type { Models } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension, type AgentChange, type Extension, type HarnessOptions } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, type AgentChange, type Extension, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
 import { createPiModelRuntime } from "@atelier/llm/server";
 import { workspaceRoot } from "@atelier/workspace";
@@ -25,13 +26,15 @@ export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick
 }
 
 /** No AgentSession, delegation coordinator, or host-local filesystem environment. */
-export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions, writeTiming: WriteDurableTiming): Promise<HarnessOptions> {
+export async function createDurableHarnessOptions(workspaceId: string, options: WorkspaceAgentToolOptions, writeTiming: WriteDurableTiming, harness: () => Harness): Promise<HarnessOptions> {
   const models = await createPiModelRuntime();
   const registry = createDurableWorkspaceRegistry(workspaceId, models, options);
+  const delegation = agentDelegation?.create(models, harness);
+  if (delegation) registry.install(delegation.extension);
   registry.install(durableSubscriptionActivity(models));
   registry.install(durableTiming(writeTiming));
   return {
-    models,
+    models: delegation?.models ?? models,
     registry,
     settings: { compaction: { enabled: true, keepRecentTokens: 6000 } },
   };

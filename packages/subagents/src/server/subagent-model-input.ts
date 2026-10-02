@@ -10,12 +10,11 @@ import type { AgentMessageInput } from "./subagent-protocol.ts";
  * They are removed before the request leaves Atelier; no IDs enter the textual envelope. */
 export class SubagentModelInput {
   private readonly messages = new Map<string, AgentMessageInput>();
-  placeholder(message: AgentMessageInput): string {
+  private placeholder(message: AgentMessageInput): string {
     const token = `atelier-agent-message:${randomUUID()}`;
     this.messages.set(token, message);
     return token;
   }
-  clear(): void { this.messages.clear(); }
   /** Convert before provider serialization, so each non-native API gets its normal user-message encoding. */
   forModel(message: AgentMessageInput, api: string, timestamp: number) {
     return { role: "user" as const, content: api === "openai-codex-responses" ? this.placeholder(message) : message.content.map((part) => part.text).join("\n"), timestamp };

@@ -7,7 +7,8 @@ import { createOnboardingCapabilities, onboardingToolDefinitions, registeredOnbo
 function atelierConversation(records: readonly DurableConversationRecord[], id: ConversationId): string {
   const record = records.find((record) => record.durableId === id);
   if (!record) throw new Error(`No Atelier conversation registered for Durable conversation ${id}`);
-  return record.conversationId;
+  // Delegated work acts under the root’s already-established workspace authority.
+  return record.rootId ?? record.conversationId;
 }
 
 /** One registry serves every conversation; authorization uses the calling conversation's committed Atelier identity. */

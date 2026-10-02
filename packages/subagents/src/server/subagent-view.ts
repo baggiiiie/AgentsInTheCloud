@@ -8,9 +8,10 @@ import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } fr
 import { createLivePresentation, escapeHtml as h } from "@atelier/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { agentPath } from "./subagent-protocol.ts";
-import type { SubagentRecord } from "./subagent-runtime.ts";
-import { getSubagents, subscribeSubagentChanges } from "./subagents.ts";
+import { nativeSnapshot, viewPath, type NativeAgentView as SubagentRecord } from "./native-view-state.ts";
+import { durableWorkspaceOwner, WorkspaceConversations } from "@atelier/agent/server";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { Delegation } from "./native-state.ts";
 
 export const subagentsWorkView: WorkspaceWorkViewPresentation = {
   reference: { type: "subagents" }, sourceKey: "subagents", label: "Subagents", kind: "contextual", iconHtml: Icons.Subagents, availability: { phase: "live" }, initiallyOpen: false,
@@ -37,9 +38,9 @@ export const handleSubagentRequest: AgentRouteHandler = async (request, url, opt
   const parentId = url.searchParams.get("agent") ?? conversations[0]?.conversationId;
   const parent = conversations.find((agent) => agent.conversationId === parentId);
   if (!parent) return new Response("Agent not found", { status: 404 });
-  const coordinator = await getSubagents(workspaceId, options.events);
-  const agents = coordinator.list(parent.conversationId);
-  if (requestAcceptsJson(request)) return Response.json({ parent: { id: parentId, title: parent.title }, agents, messages: coordinator.state.messages.filter((message) => message.to === parentId || message.from === parentId || agents.some((agent) => agent.id === message.to || agent.id === message.from)) });
+  const snapshot = await nativeSnapshot(workspaceId);
+  const agents = snapshot.agents.filter(agent => agent.rootId === parent.conversationId);
+  if (requestAcceptsJson(request)) return Response.json({ parent: { id: parentId, title: parent.title }, agents, messages: snapshot.messages.filter((message) => message.to === parentId || message.from === parentId || agents.some((agent) => agent.id === message.to || agent.id === message.from)) });
   const open = new Set(url.searchParams.getAll("open"));
   let revealed = agents.find((agent) => agent.id === url.searchParams.get("reveal"));
   while (revealed) { open.add(revealed.id); revealed = agents.find((agent) => agent.id === revealed!.parentId); }
@@ -48,8 +49,8 @@ export const handleSubagentRequest: AgentRouteHandler = async (request, url, opt
 
 function childrenId(workspaceId: string, parentId: string): string { return `subagent-children-${workspaceId}-${parentId}`; }
 function summaryHtml(agent: SubagentRecord, agents: SubagentRecord[]): string {
-  const tone = agent.status === "running" || agent.status === "starting" ? "running" : agent.status === "failed" ? "danger" : agent.status === "completed" ? "success" : "";
-  return actionItemHtml({ kind: "single", element: { tag: "summary", attributesHtml: `id="subagent-summary-${h(agent.id)}"` }, leadingHtml: Icons.Disclosure, label: { kind: "text", text: agentPath({ agents, messages: [] }, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` });
+  const tone = agent.status === "running" || agent.status === "pending" ? "running" : agent.status === "failed" ? "danger" : agent.status === "completed" ? "success" : "";
+  return actionItemHtml({ kind: "single", element: { tag: "summary", attributesHtml: `id="subagent-summary-${h(agent.id)}"` }, leadingHtml: Icons.Disclosure, label: { kind: "text", text: viewPath(agents, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` });
 }
 function branchHtml(workspaceId: string, agent: SubagentRecord, agents: SubagentRecord[], open: Set<string>): string {
   return `<details id="subagent-${h(agent.id)}" class="subagent-branch" data-subagent-id="${h(agent.id)}" data-subagents-target="branch"${open.has(agent.id) ? " open" : ""}>
@@ -71,14 +72,22 @@ function renderSubagentTree(workspaceId: string, rootId: string, agents: Subagen
 export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void, events?: AtelierEventBus): Promise<AgentLivePresentationSubscription> {
   const roots = await listWorkspaceAgentConversations(workspaceId);
   if (!roots.some((root) => root.conversationId === rootId)) throw new Error("Subagent root not found");
-  const coordinator = await getSubagents(workspaceId, events);
+  const owner = await durableWorkspaceOwner(workspaceId);
+  let snapshot = await nativeSnapshot(workspaceId);
   const presentation = createLivePresentation(() => [{
     target: `subagents-content-${workspaceId}`,
-    html: renderSubagentTree(workspaceId, rootId, coordinator.list(rootId)),
+    html: renderSubagentTree(workspaceId, rootId, snapshot.agents.filter(agent => agent.rootId === rootId)),
   }]);
-  const stopChanges = subscribeSubagentChanges(changedWorkspace => {
-    if (changedWorkspace === workspaceId) presentation.invalidate();
-  });
+  const watches = await Promise.all([
+    owner.harness.watchDoc(WorkspaceConversations, BACKGROUND_CONTEXT),
+    owner.harness.watchDoc(Delegation, BACKGROUND_CONTEXT),
+    owner.harness.watchTaskGraph(BACKGROUND_CONTEXT),
+  ]);
+  let updates = Promise.resolve();
+  const refresh = () => updates = updates.then(async () => { snapshot = await nativeSnapshot(workspaceId); presentation.invalidate(); });
+  for (const watch of watches) watch?.start(refresh);
+  await refresh();
+
   const subscription = presentation.subscribe(listener);
-  return { unsubscribe() { stopChanges(); subscription.unsubscribe(); presentation.dispose(); } };
+  return { unsubscribe() { for (const watch of watches) void watch?.stop(); subscription.unsubscribe(); presentation.dispose(); } };
 }

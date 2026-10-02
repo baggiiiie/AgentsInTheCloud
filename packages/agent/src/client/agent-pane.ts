@@ -320,7 +320,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       const button = this.sendStopTarget;
       const busy = button.dataset.agentBusy === "true";
       if (this.connected) this.navigation.setStreaming(busy);
-      const action = agentComposerPrimaryAction(busy, this.inputTarget.value, this.formTarget.querySelectorAll('input[name="attachment"]').length);
+      const action = agentComposerPrimaryAction(busy, this.inputTarget.value, this.formTarget.querySelectorAll('input[name="attachment"]').length, button.dataset.agentStoppable === "true");
       if (action === "abort") {
         setActivityButtonState(button, "active");
         button.type = "submit";

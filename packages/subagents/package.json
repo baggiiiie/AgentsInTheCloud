@@ -2,7 +2,10 @@
   "name": "@atelier/subagents",
   "private": true,
   "type": "module",
-  "exports": { "./server": "./src/server/index.ts", "./client": "./src/client/index.ts" },
+  "exports": {
+    "./server": "./src/server/index.ts",
+    "./client": "./src/client/index.ts"
+  },
   "dependencies": {
     "@atelier/agent": "workspace:*",
     "@atelier/core": "workspace:*",
@@ -10,6 +13,8 @@
     "@atelier/shared": "workspace:*",
     "@earendil-works/pi-ai": "catalog:",
     "@earendil-works/pi-coding-agent": "catalog:",
-    "typebox": "^1.0.57"
+    "typebox": "^1.0.57",
+    "@earendil-works/pi-durable": "catalog:",
+    "@earendil-works/chord": "catalog:"
   }
 }

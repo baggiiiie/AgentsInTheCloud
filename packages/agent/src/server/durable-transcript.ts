@@ -1,3 +1,5 @@
+import { agentDelegation } from "./delegation.ts";
+import { applyTranscriptContributions } from "./transcript-contributions.ts";
 import { durableTimingEntry, DurableTurnTiming } from "./durable-timing.ts";
 import { historyNote } from "@atelier/legacy-converter/entries";
 import { contentText, type Message } from "@earendil-works/pi-ai";
@@ -35,6 +37,18 @@ function images(content: Message["content"], entryId: string, offset = 0): Sessi
  * persisted run ledger. Only pi.live.run is authoritative for current activity.
  */
 export function projectDurableTranscript(view: ConversationView): TranscriptItem[] {
+  const contribution = agentDelegation?.transcript(view);
+  const inherited = contribution?.inheritedContext;
+  if (inherited) {
+    const index = view.entries.findIndex(entry => String(entry.id) === inherited.boundaryEntryId);
+    const prefix = view.entries.slice(0, index);
+    const own = projectDurableTranscript({ ...view, entries: view.entries.slice(index + 1) });
+    if (!prefix.length) return own;
+    return [{ type: "inherited-context", key: `inherited:${inherited.boundaryEntryId}`, source: inherited.source,
+      messageCount: prefix.reduce((count, entry) => count + (entry.model?.length ?? 0), 0),
+      items: projectDurableTranscript({ ...view, entries: prefix, docs: {} }),
+    }, ...own];
+  }
   const { live, inbox } = durableViewState(view);
   const records: TranscriptRecord[] = [];
   const completedTools = new Set<string>();
@@ -87,6 +101,16 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
     if (CompactionEntry.is(entry) || ResetEntry.is(entry)) {
       records.push({ kind: "note", id: String(entry.id), text: entry.model?.map(message => contentText(message.content)).join("\n") || "New session", tone: CompactionEntry.is(entry) ? "summary" : "system" });
       pendingBoundary = true;
+      continue;
+    }
+    const traffic = agentDelegation?.attributed(entry);
+    if (traffic) {
+      if (traffic === "task") {
+        const timestamp = entry.model?.find(message => message.role === "user")?.timestamp ?? 0;
+        turn = String(entry.id); pendingBoundary = false; timings.set(turn, new DurableTurnTiming());
+        records.push({ kind: "taskStart", id: turn, timestamp });
+        records.push({ kind: "runStart", turnEntryId: turn, timestamp, startedAt: timestamp });
+      }
       continue;
     }
     let offset = 0;
@@ -171,6 +195,6 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
     const key = `queued-${input.id}`;
     items.push({ type: "user", key, text: contentText(input.content), images: images(input.content, key), pending: true, steering: input.mode === "steer" && Boolean(live.run) });
   }
-  return items;
+  return contribution ? applyTranscriptContributions(items, contribution) : items;
 }
 

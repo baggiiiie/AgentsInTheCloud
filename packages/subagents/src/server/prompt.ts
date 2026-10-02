@@ -1,4 +1,4 @@
-import { maxConcurrentSubagents } from "./subagent-runtime.ts";
+import { maxConcurrentSubagents } from "./native-state.ts";
 import { codexModelId } from "./codex-model.ts";
 import upstream from "./codex-prompts.json";
 

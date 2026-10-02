@@ -4,9 +4,9 @@ export function agentComposerTextStorageKey(workspaceId: string, conversationId:
   return `atelier.agentComposerText:${JSON.stringify([workspaceId, conversationId])}`;
 }
 
-export function agentComposerPrimaryAction(busy: boolean, text: string, attachmentCount: number): "abort" | "send" | "steer" {
-  if (!busy) return "send";
-  return text.trim().length > 0 || attachmentCount > 0 ? "steer" : "abort";
+export function agentComposerPrimaryAction(busy: boolean, text: string, attachmentCount: number, hasStoppableWork = busy): "abort" | "send" | "steer" {
+  if (hasStoppableWork && !text.trim() && attachmentCount === 0) return "abort";
+  return busy ? "steer" : "send";
 }
 
 export type PromptHistoryState = { prompts: string[]; draft: string; index: number };

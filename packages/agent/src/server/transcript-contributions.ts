@@ -11,7 +11,7 @@ export interface AgentTranscriptAddition {
 }
 export type AgentTranscriptAnchor = {
   anchor: string;
-  target: { toolCallId: string } | { finalText: string; completedAt: number };
+  target: { toolCallId: string } | { entryId: string };
 };
 
 /** Declarative data only. The adapter never receives or rewrites host transcript items.
@@ -29,7 +29,7 @@ export function applyTranscriptContributions(items: TranscriptItem[], snapshot: 
     if (item.type === "working") return { ...item, unreadQueueCount: 0, items: annotate(item.items) };
     const anchor = snapshot.anchors.find(({ target }) => "toolCallId" in target
       ? item.type === "tool" && item.tool.callId === target.toolCallId
-      : item.type === "text" && item.final && item.text === target.finalText && (item.timestamp ?? 0) <= target.completedAt)?.anchor;
+      : item.type === "text" && item.final && item.key.startsWith(`${target.entryId}:text:`))?.anchor;
     return anchor ? { ...item, anchor } : item;
   });
   const time = (item: TranscriptItem) => item.timestamp ?? (item.type === "working" ? item.startedAt : 0);

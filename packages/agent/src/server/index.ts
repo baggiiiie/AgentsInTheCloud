@@ -42,7 +42,7 @@ export {
   type WorkspacePresenterDeps,
 } from "./tools.ts";
 
-export { configureAgentDelegation, resolveAgentConversation, type AgentDelegation, type AgentSessionPreparation, type AgentSessionAttachment, type AgentModelRequestTransform, type AgentDelegationTranscript, type AgentToolPresentation } from "./delegation.ts";
+export { configureAgentDelegation, resolveAgentConversation, type AgentDelegation, type AgentToolPresentation } from "./delegation.ts";
 export { ids, type AgentRenderContext } from "./render-context.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
 export { statusHtml } from "./render-tool.ts";
@@ -60,3 +60,7 @@ export { hasAvailableBuiltinAgentModel } from "./model-state.ts";
 
 export { prepareAgentMcp, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest } from "./mcp.ts";
 export { markProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
+
+export { WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
+export { WorkspaceAdmission, WorkspaceStops, DurableTaskAdmissions, commitDurableStop, markGatedDurableWork, settleStoppedDurableWork } from "./durable-lifecycle.ts";
+export { durableWorkspaceOwner } from "./runtime.ts";
