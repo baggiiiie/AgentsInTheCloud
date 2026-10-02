@@ -218,7 +218,12 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
   await resetComposerText();
   await page.tap(sel.input);
   await Bun.sleep(300);
-  await page.insertText("Line 1");
+  const launches = '.agent-composer-pane .composer-quick-launches [data-agent-quick-launch]';
+  const hadLaunches = await page.visible(launches);
+  // The buttons set the empty composer's height, so the text field simply takes the quick launches' place.
+  await transition(recorder, "first letter", () => page.insertText("L"), { expectChange: false });
+  recorder.add(check("Quick launches hide once something is written", hadLaunches && !await page.visible(launches), hadLaunches ? "shown when empty, hidden after one letter" : "no quick launches staged in this workspace"));
+  await page.insertText("ine 1");
   await Bun.sleep(200);
   const heights: number[] = [];
   const minimum = (await transition(recorder, "baseline", async () => {}, { waitMs: 200, expectChange: false })).after.composer![3];

@@ -158,17 +158,23 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       // Everything but the input area: thumbnails, status, footer.
       const chrome = composer.getBoundingClientRect().height - area.getBoundingClientRect().height;
       const stacked = composer.classList.contains("composer-stacked");
+      // Quick launches make way as soon as there is something written.
+      const hadText = composer.classList.contains("composer-has-text");
+      const hasText = /\S/.test(input.value);
       // Measure without letting the pane reflow: the input area keeps its size,
       // so the transcript above cannot clamp its scroll offset.
       const areaHeight = area.style.height;
       area.style.height = `${area.getBoundingClientRect().height}px`;
       const inline = input.style.height;
       const measure = (stack: boolean) => {
+        composer.classList.toggle("composer-has-text", hasText);
         composer.classList.toggle("composer-stacked", stack);
         input.style.height = "0px";
         const content = Math.ceil(input.scrollHeight);
         const below = height(launches);
-        const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, height(buttons) - below);
+        // Buttons beside the text set its minimum; buttons floating above it (while typing) don't.
+        const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
+        const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);
         const room = maxComposer - chrome - below;
         // The stack only fits when the content itself fills its height within the max.
         return { content, minimum, limit: Math.max(minimum, room), fits: Math.min(content, room) + below >= height(buttons) - 1 };
@@ -177,13 +183,15 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       const stack = !root.classList.contains("software-keyboard-visible") && measure(true).fits;
       const layout = measure(stack);
       composer.classList.toggle("composer-stacked", stacked);
+      composer.classList.toggle("composer-has-text", hadText);
       input.style.height = inline;
       area.style.height = areaHeight;
       const next = Math.max(layout.minimum, Math.min(layout.content, layout.limit));
       const overflow = layout.content > layout.limit ? "auto" : "hidden";
       const current = input.getBoundingClientRect().height;
-      if (stack !== stacked || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
+      if (stack !== stacked || hasText !== hadText || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
         changeLayout(() => {
+          composer.classList.toggle("composer-has-text", hasText);
           composer.classList.toggle("composer-stacked", stack);
           input.style.height = `${next}px`;
           input.style.overflowY = overflow;
