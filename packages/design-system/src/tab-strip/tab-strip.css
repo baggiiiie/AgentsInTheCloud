@@ -1,6 +1,6 @@
 .tab-strip { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-/* Short titles stay content-sized; crowded strips shrink tabs to fit.
+/* Tabs shrink only to their tappable minimum, then the strip scrolls.
    Revealing actions never changes the tab's outer size. */
-.tab-strip > .action-item { flex: 0 1 auto; max-width: 24rem; user-select: none; -webkit-user-select: none; }
+.tab-strip > .action-item { flex: 0 1 auto; min-width: 9.5rem; max-width: 24rem; user-select: none; -webkit-user-select: none; }
 
 .tab-strip::-webkit-scrollbar { display: none; }

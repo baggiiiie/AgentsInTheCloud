@@ -33,7 +33,7 @@ export interface CatalogueEntry {
 export const entries: CatalogueEntry[] = [
   {
     id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Agent, Work and Host terminals.",
-    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering. Tabs stay content-sized up to 24rem and shrink when crowded.",
+    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering. Tabs stay between 9.5rem and 24rem wide, shrinking to their minimum before the strip scrolls horizontally.",
     imports: { "tab-strip": "tabHtml, tabStripHtml" },
     sources: ["tab-strip/tab-strip-controller.ts", "tab-strip/tab-strip.css"],
     examples: [{ title: "Terminal tabs", render: () => tabStripHtml({ label: "Example terminals", tabsHtml: ["Shell", "Diagnostics"].map((text, index) => tabHtml({ label: { kind: "text", text }, selected: index === 0, primary: { tag: "button", attributesHtml: 'type="button"' }, iconHtml: Icons.Terminal })).join("") }) }],
