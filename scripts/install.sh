@@ -382,7 +382,7 @@ wait_for_system() {
   status_file="${log_file}.status"
   local request_connect=0 last_action="" current_action app_url
   local -a fields
-  [ "$action" != connect ] || request_connect=1
+  if [ "$action" = connect ] && [ "$access_mode" != localhost ]; then request_connect=1; fi
   while true; do
     check_system_running
     if [ "$request_connect" -eq 1 ]; then

@@ -156,6 +156,7 @@ test("connect honors an explicit localhost access mode", () => {
   expect(result.output).toContain("http://127.0.0.1:3001/access");
   expect(result.output).toContain(" 55123 localhost");
   expect(result.output).not.toContain(" 55123 tailscale");
+  expect(result.output).not.toContain("3001/connect");
 });
 
 test("open honors an explicit Tailscale access mode without replacing System", () => {
