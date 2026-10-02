@@ -75,6 +75,45 @@ test("native runtime owns stable handles and reacquires admission before retry p
   expect((await corrected.wait(context)).status).toBe("done");
 });
 
+test("model setup fills a model-less conversation and permits submission without recreating it", async () => {
+  const { runtime, faux, load, open } = await setup();
+  load.prepare = async () => ({ instructions: "Created before model setup" });
+  const agent = await runtime.conversation(record);
+  expect((await agent.settings()).model).toBeUndefined();
+  load.validateModel = async (ref) => {
+    if (!ref) throw new Error("No connected model");
+  };
+  await expect(agent.submit({ requestId: "before-setup", text: "Hello" })).rejects.toThrow("No connected model");
+  await agent.configureDefaultModel({ provider: "faux", modelId: "small" });
+  expect((await agent.settings()).model).toEqual({ provider: "faux", modelId: "small" });
+  expect((await agent.settings()).instructions).toBe("Created before model setup");
+  faux.setResponses([fauxAssistantMessage("Ready after setup")]);
+  const submission = await agent.submit({ requestId: "after-setup", text: "Hello" });
+  expect((await submission.wait(context)).status).toBe("done");
+  await runtime.suspend();
+  const restored = await (await open()).conversation(record);
+  expect(restored.id).toBe(agent.id);
+  expect((await restored.settings()).model).toEqual({ provider: "faux", modelId: "small" });
+});
+
+test("model setup preserves explicit selections, including a queued selection", async () => {
+  const { runtime, load } = await setup();
+  load.prepare = async () => ({});
+  const agent = await runtime.conversation(record);
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  load.validateModel = async () => { entered.resolve(); await release.promise; };
+  const explicit = agent.configure({ model: { provider: "faux", modelId: "large" } });
+  await entered.promise;
+  const defaultSelection = agent.configureDefaultModel({ provider: "faux", modelId: "small" });
+  release.resolve();
+  await Promise.all([explicit, defaultSelection]);
+  expect((await agent.settings()).model?.modelId).toBe("large");
+  load.validateModel = async () => { throw new Error("Existing selection is unavailable"); };
+  await agent.configureDefaultModel({ provider: "faux", modelId: "small" });
+  expect((await agent.settings()).model?.modelId).toBe("large");
+});
+
 test("settings serialize with image preparation without blocking another conversation", async () => {
   const { runtime, faux, load } = await setup();
   const entered = Promise.withResolvers<void>();

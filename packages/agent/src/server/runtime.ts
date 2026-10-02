@@ -1,4 +1,5 @@
 import { AtelierCoreError } from "@atelier/core";
+import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { ConversationPresentation } from "./conversation-presentation.ts";
 import { openDurableAgentRuntime, type DurableAgentRuntime, type DurableAgentController } from "./durable-runtime.ts";
 import { existsSync } from "node:fs";
@@ -114,8 +115,9 @@ export function stopDurableWorkspaceAgentConversation(agent: WorkspaceAgentConve
 
 /** Update live composer controls without replacing drafts or existing model selections. */
 export async function refreshConfiguredAgentRuntimes(): Promise<void> {
+  const defaultModel = await resolveNewWorkspaceAgentModel();
   await Promise.all([...presentations.values()].map(async (pending) => {
-    await (await pending).refreshModelConfiguration();
+    await (await pending).refreshModelConfiguration(defaultModel);
   }));
 }
 

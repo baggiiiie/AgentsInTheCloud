@@ -2,7 +2,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { durableContextTokens } from "./durable-accounting.ts";
 import { renderDurableTree } from "./durable-tree.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
-import { createPiModelRuntime } from "@atelier/llm/server";
+import { createPiModelRuntime, type ModelRef } from "@atelier/llm/server";
 import { createLivePresentation } from "@atelier/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { DurableAgentController } from "./durable-runtime.ts";
@@ -144,7 +144,15 @@ export class ConversationPresentation {
   async paneState() { this.assertOpen(); return { transcriptHtml: this.presentation.transcriptHtml(), busy: this.isStreaming, hasStoppableWork: this.controller.hasStoppableWork, stats: this.stats(), readOnly: this.readOnly }; }
   async refreshCompletionCatalog() { if (this.readOnly) return ""; this.catalog = await renderWorkspaceCompletionCatalog(this.workspaceId); this.chrome.invalidate(); return this.catalog; }
   revealTurn(target: string) { return this.presentation.revealTurn(target); }
-  async refreshModelConfiguration() { if (this.readOnly) return; this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime); this.chrome.invalidate(); }
+  async refreshModelConfiguration(defaultModel?: ModelRef) {
+    if (this.readOnly) return;
+    if (defaultModel) await this.controller.configureDefaultModel({ provider: defaultModel.provider, modelId: defaultModel.id });
+    const settings = await this.controller.settings();
+    this.model = settings.model ? { provider: settings.model.provider, id: settings.model.modelId } : undefined;
+    this.thinking = settings.thinkingLevel ?? "off";
+    this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime);
+    this.chrome.invalidate();
+  }
   async detailHtml(key: string, count?: number) { return this.presentation.detailHtml(key, count); }
   async treeHtml(options: { filter: TreeFilterMode; query: string }) { this.assertOpen(); return renderDurableTree(await this.controller.tree(), { ...options, historyPath: `/workspaces/${encodeURIComponent(this.workspaceId)}/agent-history` }); }
   async dispose() {

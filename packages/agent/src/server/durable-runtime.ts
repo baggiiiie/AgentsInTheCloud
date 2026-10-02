@@ -254,6 +254,18 @@ export async function openDurableAgentRuntime(
       }
       return undefined;
     }
+    async function configure(change: SettingsChange) {
+      const current = await conversation.agent(context);
+      const ref = change.model === undefined ? current.model : change.model;
+      const model = ref ? harnessOptions.models.getModel(ref.provider, ref.modelId) : undefined;
+      if (ref && !model) throw new AtelierCoreError("invalid_arguments", `Model not found: ${ref.provider}/${ref.modelId}`);
+      if (change.model !== undefined) await load.validateModel(ref);
+      const levels = model ? getSupportedThinkingLevels(model) : [];
+      const requested = change.thinkingLevel ?? (change.model ? await getAgentModelThinkingLevel("builtin", { provider: change.model.provider, id: change.model.modelId }) : undefined);
+      const thinkingLevel = levels.find(level => level === requested);
+      if (change.thinkingLevel !== undefined && !thinkingLevel) throw new AtelierCoreError("invalid_arguments", `Unsupported thinking level: ${change.thinkingLevel}`);
+      await conversation.configure({ ...change, thinkingLevel }, context);
+    }
     commandDrains.add(() => tail);
     await observe();
     return {
@@ -388,17 +400,13 @@ export async function openDurableAgentRuntime(
         });
       },
       configure(change: SettingsChange) {
+        return command(() => configure(change));
+      },
+      /** Setup may fill an empty selection, but must never replace a user's choice. */
+      configureDefaultModel(model: NonNullable<AgentChange["model"]>) {
         return command(async () => {
-          const current = await conversation.agent(context);
-          const ref = change.model === undefined ? current.model : change.model;
-          const model = ref ? harnessOptions.models.getModel(ref.provider, ref.modelId) : undefined;
-          if (ref && !model) throw new AtelierCoreError("invalid_arguments", `Model not found: ${ref.provider}/${ref.modelId}`);
-          if (change.model !== undefined) await load.validateModel(ref);
-          const levels = model ? getSupportedThinkingLevels(model) : [];
-          const requested = change.thinkingLevel ?? (change.model ? await getAgentModelThinkingLevel("builtin", { provider: change.model.provider, id: change.model.modelId }) : undefined);
-          const thinkingLevel = levels.find(level => level === requested);
-          if (change.thinkingLevel !== undefined && !thinkingLevel) throw new AtelierCoreError("invalid_arguments", `Unsupported thinking level: ${change.thinkingLevel}`);
-          await conversation.configure({ ...change, thinkingLevel }, context);
+          if ((await conversation.agent(context)).model) return;
+          await configure({ model });
         });
       },
       /** Explicit Stop withdraws queued input and cancels owned work. */
