@@ -34,7 +34,7 @@ class SubmitShortcutController extends Controller {
 
   windowKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || event.repeat || event.isComposing) return;
-    if (composerSubmitKey(event, false) !== "shortcut") return;
+    if (!composerSubmitKey(event)) return;
     if (!isWorkspacePaneVisible(this.element) || !this.element.checkVisibility()) return;
     if (document.querySelector("dialog[open]")) return;
     event.preventDefault();

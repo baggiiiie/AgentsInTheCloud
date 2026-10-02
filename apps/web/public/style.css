@@ -404,10 +404,10 @@ html.software-keyboard-visible .fixed-shell-app .fixed-shell-mobile-nav { displa
    * participate in layout instead of being duplicated in a pane inset. */
   .fixed-shell-app { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); gap: 0; padding: 0; }
   /* Fit the root, not individual descendants inside clipped full-height panes.
-   * A fixed origin plus the visual viewport offset also follows Safari's pan. */
+   * The keyboard arrangement snaps the shell above the (predicted) keyboard in
+   * one step; it never follows the keyboard's animation. */
   html.software-keyboard-visible .fixed-shell-app {
-    position: fixed; left: 0; top: var(--keyboard-viewport-top);
-    height: var(--keyboard-viewport-height);
+    position: fixed; left: 0; right: 0; top: var(--software-keyboard-top); bottom: var(--software-keyboard-inset); height: auto;
   }
   /* Resident workspaces own their bar; the overlaid workspace list uses the
    * outer grid's Atelier-bar row independently. */

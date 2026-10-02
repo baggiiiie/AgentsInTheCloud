@@ -1,6 +1,6 @@
 import { setActionItemLabel } from "@atelier/design-system/action-item/client";
 import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { agentComposerSendPromptEvent, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { agentComposerSendPromptEvent, changeLayout, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
 import { agentCompletionRequest, insertFileCompletion, insertSlashCommand } from "./completion-input.ts";
 import { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 import { handleAgentTreeKeydown, handleAgentTreeMenuEvent, selectAgentTreeOption } from "./session-tree.ts";
@@ -151,16 +151,10 @@ function composerIsTranscribing(element: Element): boolean {
 
 export function createAgentCompletionsController(Controller: StimulusControllerConstructor, hooks: WorkspaceClientHooks) {
   const HtmlAutocompleteController = createHtmlAutocompleteController(Controller, {
-    // Quick launches are buttons, not keyboard-selected listbox options.
-    optionSelector: ':is([role="option"], [data-agent-quick-launch]):not([hidden]):not(:disabled)',
+    optionSelector: '[role="option"]:not([hidden]):not(:disabled)',
     loadingHtml: autocompleteHtml({ kind: "message", role: "status", content: { kind: "html", html: '<span class="agent-completion-spinner" aria-hidden="true"></span>Loading completions…' } }),
     triggerKeysWhenClosed: ["/", "@"],
     fullscreenShortcut: (option) => option.dataset.completionKind === "prompt-template",
-    // Sending can blur the composer while the menu still shows its loading state.
-    // Use the catalog so blur does not cancel the pending quick-launch refresh.
-    keepOpenOnBlur: (input) => !composerIsTranscribing(input)
-      && input.value === ""
-      && Boolean(input.closest(".composer")!.querySelector('[data-agent-completions-target="catalog"] [data-agent-quick-launch]')),
     menuEvent: handleAgentTreeMenuEvent,
     request(input, force) {
       if (composerIsTranscribing(input)) return undefined;
@@ -180,24 +174,15 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
     },
     loadHtml(request, host) {
       const catalog = host.querySelector<HTMLElement>("[data-agent-completions-target='catalog']")!.innerHTML;
-      const html = request.params?.kind === "quick-launch"
-        ? quickLaunchHtml(catalog)
-        : request.params?.kind === "slash-command"
-          ? slashCompletionHtml(catalog, request.query, request.params.compactAvailable !== "false")
-          : undefined;
+      const html = request.params?.kind === "slash-command"
+        ? slashCompletionHtml(catalog, request.query, request.params.compactAvailable !== "false")
+        : undefined;
       return html === undefined ? undefined : labelPromptTemplateShortcuts(html, hooks);
     },
     select(option, input, url) {
       if (runApplicationCommand(option, input)) return;
       if (selectAgentTreeOption(option, input)) return false;
-      if (option.dataset.completionKind === "quick-launch") {
-        const initialValue = input.value;
-        void expandedPromptTemplate(url, option.dataset.commandTrigger!).then((expanded) => {
-          if (input.value !== initialValue || composerIsTranscribing(input)) return;
-          setTextInputValue(input, expanded);
-          if (!focusLikelyOpensSoftwareKeyboard()) input.focus({ preventScroll: true });
-        });
-      } else if (option.dataset.commandTrigger) insertSlashCommand(option, input);
+      if (option.dataset.commandTrigger) insertSlashCommand(option, input);
       else if (option.dataset.completionKind === "file") insertFileCompletion(option, input);
     },
     keydown(event, input, url, actions) {
@@ -205,7 +190,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
         actions.close();
         return false;
       }
-      const send = composerSubmitKey(event) === "shortcut";
+      const send = composerSubmitKey(event);
       const expand = event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey;
       const treeCommand = input.closest(".composer")?.querySelector('[data-agent-completions-target="catalog"] [data-completion-kind="application-command"][data-command-trigger="/tree"]');
       if (event.key === "Enter" && input.value.trim() === "/tree" && treeCommand) {
@@ -238,20 +223,50 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
   });
 
   return class AgentCompletionsController extends HtmlAutocompleteController {
+    static targets = [...HtmlAutocompleteController.targets, "quickLaunches"];
     declare readonly catalogTarget: HTMLElement;
+    declare readonly quickLaunchesTarget: HTMLElement;
+    declare readonly hasQuickLaunchesTarget: boolean;
     private catalogObserver?: MutationObserver;
 
     connect(): void {
       super.connect();
-      this.catalogObserver = new MutationObserver(() => this.input());
+      this.catalogObserver = new MutationObserver(() => { this.renderQuickLaunches(); this.input(); });
       this.catalogObserver.observe(this.catalogTarget, { childList: true });
+      if (this.hasQuickLaunchesTarget) this.quickLaunchesTarget.addEventListener("click", this.quickLaunch);
+      this.renderQuickLaunches();
       this.input();
     }
 
     disconnect(): void {
       this.catalogObserver?.disconnect();
+      if (this.hasQuickLaunchesTarget) this.quickLaunchesTarget.removeEventListener("click", this.quickLaunch);
       super.disconnect();
     }
+
+    /** Quick launches always sit in the composer, so its height never changes late. */
+    private renderQuickLaunches(): void {
+      if (!this.hasQuickLaunchesTarget) return;
+      const html = labelPromptTemplateShortcuts(quickLaunchHtml(this.catalogTarget.innerHTML), hooks);
+      if (this.quickLaunchesTarget.innerHTML === html) return;
+      changeLayout(() => {
+        this.quickLaunchesTarget.innerHTML = html;
+        this.element.dispatchEvent(new Event("agent-composer:resize", { bubbles: true }));
+      });
+    }
+
+    private readonly quickLaunch = (event: MouseEvent): void => {
+      const option = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-agent-quick-launch]") : null;
+      if (!option) return;
+      const input = this.inputTarget;
+      const initialValue = input.value;
+      void expandedPromptTemplate(this.urlValue, option.dataset.commandTrigger!).then((expanded) => {
+        if (input.value !== initialValue || composerIsTranscribing(input)) return;
+        // A draft is never discarded: the template follows it.
+        setTextInputValue(input, initialValue.trim() ? `${initialValue.trimEnd()}\n\n${expanded}` : expanded);
+        if (!focusLikelyOpensSoftwareKeyboard()) input.focus({ preventScroll: true });
+      });
+    };
   };
 }
 
