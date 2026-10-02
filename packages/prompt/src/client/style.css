@@ -107,12 +107,16 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 html.software-keyboard-visible :is(.composer-floating-buttons, .agent-composer-pane .composer-attach, .agent-composer-pane .composer-close,
   .agent-composer-pane .composer-transcribe, .agent-composer-pane .composer-quick-launches, .agent-composer-pane .composer-footer) { display: none; }
 html.software-keyboard-visible .agent-composer-pane .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
-/* The text takes the full width; send floats just above the composer's top-right edge. */
+/* The text takes the full width and runs underneath send, which sits in the top-right corner. */
+html.software-keyboard-visible .agent-composer-pane .composer-input-area { position: relative; }
 html.software-keyboard-visible .agent-composer-pane .composer-buttons {
-  position: absolute; right: var(--composer-control-inset); bottom: calc(100% + 8px); padding: 0;
+  position: absolute; z-index: 1; top: var(--composer-control-inset); right: var(--composer-control-inset); padding: 0;
   grid-template: "send" var(--composer-control-size) / var(--composer-control-size);
 }
-html.software-keyboard-visible .agent-composer-pane .composer-input-area > .composer-input { grid-column: 1 / -1; min-height: calc(1lh + 24px); padding: 12px 16px; }
+html.software-keyboard-visible .agent-composer-pane .composer-input-area > .composer-input {
+  grid-column: 1 / -1; padding: 12px 16px;
+  min-height: max(calc(1lh + 24px), calc(var(--composer-control-size) + 2 * var(--composer-control-inset)));
+}
 html.software-keyboard-visible .agent-composer-pane .composer-surface > form > [role="status"] { margin: 0; max-height: 2lh; overflow-y: auto; }
 /* Host launch settings can wrap without hiding provider-specific controls. */
 .launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }

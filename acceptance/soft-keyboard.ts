@@ -273,7 +273,7 @@ await scenario("ios-D12-D13-tap-outside", "D12/D13: tapping outside the text fie
   recorder.add(check("Keyboard down", !after.keyboard && !after.focus.includes("composer-input"), `arranged: ${after.keyboard}, focus: ${after.focus || "body"}`));
 });
 
-await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; send floats above the full-width text.", async (recorder) => {
+await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; the full-width text runs under send in the top-right corner.", async (recorder) => {
   await openComposer();
   await tap(sel.input);
   await Bun.sleep(1500);
@@ -285,7 +285,7 @@ await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only 
     return { send: box(pane.querySelector(".composer-send button")), composer: box(pane.querySelector(":scope > .composer")), input: box(pane.querySelector(".composer-input")) };
   })()`);
   recorder.add(
-    check("Send floats just above the composer's top-right edge", placement.send[1] + placement.send[3] <= placement.composer[1] && close(placement.send[0] + placement.send[2], placement.composer[0] + placement.composer[2] - 4, 8), `send ${JSON.stringify(placement.send.map(Math.round))}, composer ${JSON.stringify(placement.composer.map(Math.round))}`),
+    check("Send sits in the composer's top-right corner", placement.send[1] >= placement.composer[1] && placement.send[1] - placement.composer[1] <= 12 && close(placement.send[0] + placement.send[2], placement.composer[0] + placement.composer[2] - 4, 8), `send ${JSON.stringify(placement.send.map(Math.round))}, composer ${JSON.stringify(placement.composer.map(Math.round))}`),
     check("The text takes the composer's full width", close(placement.input[2], placement.composer[2], 2), `text field ${Math.round(placement.input[2])}px wide, composer ${Math.round(placement.composer[2])}px`),
   );
   const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-quick-launches", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-transcribe"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
@@ -325,7 +325,43 @@ await scenario("ios-composer-tap-and-stack", "On the phone itself: a tap anywher
   await set("");
   await Bun.sleep(400);
   recorder.add(check("Empty again: 2×2", !(await stacked()).stacked, "unstacked"));
+  // Dictation through the real controller. The simulator has no microphone or
+  // speech, so the page gets a synthetic microphone and scripted recognition.
+  await page.evaluate<boolean>(`(() => {
+    navigator.mediaDevices.getUserMedia = async () => { const c = new AudioContext(); const o = c.createOscillator(); const d = c.createMediaStreamDestination(); o.connect(d); o.start(); return d.stream; };
+    const Real = window.WebSocket;
+    window.WebSocket = function (url, protocols) {
+      if (!String(url).includes("/transcription/realtime")) return new Real(url, protocols);
+      const socket = new EventTarget(); socket.readyState = 1; let all = ""; let timer;
+      const emit = (data) => socket.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(data) }));
+      socket.send = (data) => {
+        if (typeof data !== "string") return;
+        const message = JSON.parse(data);
+        if (message.type === "session.update") { let n = 0; timer = setInterval(() => { const word = (n ? " " : "") + "dictated" + n++; all += word; emit({ type: "conversation.item.input_audio_transcription.delta", delta: word }); if (n >= 200) clearInterval(timer); }, 20); }
+        if (message.type === "input_audio_buffer.commit") { clearInterval(timer); setTimeout(() => emit({ type: "conversation.item.input_audio_transcription.completed", transcript: all }), 50); }
+      };
+      socket.close = () => { clearInterval(timer); socket.readyState = 3; };
+      setTimeout(() => emit({ type: "session.created" }), 50);
+      return socket;
+    };
+    window.WebSocket.OPEN = 1;
+    return true;
+  })()`);
+  const dictate = await point(".agent-composer-pane [data-transcription-composer-target=\"button\"]");
+  await sim.tap(dictate.x, dictate.y);
+  await Bun.sleep(2000);
+  // First use on a fresh simulator asks for the microphone.
+  if (await page.evaluate<string>(`[...document.querySelectorAll('.agent-composer-pane [data-transcription-composer-target="button"]')].find((e) => e.checkVisibility()).dataset.state`) === "loading") await sim.tap(271, 473);
+  await Bun.sleep(5000);
+  const dictated = await stacked();
+  recorder.add(check("B: dictating long text stacks the buttons", dictated.stacked && dictated.composer <= window50(), `stacked: ${dictated.stacked}, composer ${Math.round(dictated.composer)}px`));
+  await tap('.agent-composer-pane [data-transcription-composer-target="button"]');
+  await Bun.sleep(1500);
+  await set("");
+  await Bun.sleep(300);
 });
+/** Half of the standalone page's height: a stacked composer may exceed 40%, never this. */
+function window50(): number { return 793 / 2; }
 
 // ─── Pi CLI agent ───────────────────────────────────────────────────────────
 await navigate(piPath, ".cli-agent-body .observable-terminal-host");

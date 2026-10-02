@@ -2,6 +2,8 @@ import { changeLayout, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible,
 
 /** The composer may grow to this share of the space above the keyboard (or of the window). */
 const composerMaxShare = 0.4;
+/** A stacked composer may exceed that max (short screens) up to this share. */
+const stackMaxShare = 0.5;
 const longPressMs = 500;
 
 /**
@@ -163,7 +165,8 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       const style = getComputedStyle(root);
       const keyboard = Number.parseFloat(style.getPropertyValue("--software-keyboard-inset") || "0")
         + Number.parseFloat(style.getPropertyValue("--software-keyboard-top") || "0");
-      const maxComposer = Math.floor((root.clientHeight - keyboard) * composerMaxShare);
+      const available = root.clientHeight - keyboard;
+      const maxComposer = Math.floor(available * composerMaxShare);
       const area = input.parentElement!;
       const buttons = area.querySelector<HTMLElement>(":scope > .composer-buttons")!;
       const launches = area.querySelector<HTMLElement>(":scope > .composer-quick-launches");
@@ -189,8 +192,10 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
         const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
         const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);
         const room = maxComposer - chrome - below;
-        // The stack only fits when the content itself fills its height within the max.
-        return { content, minimum, limit: Math.max(minimum, room), fits: Math.min(content, room) + below >= height(buttons) - 1 };
+        // Stack once the text fills the stack's height, or overflows the max. On a short
+        // screen the stack may then exceed the max, but never half the space.
+        const wanted = content >= room || content + below >= height(buttons) - 1;
+        return { content, minimum, limit: Math.max(minimum, room), fits: wanted && chrome + height(buttons) <= available * stackMaxShare };
       };
       // While typing with a soft keyboard only send shows; there is nothing to stack.
       const stack = !root.classList.contains("software-keyboard-visible") && measure(true).fits;
