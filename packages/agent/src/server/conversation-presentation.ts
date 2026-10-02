@@ -1,6 +1,5 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { durableContextTokens } from "./durable-accounting.ts";
-import { contextUsagePercent } from "./runtime-status.ts";
 import { renderDurableTree } from "./durable-tree.ts";
 import type { TreeFilterMode } from "./session-tree.ts";
 import { createPiModelRuntime } from "@atelier/llm/server";
@@ -122,7 +121,7 @@ export class ConversationPresentation {
     const usage = this.presentation.state.usage;
     const buckets = [...Object.values(usage.models), ...Object.values(usage.tools)];
     const model = this.model && this.modelRuntime.getModel(this.model.provider, this.model.id);
-    return { nativeBranchUsage: true, contextPercent: contextUsagePercent(undefined, this.contextTokens, model?.contextWindow), compactAvailable: !this.isStreaming && Boolean(this.model),
+    return { nativeBranchUsage: true, contextPercent: model?.contextWindow ? this.contextTokens / model.contextWindow * 100 : null, compactAvailable: !this.isStreaming && Boolean(this.model),
       inputTokens: buckets.reduce((sum, item) => sum + item.input, 0), outputTokens: buckets.reduce((sum, item) => sum + item.output, 0),
       cost: buckets.reduce((sum, item) => sum + item.cost.total, 0), modelName: this.model?.id,
       thinkingLevel: this.thinking, thinkingLevels: this.availableThinkingLevels(), models: this.models.map(model => ({ ...model, selected: model.provider === this.model?.provider && model.id === this.model.id })) };

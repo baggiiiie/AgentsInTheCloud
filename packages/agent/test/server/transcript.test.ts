@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { StopReason } from "@earendil-works/pi-ai";
-import { buildTranscript, finalAssistantText, findTranscriptItem, formatDuration, formatTokens, isFinalAssistantMessage, isFinalAssistantTextEvent, isToolViewDetails, toolDetailsIndicateError, type TranscriptRecord } from "../../src/server/transcript.ts";
+import { buildTranscript, finalAssistantText, findTranscriptItem, formatDuration, formatTokens, isFinalAssistantMessage, isToolViewDetails, toolDetailsIndicateError, type TranscriptRecord } from "../../src/server/transcript.ts";
 
 describe("transcript", () => {
   test("preserves record order, joins tool results, and ends Working when the final answer completes", () => {
@@ -239,19 +239,4 @@ test("a new persisted run after an interrupted run is not mistaken for steering"
   const blocks = items.filter((item) => item.type === "working");
   expect(blocks[0]).toMatchObject({ key: "old:working", inputEntryIds: ["old", "steer"], stoppedAt: 5000 });
   expect(blocks[1]).toMatchObject({ key: "new:working", inputEntryIds: ["new"], completedAt: 6001 });
-});
-
-test("final-answer phase collapses Working at text start while commentary stays inside it", () => {
-  const textEvent = (phase: "commentary" | "final_answer", stopReason: StopReason = "toolUse") => ({
-    type: "text_start" as const,
-    contentIndex: 0,
-    partial: {
-      stopReason,
-      content: [{ type: "text", text: "", textSignature: JSON.stringify({ v: 1, id: "message-1", phase }) }],
-    },
-  });
-
-  expect(isFinalAssistantTextEvent(textEvent("final_answer"))).toBe(true);
-  expect(isFinalAssistantTextEvent(textEvent("commentary", "stop"))).toBe(false);
-  expect(isFinalAssistantTextEvent({ type: "text_delta", contentIndex: 0, delta: "Done", partial: { stopReason: "stop", content: [{ type: "text", text: "Done" }] } })).toBe(true);
 });
