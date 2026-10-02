@@ -1,5 +1,5 @@
 import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@atelier/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingButtons, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@atelier/prompt/server";
 import { transcriptionComposerController } from "@atelier/transcription/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
@@ -8,7 +8,7 @@ import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
-import { cliTranscriptRoutes, renderCliTranscriptSwitch } from "./transcript-routes.ts";
+import { cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
@@ -65,7 +65,8 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
                 ${renderComposerBody({
                   draft: { id: draftId, rowId, attachments: await listStagedAttachments(draftId) },
                   collapsible: true,
-                  inputHtml: `<textarea class="composer-input" name="text" rows="2" enterkeyhint="send" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-controller="composer-send-hint" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
+                  quickLaunches: true,
+                  inputHtml: `<textarea class="composer-input" name="text" rows="2" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-controller="composer-send-hint" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
                 })}
               </form>
               <div class="agent-completion-menu-host" data-agent-completions-target="menu" hidden></div>
@@ -77,10 +78,10 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
             <div class="cli-agent-stage">
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
               ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture terminal-text-input:input->cli-terminal#sendNativeInput keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
-              ${renderCliTranscriptSwitch(adapter, workspaceId, conversationId)}
+              ${renderCliTranscriptView(adapter, workspaceId, conversationId)}
+              ${renderFloatingButtons(`${renderCliTranscriptControls(adapter, workspaceId, conversationId)}${composer ? renderOpenComposerButton() : ""}`)}
             </div>
             ${terminal.exists ? renderTerminalKeyBar("cli-terminal") : ""}
-            ${composer ? renderOpenComposerButton() : ""}
             ${composer}
           </section>`;
         },

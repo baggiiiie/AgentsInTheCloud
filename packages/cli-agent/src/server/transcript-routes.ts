@@ -11,11 +11,17 @@ function context(workspaceId: string, conversationId: string, providerId: string
   return { workspaceId, conversationId, transcriptBasePath: `/workspaces/${encodeURIComponent(workspaceId)}/${providerId}-agents/${encodeURIComponent(conversationId)}/transcript` };
 }
 
-export function renderCliTranscriptSwitch(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): string {
+export function renderCliTranscriptView(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): string {
   if (!adapter.loadTranscript) return "";
   const ctx = context(workspaceId, conversationId, adapter.id);
-  return `<turbo-frame id="${ids.transcript(ctx)}" class="agent-transcript cli-transcript-view" data-cli-terminal-target="transcript" data-action="turbo:frame-load->cli-terminal#transcriptLoaded scroll->cli-terminal#transcriptScrolled"></turbo-frame>
-    <div class="cli-transcript-switch">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>', label: "Follow latest" }, attributesHtml: 'data-popular-button data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd" hidden' })}${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}</div>`;
+  return `<turbo-frame id="${ids.transcript(ctx)}" class="agent-transcript cli-transcript-view" data-cli-terminal-target="transcript" data-action="turbo:frame-load->cli-terminal#transcriptLoaded scroll->cli-terminal#transcriptScrolled"></turbo-frame>`;
+}
+
+/** The terminal/transcript toggle and the transcript's scroll-to-bottom, for the floating button stack. */
+export function renderCliTranscriptControls(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): string {
+  if (!adapter.loadTranscript) return "";
+  const ctx = context(workspaceId, conversationId, adapter.id);
+  return `${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>', label: "Follow latest" }, attributesHtml: 'data-popular-button data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd" hidden' })}`;
 }
 
 export function cliTranscriptRoutes(adapter: CliAgentAdapter, sessions: CliSessions) {
