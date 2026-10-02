@@ -202,6 +202,6 @@ def tmux(argv, **kwargs):
 subprocess.run = tmux
 sys.argv = [script, "status", request, "--root", root]
 runpy.run_path(script, run_name="__main__")
-`, join(import.meta.dir, "../../workspace-image/agents-in-the-cloud-agent-bash"), f.root, JSON.stringify(input)]);
+`, join(import.meta.dir, "../../workspace_tools/agents-in-the-cloud-agent-bash"), f.root, JSON.stringify(input)]);
   expect(JSON.parse(output)).toEqual({ status: "done", aborted: true });
 });
