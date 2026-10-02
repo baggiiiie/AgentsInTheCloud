@@ -2,12 +2,12 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { Value } from "typebox/value";
-import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type { WorkspaceTool } from "./workspace-tool.ts";
 import { authenticateAgentRequest, type AgentMcpIdentity } from "./mcp-credentials.ts";
 
 export interface AgentMcpServerOptions {
   authenticate(token: string): AgentMcpIdentity | undefined;
-  tools(identity: AgentMcpIdentity): ToolDefinition<any, any>[];
+  tools(identity: AgentMcpIdentity): WorkspaceTool<any, any>[];
   instructions(identity: AgentMcpIdentity): string | Promise<string>;
 }
 
@@ -47,7 +47,7 @@ export function createAgentMcpServer(options: AgentMcpServerOptions) {
             const message = update.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
             const current = ++progress;
             updates = updates.then(() => extra.sendNotification({ method: "notifications/progress", params: { progressToken, progress: current, message } }));
-          }, undefined!);
+          });
           await updates;
           return { content: result.content };
         } catch (error) {

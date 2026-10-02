@@ -1,4 +1,4 @@
-import { configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@atelier/agent/server";
+import { configureAgentMcp, handleAgentMcpRequest } from "@atelier/agent/server";
 import { createAtelierEventBus, getAtelierRuntimeContext } from "@atelier/core";
 import { designSystemCatalogueHtml } from "@atelier/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@atelier/observable-terminal/server";
@@ -26,7 +26,6 @@ import { agentProvider, rememberAgentProvider } from "./agent-providers.ts";
 import { createWebApp, type WebApp } from "./app.ts";
 import { parseAssetManifest } from "./asset-manifest.ts";
 import { createCableServer, type CableSocketData } from "./cable.ts";
-import { createProjectSecretRequester } from "./project-secret-request.ts";
 import { legacyStaticFiles } from "./static-files.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
@@ -253,7 +252,6 @@ app = createWebApp({
   },
 });
 
-configureOnboardingTools({ deleteWorkspace: app.deleteCurrentWorkspaceFromAgent, createWorkspace: app.createWorkspaceFromAgent, requestSecretValue: createProjectSecretRequester() });
 
 atelierEvents.on("workspace_user_activity", ({ workspaceId }) => registry.touch(workspaceId));
 atelierEvents.on("workspace_title_changed", ({ workspaceId, title }) => registry.setTitle(workspaceId, title || null));
@@ -279,7 +277,6 @@ for (const module of workspaceModules) {
 }
 
 provisioningHooks.push({ id: "workspace.agent", label: "Prepare agent", async run({ workspaceId, creationContext }) {
-  if (creationContext?.projectOnboarding) markProjectOnboardingWorkspace(workspaceId);
   const parameters = creationContext?.agent;
   const provider = agentProvider(parameters?.provider ?? "builtin");
   if (parameters) {

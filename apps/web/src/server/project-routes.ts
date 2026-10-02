@@ -18,10 +18,8 @@ import {
   getProjectSshKnownHosts,
   listProjectEnvironmentVariables, listProjectSecrets,
   listProjectSshKeys, listProjects, parseProjectSpec, renameProjectSshKey,
-  projectSecretRoutingRevision, projectSecretValueInputSchema,
   secretNeedsValue, projectSecretAllowsPath, projectSecretPathPermissionSchema,
   setProjectDockerfile, setProjectPreloadImages,
-  setProjectSecretValue,
   setProjectSshKnownHosts,
   updateProject,
   updateProjectEnvironmentVariable, updateProjectSecret,
@@ -40,9 +38,7 @@ const jsonBooleanSchema = Type.Boolean();
 
 export type ProjectEditorModalOptions =
   | { kind: "settings"; projectId: string; section: string | undefined }
-  | { kind: "new" }
-  | { kind: "onboarding"; projectId: string }
-  | { kind: "secret-value"; projectId: string; secretId: string; purpose?: string };
+  | { kind: "new" };
 
 export interface ProjectRoutes {
   handle(request: Request, url: URL): Promise<Response | undefined>;
@@ -59,7 +55,6 @@ export function createProjectRoutes(deps: {
   referencingWorkspaces(projectId: string): ProjectWorkspaceReference[];
   invalidatePresentation(): void;
   renderLaunchComposer(project: ProjectSummary): Promise<string>;
-  createOnboardingWorkspace(project: ProjectSummary, request: Request): Promise<Response>;
   createAgentWorkspace(project: ProjectSummary, request: Request): Promise<Response>;
   workspaceCommandModalHostId: string;
 }): ProjectRoutes {
@@ -285,7 +280,6 @@ export function createProjectRoutes(deps: {
       <div class="project-editor-page project-editor-detail-page">
         <div class="project-editor-detail-body">
           <section class="project-edit-section"${revealSection(section, "repository")}><form class="project-edit-form" aria-label="Repository" method="post" action="/projects/${encodeURIComponent(project.id)}" data-controller="settings-autosave" data-action="change->settings-autosave#save"><label class="project-edit-field"><span>Display name</span><input class="text-field" name="name" value="${escapeHtml(project.name)}" required></label><label class="project-edit-field"><span>Repository</span><input class="text-field" name="gitUrl" value="${escapeHtml(formatProjectSpec(project))}" required></label></form></section>
-          <section class="project-configuration-list"><div class="project-configuration-head"><h3>Set up with an agent</h3><p>An agent can set up your project’s dependencies, environment variables and secrets.</p><p>It starts in a workspace without your custom Dockerfile, so setup still works if that file is broken.</p></div>${actionLinkHtml({ href: `/projects/${encodeURIComponent(project.id)}/onboarding`, variant: "secondary", content: { kind: "caption", caption: "Set up with agent" }, attributesHtml: 'data-turbo-stream="true"' })}</section>
           <div class="project-edit-config">${projectSecretEditor(project, secrets, section)}${projectSshKeyEditor(project, sshKeys, knownHosts, section)}${projectEnvironmentEditor(project, environment, section)}${projectDockerfileEditor(project, section)}${projectPreloadImagesEditor(project, section)}</div>
           <section class="project-edit-danger-zone"${revealSection(section, "danger")}>${projectConfigurationDisclosure("Danger zone", `<div class="project-edit-danger">${projectDeleteControl(project.id)}</div>`, section === "danger")}</section>
           <section class="project-configuration-list">
@@ -304,8 +298,6 @@ export function createProjectRoutes(deps: {
   }
 
   async function projectEditorModal(options: ProjectEditorModalOptions, request: Request): Promise<string> {
-    if (options.kind === "onboarding") return onboardingModal(await projectById(options.projectId));
-    if (options.kind === "secret-value") return secretValueModal(options.projectId, options.secretId, options.purpose);
     const title = options.kind === "new" ? "Add project" : "Project settings";
     const bodyHtml = options.kind === "new"
       ? newProjectEditorBody()
@@ -321,16 +313,6 @@ export function createProjectRoutes(deps: {
       bodyLayout: "full-bleed",
       footerHtml: options.kind === "new" ? undefined : `<span class="project-settings-save-status" role="status" data-project-settings-target="status">Changes save automatically.</span>${buttonHtml({ type: "button", variant: "primary", content: { kind: "caption", caption: "OK" }, attributesHtml: 'data-action="project-settings#complete" data-project-settings-target="confirm"' })}`,
       closeLabel: `Close ${title.toLowerCase()}`,
-    });
-  }
-
-  function onboardingModal(project: ProjectSummary): string {
-    return dialogHtml({
-      element: { id: "project-editor-modal", attributesHtml: "data-dialog-auto-show data-project-onboarding-dialog" },
-      iconHtml: Icons.Settings,
-      titleCaption: "Agent setup",
-      bodyHtml: "Let's ask an agent to find the best project settings for your project.<br>Nothing will be committed or pushed.",
-      footerHtml: `${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "No thanks" }, attributesHtml: 'data-action="dialog#close"' })}<form method="post" action="/projects/${encodeURIComponent(project.id)}/onboarding" data-turbo="true">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Let's go!" }, attributesHtml: 'autofocus data-turbo-submits-with="Starting…"' })}</form>`,
     });
   }
 
@@ -380,8 +362,8 @@ export function createProjectRoutes(deps: {
     }
     deps.invalidatePresentation();
     if (json) return jsonResponse({ project });
-    if (wantsStream(request)) return turboStreamResponse(`${replace("project-editor-modal", onboardingModal(project))}`);
-    return Response.redirect(new URL(`/projects/${encodeURIComponent(project.id)}/onboarding`, url).toString(), 303);
+    if (wantsStream(request)) return turboStreamResponse(`${replace("project-editor-modal", await projectEditorModal({ kind: "settings", projectId: project.id, section: undefined }, request))}`);
+    return Response.redirect(new URL(`/projects/${encodeURIComponent(project.id)}/settings`, url).toString(), 303);
   }
 
   async function updateProjectEndpoint(projectId: string, request: Request): Promise<Response> {
@@ -459,36 +441,6 @@ export function createProjectRoutes(deps: {
     if (requestAcceptsJson(request)) await readJsonObject(request);
     const environmentVariable = await deleteProjectEnvironmentVariable(projectId, variableId);
     return projectSettingsResponse(request, { deleted: true, environmentVariable }, () => renderProjectEnvironmentStreams(projectId));
-  }
-
-  async function secretValueModal(projectId: string, secretId: string, purpose?: string): Promise<string> {
-    const project = await projectById(projectId);
-    const secret = (await listProjectSecrets(projectId)).find((secret) => secret.id === secretId);
-    if (!secret) throw new AtelierCoreError("project_secret_not_found", "Project secret not found");
-    const formId = "project-secret-value-form";
-    return dialogHtml({
-      element: { id: "project-editor-modal", attributesHtml: 'data-dialog-auto-show data-secret-value-dialog' },
-      iconHtml: Icons.Agent,
-      titleCaption: "Provide a secret",
-      bodyHtml: `<div class="secret-value-request"><p>${escapeHtml(purpose ?? secret.annotation)}</p>
-        <p>Allowed destinations: <strong>${escapeHtml(secret.hostPattern)}</strong></p>
-        <p>Secret in URL paths: <strong>${projectSecretAllowsPath(secret) ? "allowed" : "not allowed"}</strong></p>
-        <form id="${formId}" method="post" action="/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}/value" data-turbo="true" data-action="turbo:submit-end->dialog#submitted">
-          <input type="hidden" name="expectedRoutingRevision" value="${projectSecretRoutingRevision(secret)}">
-          <label class="secret-value-request__field"><span>${escapeHtml(secret.envName)}</span><input class="text-field" name="secretValue" type="password" autocomplete="new-password" data-1p-ignore autofocus required placeholder="Paste secret value"></label>
-        </form>
-        <p class="secret-value-request__note">${secret.configured ? "Replaces the saved value in" : "Saved immediately to"} <strong>${escapeHtml(project.name)}</strong>. The agent receives a placeholder, never this value.</p>
-      </div>`,
-      footerHtml: buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Not now" }, attributesHtml: 'data-action="dialog#close"' })
-        + buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Save to project" }, attributesHtml: `form="${formId}" data-turbo-submits-with="Saving…"` }),
-    });
-  }
-
-  async function setProjectSecretValueEndpoint(projectId: string, secretId: string, request: Request): Promise<Response> {
-    const input = requestAcceptsJson(request) ? await readJsonObject(request) : Object.fromEntries(await request.formData());
-    if (!Value.Check(projectSecretValueInputSchema, input)) throw invalidArguments("Supply a secret value and the routing confirmation from the secret dialog");
-    const secret = await setProjectSecretValue(projectId, secretId, input);
-    return projectSettingsResponse(request, { secret }, async () => replace("project-editor-modal", '<div id="project-editor-modal"></div>'));
   }
 
   async function renderProjectSecretStreams(projectId: string): Promise<string> {
@@ -628,7 +580,6 @@ export function createProjectRoutes(deps: {
       return result ? result.slice(1).map(decodeURIComponent) : undefined;
     };
     let params: string[] | undefined;
-    if ((params = match(/^\/projects\/([^/]+)\/onboarding$/)) && request.method === "POST") return await deps.createOnboardingWorkspace(await projectById(params[0]!), request);
     if ((params = match(/^\/projects\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateProjectDockerfileEndpoint(params[0]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateProjectPreloadImagesEndpoint(params[0]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/launch-composer$/)) && request.method === "GET") return response(await deps.renderLaunchComposer(await projectById(params[0]!)));
@@ -638,7 +589,6 @@ export function createProjectRoutes(deps: {
     if ((params = match(/^\/projects\/([^/]+)\/environment\/([^/]+)$/)) && request.method === "POST") return await updateProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/environment\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/secrets$/)) && request.method === "POST") return await createProjectSecretEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/secrets\/([^/]+)\/value$/)) && request.method === "POST") return await setProjectSecretValueEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/secrets\/([^/]+)$/)) && request.method === "POST") return await updateProjectSecretEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/secrets\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSecretEndpoint(params[0]!, params[1]!, request);
     if ((params = match(/^\/projects\/([^/]+)\/ssh-known-hosts$/))) {

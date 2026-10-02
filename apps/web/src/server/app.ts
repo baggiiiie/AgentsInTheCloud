@@ -1,8 +1,4 @@
-import {
-  maybeNameWorkspaceFromPrompt,
-  projectOnboardingInitialPrompt,
-  type OnboardingToolDependencies,
-} from "@atelier/agent/server";
+import { maybeNameWorkspaceFromPrompt } from "@atelier/agent/server";
 import {
   AtelierCoreError,
   createKeyedOperationQueue,
@@ -21,7 +17,7 @@ import { panelHtml } from "@atelier/design-system/panel";
 import { Icons } from "@atelier/design-system/icons";
 import { warningBannerHtml } from "@atelier/design-system/warning-banner";
 import { parseModelRef } from "@atelier/llm/server";
-import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, type ProjectConfiguration, type ProjectSummary } from "@atelier/projects";
+import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, type ProjectConfiguration, type ProjectSummary } from "@atelier/projects";
 import { validDraftId } from "@atelier/prompt/server";
 import {
   domId,
@@ -45,7 +41,6 @@ import {
 } from "@atelier/shared";
 import { createWorkspacePresentationStore, createWorkspaceProvisioning, generateWorkspaceId, listWorkspaces, setWorkspaceParked, setWorkspaceTitle, type WorkspaceCreationContext, type WorkspaceInitInstruction, type WorkspaceProvisioning, type WorkspaceProvisionRun, type WorkspaceWorkViewReference, type WorkspaceWorkViewState } from "@atelier/workspace";
 import { renderWorkspaceLaunchPrompt, renderWorkspaceProvisioning } from "@atelier/workspace/server/provisioning";
-import { setTimeout as delay } from "node:timers/promises";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { createAgentPaneHost } from "./agent-pane-host.ts";
@@ -97,7 +92,6 @@ export interface WebApp {
   deleteCurrentWorkspaceFromAgent(workspaceId: string, force: boolean): Promise<DeleteCurrentWorkspaceResult>;
   resumeWorkspaceDeletions(): void;
   provisioning: WorkspaceProvisioning;
-  createWorkspaceFromAgent: OnboardingToolDependencies["createWorkspace"];
   createWorkView(workspaceId: string, reference: WorkspaceWorkViewReference): Promise<void>;
   presentWorkViewFromAgent(workspaceId: string, reference: WorkspaceWorkViewReference): Promise<void>;
   globalSidebarContributions: GlobalSidebarContributionRegistry;
@@ -229,7 +223,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     invalidatePresentation,
     renderLaunchComposer: renderProjectLaunchComposerFrame,
     createAgentWorkspace: async (project, request) => await createAgentWorkspaceFromForm(request, { project }),
-    createOnboardingWorkspace,
     workspaceCommandModalHostId,
   });
 
@@ -723,7 +716,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     isFirstWorkspace: boolean;
   }
 
-  async function createWorkspaceFromCommand(command: { init?: WorkspaceInitInstruction; agent?: JsonObject; context?: WorkspaceCreationContext; title?: string; projectOnboarding?: true }): Promise<CreatedWorkspace> {
+  async function createWorkspaceFromCommand(command: { init?: WorkspaceInitInstruction; agent?: JsonObject; context?: WorkspaceCreationContext; title?: string }): Promise<CreatedWorkspace> {
     const isFirstWorkspace = registry.list().length === 0;
     const id = generateWorkspaceId();
     const init = command.init;
@@ -738,7 +731,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const prepared = await provider.launch.prepare(command.agent);
       context = { ...prepared, agent: { ...prepared?.agent, initialPrompt, attachmentDraft, provider: provider.id } };
     }
-    if (command.projectOnboarding) context = { ...context, projectOnboarding: true };
     if (context?.agent?.initialPrompt) provisioningPrompts.set(id, context.agent.initialPrompt);
     registry.add(id, title || null, init);
     const options: Parameters<typeof startWorkspaceProvisioning>[1] = {};
@@ -752,21 +744,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   function workspaceCreatedJsonResponse(id: string): Response {
     const location = `/workspaces/${encodeURIComponent(id)}`;
     return jsonResponse({ workspace: { id, phase: requireWorkspace(id).phase, requestingAttention: requireWorkspace(id).requestingAttention, url: location } }, { status: 202, headers: { location } });
-  }
-
-  async function createOnboardingWorkspace(project: ProjectSummary, request: Request): Promise<Response> {
-    const { settingsRevision } = await readProjectWorkspaceSettings(project.id);
-    const init = await projectWorkspaceInitWithSettings(project.id, settingsRevision, { dockerfile: "FROM atelier-workspace", preloadImages: [], environment: [] });
-    const { id } = await createWorkspaceFromCommand({
-      init,
-      projectOnboarding: true,
-      title: `Set up ${project.name}`,
-      agent: { initialPrompt: projectOnboardingInitialPrompt(project.name) },
-    });
-    const location = `/workspaces/${encodeURIComponent(id)}`;
-    if (requestAcceptsJson(request)) return workspaceCreatedJsonResponse(id);
-    if (wantsStream(request)) return turboStreamResponse(`${replace("project-editor-modal", '<div id="project-editor-modal"></div>')}${selectWorkspaceTurboStream(id)}`);
-    return new Response(null, { status: 303, headers: { location } });
   }
 
   async function createWorkspaceEndpoint(request: Request): Promise<Response> {
@@ -1185,18 +1162,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/launch-composer" && request.method === "GET") return response(await renderProjectlessLaunchComposerFrame());
     if (url.pathname === "/launch-composer/provider" && request.method === "GET") return response(await renderLaunchProvider(agentProvider(url.searchParams.get("provider") ?? "builtin"), await orderedAgentProviders(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await agentProvider(url.searchParams.get("provider") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
-    const projectOnboardingMatch = url.pathname.match(/^\/projects\/([^/]+)\/onboarding$/);
-    if (projectOnboardingMatch && request.method === "GET") {
-      const projectId = decodeURIComponent(projectOnboardingMatch[1]!);
-      return projectEditorResponse(request, { kind: "onboarding", projectId });
-    }
-    const secretValueMatch = url.pathname.match(/^\/projects\/([^/]+)\/secrets\/([^/]+)\/value$/);
-    if (secretValueMatch && request.method === "GET") {
-      const projectId = decodeURIComponent(secretValueMatch[1]!);
-      const secretId = decodeURIComponent(secretValueMatch[2]!);
-      const purpose = url.searchParams.get("purpose") ?? undefined;
-      return projectEditorResponse(request, { kind: "secret-value", projectId, secretId, purpose });
-    }
     const projectSettingsMatch = url.pathname.match(/^\/projects\/([^/]+)\/settings$/);
     if (projectSettingsMatch && request.method === "GET") {
       const projectId = decodeURIComponent(projectSettingsMatch[1]!);
@@ -1309,27 +1274,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     deleteCurrentWorkspaceFromAgent,
     resumeWorkspaceDeletions: deletion.resume,
     provisioning,
-    async createWorkspaceFromAgent(init, title, signal, onUpdate) {
-      signal?.throwIfAborted();
-      const { id } = await createWorkspaceFromCommand({ init, title });
-      const identity = { workspaceId: id, url: `/workspaces/${id}` };
-      while (true) {
-        signal?.throwIfAborted();
-        const entry = registry.get(id);
-        const snapshot = provisioning.snapshot(id);
-        const progress = JSON.stringify({ ...identity, provisioning: snapshot });
-        onUpdate?.({ content: [{ type: "text", text: progress }], details: identity });
-        if (!entry || entry.phase.kind === "runningPhase" || (entry.phase.kind === "provisioningPhase" && entry.phase.status === "failed") || snapshot?.status === "waiting") {
-          return {
-            ...identity, status: !entry ? "deleted" : entry.phase.kind === "runningPhase" ? "ready" : snapshot?.status === "waiting" ? "awaiting_user" : "failed",
-            error: entry?.phase.error ?? snapshot?.error,
-            settings: init.settings,
-            timings: { totalMs: snapshot?.totalMs, phases: snapshot?.steps.map(({ id, label, durationMs, status, error }) => ({ id, label, durationMs, status, error })) ?? [] },
-          };
-        }
-        await delay(250, undefined, { signal });
-      }
-    },
     createWorkView,
     presentWorkViewFromAgent,
     globalSidebarContributions,

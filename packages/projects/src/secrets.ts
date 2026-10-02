@@ -1,6 +1,6 @@
-import { Type, type Static } from "typebox";
+import { Type } from "typebox";
 import { projectSecretHosts, projectSecretAllowsPath, secretPathInjectionDefaultHosts } from "./secret-path-policy.ts";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { AtelierCoreError } from "@atelier/core";
 import { decryptProjectValue, encryptProjectValue } from "./secret-crypto.ts";
 import { findProjectRecord, projectSecretSummary, projectSecretSummaries, projectsFile, readProjectStore, updateProjectStore, type ProjectRecord, type ProjectSecretSummary, type StoredProjectSecret } from "./project.ts";
@@ -101,30 +101,6 @@ export function projectSecretPlaceholder(name: string): string {
 export const projectSecretPathPermissionSchema = Type.Boolean({
   description: `Allow secret substitution in URL paths. Defaults to true only when all hosts are exact matches in: ${secretPathInjectionDefaultHosts.join(", ")}. Otherwise false. Omit on updates to keep the saved permission.`,
 });
-
-/** Binds a value-entry confirmation to the exact routing metadata the user reviewed. */
-export function projectSecretRoutingRevision(secret: Pick<ProjectSecretSummary, "envName" | "hostPattern" | "placeholder" | "allowInPath">): string {
-  return createHash("sha256").update(JSON.stringify([secret.envName.trim(), projectSecretHosts(secret.hostPattern).sort(), secret.placeholder?.trim() || projectSecretPlaceholder(secret.envName.trim()), projectSecretAllowsPath(secret)])).digest("hex");
-}
-
-export const projectSecretValueInputSchema = Type.Object({
-  secretValue: Type.String({ minLength: 1, writeOnly: true }),
-  expectedRoutingRevision: Type.String({ minLength: 1, description: "Routing confirmation from the secret-value dialog" }),
-}, { additionalProperties: false });
-export type ProjectSecretValueInput = Static<typeof projectSecretValueInputSchema>;
-
-/** Value-only entry must not overwrite metadata that changed while its dialog was open. */
-export async function setProjectSecretValue(projectId: string, secretId: string, input: ProjectSecretValueInput, file = projectsFile(), keyFile?: string): Promise<ProjectSecretSummary> {
-  const { secretValue, expectedRoutingRevision } = input;
-  if (!secretValue.trim()) throw new AtelierCoreError("invalid_arguments", "Enter a secret value");
-  return updateProjectStore(file, async (store) => {
-    const secret = findProjectSecret(findProjectRecord(store, projectId), secretId);
-    if (projectSecretRoutingRevision(secret) !== expectedRoutingRevision) throw new AtelierCoreError("project_secret_routing_changed", "Secret destination, path permission, or placeholder changed. Reopen the secret dialog and review its restrictions before saving.");
-    secret.encryptedSecret = await encryptProjectValue(projectId, secretId, secretValue, keyFile);
-    secret.updatedAt = new Date().toISOString();
-    return projectSecretSummary(secret);
-  });
-}
 
 export async function deleteProjectSecret(projectId: string, secretId: string, file = projectsFile()): Promise<ProjectSecretSummary> {
   return await updateProjectStore(file, (store) => {

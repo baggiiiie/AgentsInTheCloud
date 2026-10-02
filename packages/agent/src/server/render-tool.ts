@@ -1,5 +1,4 @@
 import { agentDelegation } from "./delegation.ts";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
 import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { toggleHtml } from "@atelier/design-system/toggle";
 import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
@@ -13,7 +12,7 @@ import { isBashTool, formatDuration, formatTokens, type ToolView, type ToolViewD
 import { ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptActionItemHtml } from "./render-markup.ts";
 
-type ToolArgumentKey = "workspace_id" | "command" | "path" | "file_path" | "content" | "offset" | "limit" | "timeout" | "edits" | "oldText" | "newText";
+type ToolArgumentKey = "command" | "path" | "file_path" | "content" | "offset" | "limit" | "timeout" | "edits" | "oldText" | "newText";
 
 const toolStringArgumentSchema = Type.String();
 const toolNumberArgumentSchema = Type.Number();
@@ -211,13 +210,11 @@ function renderBashCommand(command: string, streaming: boolean): string {
 
 function renderBashDetail(ctx: AgentRenderContext, key: string, tool: ToolView, count: number): string {
   const command = stringArg(toolArgs(tool), "command") ?? "";
-  const destination = tool.name === "bash_in_other_workspace" ? tool.details?.workspaceId ?? stringArg(toolArgs(tool), "workspace_id") : undefined;
-  const destinationHtml = destination ? `<div class="agent-region-header">Workspace · <a href="/workspaces/${encodeURIComponent(destination)}" data-turbo-frame="_top">${escapeHtml(destination)}</a></div>` : "";
-  const commandHtml = destinationHtml + renderBashCommand(command, tool.status === "streaming");
+  const commandHtml = renderBashCommand(command, tool.status === "streaming");
   if (tool.status === "streaming") return `<div class="agent-tool-detail">${commandHtml}</div>`;
   if (tool.status === "running") {
     // The viewer owns its generated DOM and the awaiting-output visibility state.
-    const terminal = tool.tmuxSession && tool.terminalVisible ? `<section id="${domId(ids.item(ctx, key), "terminal", destination ?? ctx.workspaceId, tool.tmuxSession)}" data-turbo-permanent class="agent-tool-region agent-bash-output agent-terminal-awaiting-output"><div class="agent-region-header">Live terminal</div><div class="agent-terminal-viewport"><div class="agent-tool-term observable-terminal-host" data-controller="agent-term" data-agent-term-workspace-id-value="${escapeHtml(destination ?? ctx.workspaceId)}" data-agent-term-session-value="${escapeHtml(tool.tmuxSession)}"></div></div></section>` : "";
+    const terminal = tool.tmuxSession && tool.terminalVisible ? `<section id="${domId(ids.item(ctx, key), "terminal", ctx.workspaceId, tool.tmuxSession)}" data-turbo-permanent class="agent-tool-region agent-bash-output agent-terminal-awaiting-output"><div class="agent-region-header">Live terminal</div><div class="agent-terminal-viewport"><div class="agent-tool-term observable-terminal-host" data-controller="agent-term" data-agent-term-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-term-session-value="${escapeHtml(tool.tmuxSession)}"></div></div></section>` : "";
     return `<div class="agent-tool-detail agent-bash-detail">${commandHtml}${terminal}</div>`;
   }
   return `<div class="agent-tool-detail agent-bash-detail">${commandHtml}${renderBashResultViews(ctx, key, tool, count)}</div>`;
@@ -292,10 +289,6 @@ export function renderToolDetail(ctx: AgentRenderContext, key: string, tool: Too
   const custom = agentDelegation?.toolPresentations?.get(tool.name)?.detail(ctx, tool);
   if (custom !== undefined) return custom;
   if (isBashTool(tool.name)) return renderBashDetail(ctx, key, tool, count);
-  if (tool.name === "request_secret_value" && tool.status === "running" && tool.details?.secretRequestUrl) {
-    const link = actionLinkHtml({ href: tool.details.secretRequestUrl, variant: "primary", content: { kind: "caption", caption: "Provide secret" }, attributesHtml: 'data-turbo-frame="_top" data-turbo-stream="true"' });
-    return `<div class="agent-tool-detail"><p>The value is saved to this project immediately. Do not enter it in chat.</p>${link}</div>${renderGenericDetail(ctx, tool)}`;
-  }
   if (tool.name === "read") return renderReadDetail(ctx, key, tool, count);
   if (tool.name === "write") return renderWriteDetail(ctx, key, tool, count);
   if (tool.name === "edit") return renderEditDetail(tool);
@@ -590,8 +583,7 @@ function parseKnownStreamedArgs(name: string, stream: string): StreamedToolArgs 
   if (parsed) return parsed;
   if (isBashTool(name)) {
     const command = partialStringField(stream, "command") ?? "";
-    const workspaceId = partialStringField(stream, "workspace_id");
-    return workspaceId ? { command, workspace_id: workspaceId } : { command };
+    return { command };
   }
   if (name === "write") return { path: partialStringField(stream, "path"), content: partialStringField(stream, "content") ?? "" };
   if (name === "read" || name === "edit") return { path: partialStringField(stream, "path") };

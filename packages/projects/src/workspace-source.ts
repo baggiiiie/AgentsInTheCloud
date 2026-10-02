@@ -383,7 +383,7 @@ export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): voi
   events.on("workspace_image_configure", async (configuration) => {
     if (!isGitProjectInit(configuration.init)) return;
     const projectId = configuration.init.projectId;
-    configuration.dockerfile = configuration.init.settings?.dockerfile ?? (await listProjects()).projects.find((project) => project.id === projectId)?.dockerfile;
+    configuration.dockerfile = (await listProjects()).projects.find((project) => project.id === projectId)?.dockerfile;
   });
   events.on("workspace_source_prepare", async ({ workspaceId, init, workHostPath }) => {
     if (!isGitProjectInit(init)) return;
@@ -392,7 +392,7 @@ export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): voi
 
   events.on("workspace_plan_prepare", async ({ workspaceId, init, plan }) => {
     if (isGitProjectInit(init)) {
-      const settings = init.settings ?? await getProjectConfiguration(init.projectId);
+      const settings = await getProjectConfiguration(init.projectId);
       plan.preloadImages = [...settings.preloadImages ?? []];
       plan.mounts.push({ type: "bind", ...(await projectPersistentMount(init.projectId)) });
       Object.assign(plan.env, Object.fromEntries(settings.environment.map(({ name, value }) => [name, value])));

@@ -43,7 +43,6 @@ const projectSecretSummarySchema = Type.Object({
   annotation: Type.String(),
   optional: Type.Boolean(),
   configured: Type.Boolean(),
-  valueRevision: Type.Optional(Type.String()),
   createdAt: Type.String(),
   updatedAt: Type.String(),
 }, { additionalProperties: false });
@@ -75,6 +74,16 @@ beforeEach(dataDir.setUp);
 afterEach(dataDir.tearDown);
 
 describe("HTTP contracts", () => {
+  test("retired agent onboarding endpoints are unavailable and cannot create workspaces", async () => {
+    const { app, registry } = createTestApp();
+    const { project } = await addProject("https://github.com/example/no-agent-setup.git");
+    for (const path of [`/projects/${project.id}/onboarding`, `/projects/${project.id}/secrets/unused/value`]) {
+      expect((await app.fetch(new Request(`http://test.local${path}`, { headers: { accept: "application/json" } }))).status).toBe(404);
+      expect((await app.fetch(postJson(path, {}))).status).toBe(404);
+    }
+    expect(registry.list()).toEqual([]);
+  });
+
   test("restart requests from both surfaces reach the update module", async () => {
     const { app } = createTestApp();
     for (const surface of ["sidebar", "settings"]) {

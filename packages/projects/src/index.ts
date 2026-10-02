@@ -47,9 +47,6 @@ export {
   listProjectSecrets,
   revealProjectSecrets,
   updateProjectSecret,
-  setProjectSecretValue,
-  projectSecretValueInputSchema,
-  projectSecretRoutingRevision,
   secretNeedsValue,
   projectSecretPlaceholder,
   projectSecretPathPermissionSchema,
@@ -77,9 +74,6 @@ export {
 } from "./workspace-source.ts";
 
 export { registerProjectWorkspaceEvents } from "./workspace-repos.ts";
-
-export { projectWorkspaceSettingsSchema, type ProjectWorkspaceSettings } from "./project.ts";
-export { readProjectWorkspaceSettings, writeProjectWorkspaceSettings, projectWorkspaceInitWithSettings, validateProjectWorkspaceSettings } from "./workspace-settings.ts";
 
 export { getProjectSshKnownHosts, setProjectSshKnownHosts } from "./ssh-host-trust.ts";
 export { sshHostTrustFailure, unknownSshHost, scanSshHost, trustScannedSshHost } from "./ssh-trust-recovery.ts";

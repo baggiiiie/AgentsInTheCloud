@@ -1,4 +1,4 @@
-import { projectSecretValueInputSchema, projectSecretPathPermissionSchema } from "@atelier/projects";
+import { projectSecretPathPermissionSchema } from "@atelier/projects";
 import { emptyWorkspaceCommandInputSchema, type WorkspaceModuleCommandHandler } from "@atelier/shared";
 import type { TSchema } from "typebox";
 import { closeWorkViewRequestSchema, reorderWorkViewRequestSchema, workViewReferenceSchema } from "./work-view-api.ts";
@@ -100,15 +100,6 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
           responses: htmlSurfaceResponses("Atelier with project settings open"),
         },
       },
-      "/projects/{projectId}/onboarding": {
-        get: { summary: "Offer agent-assisted project setup", parameters: [projectId], responses: htmlSurfaceResponses("Project onboarding confirmation") },
-        post: {
-          summary: "Accept agent-assisted project setup",
-          description: "Creates an ordinary workspace for this project using the default image, bypassing saved and committed Dockerfiles, environment overrides and image preloads. Starts a host-authorized onboarding conversation with setup instructions. When no model is available, stages the initial message for sending after model setup. Does not change saved project settings. No repository, settings or agent overrides are accepted.",
-          parameters: [projectId],
-          responses: jsonResponse("Onboarding workspace creation started", { $ref: "#/components/schemas/WorkspaceEnvelope" }, "202"),
-        },
-      },
       "/projects/{projectId}/workspaces/new": { get: { summary: "Present a new project workspace composer", parameters: [projectId], responses: htmlSurfaceResponses("Atelier with the project workspace composer open") } },
       "/projects/{projectId}/preload-images": { post: { summary: "Set images to preload in future project workspaces", description: "Replaces the image list. An empty array disables preloading. Existing workspaces are unchanged.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["preloadImages"], properties: { preloadImages: { type: "array", items: { type: "string" } } }, additionalProperties: false }), responses: jsonResponse("Preload images saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
       "/projects/{projectId}/dockerfile": { post: { summary: "Set the project workspace Dockerfile override", description: "Must start with FROM atelier-workspace. An empty string clears the override. Takes priority over .atelier/Dockerfile for new workspaces.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["dockerfile"], properties: { dockerfile: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Dockerfile saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
@@ -117,10 +108,6 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
       "/projects/{projectId}/environment/{variableId}/delete": { post: { summary: "Delete a project environment variable", parameters: [projectId, variableId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Environment variable deleted", { type: "object", required: ["deleted", "environmentVariable"], properties: { deleted: { const: true }, environmentVariable: { $ref: "#/components/schemas/EnvironmentVariable" } } }) } },
       "/projects/{projectId}/secrets": { post: { summary: "Create a project secret", description: "Omit secretValue to declare a secret without a value. Values are encrypted and never returned.", parameters: [projectId], requestBody: jsonBody({ $ref: "#/components/schemas/CreateSecret" }), responses: jsonResponse("Secret metadata created", { $ref: "#/components/schemas/SecretEnvelope" }) } },
       "/projects/{projectId}/secrets/{secretId}": { post: { summary: "Update a project secret", description: "Omit secretValue to preserve the stored secret. The value is never returned.", parameters: [projectId, secretId], requestBody: jsonBody({ $ref: "#/components/schemas/UpdateSecret" }), responses: jsonResponse("Secret metadata updated", { $ref: "#/components/schemas/SecretEnvelope" }) } },
-      "/projects/{projectId}/secrets/{secretId}/value": {
-        get: { summary: "Open a focused secret-value dialog", parameters: [projectId, secretId, { name: "purpose", in: "query", required: false, schema: { type: "string" } }], responses: htmlSurfaceResponses("Secure value entry") },
-        post: { summary: "Save only a project secret's value", description: "Preserves all secret metadata. The value is encrypted immediately and never returned.", parameters: [projectId, secretId], requestBody: jsonBody(projectSecretValueInputSchema), responses: jsonResponse("Secret value saved", { $ref: "#/components/schemas/SecretEnvelope" }) },
-      },
       "/projects/{projectId}/secrets/{secretId}/delete": { post: { summary: "Delete a project secret", parameters: [projectId, secretId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Secret deleted", { type: "object", required: ["deleted", "secret"], properties: { deleted: { const: true }, secret: { $ref: "#/components/schemas/SecretSummary" } } }) } },
       "/projects/{projectId}/delete": { post: { summary: "Delete a project", parameters: [projectId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Project deleted or blocked by workspace references", { $ref: "#/components/schemas/DeleteProjectResult" }) } },
       "/workspaces/{id}": { get: { summary: "Inspect or present a workspace", description: "JSON requests inspect workspace state. Browser navigation presents the workspace and can select an Agent conversation or Work view.", parameters: [workspaceId, agentConversation, selectedWorkView], responses: jsonAndHtmlResponse("Workspace state or browser surface", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
@@ -178,7 +165,7 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
         SecretSummary: {
           type: "object",
           required: ["id", "projectId", "envName", "hostPattern", "createdAt", "updatedAt", "annotation", "optional", "configured"],
-          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, valueRevision: { type: "string", description: "Opaque version of the saved value; unchanged by metadata edits" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
+          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
           additionalProperties: false,
         },
         CreateSecret: projectSecretInputSchema,

@@ -1,5 +1,6 @@
+import { defineWorkspaceTool } from "../../agent/src/server/workspace-tool.ts";
 import { afterEach, expect, test } from "bun:test";
-import { createMcpExtension, createCodemodeExtension, defineTool, type ExtensionAPI, type McpServerConfig, type ToolInfo, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { createMcpExtension, createCodemodeExtension, type ExtensionAPI, type McpServerConfig, type ToolInfo, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { createAgentMcpServer } from "../../agent/src/server/mcp-server.ts";
 import { registerPiAtelier } from "../src/extension/pi-atelier.ts";
@@ -47,7 +48,7 @@ function fixture() {
     authenticate: (candidate) => candidate === token ? identity : undefined,
     instructions: () => "Use present to show interactive work.",
     tools: () => [
-      defineTool({
+      defineWorkspaceTool({
         name: "present", label: "Present", description: "Present work",
         parameters: Type.Object({ kind: Type.String() }),
         execute: async (_id, args: { kind: string }, _signal, update) => {
@@ -55,7 +56,7 @@ function fixture() {
           return { content: [{ type: "text", text: `Presented ${args.kind}` }], details: {} };
         },
       }),
-      defineTool({
+      defineWorkspaceTool({
         name: "fail", label: "Fail", description: "Fail visibly", parameters: Type.Object({}),
         execute: async () => { throw new Error("deliberate failure"); },
       }),

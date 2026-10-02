@@ -3,7 +3,6 @@ import { execWorkspaceShell } from "@atelier/workspace";
 import { authenticateAgentRequest, createAgentMcpCredentials } from "./mcp-credentials.ts";
 import { createAgentMcpServer } from "./mcp-server.ts";
 import { createAtelierControlTools } from "./tools.ts";
-import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import { agentConversationKey } from "./render-context.ts";
 import { publishWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 import { prepareAppendedAtelierInstructions, sharedAtelierInstructions } from "./system-prompt.ts";
@@ -17,7 +16,7 @@ function credentialStore() { return credentials ??= createAgentMcpCredentials();
 let events: AtelierEventBus | undefined;
 const mcp = createAgentMcpServer({
   authenticate: (token) => credentialStore().authenticate(token),
-  tools: ({ workspaceId, agentId }) => [...createAtelierControlTools(workspaceId, { events }), ...createRegisteredOnboardingTools(workspaceId, agentId)],
+  tools: ({ workspaceId }) => createAtelierControlTools(workspaceId, { events }),
   instructions: ({ workspaceId, agentId }) => agentMcpInstructions(workspaceId, agentId),
 });
 export function configureAgentMcp(eventBus: AtelierEventBus): void {

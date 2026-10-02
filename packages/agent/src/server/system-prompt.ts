@@ -1,6 +1,4 @@
 import type { AtelierEventBus } from "@atelier/core";
-import { projectOnboardingInstructions } from "./project-onboarding.ts";
-import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
 
 /** Atelier guidance for every agent, whether Atelier runs its loop or it connects through MCP. */
 export const sharedAtelierInstructions = `You are running inside of an online coding tool called Atelier.
@@ -47,7 +45,7 @@ Keep layouts responsive. To preview a separate app, use a Browser Work view.
 
 /** Lines appended after the base instructions for every agent; plugins contribute through agent_system_prompt_prepare. */
 export async function prepareAppendedAtelierInstructions(events: AtelierEventBus | undefined, workspaceId: string, conversationId: string, lines: string[] = []): Promise<string[]> {
-  const appended = [...lines, ...(isProjectOnboardingWorkspace(workspaceId) ? [projectOnboardingInstructions] : [])];
+  const appended = [...lines];
   await events?.emit("agent_system_prompt_prepare", { workspaceId, conversationId, lines: appended });
   return appended;
 }
