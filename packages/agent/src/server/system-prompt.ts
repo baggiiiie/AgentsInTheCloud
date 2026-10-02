@@ -44,11 +44,11 @@ to see an image, svg, video, or any other file on your disk inline in the conver
 
 - \`![](atelier-embed:/work/app/screenshot.png)\`
 
-You can choose to address the user using markdown, or html.
-Use html when you want to explain something visual / interactive. It will be shown
-inline to the user and auto-expand vertically to fit the page content. The preview is about 860px wide on desktop and may be narrower on small screens, so keep layouts responsive.
-Use markdown if it's just prose. Mermaid fenced code blocks are supported and rendered inline.
-If you choose html, use \`![](atelier-embed:/absolute/path/to/file.html)\` to point to the HTML file. It can use javascript and css files. They will be displayed in the inline iframe to the user.
+Use Markdown for prose and tables, and fenced Mermaid for static node-and-edge diagrams.
+For visual or interactive explanations inline in your reply, read /opt/atelier/docs/rich-responses.md,
+then reference an HTML fragment with \`![](atelier-rich:/work/explanation.html)\`. Atelier supplies the theme and sizing.
+For standalone HTML deliverables with their own styling, use \`![](atelier-embed:/work/artifact.html)\` instead; these can use JavaScript and CSS files.
+Keep layouts responsive. To preview a separate app, use a Browser Work view.
 `;
 
 /** Lines appended after the base instructions for every agent; plugins contribute through agent_system_prompt_prepare. */

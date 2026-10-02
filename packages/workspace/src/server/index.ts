@@ -1,45 +1,27 @@
 import { ensureSharedHome } from "../home.ts";
-import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { syncWorkspaceDocs } from "./workspace-docs.ts";
 import {
   atelierDataPath,
   dockerHostAtelierDataPath,
   getAtelierRuntimeContext,
 } from "@atelier/core";
-import type { AtelierRuntimeContext } from "@atelier/core";
 import type { WorkspaceModule } from "@atelier/shared";
 
-const docsSourceUrl = new URL("../../../../docs/deploy-in-workspace/", import.meta.url);
+const repositoryRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const docsMountPath = "/opt/atelier/docs";
-
-async function installReadOnlyFile(sourceUrl: URL, destinationPath: string): Promise<void> {
-  await mkdir(dirname(destinationPath), { recursive: true });
-  const content = await Bun.file(sourceUrl).text();
-  const tmpPath = `${destinationPath}.tmp-${process.pid}-${Date.now()}`;
-  await writeFile(tmpPath, content, { mode: 0o444 });
-  await rename(tmpPath, destinationPath);
-}
-
-async function syncAtelierDocs(runtime?: AtelierRuntimeContext): Promise<{ hostDocsDir: string }> {
-  runtime ??= getAtelierRuntimeContext();
-  const docsDir = atelierDataPath(runtime, "docs");
-  await rm(docsDir, { recursive: true, force: true });
-  for (const entry of await readdir(docsSourceUrl, { withFileTypes: true })) {
-    if (entry.isFile()) await installReadOnlyFile(new URL(entry.name, docsSourceUrl), atelierDataPath(runtime, "docs", entry.name));
-  }
-  return { hostDocsDir: dockerHostAtelierDataPath(runtime, "docs") };
-}
 
 export const atelierServerModule: WorkspaceModule = {
   id: "workspace",
   async initialize({ events }) {
     await ensureSharedHome();
-    const docs = await syncAtelierDocs();
+    const runtime = getAtelierRuntimeContext();
+    await syncWorkspaceDocs(repositoryRoot, atelierDataPath(runtime, "docs"));
     events.on("workspace_plan_prepare", ({ plan }) => {
       if (plan.mounts.some((mount) => mount.target === docsMountPath)) return;
       plan.mounts.push({
         type: "bind",
-        source: docs.hostDocsDir,
+        source: dockerHostAtelierDataPath(runtime, "docs"),
         target: docsMountPath,
         readonly: true,
       });

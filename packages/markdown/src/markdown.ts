@@ -1,7 +1,8 @@
+import { renderMarkdownEmbed } from "./embeds.ts";
 import { copyButtonHtml } from "@atelier/design-system/copy-button";
 import { buttonHtml } from "@atelier/design-system/button";
 import MarkdownIt from "markdown-it";
-import { atelierFileHref, renderAtelierEmbed } from "./atelier-markdown.ts";
+import { atelierFileHref } from "./atelier-markdown.ts";
 import { escapeHtml, isWorkspaceAppPort, workspaceProxyUrl } from "@atelier/shared";
 import { renderMarkdownDiff } from "@atelier/syntax/markdown-diff";
 import { highlightCodeHtml } from "@atelier/syntax";
@@ -92,9 +93,12 @@ markdown.renderer.rules.link_open = (tokens, index, options, environment: Markdo
 const defaultImage = markdown.renderer.rules.image!;
 markdown.renderer.rules.image = (tokens, index, options, environment: MarkdownEnvironment, renderer) => {
   const source = tokens[index]!.attrGet("src") ?? "";
-  if (source.startsWith("atelier-embed:")) {
-    return renderAtelierEmbed(environment.workspaceId, source.slice("atelier-embed:".length));
-  }
+  const embed = renderMarkdownEmbed(source, {
+    workspaceId: environment.workspaceId,
+    title: tokens[index]!.content,
+    provisional: environment.provisional ?? false,
+  });
+  if (embed !== undefined) return embed;
   return defaultImage(tokens, index, options, environment, renderer);
 };
 
