@@ -280,6 +280,8 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
   const events = createAtelierEventBus();
   const finished = [];
   const busy = [];
+  const attention = [];
+  module.initialize({ events, registry: { requestAttention(workspaceId) { attention.push(workspaceId); } }, registerSocketHandler() {} });
   events.on("workspace_agent_turn_finished", event => { finished.push(event); });
   subscribeWorkspaceAgentBusy(event => { busy.push(event); });
   configureAgentMcp(events);
@@ -293,14 +295,20 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
   expect((await handleAgentMcpRequest(request({ authorization: "Bearer invalid" }), "completion")).status).toBe(401);
   expect(finished).toEqual([]);
   expect(busy).toEqual([]);
+  expect(attention).toEqual([]);
   expect((await handleAgentMcpRequest(request({}, "POST", "started"), "completion")).status).toBe(204);
   expect(finished).toEqual([]);
+  expect(attention).toEqual([]);
   expect((await handleAgentMcpRequest(request(), "completion")).status).toBe(204);
   expect(busy).toEqual([
     { workspaceId: "completion", agentKey: "agent:" + id, busy: true },
     { workspaceId: "completion", agentKey: "agent:" + id, busy: false },
   ]);
   expect(finished).toEqual([{ workspaceId: "completion", conversationId: id }]);
+  expect(attention).toEqual(["completion"]);
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "completion", conversationId: "delegated-or-other-provider" });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "another-workspace", conversationId: id });
+  expect(attention).toEqual(["completion"]);
   await provider.tabs.close({ workspaceId: "completion", conversationId: id });
   expect((await handleAgentMcpRequest(request({}, "POST", "started"), "completion")).status).toBe(401);
 `));

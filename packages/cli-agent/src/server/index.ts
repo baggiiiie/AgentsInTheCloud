@@ -32,6 +32,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
       context.registerSocketHandler(cliSocketHandler(adapter.id, sessions));
       context.events.on("workspace_agent_turn_finished", ({ workspaceId, conversationId }) => {
         if (sessions.list(workspaceId).some((session) => session.id === conversationId)) {
+          context.registry.requestAttention(workspaceId);
           void sessions.exportHistory(workspaceId, conversationId).catch((error) => console.error(`Could not export ${adapter.label} session ${conversationId}`, error));
         }
       });
