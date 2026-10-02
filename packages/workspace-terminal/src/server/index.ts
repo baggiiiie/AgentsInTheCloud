@@ -1,1 +1,1 @@
-export { terminalWorkspaceModule as atelierServerModule } from "./web.ts";
+export { terminalWorkspaceModule as agentsInTheCloudServerModule } from "./web.ts";

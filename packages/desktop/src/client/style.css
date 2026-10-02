@@ -1,11 +1,35 @@
 .work-view-pane:has(> .desktop-pane) { height: 100%; min-height: 0; }
-.desktop-pane { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: var(--bg); }
+.desktop-pane { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: var(--bg); container-type: inline-size; }
 .desktop-frame { display: block; flex: 1; min-height: 0; width: 100%; border: 0; }
-.desktop-toolbar { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: var(--text-body); }
-.desktop-connection { flex: 1; min-width: 0; }
+.desktop-toolbar { display: grid; grid-template-columns: minmax(8px, 1fr) minmax(80px, 42ch) minmax(8px, 1fr); align-items: center; gap: 12px; flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: var(--text-body); }
+.desktop-connection { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .desktop-connection > span:not([hidden]):not(.desktop-status-detail) { display: inline-flex; align-items: center; gap: 8px; }
-.desktop-status-detail { margin-inline-start: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.desktop-status-detail { margin-inline-start: 12px; color: var(--text-muted); }
+.desktop-toolbar > .button { justify-self: end; }
+/* Copy and send feedback share a reserved slot, so the editor never resizes. */
+.desktop-clipboard-action { display: grid; flex: 0 0 26px; height: 26px; }
+.desktop-clipboard-action > * { grid-area: 1 / 1; }
+.desktop-clipboard-feedback { display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.desktop-clipboard-feedback[data-state="sent"] { color: var(--success); }
+.desktop-clipboard-feedback-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.desktop-clipboard-action > [hidden] { display: none; }
+.desktop-clipboard-feedback [data-clipboard-state] { display: none; }
+.desktop-clipboard-feedback[data-state="pending"] [data-clipboard-state="pending"],
+.desktop-clipboard-feedback[data-state="sending"] [data-clipboard-state="sending"],
+.desktop-clipboard-feedback[data-state="sent"] [data-clipboard-state="sent"] { display: inline-flex; }
+.desktop-clipboard { display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* A one-line editor keeps the full clipboard value, including pasted line breaks. */
+.desktop-clipboard-input { flex: 1; height: 34px; min-height: 0; padding: 6px 10px; resize: none; overflow: hidden; white-space: pre; }
 
 @media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  .desktop-toolbar [data-desktop-pane-target="fullscreen"] { display: none; }
+  .desktop-clipboard-input { height: 44px; padding-block: 10px; }
+  .desktop-clipboard-action { flex-basis: 42.5px; height: 42.5px; }
+}
+
+@container (max-width: 600px) {
+  .desktop-toolbar { grid-template-columns: 8px minmax(0, 1fr) 8px; gap: 8px; padding-inline: 8px; }
+  .desktop-connection { overflow: visible; }
+  .desktop-status-caption, .desktop-status-detail { display: none; }
   .desktop-toolbar [data-desktop-pane-target="fullscreen"] { display: none; }
 }

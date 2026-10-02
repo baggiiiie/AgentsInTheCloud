@@ -1,11 +1,11 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { Icons } from "@atelier/design-system/icons";
-import { renderTranscriptionComposerControl } from "@atelier/transcription/server";
-import { escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { renderTranscriptionComposerControl } from "@agents-in-the-cloud/transcription/server";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
 
-export const agentComposerActions = "atelier:workspace-pane-visible@document->agent-composer#selected atelier:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sent->agent-composer#sent";
+export const agentComposerActions = "agents-in-the-cloud:workspace-pane-visible@document->agent-composer#selected agents-in-the-cloud:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sent->agent-composer#sent";
 
 const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg>';
 

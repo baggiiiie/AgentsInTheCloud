@@ -4,10 +4,10 @@ import { workspaceImagePreloader } from "./preload.ts";
 import type { WorkspaceImageConfigureEvent } from "./events.ts";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AtelierCoreError, atelierDataPath, createProcessFileLock, dockerHostAtelierDataPath, getAtelierRuntimeContext, gitHubCredentialHelperShellBody, invalidArguments, isJsonObject, requireDocker, runDocker, runDockerBuffer, withManagedDockerCommand, withCommandSignal, waitForCommand, shellQuote, type AtelierEventBus, type CommandInput, type JsonObject } from "@atelier/core";
-import { runHostObservableCommand, stripTerminalControls, tailTerminalText } from "@atelier/observable-terminal/server";
-import { isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceGateway, type WorkspaceHttpAppBackend, type WorkspaceServerProvisioningHook } from "@atelier/shared";
-import { inspectWorkspaceImage, resolveWorkspaceImage } from "@atelier/workspace-image";
+import { AgentsInTheCloudCoreError, agentsInTheCloudDataPath, createProcessFileLock, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, gitHubCredentialHelperShellBody, invalidArguments, isJsonObject, requireDocker, runDocker, runDockerBuffer, withManagedDockerCommand, withCommandSignal, waitForCommand, shellQuote, type AgentsInTheCloudEventBus, type CommandInput, type JsonObject } from "@agents-in-the-cloud/core";
+import { runHostObservableCommand, stripTerminalControls, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
+import { isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceGateway, type WorkspaceHttpAppBackend, type WorkspaceServerProvisioningHook } from "@agents-in-the-cloud/shared";
+import { inspectWorkspaceImage, resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import { prepareWorkspaceSystemd } from "./systemd.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -43,17 +43,17 @@ export {
   type WorkspaceWorkViewState,
 } from "./presentation.ts";
 
-const workspaceTypeLabel = "com.atelier.type";
-const namespaceLabel = "com.atelier.namespace";
-const workspaceIdLabel = "com.atelier.workspace-id";
+const workspaceTypeLabel = "com.agents-in-the-cloud.type";
+const namespaceLabel = "com.agents-in-the-cloud.namespace";
+const workspaceIdLabel = "com.agents-in-the-cloud.workspace-id";
 const titlePath = "title";
 const parkedPath = "parked";
 const initPath = "init.json";
-const workspaceManifestPath = ".atelier/workspace.json";
+const workspaceManifestPath = ".agents-in-the-cloud/workspace.json";
 const workspaceStartupTimeoutMs = 5 * 60_000;
 const withWorkspaceIdentityLock = createProcessFileLock({
   label: "workspace identity tombstone",
-  lockDir: () => atelierDataPath(getAtelierRuntimeContext(), "workspaces", "identity-tombstones.lock"),
+  lockDir: () => agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", "identity-tombstones.lock"),
 });
 const dockerLabelsSchema = Type.Record(Type.String(), Type.String());
 const booleanSchema = Type.Boolean();
@@ -66,56 +66,56 @@ export const workspaceVSCodePort = 24800;
 export interface WorkspaceListResult { workspaces: Array<{ id: string; title: string | null; parked?: boolean; init?: WorkspaceInitInstruction; imageOutdated?: boolean }> }
 export interface WorkspaceExecResult { exitCode: number; stdout: string; stderr: string; durationMs: number }
 export type WorkspaceExecBufferResult = Omit<WorkspaceExecResult, "stdout"> & { stdout: Buffer }
-export interface WorkspaceCommandOptions { workdir?: string; user?: "atelier" | "root"; stdin?: CommandInput }
-export interface DeleteWorkspaceOptions { force?: boolean; events?: AtelierEventBus }
+export interface WorkspaceCommandOptions { workdir?: string; user?: "agents-in-the-cloud" | "root"; stdin?: CommandInput }
+export interface DeleteWorkspaceOptions { force?: boolean; events?: AgentsInTheCloudEventBus }
 
 function namespace(): string { return process.env.ATELIER_NAMESPACE || "host"; }
 export function generateWorkspaceId(): string { return crypto.randomUUID().replaceAll("-", "").slice(0, 8); }
-export function workspaceContainerName(id: string): string { return `atelier-${id}`; }
+export function workspaceContainerName(id: string): string { return `agents-in-the-cloud-${id}`; }
 
-export function workspaceNetworkName(id: string): string { return `atelier-workspace-${id}`; }
+export function workspaceNetworkName(id: string): string { return `agents-in-the-cloud-workspace-${id}`; }
 export function workspaceBridgeName(id: string): string { return `atw-${createHash("sha256").update(id).digest("hex").slice(0, 11)}`; }
 function formatDeleteBlockedMessage(id: string, issues: JsonObject[]): string { return `workspace ${id} has delete blockers:\n${issues.map((issue) => `- ${JSON.stringify(issue)}`).join("\n")}\nuse --force to delete anyway`; }
 
 async function createWorkspaceWorkDir(id: string): Promise<{ worktreePath: string; dockerHostWorktreePath: string }> {
-  const runtime = getAtelierRuntimeContext();
-  const worktreePath = atelierDataPath(runtime, "workspaces", id, "work");
-  const dockerHostWorktreePath = dockerHostAtelierDataPath(runtime, "workspaces", id, "work");
-  if (await Bun.file(worktreePath).exists()) throw new AtelierCoreError("workspace_source_exists", `workspace source already exists: ${worktreePath}`);
+  const runtime = getAgentsInTheCloudRuntimeContext();
+  const worktreePath = agentsInTheCloudDataPath(runtime, "workspaces", id, "work");
+  const dockerHostWorktreePath = dockerHostAgentsInTheCloudDataPath(runtime, "workspaces", id, "work");
+  if (await Bun.file(worktreePath).exists()) throw new AgentsInTheCloudCoreError("workspace_source_exists", `workspace source already exists: ${worktreePath}`);
   await mkdir(worktreePath, { recursive: true });
   return { worktreePath, dockerHostWorktreePath };
 }
 
 async function deleteWorkspaceWorkDir(id: string): Promise<void> {
-  const runtime = getAtelierRuntimeContext();
-  await rm(atelierDataPath(runtime, "workspaces", id), { recursive: true, force: true });
+  const runtime = getAgentsInTheCloudRuntimeContext();
+  await rm(agentsInTheCloudDataPath(runtime, "workspaces", id), { recursive: true, force: true });
 }
 
 async function inspectLabels(id: string): Promise<Record<string, string>> {
   const inspected = await runDocker(["inspect", "--format", "{{json .Config.Labels}}", workspaceContainerName(id)]);
-  if (inspected.exitCode !== 0) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${id}`);
+  if (inspected.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
   const trimmed = inspected.stdout.trim();
   return trimmed && trimmed !== "null" ? Value.Parse(dockerLabelsSchema, JSON.parse(trimmed)) : {};
 }
 
 async function ensureWorkspaceFilesystem(id: string): Promise<void> {
-  const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `test -d ${shellQuote(workspaceRoot)} && test -d /.atelier`]);
-  if (result.exitCode !== 0) throw new AtelierCoreError("workspace_repair_failed", result.stderr.trim() || result.stdout.trim() || `workspace filesystem is not ready for ${id}`);
+  const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `test -d ${shellQuote(workspaceRoot)} && test -d /.agents-in-the-cloud`]);
+  if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_repair_failed", result.stderr.trim() || result.stdout.trim() || `workspace filesystem is not ready for ${id}`);
 }
 
 async function waitForWorkspaceStartup(id: string): Promise<string> {
   const timeoutSeconds = Math.ceil(workspaceStartupTimeoutMs / 1000);
-  const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `deadline=$(( $(date +%s) + ${timeoutSeconds} )); while [ "$(date +%s)" -le "$deadline" ]; do if test -f /.atelier/ready; then cat /.atelier/startup.log; exit 0; fi; if test -S /run/systemd/private && systemctl is-failed --quiet atelier-tmux.service atelier-init.service atelier-gateway.service; then break; fi; sleep 0.05; done; tail -n 120 /.atelier/startup.log; journalctl --no-pager -n 120 -u atelier-tmux.service -u atelier-init.service -u atelier-gateway.service; exit 1`]);
+  const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `deadline=$(( $(date +%s) + ${timeoutSeconds} )); while [ "$(date +%s)" -le "$deadline" ]; do if test -f /.agents-in-the-cloud/ready; then cat /.agents-in-the-cloud/startup.log; exit 0; fi; if test -S /run/systemd/private && systemctl is-failed --quiet agents-in-the-cloud-tmux.service agents-in-the-cloud-init.service agents-in-the-cloud-gateway.service; then break; fi; sleep 0.05; done; tail -n 120 /.agents-in-the-cloud/startup.log; journalctl --no-pager -n 120 -u agents-in-the-cloud-tmux.service -u agents-in-the-cloud-init.service -u agents-in-the-cloud-gateway.service; exit 1`]);
   const log = result.stdout.trim();
   if (result.exitCode === 0) return log;
   const output = result.stderr.trim();
-  throw new AtelierCoreError("workspace_startup_timeout", `workspace did not finish startup: ${id}${output ? `\n${output}` : ""}${log ? `\n\nStartup log:\n${log}` : ""}`);
+  throw new AgentsInTheCloudCoreError("workspace_startup_timeout", `workspace did not finish startup: ${id}${output ? `\n${output}` : ""}${log ? `\n\nStartup log:\n${log}` : ""}`);
 }
 
 async function validateWorkspaceContainer(id: string): Promise<void> {
   assertValidWorkspaceId(id);
   const labels = await inspectLabels(id);
-  if (labels[workspaceTypeLabel] !== "workspace" || labels[namespaceLabel] !== namespace()) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${id}`);
+  if (labels[workspaceTypeLabel] !== "workspace" || labels[namespaceLabel] !== namespace()) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
 }
 
 export async function resolveWorkspace(id: string): Promise<string> {
@@ -127,7 +127,7 @@ export async function resolveWorkspace(id: string): Promise<string> {
 export async function isWorkspaceRunning(id: string): Promise<boolean> {
   await validateWorkspaceContainer(id);
   const result = await runDocker(["inspect", "--format", "{{.State.Running}}", workspaceContainerName(id)]);
-  if (result.exitCode !== 0) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${id}`);
+  if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
   return result.stdout.trim() === "true";
 }
 
@@ -136,7 +136,7 @@ function assertValidWorkspaceId(id: string): void {
 }
 
 function workspaceIdentityTombstonePath(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "workspaces", "identity-tombstones.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", "identity-tombstones.json");
 }
 
 async function readRetiredWorkspaceIds(): Promise<Set<string>> {
@@ -171,28 +171,28 @@ async function retireWorkspaceId(id: string): Promise<void> {
 
 export function workspaceWorkHostPath(id: string): string {
   assertValidWorkspaceId(id);
-  return atelierDataPath(getAtelierRuntimeContext(), "workspaces", id, "work");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "work");
 }
 
-function workspaceMetadataDir(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string): string {
-  return atelierDataPath(context, "workspaces", id, "metadata");
+function workspaceMetadataDir(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string): string {
+  return agentsInTheCloudDataPath(context, "workspaces", id, "metadata");
 }
 
-function workspaceMetadataPath(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string, name: string): string {
+function workspaceMetadataPath(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string, name: string): string {
   return join(workspaceMetadataDir(context, id), name);
 }
 
-async function readTitle(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string): Promise<string | null> {
+async function readTitle(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string): Promise<string | null> {
   const file = Bun.file(workspaceMetadataPath(context, id, titlePath));
   if (!(await file.exists())) return null;
   return (await file.text()).replace(/\n$/, "");
 }
 
-async function readParked(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string): Promise<boolean> {
+async function readParked(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string): Promise<boolean> {
   return await Bun.file(workspaceMetadataPath(context, id, parkedPath)).exists();
 }
 
-async function writeWorkspaceInit(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string, init: WorkspaceInitInstruction | undefined): Promise<void> {
+async function writeWorkspaceInit(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string, init: WorkspaceInitInstruction | undefined): Promise<void> {
   if (init === undefined) return;
   await mkdir(workspaceMetadataDir(context, id), { recursive: true });
   await writeFile(workspaceMetadataPath(context, id, initPath), `${JSON.stringify(init, null, 2)}\n`);
@@ -200,10 +200,10 @@ async function writeWorkspaceInit(context: Awaited<ReturnType<typeof getAtelierR
 
 export async function getWorkspaceInit(id: string): Promise<WorkspaceInitInstruction | undefined> {
   await resolveWorkspace(id);
-  return await readWorkspaceInit(getAtelierRuntimeContext(), id);
+  return await readWorkspaceInit(getAgentsInTheCloudRuntimeContext(), id);
 }
 
-async function readWorkspaceInit(context: Awaited<ReturnType<typeof getAtelierRuntimeContext>>, id: string): Promise<WorkspaceInitInstruction | undefined> {
+async function readWorkspaceInit(context: Awaited<ReturnType<typeof getAgentsInTheCloudRuntimeContext>>, id: string): Promise<WorkspaceInitInstruction | undefined> {
   const file = Bun.file(workspaceMetadataPath(context, id, initPath));
   if (!(await file.exists())) return undefined;
   // SAFETY: This internal file serializes the open, declaration-merged
@@ -220,7 +220,7 @@ export interface RepoWorkspaceManifest {
     modelsJson?: string;
     modelsStoreJson?: string;
   };
-  seedAtelierConfig?: {
+  seedAgentsInTheCloudConfig?: {
     projectsJson?: string;
   };
 }
@@ -257,7 +257,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   const record = parsed;
   if (record.version !== 1) throw invalidArguments(`invalid ${path}: unsupported version`);
   if (record.privileged !== undefined) throw invalidArguments(`invalid ${path}: privileged is no longer supported; use docker.privileged`);
-  if (record.isAtelier !== undefined) throw invalidArguments(`invalid ${path}: isAtelier is no longer supported`);
+  if (record.isAgentsInTheCloud !== undefined) throw invalidArguments(`invalid ${path}: isAgentsInTheCloud is no longer supported`);
   const dockerRecord = optionalRecord(record, "docker", path);
   const privileged = dockerRecord ? optionalBoolean(dockerRecord, "privileged", path, "docker.privileged") : undefined;
   const docker: RepoWorkspaceManifest["docker"] | undefined = dockerRecord ? {} : undefined;
@@ -268,8 +268,8 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   const authJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "authJson", path, "seedPiConfig.authJson") : undefined;
   const modelsJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsJson", path, "seedPiConfig.modelsJson") : undefined;
   const modelsStoreJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsStoreJson", path, "seedPiConfig.modelsStoreJson") : undefined;
-  const seedAtelierConfigRecord = optionalRecord(record, "seedAtelierConfig", path);
-  const projectsJson = seedAtelierConfigRecord ? optionalString(seedAtelierConfigRecord, "projectsJson", path, "seedAtelierConfig.projectsJson") : undefined;
+  const seedAgentsInTheCloudConfigRecord = optionalRecord(record, "seedAgentsInTheCloudConfig", path);
+  const projectsJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
   const manifest: RepoWorkspaceManifest = { version: 1 };
   if (docker) manifest.docker = docker;
   if (initScripts) manifest.initScripts = initScripts;
@@ -279,20 +279,20 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
     if (modelsJson) manifest.seedPiConfig.modelsJson = modelsJson;
     if (modelsStoreJson) manifest.seedPiConfig.modelsStoreJson = modelsStoreJson;
   }
-  if (seedAtelierConfigRecord) {
-    manifest.seedAtelierConfig = {};
-    if (projectsJson) manifest.seedAtelierConfig.projectsJson = projectsJson;
+  if (seedAgentsInTheCloudConfigRecord) {
+    manifest.seedAgentsInTheCloudConfig = {};
+    if (projectsJson) manifest.seedAgentsInTheCloudConfig.projectsJson = projectsJson;
   }
   return manifest;
 }
 
 function applySeedConfigManifest(manifest: RepoWorkspaceManifest, plan: WorkspaceDockerPlan): void {
-  const runtime = getAtelierRuntimeContext();
+  const runtime = getAgentsInTheCloudRuntimeContext();
   const entries = [
-    manifest.seedPiConfig?.authJson ? { source: atelierDataPath(runtime, "pi-config", "auth.json"), staging: "/.atelier/seed-pi-auth.json", target: manifest.seedPiConfig.authJson } : undefined,
-    manifest.seedPiConfig?.modelsJson ? { source: atelierDataPath(runtime, "pi-config", "models.json"), staging: "/.atelier/seed-pi-models.json", target: manifest.seedPiConfig.modelsJson } : undefined,
-    manifest.seedPiConfig?.modelsStoreJson ? { source: atelierDataPath(runtime, "pi-config", "models-store.json"), staging: "/.atelier/seed-pi-models-store.json", target: manifest.seedPiConfig.modelsStoreJson } : undefined,
-    manifest.seedAtelierConfig?.projectsJson ? { source: atelierDataPath(runtime, "projects.json"), staging: "/.atelier/seed-projects.json", target: manifest.seedAtelierConfig.projectsJson } : undefined,
+    manifest.seedPiConfig?.authJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "auth.json"), staging: "/.agents-in-the-cloud/seed-pi-auth.json", target: manifest.seedPiConfig.authJson } : undefined,
+    manifest.seedPiConfig?.modelsJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "models.json"), staging: "/.agents-in-the-cloud/seed-pi-models.json", target: manifest.seedPiConfig.modelsJson } : undefined,
+    manifest.seedPiConfig?.modelsStoreJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "models-store.json"), staging: "/.agents-in-the-cloud/seed-pi-models-store.json", target: manifest.seedPiConfig.modelsStoreJson } : undefined,
+    manifest.seedAgentsInTheCloudConfig?.projectsJson ? { source: agentsInTheCloudDataPath(runtime, "projects.json"), staging: "/.agents-in-the-cloud/seed-projects.json", target: manifest.seedAgentsInTheCloudConfig.projectsJson } : undefined,
   ].filter((entry): entry is { source: string; staging: string; target: string } => Boolean(entry));
   for (const entry of entries) {
     plan.containerFiles.push({ source: entry.source, target: entry.staging });
@@ -315,7 +315,7 @@ async function applyRepoWorkspaceManifest(sourcePath: string, plan: WorkspaceDoc
 }
 
 function workspaceExecDockerArgs(resolved: string, command: string[], options: WorkspaceCommandOptions, terminal = false): string[] {
-  return ["exec", ...(terminal ? ["--interactive", "--tty"] : options.stdin !== undefined ? ["-i"] : []), "--user", options.user ?? "atelier", "--env", "LANG=C.UTF-8", "--env", "LC_ALL=C.UTF-8", "--workdir", options.workdir ?? workspaceRoot, workspaceContainerName(resolved), ...command];
+  return ["exec", ...(terminal ? ["--interactive", "--tty"] : options.stdin !== undefined ? ["-i"] : []), "--user", options.user ?? "agents-in-the-cloud", "--env", "LANG=C.UTF-8", "--env", "LC_ALL=C.UTF-8", "--workdir", options.workdir ?? workspaceRoot, workspaceContainerName(resolved), ...command];
 }
 
 export async function execWorkspaceCommand(id: string, command: string[], options: WorkspaceCommandOptions = {}): Promise<WorkspaceExecResult> {
@@ -334,7 +334,7 @@ export async function execWorkspaceCommandBuffer(id: string, command: string[], 
 }
 export async function execWorkspaceShell(id: string, script: string, options: WorkspaceCommandOptions = {}): Promise<WorkspaceExecResult> { return await execWorkspaceCommand(id, ["sh", "-lc", script], options); }
 
-const workspaceSetupScript = ".atelier/setup.sh";
+const workspaceSetupScript = ".agents-in-the-cloud/setup.sh";
 export const workspaceSetupProvisioningHook: WorkspaceServerProvisioningHook = {
   id: "workspace.setup",
   label: "Run project setup",
@@ -345,7 +345,7 @@ export const workspaceSetupProvisioningHook: WorkspaceServerProvisioningHook = {
       return;
     }
 
-    const session = `atelier-provision-setup-${crypto.randomUUID().slice(0, 8)}`;
+    const session = `agents-in-the-cloud-provision-setup-${crypto.randomUUID().slice(0, 8)}`;
     const result = await withManagedDockerCommand(workspaceExecDockerArgs(id, ["sh", workspaceSetupScript], {}, true), (args) => runHostObservableCommand({
       session,
       cwd: "/",
@@ -356,7 +356,7 @@ export const workspaceSetupProvisioningHook: WorkspaceServerProvisioningHook = {
     }));
     const output = tailTerminalText(stripTerminalControls(result.output));
     await events?.emit("workspace_provision_progress", { workspaceId: id, output });
-    if (result.exitCode !== 0) throw new AtelierCoreError("workspace_setup_failed", output || `${workspaceSetupScript} failed with exit code ${result.exitCode}`);
+    if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_setup_failed", output || `${workspaceSetupScript} failed with exit code ${result.exitCode}`);
   },
 };
 
@@ -380,17 +380,17 @@ function workspaceCreateDockerArgs(container: string, image: string, plan: Works
     ...plan.mounts.flatMap((mount) => ["--mount", dockerMountArg(mount)]),
     "--user", "root",
     image,
-    "/usr/local/bin/atelier-workspace-init",
+    "/usr/local/bin/agents-in-the-cloud-workspace-init",
   ];
 }
 
 function workspaceGitCredentialInitScript(): string {
-  return `cat > /usr/local/bin/atelier-git-credential <<'EOF'
+  return `cat > /usr/local/bin/agents-in-the-cloud-git-credential <<'EOF'
 #!/bin/sh
 ${gitHubCredentialHelperShellBody}
 EOF
-chmod 755 /usr/local/bin/atelier-git-credential
-git config --system credential.helper '!/usr/local/bin/atelier-git-credential'`;
+chmod 755 /usr/local/bin/agents-in-the-cloud-git-credential
+git config --system credential.helper '!/usr/local/bin/agents-in-the-cloud-git-credential'`;
 }
 
 interface WorkspaceEnvironment {
@@ -400,8 +400,8 @@ interface WorkspaceEnvironment {
 function hostUserEnv(): WorkspaceEnvironment {
   const uid = process.getuid?.();
   const gid = process.getgid?.();
-  if (uid === undefined || gid === undefined) throw new AtelierCoreError("unsupported_platform", "workspace containers require a POSIX host uid/gid");
-  if (uid === 0 || gid === 0) throw new AtelierCoreError("unsupported_root_user", "workspace containers require a non-root Atelier process");
+  if (uid === undefined || gid === undefined) throw new AgentsInTheCloudCoreError("unsupported_platform", "workspace containers require a POSIX host uid/gid");
+  if (uid === 0 || gid === 0) throw new AgentsInTheCloudCoreError("unsupported_root_user", "workspace containers require a non-root AgentsInTheCloud process");
   return { ATELIER_HOST_UID: String(uid), ATELIER_HOST_GID: String(gid) };
 }
 
@@ -412,28 +412,28 @@ function baseWorkspacePlan(labels: Record<string, string>): WorkspaceDockerPlan 
 function alignWorkspaceUserScript(): string {
   return `work_uid="\${ATELIER_HOST_UID:?}"
 work_gid="\${ATELIER_HOST_GID:?}"
-if [ "$work_uid" = 0 ] || [ "$work_gid" = 0 ]; then echo "Atelier must run as a non-root host user" >&2; exit 1; fi
+if [ "$work_uid" = 0 ] || [ "$work_gid" = 0 ]; then echo "AgentsInTheCloud must run as a non-root host user" >&2; exit 1; fi
 conflict_user="$(getent passwd "$work_uid" | cut -d: -f1 || true)"
-if [ -n "$conflict_user" ] && [ "$conflict_user" != atelier ]; then userdel "$conflict_user"; fi
-if [ "$(id -u atelier)" != "$work_uid" ] || [ "$(id -g atelier)" != "$work_gid" ]; then
+if [ -n "$conflict_user" ] && [ "$conflict_user" != agents-in-the-cloud ]; then userdel "$conflict_user"; fi
+if [ "$(id -u agents-in-the-cloud)" != "$work_uid" ] || [ "$(id -g agents-in-the-cloud)" != "$work_gid" ]; then
   # Do not replace this with usermod/groupmod without profiling workspace startup.
   # The shared home already belongs to the host user; never recursively chown it.
-  sed -i -E "s/^(atelier:[^:]*:)[0-9]+:[0-9]+:/\\1\${work_uid}:\${work_gid}:/" /etc/passwd
-  sed -i -E "s/^(atelier:[^:]*:)[0-9]+:/\\1\${work_gid}:/" /etc/group
-  if [ -d /.atelier/vscode ]; then chown -R atelier:atelier /.atelier/vscode; fi
+  sed -i -E "s/^(agents-in-the-cloud:[^:]*:)[0-9]+:[0-9]+:/\\1\${work_uid}:\${work_gid}:/" /etc/passwd
+  sed -i -E "s/^(agents-in-the-cloud:[^:]*:)[0-9]+:/\\1\${work_gid}:/" /etc/group
+  if [ -d /.agents-in-the-cloud/vscode ]; then chown -R agents-in-the-cloud:agents-in-the-cloud /.agents-in-the-cloud/vscode; fi
   # VS Code writes its extensions manifest here, outside the home directory.
   # Keep installed extensions writable after aligning the image user to the host.
-  if [ -d /opt/atelier/vscode-extensions ]; then chown -R atelier:atelier /opt/atelier/vscode-extensions; fi
+  if [ -d /opt/agents-in-the-cloud/vscode-extensions ]; then chown -R agents-in-the-cloud:agents-in-the-cloud /opt/agents-in-the-cloud/vscode-extensions; fi
 fi
-chown atelier:atelier /.atelier`;
+chown agents-in-the-cloud:agents-in-the-cloud /.agents-in-the-cloud`;
 }
 
 function workspaceStartupPreambleScript(): string {
   return `set -eu
-mkdir -p /.atelier
-rm -f /.atelier/ready
+mkdir -p /.agents-in-the-cloud
+rm -f /.agents-in-the-cloud/ready
 startup_started_at_ms="$(($(date +%s%N) / 1000000))"
-startup_log_path=/.atelier/startup.log
+startup_log_path=/.agents-in-the-cloud/startup.log
 : > "$startup_log_path"
 startup_now_ms() { now_ns="$(date +%s%N)"; echo "$((now_ns / 1000000))"; }
 startup_log_step() { now_ms="$(startup_now_ms)"; printf '%s +%sms %s\\n' "$now_ms" "$((now_ms - startup_started_at_ms))" "$1" >> "$startup_log_path"; }
@@ -452,18 +452,18 @@ startup_log_step ${shellQuote(`${id}.done`)}`;
 function workspaceInitScript(plan: WorkspaceDockerPlan): string {
   return [
     workspaceStartupPreambleScript(),
-    workspaceInitStepScript("gateway-credential", "chown root:root /etc/atelier-workspace-gateway-token; chmod 600 /etc/atelier-workspace-gateway-token"),
+    workspaceInitStepScript("gateway-credential", "chown root:root /etc/agents-in-the-cloud-workspace-gateway-token; chmod 600 /etc/agents-in-the-cloud-workspace-gateway-token"),
     workspaceInitStepScript("align-user", alignWorkspaceUserScript()),
-    workspaceInitStepScript("atelier-dir", `install -d -o atelier -g atelier /.atelier`),
+    workspaceInitStepScript("agents-in-the-cloud-dir", `install -d -o agents-in-the-cloud -g agents-in-the-cloud /.agents-in-the-cloud`),
     // Start after UID/GID alignment, before project hooks can create sessions.
-    workspaceInitStepScript("tmux", "systemctl start atelier-tmux.service"),
+    workspaceInitStepScript("tmux", "systemctl start agents-in-the-cloud-tmux.service"),
     ...plan.initScripts.map((script, index) => workspaceInitStepScript(`init-${index + 1}`, script)),
     "startup_log_step gateway.start",
     "trap - EXIT",
   ].join("\n");
 }
 
-export async function createWorkspace(options: { id: string; events: AtelierEventBus; init?: WorkspaceInitInstruction; context?: WorkspaceCreationContext; run: WorkspaceProvisionRun }): Promise<void> {
+export async function createWorkspace(options: { id: string; events: AgentsInTheCloudEventBus; init?: WorkspaceInitInstruction; context?: WorkspaceCreationContext; run: WorkspaceProvisionRun }): Promise<void> {
   const { id, events, run } = options;
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(id)) throw invalidArguments(`invalid workspace id: ${id}`);
   if (await isRetiredWorkspaceId(id)) throw invalidArguments(`workspace id has been permanently retired and cannot be reused: ${id}`);
@@ -473,23 +473,23 @@ export async function createWorkspace(options: { id: string; events: AtelierEven
   let plan: WorkspaceDockerPlan | undefined;
   try {
     await run.step("workspace.source", "Prepare workspace source", async () => {
-      await writeWorkspaceInit(getAtelierRuntimeContext(), id, init);
+      await writeWorkspaceInit(getAgentsInTheCloudRuntimeContext(), id, init);
       await events.emit("workspace_source_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot });
     }, "retry");
     const activePlan = await run.step("workspace.plan", "Prepare workspace container plan", async () => {
       const labels = { [workspaceTypeLabel]: "workspace", [namespaceLabel]: namespace(), [workspaceIdLabel]: id } satisfies Record<string, string>;
       const activePlan = baseWorkspacePlan(labels);
       plan = activePlan;
-      const gatewayTokenPath = atelierDataPath(getAtelierRuntimeContext(), "workspaces", id, "gateway-token");
+      const gatewayTokenPath = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "gateway-token");
       await writeFile(gatewayTokenPath, crypto.randomUUID() + crypto.randomUUID(), { mode: 0o600 });
-      activePlan.containerFiles.push({ source: gatewayTokenPath, target: "/etc/atelier-workspace-gateway-token" });
+      activePlan.containerFiles.push({ source: gatewayTokenPath, target: "/etc/agents-in-the-cloud-workspace-gateway-token" });
       activePlan.mounts.push({ type: "bind", source: source.dockerHostWorktreePath, target: workspaceRoot });
       activePlan.mounts.push(...await workspaceHomeMounts(id));
-      const sockets = atelierDataPath(getAtelierRuntimeContext(), "workspace-sockets", id);
+      const sockets = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id);
       await mkdir(sockets, { recursive: true });
       activePlan.mounts.push({ type: "volume", target: "/data" });
       activePlan.mounts.push({ type: "bind", source: "/data/erofs-cache", target: "/data/erofs-cache", readonly: true });
-      activePlan.mounts.push({ type: "bind", source: dockerHostAtelierDataPath(getAtelierRuntimeContext(), "workspace-sockets", id), target: "/run/atelier-parent", readonly: true });
+      activePlan.mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), target: "/run/agents-in-the-cloud-parent", readonly: true });
       await applyRepoWorkspaceManifest(source.worktreePath, activePlan);
       await events.emit("workspace_plan_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot, plan: activePlan });
       return activePlan;
@@ -501,12 +501,12 @@ export async function createWorkspace(options: { id: string; events: AtelierEven
         return resolveWorkspaceImage({ workspaceId: id, events, sourcePath: source.worktreePath, dockerfile: configuration.dockerfile });
       });
     }
-    const defaultWorkspaceFile = await run.step("workspace.preload-resolve", "Save configured preload images", () => workspaceImagePreloader.snapshot(activePlan.preloadImages, atelierDataPath(getAtelierRuntimeContext(), "workspaces", id)));
+    const defaultWorkspaceFile = await run.step("workspace.preload-resolve", "Save configured preload images", () => workspaceImagePreloader.snapshot(activePlan.preloadImages, agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id)));
     if (defaultWorkspaceFile) activePlan.containerFiles.push({ source: dirname(defaultWorkspaceFile), target: "/etc" });
     await run.step("workspace.container", "Start workspace container", async () => {
-      await prepareWorkspaceSystemd(activePlan, atelierDataPath(getAtelierRuntimeContext(), "workspaces", id, "systemd"), workspaceInitScript(activePlan));
+      await prepareWorkspaceSystemd(activePlan, agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "systemd"), workspaceInitScript(activePlan));
       const image = activePlan.image;
-      if (!image) throw new AtelierCoreError("workspace_image_missing", "workspace image was not resolved");
+      if (!image) throw new AgentsInTheCloudCoreError("workspace_image_missing", "workspace image was not resolved");
       const container = workspaceContainerName(id);
       await requireDocker(["network", "create", "--driver", "bridge", "--opt", `com.docker.network.bridge.name=${workspaceBridgeName(id)}`, "--label", `${workspaceTypeLabel}=workspace-network`, "--label", `${workspaceIdLabel}=${id}`, workspaceNetworkName(id)]);
       await requireDocker(workspaceCreateDockerArgs(container, image, activePlan));
@@ -529,7 +529,7 @@ export async function createWorkspace(options: { id: string; events: AtelierEven
       const networks = await requireDocker(["network", "ls", "--quiet", "--filter", `name=^${workspaceNetworkName(id).replaceAll(".", "\\.")}$`]);
       if (networks.stdout.trim()) await requireDocker(["network", "rm", workspaceNetworkName(id)]);
       await events.emit("workspace_deleted", { workspaceId: id });
-      await rm(atelierDataPath(getAtelierRuntimeContext(), "workspace-sockets", id), { recursive: true, force: true });
+      await rm(agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), { recursive: true, force: true });
       await Promise.all((plan?.cleanup ?? []).map((cleanup) => cleanup()));
       await deleteWorkspaceWorkDir(id);
     } catch (cleanupError) {
@@ -549,8 +549,8 @@ async function inspectWorkspaceGateway(id: string): Promise<WorkspaceGateway> {
   await resolveWorkspace(id);
   const result = await requireDocker(["inspect", "--format", `{{with index .NetworkSettings.Networks "${workspaceNetworkName(id)}"}}{{.IPAddress}}{{end}}`, workspaceContainerName(id)]);
   const address = result.stdout.trim();
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(address)) throw new AtelierCoreError("workspace_gateway_unavailable", `Workspace ${id} has no address on its dedicated network`);
-  const token = await readFile(atelierDataPath(getAtelierRuntimeContext(), "workspaces", id, "gateway-token"), "utf8");
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(address)) throw new AgentsInTheCloudCoreError("workspace_gateway_unavailable", `Workspace ${id} has no address on its dedicated network`);
+  const token = await readFile(agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "gateway-token"), "utf8");
   return { url: new URL(`http://${address}:${workspaceGatewayPort}`), token };
 }
 
@@ -577,8 +577,8 @@ export async function workspacePortBackend(id: string, port: number, pathAndSear
   return { kind: "http", target, gateway: await workspaceGateway(id) };
 }
 
-export async function workspaceImageOutdated(id: string, container = workspaceContainerName(id), events?: AtelierEventBus): Promise<boolean> {
-  const configuration: WorkspaceImageConfigureEvent = { init: await readWorkspaceInit(getAtelierRuntimeContext(), id) };
+export async function workspaceImageOutdated(id: string, container = workspaceContainerName(id), events?: AgentsInTheCloudEventBus): Promise<boolean> {
+  const configuration: WorkspaceImageConfigureEvent = { init: await readWorkspaceInit(getAgentsInTheCloudRuntimeContext(), id) };
   await events?.emit("workspace_image_configure", configuration);
   const [expectedImageId, actualImage] = await Promise.all([
     inspectWorkspaceImage({ sourcePath: workspaceWorkHostPath(id), dockerfile: configuration.dockerfile }),
@@ -588,8 +588,8 @@ export async function workspaceImageOutdated(id: string, container = workspaceCo
 }
 
 /** Discovery can skip image inspection so server startup only reads workspace identity. */
-export async function listWorkspaces(options: { inspectImages?: boolean; events?: AtelierEventBus } = {}): Promise<WorkspaceListResult> {
-  const context = getAtelierRuntimeContext();
+export async function listWorkspaces(options: { inspectImages?: boolean; events?: AgentsInTheCloudEventBus } = {}): Promise<WorkspaceListResult> {
+  const context = getAgentsInTheCloudRuntimeContext();
   const listed = await requireDocker(["ps", "-a", "--filter", `label=${workspaceTypeLabel}=workspace`, "--filter", `label=${namespaceLabel}=${namespace()}`, "--format", `{{.ID}}\t{{.Label "${workspaceIdLabel}"}}`]);
   const workspaces = await Promise.all(listed.stdout.trim().split(/\n+/).filter(Boolean).map(async (line) => {
     const [containerId, labelledId] = line.split("\t");
@@ -614,16 +614,16 @@ export async function deleteWorkspace(id: string, options: DeleteWorkspaceOption
   let containerExists = true;
   if (options.force) {
     const labels = await inspectLabels(id).catch((error) => {
-      if (error instanceof AtelierCoreError && error.code === "workspace_not_found") return undefined;
+      if (error instanceof AgentsInTheCloudCoreError && error.code === "workspace_not_found") return undefined;
       throw error;
     });
-    if (labels && (labels[workspaceTypeLabel] !== "workspace" || labels[namespaceLabel] !== namespace())) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${id}`);
+    if (labels && (labels[workspaceTypeLabel] !== "workspace" || labels[namespaceLabel] !== namespace())) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
     containerExists = labels !== undefined;
   } else {
     await resolveWorkspace(id);
     const issues: JsonObject[] = [];
     await options.events?.emit("workspace_delete_inspect", { workspaceId: id, issues });
-    if (issues.length > 0) throw new AtelierCoreError("workspace_delete_blocked", formatDeleteBlockedMessage(id, issues), { workspaceId: id, issues });
+    if (issues.length > 0) throw new AgentsInTheCloudCoreError("workspace_delete_blocked", formatDeleteBlockedMessage(id, issues), { workspaceId: id, issues });
   }
   // Join workspace consumers while their container and persisted files still exist.
   await options.events?.emit("workspace_deleting", { workspaceId: id });
@@ -633,19 +633,19 @@ export async function deleteWorkspace(id: string, options: DeleteWorkspaceOption
   await retireWorkspaceId(id);
   workspaceGatewayCache.delete(workspaceGatewayCacheKey(id));
   await options.events?.emit("workspace_deleted", { workspaceId: id });
-  await rm(atelierDataPath(getAtelierRuntimeContext(), "workspace-sockets", id), { recursive: true, force: true });
+  await rm(agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), { recursive: true, force: true });
   await deleteWorkspaceWorkDir(id);
   return null;
 }
 
 export async function getWorkspaceTitle(id: string): Promise<string | null> {
   await resolveWorkspace(id);
-  return await readTitle(getAtelierRuntimeContext(), id);
+  return await readTitle(getAgentsInTheCloudRuntimeContext(), id);
 }
 
 export async function setWorkspaceTitle(id: string, title: string): Promise<null> {
   await resolveWorkspace(id);
-  const context = getAtelierRuntimeContext();
+  const context = getAgentsInTheCloudRuntimeContext();
   await mkdir(workspaceMetadataDir(context, id), { recursive: true });
   await writeFile(workspaceMetadataPath(context, id, titlePath), title);
   return null;
@@ -661,7 +661,7 @@ async function updateWorkspaceContainerRunning(id: string, running: boolean): Pr
 export async function checkWorkspaceGateway(id: string): Promise<void> {
   await workspaceGateway(id);
   const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `deadline=$(( $(date +%s) + 15 )); while [ "$(date +%s)" -lt "$deadline" ]; do if test "$(curl --noproxy '*' --silent --max-time 1 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:${workspaceGatewayPort}/)" = 401; then exit 0; fi; sleep 0.05; done; exit 1`]);
-  if (result.exitCode !== 0) throw new AtelierCoreError("workspace_gateway_unavailable", `Workspace gateway did not become ready within 15 seconds.${result.stderr.trim() ? `\n${result.stderr.trim()}` : ""}`);
+  if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_gateway_unavailable", `Workspace gateway did not become ready within 15 seconds.${result.stderr.trim() ? `\n${result.stderr.trim()}` : ""}`);
 }
 
 export async function setWorkspaceContainerRunning(id: string, running: boolean): Promise<null> {
@@ -672,7 +672,7 @@ export async function setWorkspaceContainerRunning(id: string, running: boolean)
 
 export async function setWorkspaceParked(id: string, parked: boolean): Promise<null> {
   await validateWorkspaceContainer(id);
-  const context = getAtelierRuntimeContext();
+  const context = getAgentsInTheCloudRuntimeContext();
   await mkdir(workspaceMetadataDir(context, id), { recursive: true });
   const path = workspaceMetadataPath(context, id, parkedPath);
   if (parked) await writeFile(path, "");
@@ -687,11 +687,11 @@ export async function checkWorkspaceReadiness(id: string, report: (detail: strin
   await checkWorkspaceGateway(id);
   for (const socket of ["ingress", "egress"]) {
     report(`Checking ${socket} proxy`);
-    await requireDocker(["exec", "--user", "root", workspaceContainerName(id), "curl", "--noproxy", "*", "--fail", "--silent", "--max-time", "5", "--unix-socket", `/run/atelier-parent/${socket}.sock`, "http://localhost/health"]);
+    await requireDocker(["exec", "--user", "root", workspaceContainerName(id), "curl", "--noproxy", "*", "--fail", "--silent", "--max-time", "5", "--unix-socket", `/run/agents-in-the-cloud-parent/${socket}.sock`, "http://localhost/health"]);
   }
   report("Checking workspace image service");
   await requireDocker(["exec", "--user", "root", workspaceContainerName(id), "curl", "--noproxy", "*", "--fail", "--silent", "--max-time", "5", "http://127.0.0.1:58124/health"]);
   report("Resolving required images");
-  const images = await workspaceImagePreloader.load(atelierDataPath(getAtelierRuntimeContext(), "workspaces", id), report);
+  const images = await workspaceImagePreloader.load(agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id), report);
   await workspaceImagePreloader.install(images, workspaceContainerName(id), report, activity);
 }

@@ -1,5 +1,5 @@
-import type { JsonObject } from "@atelier/core";
-import { supportedUsageProviders } from "@atelier/llm/server";
+import type { JsonObject } from "@agents-in-the-cloud/core";
+import { supportedUsageProviders } from "@agents-in-the-cloud/llm/server";
 
 const errorResponse = { description: "Request failed", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } };
 const htmlSurfaceResponses = (description: string) => ({ "200": { description, content: { "text/html": { schema: { type: "string" } } } }, "400": errorResponse, "404": errorResponse });
@@ -36,13 +36,13 @@ const providerUsageSchema = {
   },
 };
 
-const refreshParameter = { name: "refresh", in: "query", required: false, schema: { type: "string" }, description: "When present, ask providers now instead of reusing what Atelier already knows." } satisfies JsonObject;
+const refreshParameter = { name: "refresh", in: "query", required: false, schema: { type: "string" }, description: "When present, ask providers now instead of reusing what AgentsInTheCloud already knows." } satisfies JsonObject;
 
 export const usageOpenApiPaths = {
   "/usage": { get: {
     summary: "Open Usage or inspect all connected, supported providers",
     parameters: [refreshParameter],
-    description: "HTML opens the Usage dialog in the Atelier shell. JSON includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key; its main limits come from Claude Code responses through the workspace proxy. Atelier asks Anthropic with a one-token message to its cheapest model only on the first read after start or a credential change, after a window resets, and on refresh. Provider failures are explicit per-provider errors.",
+    description: "HTML opens the Usage dialog in the AgentsInTheCloud shell. JSON includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key; its main limits come from Claude Code responses through the workspace proxy. AgentsInTheCloud asks Anthropic with a one-token message to its cheapest model only on the first read after start or a credential change, after a window resets, and on refresh. Provider failures are explicit per-provider errors.",
     responses: jsonAndHtmlResponse("Usage overview", { type: "object", properties: { providers: { type: "array", items: providerUsageSchema } } }),
   } },
   "/usage/button": { get: { summary: "Usage button perimeter for the most urgent recently used subscription", responses: htmlSurfaceResponses("Server-rendered button frame. Among subscriptions used in the 30 minutes ending at the last recorded inference, shows the active allowance furthest ahead of its linear pace. Ties prefer higher usage. Green is Time beyond Usage; red is Usage beyond Time. No ring without recorded activity or an active reported limit.") } },

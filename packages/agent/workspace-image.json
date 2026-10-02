@@ -1,0 +1,10 @@
+{
+  "files": [
+    {
+      "from": "workspace-image/agents-in-the-cloud-agent-bash",
+      "to": "/usr/local/bin/agents-in-the-cloud-agent-bash",
+      "mode": "0755",
+      "afterRun": true
+    }
+  ]
+}

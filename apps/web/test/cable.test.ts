@@ -1,5 +1,5 @@
-import { createAtelierEventBus } from "@atelier/core";
-import { CableTopics, decodeCableServerMessage, serializeCableIdentifier, type CableChannelAdapter, type CableServerMessage } from "@atelier/shared";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { CableTopics, decodeCableServerMessage, serializeCableIdentifier, type CableChannelAdapter, type CableServerMessage } from "@agents-in-the-cloud/shared";
 import { expect, test } from "bun:test";
 import { createCableServer } from "../src/server/cable.ts";
 import { createWorkspaceRegistry } from "../src/server/workspace-registry.ts";
@@ -9,7 +9,7 @@ function socket() {
   return { sent, send(raw: string) { sent.push(decodeCableServerMessage(raw)); return raw.length; } };
 }
 function server(channels: CableChannelAdapter[] = []) {
-  return createCableServer({ registry: createWorkspaceRegistry(), events: createAtelierEventBus(), channels, logError: () => {} });
+  return createCableServer({ registry: createWorkspaceRegistry(), events: createAgentsInTheCloudEventBus(), channels, logError: () => {} });
 }
 const identifier = CableTopics.agent("workspace", "conversation");
 

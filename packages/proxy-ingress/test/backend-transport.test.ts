@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceHttpAppBackend } from "@atelier/shared";
+import { isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceHttpAppBackend } from "@agents-in-the-cloud/shared";
 import { backendTransport } from "../src/ingress/backend-transport.ts";
 
 function backend(target: string): WorkspaceHttpAppBackend {
@@ -13,28 +13,28 @@ describe("workspace gateway transport", () => {
   });
 
   test("connects directly to the gateway without losing path, host, or app auth", () => {
-    const headers = new Headers({ host: "preview.example:41000", authorization: "Bearer app-token", "x-atelier-gateway-token": "forged", "x-atelier-gateway-port": "22", "x-atelier-gateway-protocol": "file", "proxy-authorization": "forged" });
+    const headers = new Headers({ host: "preview.example:41000", authorization: "Bearer app-token", "x-agents-in-the-cloud-gateway-token": "forged", "x-agents-in-the-cloud-gateway-port": "22", "x-agents-in-the-cloud-gateway-protocol": "file", "proxy-authorization": "forged" });
     const transport = backendTransport(backend("https://127.0.0.1:5173//a%2Fb?x=%2F&x=2"), headers);
     expect(transport.target.toString()).toBe("http://127.0.0.1:45678//a%2Fb?x=%2F&x=2");
     expect(Object.fromEntries(transport.headers)).toEqual({
       host: "preview.example:41000",
       authorization: "Bearer app-token",
-      "x-atelier-gateway-host": "preview.example:41000",
-      "x-atelier-gateway-token": "workspace-secret",
-      "x-atelier-gateway-port": "5173",
-      "x-atelier-gateway-protocol": "https",
+      "x-agents-in-the-cloud-gateway-host": "preview.example:41000",
+      "x-agents-in-the-cloud-gateway-token": "workspace-secret",
+      "x-agents-in-the-cloud-gateway-port": "5173",
+      "x-agents-in-the-cloud-gateway-protocol": "https",
     });
-    expect(headers.get("x-atelier-gateway-token")).toBe("forged");
+    expect(headers.get("x-agents-in-the-cloud-gateway-token")).toBe("forged");
   });
 
   test("routes default HTTP and HTTPS ports correctly", () => {
     for (const [url, port] of [["http://127.0.0.1/", "80"], ["https://127.0.0.1/", "443"]]) {
-      expect(backendTransport(backend(url!), new Headers()).headers.get("x-atelier-gateway-port")).toBe(port!);
+      expect(backendTransport(backend(url!), new Headers()).headers.get("x-agents-in-the-cloud-gateway-port")).toBe(port!);
     }
   });
 
   test("does not forward internal credentials to non-gateway backends", () => {
-    const transport = backendTransport({ kind: "http", target: new URL("http://127.0.0.1:5173/") }, new Headers({ "x-atelier-gateway-token": "forged", "x-atelier-gateway-port": "22", "x-atelier-gateway-protocol": "http", "proxy-authorization": "forged" }));
+    const transport = backendTransport({ kind: "http", target: new URL("http://127.0.0.1:5173/") }, new Headers({ "x-agents-in-the-cloud-gateway-token": "forged", "x-agents-in-the-cloud-gateway-port": "22", "x-agents-in-the-cloud-gateway-protocol": "http", "proxy-authorization": "forged" }));
     expect([...transport.headers]).toEqual([]);
   });
 

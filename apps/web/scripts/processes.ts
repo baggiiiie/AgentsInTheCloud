@@ -3,39 +3,39 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export interface AtelierProcessInfo {
+export interface AgentsInTheCloudProcessInfo {
   pid: number;
   ppid: number;
   command: string;
   kind: "dev" | "server";
 }
 
-export async function listAtelierProcesses(options: { excludePid?: number } = {}): Promise<AtelierProcessInfo[]> {
+export async function listAgentsInTheCloudProcesses(options: { excludePid?: number } = {}): Promise<AgentsInTheCloudProcessInfo[]> {
   const { stdout } = await execFileAsync("ps", ["-axo", "pid=,ppid=,command="]);
   return stdout
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .flatMap((line): AtelierProcessInfo[] => {
+    .flatMap((line): AgentsInTheCloudProcessInfo[] => {
       const match = /^(\d+)\s+(\d+)\s+(.+)$/.exec(line);
       if (!match) return [];
       const pid = Number(match[1]);
       const ppid = Number(match[2]);
       const command = match[3];
-      const kind = atelierProcessKind(command);
+      const kind = agentsInTheCloudProcessKind(command);
       if (!kind || pid === options.excludePid) return [];
       return [{ pid, ppid, command, kind }];
     });
 }
 
-export function sortAtelierProcesses(processes: AtelierProcessInfo[]): AtelierProcessInfo[] {
+export function sortAgentsInTheCloudProcesses(processes: AgentsInTheCloudProcessInfo[]): AgentsInTheCloudProcessInfo[] {
   return [...processes].sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === "dev" ? -1 : 1;
     return a.pid - b.pid;
   });
 }
 
-function atelierProcessKind(command: string): AtelierProcessInfo["kind"] | undefined {
+function agentsInTheCloudProcessKind(command: string): AgentsInTheCloudProcessInfo["kind"] | undefined {
   if (!/\bbun\b/.test(command)) return undefined;
 
   if (

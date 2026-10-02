@@ -1,13 +1,13 @@
 {
-  "name": "@atelier/workspace-image",
+  "name": "@agents-in-the-cloud/workspace-image",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/observable-terminal": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/observable-terminal": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

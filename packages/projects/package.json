@@ -1,15 +1,16 @@
 {
-  "name": "@atelier/projects",
+  "name": "@agents-in-the-cloud/projects",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./server": "./src/server/index.ts"
+    "./server": "./src/server/index.ts",
+    "./secret-path-policy": "./src/secret-path-policy.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/observable-terminal": "workspace:*",
-    "@atelier/workspace": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/observable-terminal": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

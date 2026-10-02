@@ -1,4 +1,4 @@
-import { isJsonObject, type JsonObject } from "@atelier/core";
+import { isJsonObject, type JsonObject } from "@agents-in-the-cloud/core";
 import { stream as streamAnthropic } from "@earendil-works/pi-ai/api/anthropic-messages";
 import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
 import { describe, expect, test } from "bun:test";
@@ -52,7 +52,7 @@ describe("pinned Codex V2 plaintext protocol", () => {
     expect(converted).toEqual({ role: "user", content: messageEnvelope(state, message), timestamp: 42 });
     const payload = { messages: [converted] };
     expect(bridge.transform(payload, api)).toEqual(payload);
-    expect(JSON.stringify(payload)).not.toContain("atelier-agent-message:");
+    expect(JSON.stringify(payload)).not.toContain("agents-in-the-cloud-agent-message:");
     expect(JSON.stringify(payload)).not.toContain('"type":"agent_message"');
   });
 
@@ -79,7 +79,7 @@ describe("pinned Codex V2 plaintext protocol", () => {
     expect(JSON.stringify(schemas)).not.toContain("encrypted");
   });
 
-  test("status encoding matches Codex rather than Atelier's lifecycle labels", () => {
+  test("status encoding matches Codex rather than AgentsInTheCloud's lifecycle labels", () => {
     expect(codexStatus(state.agents[0]!)).toEqual({ completed: "Done." });
     expect(codexStatus({ ...state.agents[0]!, status: "failed", result: "Failure" })).toEqual({ errored: "Failure" });
     expect(codexStatus({ ...state.agents[0]!, status: "starting" })).toBe("pending_init");
@@ -155,7 +155,7 @@ test("Anthropic's real request serializer receives user-message envelopes withou
     fetch: Object.assign(async () => { throw new Error("Unexpected network request"); }, { preconnect() {} }),
   }).result();
   expect(request?.messages).toEqual([{ role: "user", content: messageEnvelope(state, message) }]);
-  expect(JSON.stringify(request)).not.toContain("atelier-agent-message:");
+  expect(JSON.stringify(request)).not.toContain("agents-in-the-cloud-agent-message:");
   expect(result.errorMessage).toContain("Stop after serialization");
 });
 

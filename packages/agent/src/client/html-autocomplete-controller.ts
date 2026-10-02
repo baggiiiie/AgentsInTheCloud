@@ -1,5 +1,5 @@
-import { PopupPosition } from "@atelier/design-system/popup/position";
-import { notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@atelier/shared";
+import { PopupPosition } from "@agents-in-the-cloud/design-system/popup/position";
+import { notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 import { agentTreeOwnsMenu } from "./session-tree.ts";
 
 export type HtmlAutocompleteRequest = { query: string; params?: Record<string, string>; debounceMs?: number };

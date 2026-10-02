@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isGitProjectInit, secretNeedsValue, type ProjectConfiguration } from "@atelier/projects";
+import { isGitProjectInit, secretNeedsValue, type ProjectConfiguration } from "@agents-in-the-cloud/projects";
 import type { WorkspaceEntry } from "./workspace-registry.ts";
 
 export interface WorkspaceWarning {
@@ -28,6 +28,6 @@ export function workspaceWarnings(entry: WorkspaceEntry, project: ProjectConfigu
     }
   }
   for (const issue of entry.issues ?? []) add(issue.kind, issue.kind === "readiness" ? "Workspace preparation needs attention" : "Workspace image needs attention", issue.message, issue.message);
-  if (entry.imageOutdated && !warnings.some((warning) => warning.kind === "image")) add("image", "Workspace image is outdated", "This workspace was created with an older version of Atelier. Some newer features may require a new workspace.", "outdated");
+  if (entry.imageOutdated && !warnings.some((warning) => warning.kind === "image")) add("image", "Workspace image is outdated", "This workspace was created with an older version of AgentsInTheCloud. Some newer features may require a new workspace.", "outdated");
   return warnings;
 }

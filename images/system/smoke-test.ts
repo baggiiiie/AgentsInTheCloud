@@ -1,12 +1,12 @@
 // Protocol/lifecycle integration checks. Run against a disposable installed System
-// with atelier-test:{v1,v2,broken,retry} loaded into its inner Docker daemon.
+// with agents-in-the-cloud-test:{v1,v2,broken,retry} loaded into its inner Docker daemon.
 import { strict as assert } from "node:assert";
 import { parseArgs } from "node:util";
 import { command, sleep } from "./src/process.ts";
 const { values } = parseArgs({
   options: {
     host: { type: "string" },
-    container: { type: "string", default: "atelier-system" },
+    container: { type: "string", default: "agents-in-the-cloud-system" },
   },
 });
 const prefix = ["docker", ...(values.host ? ["--host", values.host] : [])];
@@ -51,26 +51,26 @@ async function healthy(version: string) {
   );
 }
 await until(async () => !(await status()).busy, "System idle");
-await update("atelier-test:v1");
+await update("agents-in-the-cloud-test:v1");
 await healthy("v1");
 const original = await api("/state", "GET", undefined, 3000);
 const workspace = await docker(
   "run",
   "-d",
   "--name",
-  "atelier-smoke-workspace",
+  "agents-in-the-cloud-smoke-workspace",
   "--mount",
-  "source=atelier-smoke-workspace,target=/data",
+  "source=agents-in-the-cloud-smoke-workspace,target=/data",
   "--entrypoint",
   "/bin/sh",
-  "atelier-test:v1",
+  "agents-in-the-cloud-test:v1",
   "-c",
   "echo preserved > /data/marker; exec sleep infinity",
 );
 const before = JSON.parse(await docker("inspect", workspace))[0];
 // Subscribe to the public protocol, not a browser/DOM. Operation continues once
 // the request that initiated it has finished, independently of this observer.
-await update("atelier-test:v2");
+await update("agents-in-the-cloud-test:v2");
 const events = exec(
   "bun",
   "-e",
@@ -99,13 +99,13 @@ const concurrent = JSON.parse(
   await exec(
     "bun",
     "-e",
-    'const send=()=>fetch("http://127.0.0.1:3001/update",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:"atelier-test:v2"})}).then(r=>r.status);console.log(JSON.stringify((await Promise.all([send(),send()])).sort()));',
+    'const send=()=>fetch("http://127.0.0.1:3001/update",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({image:"agents-in-the-cloud-test:v2"})}).then(r=>r.status);console.log(JSON.stringify((await Promise.all([send(),send()])).sort()));',
   ),
 );
 assert.deepEqual(concurrent, [202, 409]);
 await healthy("v2");
 console.log("PASS: concurrent app updates serialize");
-await update("atelier-test:broken");
+await update("agents-in-the-cloud-test:broken");
 await until(
   async () => !!(await status()).failure && !(await status()).busy,
   "broken startup timeout",
@@ -117,7 +117,7 @@ assert(
 );
 console.log("PASS: broken startup timeout and container logs");
 await exec("touch", "/data/app/fail-startup");
-await update("atelier-test:retry");
+await update("agents-in-the-cloud-test:retry");
 await until(
   async () => !!(await status()).failure && !(await status()).busy,
   "retry fixture failure",
@@ -134,12 +134,12 @@ assert.equal(
 );
 await healthy("retry");
 console.log("PASS: retry succeeds after correcting startup condition");
-await docker("kill", "atelier");
+await docker("kill", "agents-in-the-cloud");
 await until(
   async () => !(await status()).healthy && !!(await status()).failure,
   "running app failure",
 );
-await update("atelier-test:v2");
+await update("agents-in-the-cloud-test:v2");
 await healthy("v2");
 console.log("PASS: running app failure visible; restored v2 for manual review");
 const selected = (await status()).currentImage;

@@ -1,11 +1,12 @@
-import type { ToggleChangeEvent } from "@atelier/design-system/toggle/client";
-import { showTransientFeedback } from "@atelier/design-system/transient-feedback/client";
-import { copyTextToClipboard } from "@atelier/shared";
+import { ProjectSecretPathController } from "./project-secret-path-controller.ts";
+import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
+import { showTransientFeedback } from "@agents-in-the-cloud/design-system/transient-feedback/client";
+import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 
 /** Applies the server's theme setting, on page load and when the shell region pushes a change. */
-class AtelierThemeController extends Controller<HTMLElement> {
+class AgentsInTheCloudThemeController extends Controller<HTMLElement> {
   static values = { name: String };
   declare readonly nameValue: string;
 
@@ -13,7 +14,7 @@ class AtelierThemeController extends Controller<HTMLElement> {
     const root = document.documentElement;
     if (root.dataset.theme === this.nameValue) return;
     root.dataset.theme = this.nameValue;
-    document.dispatchEvent(new CustomEvent("atelier:theme-change", { detail: { theme: this.nameValue } }));
+    document.dispatchEvent(new CustomEvent("agents-in-the-cloud:theme-change", { detail: { theme: this.nameValue } }));
   }
 }
 
@@ -219,11 +220,12 @@ class SshPublicKeyCopyController extends Controller<HTMLElement> {
 
 export function registerWorkspaceSettingsControllers(): void {
   registerWorkspaceControllers({
-    "atelier-theme": AtelierThemeController,
+    "agents-in-the-cloud-theme": AgentsInTheCloudThemeController,
     "git-identity": GitIdentityController,
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
     "project-settings": ProjectSettingsController,
+    "project-secret-path": ProjectSecretPathController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,
   });

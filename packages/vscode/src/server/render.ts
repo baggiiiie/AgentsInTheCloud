@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { domId, escapeHtml, turboStream, type WorkspaceFileTarget } from "@atelier/shared";
+import { domId, escapeHtml, turboStream, type WorkspaceFileTarget } from "@agents-in-the-cloud/shared";
 
 export function vscodeViewKey(title: string): string {
   return `vscode:${title}`;
@@ -39,11 +39,11 @@ export function vscodeFileLocation(target: WorkspaceFileTarget): { file: string;
 export function vscodeFileNavigationStream(workspaceId: string, title: string, target: WorkspaceFileTarget, delivered: boolean): string {
   const { file, gotoLine } = vscodeFileLocation(target);
   const query = new URLSearchParams({
-    atelierOpenFile: file,
+    agentsInTheCloudOpenFile: file,
     // Repeated links must still navigate after the user switches files inside VS Code.
-    atelierNavigation: randomUUID(),
+    agentsInTheCloudNavigation: randomUUID(),
   });
-  if (gotoLine) query.set("atelierGotoLine", "1");
+  if (gotoLine) query.set("agentsInTheCloudGotoLine", "1");
   return turboStream("update", domId("vscode_navigation", workspaceId),
     `<span data-controller="vscode-navigate" data-vscode-navigate-pane-id-value="${domId("vscode_pane", workspaceId, title)}" data-vscode-navigate-path-value="${escapeHtml(`/?${query}`)}" data-vscode-navigate-delivered-value="${delivered}"></span>`);
 }

@@ -1,10 +1,10 @@
 import { reconcileAgentModelPreferences } from "./model-preferences.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { invalidArguments, type JsonObject } from "@atelier/core";
-import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@atelier/llm/server";
-import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@atelier/shared";
-import { listStagedAttachments } from "@atelier/prompt/server";
+import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
+import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
+import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@agents-in-the-cloud/shared";
+import { listStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { hasAvailableBuiltinAgentModel, resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { renderLaunchComposerSettings } from "./render-composer.ts";
 import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";
@@ -20,7 +20,6 @@ function stringParameter(parameters: JsonObject, name: string): string {
 }
 
 export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{ agent: AgentWorkspaceParameters } | undefined> {
-  const serviceTier = stringParameter(parameters, "serviceTier");
   const initialPromptMode = stringParameter(parameters, "initialPromptMode");
   if (initialPromptMode && initialPromptMode !== "composer") throw invalidArguments("agent.initialPromptMode must be composer");
   const agent: AgentWorkspaceParameters = {
@@ -30,7 +29,6 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
     attachmentDraft: stringParameter(parameters, "attachmentDraft"),
   };
   if (initialPromptMode) agent.initialPromptMode = "composer";
-  if (serviceTier) agent.serviceTier = serviceTier === "priority" ? "priority" : "default";
   if (!Object.values(agent).some(Boolean)) return undefined;
   if (!agent.initialPromptMode && (agent.initialPrompt || agent.attachmentDraft)) {
     const model = await resolveNewWorkspaceAgentModel(agent.model);
@@ -38,7 +36,6 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
       agent.initialPromptMode = "composer";
       agent.model = "";
       agent.thinkingLevel = "";
-      delete agent.serviceTier;
     } else if (agent.model) agent.model = modelRefValue(model);
   }
   return { agent };

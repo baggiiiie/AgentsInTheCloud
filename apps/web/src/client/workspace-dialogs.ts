@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
-import { createHtmlAutocompleteController, PromptHistoryNavigator } from "@atelier/agent/client";
-import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeProjectSpec } from "@atelier/shared";
+import { createHtmlAutocompleteController, PromptHistoryNavigator } from "@agents-in-the-cloud/agent/client";
+import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeProjectSpec } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { submitFormWithFirstButton } from "./form-submission.ts";
@@ -56,7 +56,7 @@ class SubmitShortcutController extends Controller {
   }
 }
 
-const launchComposerPromptHistoryStorageKey = "atelier:launch-composer-prompt-history";
+const launchComposerPromptHistoryStorageKey = "agents-in-the-cloud:launch-composer-prompt-history";
 const launchComposerPromptHistorySchema = Type.Array(Type.String());
 
 class LaunchComposerDialogController extends Controller<HTMLDialogElement> {

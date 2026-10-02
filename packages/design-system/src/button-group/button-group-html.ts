@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { attributesHtml } from "../html.ts";
 
 interface ButtonGroupBase {

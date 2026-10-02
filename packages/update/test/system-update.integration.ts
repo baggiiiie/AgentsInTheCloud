@@ -3,7 +3,7 @@
  * injected dependency is discovery of fixture releases instead of public GHCR.
  * No browser or UI assertions. Retains fixtures on failure for diagnosis.
  */
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -40,10 +40,10 @@ async function wait(description: string, check: () => Promise<boolean>, timeout 
   while (Date.now() < deadline) { if (await check()) return; await Bun.sleep(250); }
   throw new Error(`Timed out: ${description}`);
 }
-async function appId() { return docker("inspect", "atelier", "--format", "{{.Id}}"); }
-async function workspaceIds() { return (await docker("ps", "-aq", "--filter", "label=com.atelier.type=workspace")).split("\n").filter(Boolean).sort(); }
+async function appId() { return docker("inspect", "agents-in-the-cloud", "--format", "{{.Id}}"); }
+async function workspaceIds() { return (await docker("ps", "-aq", "--filter", "label=com.agents-in-the-cloud.type=workspace")).split("\n").filter(Boolean).sort(); }
 async function releaseDigest(tag: string) {
-  const response = await fetch(`http://${registry}/v2/atelier/manifests/${tag}`, { headers: { accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" } });
+  const response = await fetch(`http://${registry}/v2/agents-in-the-cloud/manifests/${tag}`, { headers: { accept: "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" } });
   assert(response.ok, `registry manifest ${tag}: ${response.status}`);
   const digest = response.headers.get("docker-content-digest");
   assert(digest && digest.startsWith("sha256:"));
@@ -52,15 +52,15 @@ async function releaseDigest(tag: string) {
 async function build(tag: string, dockerfile: string) {
   const file = `${directory}/${tag}.Dockerfile`;
   await writeFile(file, dockerfile);
-  await docker("build", "-f", file, "-t", `${registry}/atelier:${tag}`, directory);
-  await docker("push", `${registry}/atelier:${tag}`);
+  await docker("build", "-f", file, "-t", `${registry}/agents-in-the-cloud:${tag}`, directory);
+  await docker("push", `${registry}/agents-in-the-cloud:${tag}`);
 }
 function manager(digest: string) {
   return new UpdateManager({
     detectRuntime: async () => ({ currentDigest: `sha256:${"0".repeat(64)}` }),
     // Fixture registry supplies immutable manifests; preparation is the production code.
     fetchMetadata: async () => ({ digest }),
-    prepareUpdate: (reference, progress) => prepareUpdate(`${registry}/atelier@${reference.split("@")[1]}`, progress),
+    prepareUpdate: (reference, progress) => prepareUpdate(`${registry}/agents-in-the-cloud@${reference.split("@")[1]}`, progress),
     readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel,
     setInterval: () => {},
   });
@@ -72,9 +72,9 @@ function testContext() {
     sidebar,
     broadcasts,
     ctx: {
-      events: createAtelierEventBus(),
+      events: createAgentsInTheCloudEventBus(),
       registry: { setAgentBusy: () => {}, requestSurfaceAttention: () => undefined, requestAttention: () => undefined },
-      globalSidebarContributions: { set: (_id: string, html?: string, regions?: readonly import("@atelier/shared").LiveRegion[]) => {
+      globalSidebarContributions: { set: (_id: string, html?: string, regions?: readonly import("@agents-in-the-cloud/shared").LiveRegion[]) => {
         sidebar.push(html ?? "");
         broadcasts.push(regions?.map(region => region.html).join("") ?? "");
       } },
@@ -102,14 +102,14 @@ async function restored(previousAppId: string) {
 
 await wait("initial app healthy", async () => { const status = await statusSnapshot(); return status.healthy && !status.busy; });
 await mkdir(directory);
-const initialImage = await docker("inspect", "atelier", "--format", "{{.Image}}");
+const initialImage = await docker("inspect", "agents-in-the-cloud", "--format", "{{.Image}}");
 const initialApp = await appId();
 const beforeWorkspaces = await workspaceIds();
 assert(beforeWorkspaces.length > 0, "keep at least one workspace running to verify updates preserve it");
 const previousChannel = await readFile("/data/app/update.json", "utf8").catch((error) => { if (error.code === "ENOENT") return undefined; throw error; });
 try {
   // A transient runtime outage must recover the same container, not replace it.
-  await docker("pause", "atelier");
+  await docker("pause", "agents-in-the-cloud");
   try {
     await wait("runtime health failure", async () => {
       const status = await statusSnapshot();
@@ -119,7 +119,7 @@ try {
     assert.equal((await statusSnapshot()).healthy, false, "recheck preserves an unhealthy app");
     assert.equal(await appId(), initialApp, "recheck must not replace the app");
   } finally {
-    await docker("unpause", "atelier");
+    await docker("unpause", "agents-in-the-cloud");
   }
   await wait("automatic health recovery", async () => {
     const status = await statusSnapshot();
@@ -133,7 +133,7 @@ try {
   await wait("fixture registry", async () => { try { return (await fetch(`http://${registry}/v2/`)).ok; } catch { return false; } });
   const base = `${name}-base:local`;
   await docker("tag", initialImage, base);
-  const dependency = `${registry}/atelier:${name}-dependency`;
+  const dependency = `${registry}/agents-in-the-cloud:${name}-dependency`;
   const label = JSON.stringify(JSON.stringify([dependency]));
   await build(`${name}-good`, `FROM ${base}\nLABEL eagerly-preload=${label}\n`);
   const goodDigest = await releaseDigest(`${name}-good`);
@@ -144,7 +144,7 @@ try {
   assert.equal(await appId(), initialApp, "preparation failure leaves old app running");
   assert((await statusSnapshot()).healthy);
   log.push("Preparation failure retained healthy old app");
-  await build(`${name}-dependency`, `FROM ${base}\nLABEL atelier.update-test-dependency=${name}\n`);
+  await build(`${name}-dependency`, `FROM ${base}\nLABEL agents-in-the-cloud.update-test-dependency=${name}\n`);
   await good.startPull();
   assert.equal(good.snapshot().state, "ready_to_restart", "dependency retry prepares candidate");
   await good.setReleaseChannel("latest");
@@ -174,7 +174,7 @@ try {
   assert.equal(failed.healthy, false);
   assert(failed.logs.some((line) => line.includes("deliberately unhealthy")), "supervisor retains candidate logs");
   assert.deepEqual(await workspaceIds(), beforeWorkspaces);
-  await writeFile(marker, "retry should now start real Atelier");
+  await writeFile(marker, "retry should now start real AgentsInTheCloud");
   const failedApp = await appId();
   assert.notEqual(failedApp, healthyApp);
   await supervisor("/retry", {});

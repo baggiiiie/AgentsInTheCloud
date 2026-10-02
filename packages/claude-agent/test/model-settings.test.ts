@@ -5,14 +5,14 @@ import { join } from "node:path";
 async function scenario(script: string) {
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
-    const llm = await import("@atelier/llm/server");
+    const llm = await import("@agents-in-the-cloud/llm/server");
     const favorites = [
       { provider: "openai-codex", id: "codex", label: "Codex" },
       { provider: "anthropic", id: "first", label: "First" },
       { provider: "anthropic", id: "second", label: "Second" },
       { provider: "anthropic", id: "unavailable", label: "Unavailable" },
     ];
-    mock.module("@atelier/llm/server", () => ({ ...llm,
+    mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
       getConfiguredModels: async () => favorites,
       createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
       modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high", "xhigh"],

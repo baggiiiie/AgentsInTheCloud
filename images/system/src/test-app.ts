@@ -17,7 +17,7 @@ if (!(await Bun.file(markerFile).exists()))
 const marker = await readFile(markerFile, "utf8");
 const started = Date.now();
 console.log(
-  `Starting Atelier test app ${version}; mode=${mode}; persisted=${marker}`,
+  `Starting AgentsInTheCloud test app ${version}; mode=${mode}; persisted=${marker}`,
 );
 if (mode === "broken")
   console.error("TEST_STARTUP_FAILURE: deliberately unhealthy fixture");
@@ -69,8 +69,8 @@ Bun.serve({
     }
     return new Response(
       page(
-        `Atelier test app ${version}`,
-        `<h1>Atelier test app ${escapeHtml(version)}</h1><p>Persistent marker: ${escapeHtml(marker)}</p><form method="post" action="/update"><label>Prepared image <input class="text-field" name="image" required value="atelier-test:v2"></label>${button("Update")}</form>`,
+        `AgentsInTheCloud test app ${version}`,
+        `<h1>AgentsInTheCloud test app ${escapeHtml(version)}</h1><p>Persistent marker: ${escapeHtml(marker)}</p><form method="post" action="/update"><label>Prepared image <input class="text-field" name="image" required value="agents-in-the-cloud-test:v2"></label>${button("Update")}</form>`,
       ),
       { headers: { "content-type": "text/html" } },
     );

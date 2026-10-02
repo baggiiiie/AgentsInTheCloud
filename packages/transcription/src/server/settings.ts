@@ -1,4 +1,4 @@
-import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution } from "@atelier/shared";
+import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution } from "@agents-in-the-cloud/shared";
 import { isTranscriptionModelId, readTranscriptionModel, transcriptionModels, writeTranscriptionModel } from "./models.ts";
 import { stopTranscriptionServer } from "./realtime.ts";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/browser",
+  "name": "@agents-in-the-cloud/browser",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,12 +8,13 @@
     "./client": "./src/client/index.ts"
   },
   "dependencies": {
-    "@atelier/agent": "workspace:*",
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/proxy-ingress": "workspace:*",
+    "@agents-in-the-cloud/agent": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/proxy-ingress": "workspace:*",
+    "qrcode-generator": "2.0.4",
     "typebox": "^1.0.57",
-    "@atelier/workspace": "workspace:*"
+    "@agents-in-the-cloud/workspace": "workspace:*"
   }
 }

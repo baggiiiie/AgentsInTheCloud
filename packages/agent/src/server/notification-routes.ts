@@ -1,9 +1,9 @@
-import { requestAcceptsJson } from "@atelier/core";
+import { requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { turboStream, turboStreamResponse } from "@atelier/shared";
+import { turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { notificationFeedbackId, notificationFrameId, renderNotificationControl, renderNotificationFeedback } from "./render-notification.ts";
-import { matchRoute, requireAgentRuntime, type AgentRouteHandler } from "./route-support.ts";
+import { matchRoute, requireAgentPresentation, type AgentRouteHandler } from "./route-support.ts";
 import { currentNotificationTurn, setTurnNotification } from "./turn-notifications.ts";
 import { parsePushSubscription, pushPublicKey } from "./web-push.ts";
 
@@ -16,7 +16,7 @@ export const handleNotificationRequest: AgentRouteHandler = async (request, url,
   const params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/notification$/);
   if (!params || !["GET", "POST"].includes(request.method)) return undefined;
   const ctx = { workspaceId: params[0], conversationId: params[1] };
-  const runtime = await requireAgentRuntime(ctx.workspaceId, ctx.conversationId, options);
+  const runtime = await requireAgentPresentation(ctx.workspaceId, ctx.conversationId, options);
   const state = () => {
     const turn = currentNotificationTurn(ctx);
     return { turnId: turn?.id ?? null, busy: runtime.isStreaming, armed: turn?.armed ?? false };

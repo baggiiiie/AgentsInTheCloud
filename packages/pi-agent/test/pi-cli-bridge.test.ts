@@ -8,6 +8,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { stream as streamOpenAIResponses } from "@earendil-works/pi-ai/api/openai-responses";
 import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
+import { createHttpHooks } from "../../proxy-egress/src/secrets/placeholder-hooks.ts";
 import { createPiCliConfiguration, createPiCliCredentialTransform, piCliCredentialHosts, piCliModelUnavailableReason } from "../src/server/pi-cli-bridge.ts";
 
 function model(provider: string, api: Api = "openai-completions", baseUrl = `https://${provider}.example/v1`): Model<Api> {
@@ -61,7 +62,7 @@ test("resolves fresh credentials on each request and works with a newly created 
   const headers = { Authorization: `Bearer ${config.auth.custom!.key}`, ...config.models.providers.custom!.models[0]!.headers };
   for (const version of ["first", "refreshed"]) {
     runtime.auth.custom = { auth: { apiKey: `${version}-key`, headers: { "x-key": `${version}-header` } } };
-    const transform = createPiCliCredentialTransform(async () => runtime);
+    const transform = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest;
     const request = await transform(new Request("https://custom.example/v1/chat/completions", { method: "POST", headers, body: '{"messages":[]}' }));
     expect(request.headers.get("authorization")).toBe(`Bearer ${version}-key`);
     expect(request.headers.get("x-key")).toBe(`${version}-header`);
@@ -75,7 +76,7 @@ test("Codex receives a real access token and account header while the CLI gets o
   const key = config.auth["openai-codex"]!.key;
   const claims = JSON.parse(Buffer.from(key.split(".")[1]!, "base64url").toString());
   runtime.auth["openai-codex"]!.auth.apiKey = jwt("account-two");
-  const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://chatgpt.com/backend-api/codex/responses", { headers: { authorization: `Bearer ${key}`, "chatgpt-account-id": claims["https://api.openai.com/auth"].chatgpt_account_id } }));
+  const request = await createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest(new Request("https://chatgpt.com/backend-api/codex/responses", { headers: { authorization: `Bearer ${key}`, "chatgpt-account-id": claims["https://api.openai.com/auth"].chatgpt_account_id } }));
   expect(request.headers.get("authorization")).toBe(`Bearer ${jwt("account-two")}`);
   expect(request.headers.get("chatgpt-account-id")).toBe("account-two");
 });
@@ -99,7 +100,7 @@ test("OpenAI placeholders keep the shape Pi uses to tell API keys from Sign in w
     const key = (await createPiCliConfiguration(runtime, [])).auth.openai!.key;
     expect(key).not.toContain(secret);
     expect(await cliRequestOmitsMaxOutputTokens(key)).toBe(subscription);
-    const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://api.openai.com/v1/responses", { headers: { authorization: `Bearer ${key}` } }));
+    const request = await createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest(new Request("https://api.openai.com/v1/responses", { headers: { authorization: `Bearer ${key}` } }));
     expect(request.headers.get("authorization")).toBe(`Bearer ${secret}`);
   }
 });
@@ -109,7 +110,7 @@ test("exports Anthropic API keys but refuses Claude subscription tokens, includi
   const runtime = fixture([anthropic], { anthropic: { auth: { apiKey: "sk-ant-api03-secret" } } });
   expect(await piCliModelUnavailableReason(runtime, anthropic)).toBeUndefined();
   const config = await createPiCliConfiguration(runtime, []);
-  const transform = createPiCliCredentialTransform(async () => runtime);
+  const transform = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest;
   const request = () => new Request("https://api.anthropic.com/v1/messages", { headers: { "x-api-key": config.auth.anthropic!.key } });
   expect((await transform(request())).headers.get("x-api-key")).toBe("sk-ant-api03-secret");
 
@@ -122,20 +123,20 @@ test("exports Anthropic API keys but refuses Claude subscription tokens, includi
 test("rejects foreign hosts, changed endpoints, disconnected providers and malformed markers", async () => {
   const runtime = fixture([model("custom")], { custom: { auth: { apiKey: "secret" } } });
   const config = await createPiCliConfiguration(runtime, []);
-  const transform = createPiCliCredentialTransform(async () => runtime);
+  const transform = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest;
   const request = (url: string) => new Request(url, { headers: { authorization: `Bearer ${config.auth.custom!.key}` } });
   for (const url of ["https://attacker.example/", "http://custom.example/", "https://custom.example:444/"]) await expect(transform(request(url))).rejects.toThrow("not allowed");
   runtime.models[0]!.baseUrl = "https://changed.example/v1";
   await expect(transform(request("https://custom.example/v1"))).rejects.toThrow("not allowed");
   delete runtime.auth.custom;
   await expect(transform(request("https://changed.example/v1"))).rejects.toThrow("no longer connected");
-  await expect(transform(new Request("https://custom.example/", { headers: { authorization: "atelier-pi-e30-end" } }))).rejects.toThrow("Invalid Pi credential placeholder");
+  await expect(transform(new Request("https://custom.example/", { headers: { authorization: "agents-in-the-cloud-pi-e30-end" } }))).rejects.toThrow("Invalid Pi credential placeholder");
 });
 
 test("supports query API keys without changing unrelated query semantics", async () => {
   const runtime = fixture([model("google", "google-generative-ai", "https://generativelanguage.googleapis.com/v1beta")], { google: { auth: { apiKey: "secret+/=&" } } });
   const config = await createPiCliConfiguration(runtime, []);
-  const transform = createPiCliCredentialTransform(async () => runtime);
+  const transform = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest;
   const request = await transform(new Request(`https://generativelanguage.googleapis.com/v1beta/models?key=${config.auth.google!.key}&alt=sse`));
   expect(new URL(request.url).searchParams.get("key")).toBe("secret+/=&");
   expect(new URL(request.url).searchParams.get("alt")).toBe("sse");
@@ -150,7 +151,7 @@ test("materializes Cloudflare endpoint parameters and header-only credentials wi
   const exported = config.models.providers["cloudflare-ai-gateway"]!.models[0]!;
   expect(exported.baseUrl).toBe("https://gateway.ai.cloudflare.com/v1/account/gateway/compat");
   expect(JSON.stringify(config)).not.toContain("cf-secret");
-  const request = await createPiCliCredentialTransform(async () => runtime)(new Request(`${exported.baseUrl}/chat/completions`, { headers: exported.headers }));
+  const request = await createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest(new Request(`${exported.baseUrl}/chat/completions`, { headers: exported.headers }));
   expect(request.headers.get("cf-aig-authorization")).toBe("Bearer cf-secret");
   expect(request.headers.has("authorization")).toBe(false);
   expect(request.headers.has("x-api-key")).toBe(false);
@@ -165,7 +166,7 @@ test("refuses host-only credential chains, but supports Bedrock bearer tokens an
   runtime.auth["google-vertex"] = { auth: { apiKey: "vertex-key" } };
   const config = await createPiCliConfiguration(runtime, []);
   expect(config.models.providers["google-vertex"]!.models[0]!.baseUrl).toBe("https://aiplatform.googleapis.com");
-  const request = await createPiCliCredentialTransform(async () => runtime)(new Request("https://aiplatform.googleapis.com/v1/publishers/google/models/model:streamGenerateContent", { headers: { "x-goog-api-key": config.auth["google-vertex"]!.key } }));
+  const request = await createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks.onRequest(new Request("https://aiplatform.googleapis.com/v1/publishers/google/models/model:streamGenerateContent", { headers: { "x-goog-api-key": config.auth["google-vertex"]!.key } }));
   expect(request.headers.get("x-goog-api-key")).toBe("vertex-key");
 });
 
@@ -187,4 +188,42 @@ test("credential bridge intercepts current model hosts and authentication endpoi
   expect(await piCliCredentialHosts(runtime)).toEqual(["chatgpt.com", "custom.example"]);
   runtime.auth.openai = { auth: { apiKey: "sk-secret" } };
   expect(await piCliCredentialHosts(runtime)).toEqual(["api.openai.com", "custom.example"]);
+});
+
+test("bridge credentials are scrubbed from reflected headers and queries, including after refresh", async () => {
+  const runtime = fixture([model("custom")], { custom: { auth: { apiKey: "first-key+/=", headers: { "x-key": "first-header" } } } });
+  const config = await createPiCliConfiguration(runtime, []);
+  const hooks = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks;
+  const request = () => new Request(`https://custom.example/v1?key=${config.auth.custom!.key}`, {
+    headers: { authorization: `Bearer ${config.auth.custom!.key}`, ...config.models.providers.custom!.models[0]!.headers },
+  });
+  const first = await hooks.onRequest(request());
+  runtime.auth.custom = { auth: { apiKey: "refreshed-key+/=", headers: { "x-key": "refreshed-header" } } };
+  const second = await hooks.onRequest(request());
+  for (const outbound of [second, first]) {
+    expect(hooks.scrubResponseHeader(outbound.url, outbound)).toBe("https://custom.example/v1?key=[REDACTED]");
+    expect(hooks.scrubResponseHeader(outbound.headers.get("authorization")!, outbound)).toBe("Bearer [REDACTED]");
+    expect(hooks.scrubResponseHeader(outbound.headers.get("x-key")!, outbound)).toBe("[REDACTED]");
+  }
+});
+
+test("Pi cannot bypass path permissions by putting a bridge placeholder into a URL path", async () => {
+  const runtime = fixture([model("custom")], { custom: { auth: { apiKey: "private-key" } } });
+  const config = await createPiCliConfiguration(runtime, []);
+  const hooks = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks;
+  await expect(hooks.onRequest(new Request(`https://custom.example/v1/${config.auth.custom!.key}`))).rejects.toThrow("cannot be injected into URL paths");
+  // Disallowed path use also fails when a legitimate header accompanies it.
+  await expect(hooks.onRequest(new Request(`https://custom.example/v1/${config.auth.custom!.key}`, {
+    headers: { authorization: `Bearer ${config.auth.custom!.key}` },
+  }))).rejects.toThrow("cannot be injected into URL paths");
+});
+
+test("bridge-supplied Basic authentication protects the encoded credential as well as the complete header", async () => {
+  const encoded = Buffer.from("user:bridge-password").toString("base64");
+  const runtime = fixture([model("custom")], { custom: { auth: { headers: { authorization: `Basic ${encoded}` } } } });
+  const config = await createPiCliConfiguration(runtime, []);
+  const hooks = createHttpHooks({ onRequest: createPiCliCredentialTransform(async () => runtime) }).httpHooks;
+  const outbound = await hooks.onRequest(new Request("https://custom.example/v1", { headers: config.models.providers.custom!.models[0]!.headers }));
+  expect(hooks.scrubResponseHeader(outbound.headers.get("authorization")!, outbound)).toBe("[REDACTED]");
+  expect(hooks.scrubResponseHeader(encoded, outbound)).toBe("[REDACTED]");
 });

@@ -1,6 +1,6 @@
-# Atelier
+# AgentsInTheCloud
 
-Atelier is a workspace interface for collaborating with coding agents while inspecting and operating on the work they produce.
+AgentsInTheCloud is a workspace interface for collaborating with coding agents while inspecting and operating on the work they produce.
 
 ## Language
 
@@ -68,20 +68,20 @@ _Avoid_: Permanent view, special view
 A top-level phone navigation target for the Workspace pane, an open Agent conversation, or a Work view configured for direct mobile access. Every open Agent conversation is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.
 _Avoid_: Mobile tab, mobile Work pane
 
-**Atelier bar**:
-The phone-only bottom navigation bar for controls whose scope is Atelier rather than the selected Workspace. It is visible while the Workspace pane is visible, occupies the full bottom edge, and replaces the Workspace bar. When hidden, only the Workspace pane button remains visible at the bottom-left.
+**AgentsInTheCloud bar**:
+The phone-only bottom navigation bar for controls whose scope is AgentsInTheCloud rather than the selected Workspace. It is visible while the Workspace pane is visible, occupies the full bottom edge, and replaces the Workspace bar. When hidden, only the Workspace pane button remains visible at the bottom-left.
 _Avoid_: Application bar, global bar, Workspace pane bar
 
 **Workspace pane button**:
-The phone control that remains at the bottom-left while the Atelier bar is hidden. Activating it opens the Workspace pane and reveals the Atelier bar.
-_Avoid_: Atelier button, open button
+The phone control that remains at the bottom-left while the AgentsInTheCloud bar is hidden. Activating it opens the Workspace pane and reveals the AgentsInTheCloud bar.
+_Avoid_: AgentsInTheCloud button, open button
 
 **Workspace bar**:
-The phone-only bottom navigation bar containing Mobile destinations within the selected Workspace, such as Agents, Browser, Review, and More. It is visible while the Workspace pane is hidden and is replaced by the Atelier bar when the Workspace pane opens.
+The phone-only bottom navigation bar containing Mobile destinations within the selected Workspace, such as Agents, Browser, Review, and More. It is visible while the Workspace pane is hidden and is replaced by the AgentsInTheCloud bar when the Workspace pane opens.
 _Avoid_: Current Workspace toolbar, resident bar
 
 **Next attention**:
-An Atelier navigation action that opens the Workspace that has been requesting attention longest, regardless of whether it is busy or preloaded.
+An AgentsInTheCloud navigation action that opens the Workspace that has been requesting attention longest, regardless of whether it is busy or preloaded.
 _Avoid_: Next unread, next Agent
 
 **More**:

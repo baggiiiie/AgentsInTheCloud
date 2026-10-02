@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getAtelierRuntimeContext, shellQuote } from "@atelier/core";
-import { execWorkspaceShell } from "@atelier/workspace";
-import type { WorkspaceAgentInput } from "@atelier/shared";
+import { getAgentsInTheCloudRuntimeContext, shellQuote } from "@agents-in-the-cloud/core";
+import { execWorkspaceShell } from "@agents-in-the-cloud/workspace";
+import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 type ImageRef = WorkspaceAgentInput["images"][number];
 
 export interface ImageMimeTypeRegistry {
@@ -39,7 +39,7 @@ export function extensionOf(path: string): string {
 }
 
 export function attachmentDraftsDir(): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "agent-attachment-drafts");
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "agent-attachment-drafts");
 }
 
 export function attachmentDraftDir(draftId: string): string {
@@ -152,7 +152,7 @@ export async function deliverAttachmentDraft(workspaceId: string, draftId: strin
 }
 
 async function deliverFileAttachment(workspaceId: string, staged: StagedAttachment): Promise<string> {
-  const target = `/tmp/atelier-attachments/${staged.name}`;
+  const target = `/tmp/agents-in-the-cloud-attachments/${staged.name}`;
   await copyAttachmentIntoWorkspace(workspaceId, staged, target);
   return `[Attached file copied into the workspace at ${target}]`;
 }

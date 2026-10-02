@@ -1,4 +1,4 @@
-import { progressButtonHtml } from "@atelier/design-system/progress-button";
+import { progressButtonHtml } from "@agents-in-the-cloud/design-system/progress-button";
 
 export const transcriptionComposerController = "transcription-composer";
 

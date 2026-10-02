@@ -1,8 +1,8 @@
-import { AtelierCoreError } from "@atelier/core";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 export const anthropicSubscriptionNotice = {
-  title: "You can use your Anthropic subscription in Atelier.",
+  title: "You can use your Anthropic subscription in AgentsInTheCloud.",
   message: "Make sure to select Claude Code as agent. Anthropic does not allow you to use our other agents with their subscription.",
 };
 /** Short form for pickers and errors where a model cannot use the subscription. */
@@ -16,6 +16,6 @@ export async function usesProviderSubscription(runtime: Pick<ModelRuntime, "list
 /** Subscription CLI agents cannot run on an API key; send the user to that provider's subscription setup. */
 export async function requireProviderSubscription(runtime: Pick<ModelRuntime, "listCredentials">, provider: string, agentLabel: string): Promise<void> {
   if (!await usesProviderSubscription(runtime, provider)) {
-    throw new AtelierCoreError("agent_setup_required", `Connect a ${agentLabel} subscription before creating a ${agentLabel} agent.`, { setupUrl: `/settings/models/step?provider=${provider}` });
+    throw new AgentsInTheCloudCoreError("agent_setup_required", `Connect a ${agentLabel} subscription before creating a ${agentLabel} agent.`, { setupUrl: `/settings/models/step?provider=${provider}` });
   }
 }

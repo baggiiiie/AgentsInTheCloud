@@ -3,7 +3,6 @@ export {
   createNextWorkspaceAgentConversation,
   ensureDefaultWorkspaceAgentConversation,
   listWorkspaceAgentConversations,
-  parseWorkspaceAgentFilename,
   publishSessionSnapshot,
   sessionShareDir,
   workspaceSessionShareKey,
@@ -14,13 +13,13 @@ export {
   type WorkspaceAgentConversationInfo,
 } from "./session-store.ts";
 export {
-  getWorkspaceAgentRuntime,
-  unloadWorkspaceAgentRuntime,
+  getWorkspaceAgentPresentation,
+  getWorkspaceAgentController,
+  unloadWorkspaceAgentPresentation,
   closeWorkspaceAgentConversation,
   removeWorkspaceAgentRuntimes,
   subscribeWorkspaceAgentBusy,
   type AgentLivePresentationSubscription,
-  type WorkspaceAgentRuntime,
 } from "./runtime.ts";
 export { registerAgentEvents } from "./agent-events.ts";
 export { suggestSessionSlug } from "./agent-title-suggestion.ts";
@@ -33,10 +32,9 @@ export { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
 export { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
 export { expandPromptTemplate } from "./prompt-templates.ts";
 export { runAgentSessionNameCommand } from "./session-name-command.ts";
-export { agentWorkspaceModule, agentWorkspaceModule as atelierServerModule, workspaceAgentTabProvider } from "./web.ts";
+export { agentWorkspaceModule, agentWorkspaceModule as agentsInTheCloudServerModule, workspaceAgentTabProvider } from "./web.ts";
 export {
   createDeleteCurrentWorkspaceTool,
-  createWorkspaceAgentTools,
   normalizeWorkspacePath,
   registerWorkspaceAgentTool,
   registerWorkspacePresenter,
@@ -49,7 +47,7 @@ export { ids, type AgentRenderContext } from "./render-context.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
 export { statusHtml } from "./render-tool.ts";
 export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
-export { type AgentRouteHandler, requireAgentRuntime } from "./route-support.ts";
+export { type AgentRouteHandler, requireAgentPresentation } from "./route-support.ts";
 export { type AgentTranscriptSnapshot, type AgentTranscriptAddition, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
 
 export { configureOnboardingTools, createOnboardingTools, type OnboardingToolDependencies, type SecretValueRequest } from "./onboarding-tools.ts";

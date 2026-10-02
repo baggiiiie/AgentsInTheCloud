@@ -1,5 +1,5 @@
 import { expect, test, spyOn } from "bun:test";
-import { createWorkspaceProvisioning } from "@atelier/workspace";
+import { createWorkspaceProvisioning } from "@agents-in-the-cloud/workspace";
 import { recoverWorkspaces } from "../src/server/workspace-recovery.ts";
 import { createWorkspaceRegistry } from "../src/server/workspace-registry.ts";
 
@@ -139,4 +139,27 @@ test("failure to retain a parked container leaves a non-busy provisioning failur
     await recoverWorkspaces(registry, { ...healthy, provisioning, async setRunning() { throw new Error("Cannot stop container"); } });
     expect(registry.get("parked")).toMatchObject({ parked: false, requestingAttention: true, phase: { kind: "provisioningPhase", status: "failed", busy: false, error: "Cannot stop container" } });
   } finally { log.mockRestore(); }
+});
+
+
+test("runtime restoration waits for readiness and completes before the workspace is usable", async () => {
+  const registry = createWorkspaceRegistry();
+  const provisioning = createWorkspaceProvisioning();
+  await registry.seed([{ id: "active", title: null }, { id: "parked", title: null, parked: true }]);
+  const readiness = Promise.withResolvers<void>();
+  const restored = Promise.withResolvers<void>();
+  const calls: string[] = [];
+  const recovery = recoverWorkspaces(registry, { ...healthy, provisioning,
+    checkReadiness: () => readiness.promise,
+    async runtimeReady(id) { calls.push(id); await restored.promise; },
+  });
+  await tick();
+  expect(calls).toEqual([]);
+  readiness.resolve();
+  await tick();
+  expect(calls).toEqual(["active"]);
+  expect(registry.get("active")?.phase.kind).toBe("provisioningPhase");
+  restored.resolve();
+  await recovery;
+  expect(registry.get("active")?.phase.kind).toBe("runningPhase");
 });

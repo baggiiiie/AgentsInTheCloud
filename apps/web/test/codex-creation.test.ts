@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { createTestApp, postJson, temporaryAtelierDataDir } from "./support/test-web-app.ts";
+import { createTestApp, postJson, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 import { defaultAgentProvider } from "../src/server/agent-providers.ts";
 
-const data = temporaryAtelierDataDir();
+const data = temporaryAgentsInTheCloudDataDir();
 beforeEach(data.setUp);
 afterEach(data.tearDown);
 

@@ -7,6 +7,7 @@ declare module "@novnc/novnc" {
     showDotCursor: boolean;
     qualityLevel: number;
     compressionLevel: number;
+    clipboardPasteFrom(text: string): void;
     disconnect(): void;
   }
 }

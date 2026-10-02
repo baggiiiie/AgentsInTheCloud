@@ -18,7 +18,7 @@ const tailscaleStatusSchema = Type.Object({
 });
 
 async function main(args: string[]): Promise<void> {
-  if (process.getuid?.() !== 0) throw new Error("atelier-tailscale-serve-helper must run as root");
+  if (process.getuid?.() !== 0) throw new Error("agents-in-the-cloud-tailscale-serve-helper must run as root");
 
   const [command, hostArg, ...portArgs] = args;
   if (!command || !hostArg) usage();
@@ -65,7 +65,7 @@ async function requireLocalTailscaleHost(host: string): Promise<void> {
 }
 
 function usage(): never {
-  throw new Error("usage: atelier-tailscale-serve-helper ensure|release <host> <port>");
+  throw new Error("usage: agents-in-the-cloud-tailscale-serve-helper ensure|release <host> <port>");
 }
 
 main(process.argv.slice(2)).catch((error) => {

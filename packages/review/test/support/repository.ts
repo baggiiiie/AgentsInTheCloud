@@ -9,7 +9,7 @@ export async function command(root: string, ...args: string[]): Promise<void> {
 }
 
 export async function createReviewRepository(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "atelier-review-"));
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-"));
   await command(root, "git", "init", "-q");
   await command(root, "git", "config", "user.email", "review@example.test");
   await command(root, "git", "config", "user.name", "Review Test");

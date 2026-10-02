@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { getAtelierRuntimeContext } from "./runtime-context.ts";
+import { getAgentsInTheCloudRuntimeContext } from "./runtime-context.ts";
 
 // Submodule URLs are repository-controlled, so never offer the GitHub token to another host.
 export const gitHubCredentialHelperShellBody = `test "$1" = get || exit 0
@@ -21,11 +21,11 @@ echo password="$GH_TOKEN"`;
 export const gitHubCredentialHelperCommand = `!f() { ${gitHubCredentialHelperShellBody}; }; f`;
 
 function storedGitHubTokenPath(): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspace", "github-token");
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspace", "github-token");
 }
 
 function disabledHostGitHubTokenPath(): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspace", "github-token-disabled");
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspace", "github-token-disabled");
 }
 
 export function discoverHostGitHubToken(): string | undefined {

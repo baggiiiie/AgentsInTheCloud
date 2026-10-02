@@ -1,15 +1,15 @@
 {
-  "name": "@atelier/markdown",
+  "name": "@agents-in-the-cloud/markdown",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@atelier/shared": "workspace:*",
-    "@atelier/syntax": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/syntax": "workspace:*",
     "markdown-it": "14.3.0",
-    "@atelier/design-system": "workspace:*"
+    "@agents-in-the-cloud/design-system": "workspace:*"
   },
   "devDependencies": {
     "@types/markdown-it": "14.1.2"

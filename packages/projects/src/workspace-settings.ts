@@ -1,7 +1,8 @@
 import { validateProjectEnvironmentName } from "./environment.ts";
 import { projectSecretPlaceholder } from "./secrets.ts";
+import { projectSecretAllowsPath } from "./secret-path-policy.ts";
 import { createHash, randomUUID } from "node:crypto";
-import { AtelierCoreError, invalidArguments } from "@atelier/core";
+import { AgentsInTheCloudCoreError, invalidArguments } from "@agents-in-the-cloud/core";
 import { Value } from "typebox/value";
 import { findProjectRecord, validateProjectDockerfile, validateProjectPreloadImage, projectWorkspaceInit, projectConfigurationFingerprint, projectWorkspaceSettingsSchema, projectsFile, readProjectStore, updateProjectStore, type GitProjectInitInstruction, type ProjectRecord, type ProjectWorkspaceSettings } from "./project.ts";
 
@@ -23,7 +24,7 @@ export function validateProjectWorkspaceSettings(settings: ProjectWorkspaceSetti
 }
 
 function checkRevision(project: ProjectRecord, expectedRevision: string): void {
-  if (settingsRevision(project) !== expectedRevision) throw new AtelierCoreError("project_settings_conflict", "Project configuration changed. Read project settings again before continuing.");
+  if (settingsRevision(project) !== expectedRevision) throw new AgentsInTheCloudCoreError("project_settings_conflict", "Project configuration changed. Read project settings again before continuing.");
 }
 
 function assertNoSecretEnvironment(project: ProjectRecord, settings: ProjectWorkspaceSettings): void {
@@ -49,8 +50,8 @@ export async function readProjectWorkspaceSettings(projectId: string, file = pro
   return {
     project: { id: project.id, name: project.name, gitUrl: project.gitUrl, branch: project.branch },
     ...settingsResult(project),
-    secrets: (project.secrets ?? []).map(({ envName, hostPattern, placeholder, encryptedSecret }) => ({
-      envName, hostPattern, placeholder: placeholder ?? projectSecretPlaceholder(envName), configured: !!encryptedSecret,
+    secrets: (project.secrets ?? []).map(({ envName, hostPattern, placeholder, allowInPath, encryptedSecret }) => ({
+      envName, hostPattern, placeholder: placeholder ?? projectSecretPlaceholder(envName), configured: !!encryptedSecret, allowInPath: projectSecretAllowsPath({ hostPattern, allowInPath }),
     })),
   };
 }

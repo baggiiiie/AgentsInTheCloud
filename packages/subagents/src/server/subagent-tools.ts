@@ -1,12 +1,12 @@
 import { defineTool } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "typebox";
-import type { AtelierEventBus } from "@atelier/core";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { getSubagents, rootAgentStatus } from "./subagents.ts";
 import { agentPath, codexStatus, parseForkTurns } from "./subagent-protocol.ts";
 import { codexSubagentDescriptions } from "./codex-subagent-descriptions.ts";
 
 export const subagentToolNames = ["spawn_agent", "send_message", "followup_task", "interrupt_agent", "list_agents", "wait_agent"];
-export function createSubagentTools(workspaceId: string, caller: string, events?: AtelierEventBus) {
+export function createSubagentTools(workspaceId: string, caller: string, events?: AgentsInTheCloudEventBus) {
   const runtime = () => getSubagents(workspaceId, events);
   const tool = (name: keyof typeof codexSubagentDescriptions, parameters: TSchema, execute: (params: any, signal?: AbortSignal, callId?: string) => Promise<object | string>) => defineTool({
     name, label: name.replaceAll("_", " "), description: codexSubagentDescriptions[name], parameters,

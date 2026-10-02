@@ -3,22 +3,33 @@ import { SubscriptionUsageError, type SubscriptionUsage } from "./subscription-u
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { usageWindowTiming, type PacedUsageWindow } from "./usage-window.ts";
 import { fetchCodexSubscriptionUsage } from "./codex-subscription-usage.ts";
+import { fetchXaiSubscriptionUsage } from "./xai-subscription-usage.ts";
+import { fetchRadiusUsage } from "./radius-usage.ts";
 import { cheapestProviderModel, createPiModelRuntime } from "./pi-config-models.ts";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 // Only providers with implemented subscription adapters appear in the overview.
-export const supportedUsageProviders = [{ id: "openai", label: "OpenAI Codex" }, { id: "anthropic", label: "Anthropic" }] as const;
+// Radius reports a credit balance without allowance windows, so it never drives the usage button.
+export const supportedUsageProviders = [{ id: "openai", label: "OpenAI Codex" }, { id: "anthropic", label: "Anthropic" }, { id: "openai-codex", label: "ChatGPT / Codex" }, { id: "xai", label: "xAI" }, { id: "radius", label: "Radius" }] as const;
 export type UsageProvider = typeof supportedUsageProviders[number];
 type UsageRequest = { runtime: ModelRuntime; refresh: boolean };
 const subscriptionAdapters = {
   // Codex reports usage cheaply on every request, so it is always current.
   "openai": (token) => fetchCodexSubscriptionUsage(token),
+  "openai-codex": (token) => fetchCodexSubscriptionUsage(token),
+  xai: (token) => fetchXaiSubscriptionUsage(token),
+  radius: (token) => fetchRadiusUsage(token),
   anthropic: (token, { runtime, refresh }) => {
     const model = cheapestProviderModel(runtime, "anthropic");
     if (!model) throw new Error("Anthropic has no models to check subscription usage with.");
     return anthropicUsageSource.usage(token, { model: model.id, refresh });
   },
 } satisfies Record<UsageProvider["id"], (token: string, request: UsageRequest) => Promise<SubscriptionUsage>>;
+
+/** Frames for one provider's usage; the scope keeps two lists of the same providers on one page apart. */
+export function providerUsageFrameId(view: "rings" | "limits", provider: string, scope: string): string {
+  return `usage_provider_${view}_${scope}_${provider}`.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
 
 export interface ProviderUsageOverview {
   provider: UsageProvider;
@@ -33,7 +44,7 @@ export async function connectedUsageProviders(): Promise<UsageProvider[]> {
   return supportedUsageProviders.filter((provider) => runtime.getProviderAuthStatus(provider.id).configured);
 }
 
-/** `refresh` asks the provider now instead of reusing what Atelier already knows. */
+/** `refresh` asks the provider now instead of reusing what AgentsInTheCloud already knows. */
 export async function getProviderUsageOverview(provider: UsageProvider, options: { refresh?: boolean } = {}): Promise<ProviderUsageOverview> {
   let reported: SubscriptionUsage | null = null;
   let error: string | null = null;

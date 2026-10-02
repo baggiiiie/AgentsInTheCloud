@@ -1,8 +1,8 @@
 import { agentDelegation } from "./delegation.ts";
 import { contentText } from "@earendil-works/pi-ai";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { significantCacheMissNotice, type CacheMiss } from "./cache-miss.ts";
 import { isToolViewDetails, type SessionImageRef, type TranscriptRecord } from "./transcript.ts";
 
 import { turnStartEntryType, turnStartSchema, turnTimingEntryType, turnTimingRecordSchema } from "./turn-timing.ts";
@@ -68,10 +68,16 @@ function entryTimestamp(entry: { timestamp?: string }): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<any, CacheMiss>()): TranscriptRecord[] {
+export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" }>): string {
+  const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
+  const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
+  const note = entry.note ? ` (${entry.note})` : "";
+  return `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`;
+}
+
+export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
   const records: TranscriptRecord[] = [];
-  let lastModelChangeRecord: TranscriptRecord | undefined;
-  let cacheNoticeInsertIndex: number | undefined;
+  let lastSettingChange: { type: "model_change" | "thinking_level_change"; record: TranscriptRecord } | undefined;
   for (const entry of entries) {
     if (entry.type === "custom" && entry.customType === turnStartEntryType && Value.Check(turnStartSchema, entry.data)) {
       records.push({ kind: "runStart", ...entry.data, timestamp: entryTimestamp(entry) });
@@ -89,7 +95,6 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       if (!message) continue;
       if (message.role === "user") {
         records.push({ kind: "user", id: entry.id, text: contentText(message.content), images: sessionContentImages(entry), timestamp: entryTimestamp(entry), rewindable: entry.parentId !== null && entry.parentId !== undefined });
-        cacheNoticeInsertIndex = records.length;
       } else if (message.role === "assistant") {
         const parts: any[] = [];
         for (const part of message.content ?? []) {
@@ -109,12 +114,6 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
           errorMessage: message.errorMessage,
           timestamp: entryTimestamp(entry),
         });
-        const notice = significantCacheMissNotice(cacheMisses.get(message));
-        if (notice && message.stopReason !== "aborted" && message.stopReason !== "error") {
-          const record: TranscriptRecord = { kind: "note", text: notice, tone: "warning", timestamp: entryTimestamp(entry) };
-          if (cacheNoticeInsertIndex === undefined) records.push(record);
-          else records.splice(cacheNoticeInsertIndex++, 0, record);
-        }
       } else if (message.role === "toolResult") {
         const details = isToolViewDetails(message.details) ? message.details : undefined;
         records.push({ kind: "toolResult", callId: message.toolCallId, text: contentText(message.content), images: sessionContentImages(entry), isError: Boolean(message.isError), timestamp: entryTimestamp(entry), details });
@@ -131,6 +130,10 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       records.push({ kind: "note", id: entry.id, text: `**Rewound** — summary of the abandoned branch:\n\n${entry.summary ?? ""}`, tone: "summary", timestamp: entryTimestamp(entry) });
       continue;
     }
+    if (entry.type === "usage" && entry.kind === "cache_warm") {
+      records.push({ kind: "note", id: entry.id, text: cacheWarmingNotice(entry), tone: "system", timestamp: entryTimestamp(entry) });
+      continue;
+    }
     if (entry.type === "compaction") {
       records.push({ kind: "note", id: entry.id, text: "Context compacted", tone: "system", timestamp: entryTimestamp(entry) });
       continue;
@@ -139,12 +142,13 @@ export function recordsFromSessionEntries(entries: any[], cacheMisses = new Map<
       records.push({ kind: "note", id: entry.id, text: contentText(entry.content), tone: "summary", timestamp: entryTimestamp(entry) });
       continue;
     }
-    if (entry.type === "model_change") {
+    if (entry.type === "model_change" || entry.type === "thinking_level_change") {
       if (records.length === 0) continue;
-      const record: TranscriptRecord = { kind: "note", id: entry.id, text: `model → ${entry.provider}/${entry.modelId}`, tone: "system", timestamp: entryTimestamp(entry) };
-      if (records.at(-1) === lastModelChangeRecord) records[records.length - 1] = record;
+      const text = entry.type === "model_change" ? `model → ${entry.provider}/${entry.modelId}` : `Thinking → ${entry.thinkingLevel}`;
+      const record: TranscriptRecord = { kind: "note", id: entry.id, text, tone: "system", timestamp: entryTimestamp(entry) };
+      if (lastSettingChange && lastSettingChange.type === entry.type && records.at(-1) === lastSettingChange.record) records[records.length - 1] = record;
       else records.push(record);
-      lastModelChangeRecord = record;
+      lastSettingChange = { type: entry.type, record };
       continue;
     }
   }

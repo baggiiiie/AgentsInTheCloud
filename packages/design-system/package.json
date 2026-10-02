@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/design-system",
+  "name": "@agents-in-the-cloud/design-system",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
     "./activity-button/client": "./src/activity-button/activity-button-client.ts",
     "./button": "./src/button/button-html.ts",
     "./button-group": "./src/button-group/button-group-html.ts",
+    "./comparison-ring": "./src/comparison-ring/comparison-ring-html.ts",
     "./copy-button": "./src/copy-button/copy-button-html.ts",
     "./copy-button/client": "./src/copy-button/copy-button-controller.ts",
     "./destructive-confirmation": "./src/destructive-confirmation/destructive-confirmation-html.ts",
@@ -34,12 +35,13 @@
     "./styles": "./src/design-system.css",
     "./catalogue": "./catalogue/page.ts",
     "./styles/server": "./src/inline-styles.ts",
-    "./tab-strip": "./src/tab-strip/tab-strip-html.ts"
+    "./tab-strip": "./src/tab-strip/tab-strip-html.ts",
+    "./tab-strip/client": "./src/tab-strip/tab-strip-controller.ts"
   },
   "dependencies": {
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
     "@fontsource/jetbrains-mono": "5.2.8",
-    "@atelier/syntax": "workspace:*"
+    "@agents-in-the-cloud/syntax": "workspace:*"
   }
 }

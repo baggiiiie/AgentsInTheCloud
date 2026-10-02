@@ -1,18 +1,18 @@
 /// <reference lib="dom" />
 
-import type { WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 function cssVariable(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-function addAtelierThemeParams(url: URL): void {
-  url.searchParams.set("atelierBg", cssVariable("--bg"));
-  url.searchParams.set("atelierPanel", cssVariable("--panel"));
-  url.searchParams.set("atelierElev", cssVariable("--elev"));
-  url.searchParams.set("atelierText", cssVariable("--text"));
-  url.searchParams.set("atelierLine", cssVariable("--line"));
-  url.searchParams.set("atelierAccent", cssVariable("--accent"));
+function addAgentsInTheCloudThemeParams(url: URL): void {
+  url.searchParams.set("agentsInTheCloudBg", cssVariable("--bg"));
+  url.searchParams.set("agentsInTheCloudPanel", cssVariable("--panel"));
+  url.searchParams.set("agentsInTheCloudElev", cssVariable("--elev"));
+  url.searchParams.set("agentsInTheCloudText", cssVariable("--text"));
+  url.searchParams.set("agentsInTheCloudLine", cssVariable("--line"));
+  url.searchParams.set("agentsInTheCloudAccent", cssVariable("--accent"));
 }
 
 export const vscodeClientModule: WorkspaceClientModule = {
@@ -70,7 +70,7 @@ export const vscodeClientModule: WorkspaceClientModule = {
     application.register("vscode-starting", VSCodeStartingController);
     hooks.onWorkspaceAppFrameUrl(({ appKey, url }) => {
       if (appKey !== "vscode") return;
-      addAtelierThemeParams(url);
+      addAgentsInTheCloudThemeParams(url);
     });
     hooks.onWorkspaceAppFrameRefresh(({ appKey, frame, load }) => {
       if (appKey === "vscode" && frame.src) load();
@@ -78,4 +78,4 @@ export const vscodeClientModule: WorkspaceClientModule = {
   },
 };
 
-export { vscodeClientModule as atelierClientModule };
+export { vscodeClientModule as agentsInTheCloudClientModule };

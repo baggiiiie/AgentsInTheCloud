@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { request as httpRequest } from "node:http";
-import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
+import { isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 
 export interface PortRange {
   start: number;
@@ -20,7 +20,7 @@ export function publicOriginPortRangeFromEnv(value = process.env.ATELIER_PROXY_P
 }
 
 export const defaultTailscaleLocalApiSocketPath = "/var/run/tailscale/tailscaled.sock";
-export const defaultTailscaleServeHelperPath = "/usr/local/bin/atelier-tailscale-serve-helper";
+export const defaultTailscaleServeHelperPath = "/usr/local/bin/agents-in-the-cloud-tailscale-serve-helper";
 
 export interface OriginPublisher {
   publish(port: number): Promise<void>;

@@ -1,6 +1,6 @@
-import { createCliModelSettings, type CliModelSettings } from "@atelier/cli-agent/server";
+import { createCliModelSettings, type CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
 import { piCliModelUnavailableReason } from "./pi-cli-bridge.ts";
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 import { piModelSetupRequired } from "./auth.ts";
 
 const sharedSettings = createCliModelSettings({

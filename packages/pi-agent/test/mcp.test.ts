@@ -5,17 +5,17 @@ test("prepares bundled session-private native MCP registration without putting i
   const source = join(import.meta.dir, "../src/server/mcp.ts");
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
-    const workspace = await import("@atelier/workspace");
+    const workspace = await import("@agents-in-the-cloud/workspace");
     const calls = [];
-    mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
-    const { preparePiMcp, piAtelierExtensionPath } = await import(${JSON.stringify(source)});
+    mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
+    const { preparePiMcp, piAgentsInTheCloudExtensionPath } = await import(${JSON.stringify(source)});
     const mcp = { url: "http://127.0.0.1:2988/mcp", token: "private-bearer-token" };
     const session = { id: "session", directory: "/session", turnSignalCommand: "/session/signal.sh" };
     expect(await preparePiMcp("workspace", session, mcp)).toEqual({});
     expect(calls).toHaveLength(1);
     const [, command, options] = calls[0];
     expect(command).toContain("umask 077");
-    expect(command).toContain(piAtelierExtensionPath(session));
+    expect(command).toContain(piAgentsInTheCloudExtensionPath(session));
     expect(command).not.toContain(mcp.token);
     const count = Number(command.match(/count=(\\d+)/)[1]);
     const input = Buffer.from(options.stdin);

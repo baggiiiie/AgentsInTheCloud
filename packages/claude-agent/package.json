@@ -1,17 +1,17 @@
 {
-  "name": "@atelier/claude-agent",
+  "name": "@agents-in-the-cloud/claude-agent",
   "private": true,
   "type": "module",
   "exports": {
     "./server": "./src/server/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/llm": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/workspace": "workspace:*",
-    "@atelier/cli-agent": "workspace:*",
-    "@atelier/agent": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/llm": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*",
+    "@agents-in-the-cloud/cli-agent": "workspace:*",
+    "@agents-in-the-cloud/agent": "workspace:*",
     "typebox": "^1.0.57"
   }
 }

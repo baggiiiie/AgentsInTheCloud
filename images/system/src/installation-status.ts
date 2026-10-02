@@ -26,7 +26,7 @@ export function installationStatus(input: {
   logs: string[];
 }): InstallationStatus {
   const { hostname, appliedRoute } = input;
-  const localSupervisor = input.localOrigin?.replace("//atelier.", "//system.atelier.");
+  const localSupervisor = input.localOrigin?.replace("//agents-in-the-cloud.", "//system.agents-in-the-cloud.");
   const supervisorUrl = !input.localMode && !input.connectionAction && hostname && appliedRoute.startsWith(`${hostname}:`)
     ? `https://${hostname}:8443` : localSupervisor;
   const ready = input.appResponding && !input.busy && !input.stopping && !input.failure &&
@@ -43,16 +43,16 @@ export function installationStatus(input: {
     };
   } else if (!input.localMode && input.authUrl && input.connectionState === "NeedsLogin") {
     action = {
-      description: "Atelier uses Tailscale so only your devices can reach it. Sign in to connect securely.",
+      description: "AgentsInTheCloud uses Tailscale so only your devices can reach it. Sign in to connect securely.",
       url: input.authUrl,
     };
   }
   return {
     state,
-    activity: state === "failed" ? { description: input.failure ?? "Atelier services stopped" }
-      : ready ? { description: "Your Atelier is ready!" }
+    activity: state === "failed" ? { description: input.failure ?? "AgentsInTheCloud services stopped" }
+      : ready ? { description: "Your AgentsInTheCloud is ready!" }
       : action ? { description: "Waiting for your private connection" }
-      : input.appResponding && !input.busy ? { description: "Connecting Atelier securely" }
+      : input.appResponding && !input.busy ? { description: "Connecting AgentsInTheCloud securely" }
       : input.activity,
     appUrl: ready ? input.localMode ? input.localOrigin : `https://${hostname}` : undefined,
     supervisorUrl,

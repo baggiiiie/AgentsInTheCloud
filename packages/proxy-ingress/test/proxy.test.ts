@@ -10,7 +10,7 @@ import {
   pruneTailscaleServePortConfig,
   type ParentOriginPublisher,
   type TailscaleServeConfig,
-} from "@atelier/proxy-ingress/server";
+} from "@agents-in-the-cloud/proxy-ingress/server";
 import { closeWebSocket } from "../src/ingress/websocket.ts";
 
 async function freePort(): Promise<number> {
@@ -230,7 +230,7 @@ describe("workspace ingress", () => {
       port: 0,
       fetch(request, server) {
         const offered = request.headers.get("sec-websocket-protocol")?.split(",").map((value) => value.trim()) ?? [];
-        const headers = offered.includes("atelier-test") ? { "sec-websocket-protocol": "atelier-test" } : undefined;
+        const headers = offered.includes("agents-in-the-cloud-test") ? { "sec-websocket-protocol": "agents-in-the-cloud-test" } : undefined;
         if (server.upgrade(request, { headers })) return undefined;
         return new Response("upgrade required", { status: 426 });
       },
@@ -256,7 +256,7 @@ describe("workspace ingress", () => {
     const location = new URL(opened.headers.get("location")!);
     location.protocol = "ws:";
     const result = await new Promise<{ protocol: string; binary: number[]; closeCode: number; closeReason: string }>((resolve, reject) => {
-      const socket = new WebSocket(location, ["atelier-test"]);
+      const socket = new WebSocket(location, ["agents-in-the-cloud-test"]);
       socket.binaryType = "arraybuffer";
       const timer = setTimeout(() => reject(new Error("WebSocket bridge timed out")), 2_000);
       let protocol = "";
@@ -276,7 +276,7 @@ describe("workspace ingress", () => {
       });
       socket.addEventListener("error", () => reject(new Error("WebSocket bridge failed")));
     });
-    expect(result).toEqual({ protocol: "atelier-test", binary: [1, 2, 3], closeCode: 4001, closeReason: "upstream done" });
+    expect(result).toEqual({ protocol: "agents-in-the-cloud-test", binary: [1, 2, 3], closeCode: 4001, closeReason: "upstream done" });
     await ingress.stopAll();
     upstream.stop(true);
   });
@@ -381,13 +381,13 @@ describe("origin publication policy", () => {
   test("publishes active HTTPS origins without disturbing unrelated routes", () => {
     const config: TailscaleServeConfig = {
       TCP: { "443": { HTTPS: true } },
-      Web: { "atelier.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000/" } } } },
+      Web: { "agents-in-the-cloud.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000/" } } } },
     };
-    expect(ensureTailscaleServePortConfig(config, { host: "atelier.tailnet.ts.net", port: 41000 })).toBe(true);
-    expect(pruneTailscaleServePortConfig(config, { host: "atelier.tailnet.ts.net", port: 41000 })).toBe(true);
+    expect(ensureTailscaleServePortConfig(config, { host: "agents-in-the-cloud.tailnet.ts.net", port: 41000 })).toBe(true);
+    expect(pruneTailscaleServePortConfig(config, { host: "agents-in-the-cloud.tailnet.ts.net", port: 41000 })).toBe(true);
     expect(config).toEqual({
       TCP: { "443": { HTTPS: true } },
-      Web: { "atelier.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000/" } } } },
+      Web: { "agents-in-the-cloud.tailnet.ts.net:443": { Handlers: { "/": { Proxy: "http://127.0.0.1:3000/" } } } },
     });
   });
 });

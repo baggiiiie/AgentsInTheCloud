@@ -1,4 +1,4 @@
-import { escapeHtml, liveCollection, type LiveRegion } from "@atelier/shared";
+import { escapeHtml, liveCollection, type LiveRegion } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, type AgentRenderContext } from "./render-context.ts";
 import { renderModelContextEntries, renderTranscriptItem, type AgentModelContextView } from "./render-transcript.ts";
 import type { TranscriptItem, WorkingTranscriptItem } from "./transcript.ts";
@@ -31,20 +31,21 @@ export class LiveTranscriptRenderer {
     });
   }
 
-  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean) {
+  private transcriptRows(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, initial: boolean, statuses: readonly string[]) {
     return [
       { id: `${ids.transcript(ctx)}_context`, html: renderModelContextEntries(ctx, modelContext) },
       ...this.rows(ctx, items, initial),
+      { id: `${ids.transcript(ctx)}_status`, html: statuses.map(status => `<div class="agent-noticeline info"><span role="status">${escapeHtml(status)}</span></div>`).join("") },
     ];
   }
 
-  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView): string {
-    return this.transcriptRows(ctx, items, modelContext, true)
+  renderInitialTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, statuses: readonly string[] = []): string {
+    return this.transcriptRows(ctx, items, modelContext, true, statuses)
       .map(row => `<div id="${escapeHtml(row.id)}" data-turbo-permanent>${row.html}</div>`).join("") + this.noticesMount(ctx);
   }
 
-  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView): LiveRegion {
-    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false));
+  renderTranscript(ctx: AgentRenderContext, items: TranscriptItem[], modelContext: AgentModelContextView, statuses: readonly string[] = []): LiveRegion {
+    const region = liveCollection(ids.transcript(ctx), this.transcriptRows(ctx, items, modelContext, false, statuses));
     // Notices are browser-owned ephemeral messages, never snapshot state.
     region.html += this.noticesMount(ctx);
     return region;

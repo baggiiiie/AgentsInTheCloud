@@ -1,5 +1,5 @@
 import { buttonHtml, type ButtonOptions } from "../button/button-html.ts";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { popupMenuHtml } from "./popup-surface.ts";
 
 export interface PopupOptions {

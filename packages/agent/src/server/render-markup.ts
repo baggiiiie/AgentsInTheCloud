@@ -1,8 +1,8 @@
-import { actionItemHtml, type ActionItemLabel } from "@atelier/design-system/action-item";
-import { Icons } from "@atelier/design-system/icons";
-import { renderMarkdown } from "@atelier/markdown";
-import { highlightCodeHtmlForPath } from "@atelier/syntax";
-import { escapeHtml } from "@atelier/shared";
+import { actionItemHtml, type ActionItemLabel } from "@agents-in-the-cloud/design-system/action-item";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { renderMarkdown } from "@agents-in-the-cloud/markdown";
+import { highlightCodeHtmlForPath } from "@agents-in-the-cloud/syntax";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { AgentRenderContext } from "./render-context.ts";
 
 export function markdown(ctx: AgentRenderContext, text: string): string {
@@ -30,11 +30,11 @@ export function renderMarkdownRow(ctx: AgentRenderContext, text: string, classNa
 }
 
 export function fullscreenAttributes(title: string, mode: "template" | "media" = "template"): string {
-  return ` data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="${mode}" data-atelier-fullscreen-title-value="${escapeHtml(title)}"`;
+  return ` data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="${mode}" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(title)}"`;
 }
 
 export function detailFullscreen(title: string, html: string): string {
-  return `<div class="agent-detail-fullscreen"${fullscreenAttributes(title)}>${html}<template data-atelier-fullscreen-target="content">${html}</template></div>`;
+  return `<div class="agent-detail-fullscreen"${fullscreenAttributes(title)}>${html}<template data-agents-in-the-cloud-fullscreen-target="content">${html}</template></div>`;
 }
 
 export function codeBlockHtml(code: string, filePath: string | undefined, className = "agent-tool-code"): string {

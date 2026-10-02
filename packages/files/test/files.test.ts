@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { workspaceRoot } from "@atelier/workspace";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { compactDirectoryEntry, FilesPathError, normalizeFilesPath } from "../src/server/files.ts";
 import { filesDirectoryFrameId, filesTreeResultsFrameId, renderFilesDirectoryFrame, renderFilesEditorFrame, renderFilesTreeFrame, renderFilesTreeResultsFrame, filesWorkViewPresentation, renderFilesWorkViewBody } from "../src/server/render.ts";
 

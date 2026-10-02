@@ -10,17 +10,17 @@ const originSchema = Type.Object({ origin: Type.String() });
 const statusSchema = Type.Object({ BackendState: Type.Literal("Running"), Self: Type.Object({ DNSName: Type.String() }), CertDomains: Type.Optional(Type.Union([Type.Null(), Type.Array(Type.String())])) });
 
 export interface ParentOriginPublisher {
-  kind: "atelier" | "tailscale" | "localhost" | "system";
+  kind: "agents-in-the-cloud" | "tailscale" | "localhost" | "system";
   refresh?: boolean;
   publish(port: number): Promise<string>;
   unpublish?(port: number): Promise<void>;
 }
-export const parentIngressSocket = "/run/atelier-parent/ingress.sock";
+export const parentIngressSocket = "/run/agents-in-the-cloud-parent/ingress.sock";
 export function createLocalOriginPublisher(): ParentOriginPublisher {
   return { kind: "localhost", async publish(port) { return `http://localhost:${port}`; } };
 }
-export function createParentAtelierPublisher(socketPath = parentIngressSocket): ParentOriginPublisher {
-  return { kind: "atelier", refresh: true, async publish(port) {
+export function createParentAgentsInTheCloudPublisher(socketPath = parentIngressSocket): ParentOriginPublisher {
+  return { kind: "agents-in-the-cloud", refresh: true, async publish(port) {
     const body = JSON.stringify({ port, protocol: "http" });
     const result = await new Promise<string>((resolve, reject) => {
       const req = request({ socketPath, path: "/origins", method: "POST", headers: { "content-type": "application/json", "content-length": Buffer.byteLength(body) } }, (response) => {
@@ -78,14 +78,14 @@ export function createSystemOriginPublisher(portRange?: PortRange, fetcher: (url
     if (!Value.Check(Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), localPort: Type.Optional(Type.Integer({ minimum: 1, maximum: 65535 })) }), status)) throw new Error("Invalid System access status");
     if (status.mode === "tailscale") return tailscale.publish(port);
     if (!status.localPort) throw new Error("System's local port has not been published yet");
-    return `http://p${port}.atelier.localhost:${status.localPort}`;
+    return `http://p${port}.agents-in-the-cloud.localhost:${status.localPort}`;
   } };
 }
 
 /** A mounted parent directory is configuration even while its server is down. */
 export async function detectParentOriginPublisher(portRange?: PortRange, hasPath: (path: string) => boolean = existsSync): Promise<ParentOriginPublisher> {
-  if (hasPath("/run/atelier-parent")) return createParentAtelierPublisher();
-  if (hasPath("/run/atelier-system/access-v1")) return createSystemOriginPublisher(portRange);
+  if (hasPath("/run/agents-in-the-cloud-parent")) return createParentAgentsInTheCloudPublisher();
+  if (hasPath("/run/agents-in-the-cloud-system/access-v1")) return createSystemOriginPublisher(portRange);
   if (hasPath(dirname(defaultTailscaleLocalApiSocketPath))) return createTailscaleParentPublisher(defaultTailscaleLocalApiSocketPath, portRange);
   return createLocalOriginPublisher();
 }

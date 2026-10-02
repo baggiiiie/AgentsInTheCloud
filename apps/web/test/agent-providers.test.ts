@@ -2,14 +2,14 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { agentProvider, defaultAgentProvider, orderedAgentProviders, rememberAgentProvider } from "../src/server/agent-providers.ts";
 
 let directory: string;
 let previous: string | undefined;
 beforeEach(async () => {
   previous = process.env.ATELIER_DATA_DIR;
-  directory = await mkdtemp(join(tmpdir(), "atelier-agent-providers-"));
+  directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-agent-providers-"));
   process.env.ATELIER_DATA_DIR = directory;
 });
 afterEach(async () => {
@@ -47,7 +47,7 @@ test("unknown providers cannot overwrite the default", async () => {
 });
 
 test("default-change events observe the already-persisted preference", async () => {
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const observed: string[] = [];
   events.on("agent_provider_default_changed", async ({ providerId }) => {
     expect((await defaultAgentProvider()).id).toBe(providerId);
@@ -60,12 +60,12 @@ test("default-change events observe the already-persisted preference", async () 
 test("defaults to Claude Code when an Anthropic subscription is the only way to run an agent", async () => {
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
-    const agent = await import("@atelier/agent/server");
-    const llm = await import("@atelier/llm/server");
+    const agent = await import("@agents-in-the-cloud/agent/server");
+    const llm = await import("@agents-in-the-cloud/llm/server");
     let builtinHasModel = false;
     let credentials = [{ providerId: "anthropic", type: "oauth" }];
-    mock.module("@atelier/agent/server", () => ({ ...agent, hasAvailableBuiltinAgentModel: async () => builtinHasModel }));
-    mock.module("@atelier/llm/server", () => ({ ...llm, createPiModelRuntime: async () => ({ listCredentials: async () => credentials }) }));
+    mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agent, hasAvailableBuiltinAgentModel: async () => builtinHasModel }));
+    mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm, createPiModelRuntime: async () => ({ listCredentials: async () => credentials }) }));
     const { defaultAgentProvider, orderedAgentProviders, rememberAgentProvider } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agent-providers.ts"))});
     expect((await orderedAgentProviders())[0].id).toBe("claude");
     await rememberAgentProvider("builtin");

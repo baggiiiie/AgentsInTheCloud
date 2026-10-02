@@ -1,19 +1,20 @@
-import { atelierClientModule as clientModule0 } from "@atelier/agent/client";
-import { atelierClientModule as clientModule1 } from "@atelier/browser/client";
-import { atelierClientModule as clientModule2 } from "@atelier/cli-agent/client";
-import { atelierClientModule as clientModule3 } from "@atelier/desktop/client";
-import { atelierClientModule as clientModule4 } from "@atelier/files/client";
-import { atelierClientModule as clientModule5 } from "@atelier/host/client";
-import { atelierClientModule as clientModule6 } from "@atelier/keypress-probe/client";
-import { atelierClientModule as clientModule7 } from "@atelier/llm/client";
-import { atelierClientModule as clientModule8 } from "@atelier/prompt/client";
-import { atelierClientModule as clientModule9 } from "@atelier/review/client";
-import { atelierClientModule as clientModule10 } from "@atelier/subagents/client";
-import { atelierClientModule as clientModule11 } from "@atelier/transcription/client";
-import { atelierClientModule as clientModule12 } from "@atelier/update/client";
-import { atelierClientModule as clientModule13 } from "@atelier/vscode/client";
-import { atelierClientModule as clientModule14 } from "@atelier/workspace-terminal/client";
-import type { WorkspaceClientModule } from "@atelier/shared";
+import { agentsInTheCloudClientModule as clientModule0 } from "@agents-in-the-cloud/agent/client";
+import { agentsInTheCloudClientModule as clientModule1 } from "@agents-in-the-cloud/artifact-preview/client";
+import { agentsInTheCloudClientModule as clientModule2 } from "@agents-in-the-cloud/browser/client";
+import { agentsInTheCloudClientModule as clientModule3 } from "@agents-in-the-cloud/cli-agent/client";
+import { agentsInTheCloudClientModule as clientModule4 } from "@agents-in-the-cloud/desktop/client";
+import { agentsInTheCloudClientModule as clientModule5 } from "@agents-in-the-cloud/files/client";
+import { agentsInTheCloudClientModule as clientModule6 } from "@agents-in-the-cloud/host/client";
+import { agentsInTheCloudClientModule as clientModule7 } from "@agents-in-the-cloud/inline-content/client";
+import { agentsInTheCloudClientModule as clientModule8 } from "@agents-in-the-cloud/keypress-probe/client";
+import { agentsInTheCloudClientModule as clientModule9 } from "@agents-in-the-cloud/llm/client";
+import { agentsInTheCloudClientModule as clientModule10 } from "@agents-in-the-cloud/prompt/client";
+import { agentsInTheCloudClientModule as clientModule11 } from "@agents-in-the-cloud/review/client";
+import { agentsInTheCloudClientModule as clientModule12 } from "@agents-in-the-cloud/transcription/client";
+import { agentsInTheCloudClientModule as clientModule13 } from "@agents-in-the-cloud/update/client";
+import { agentsInTheCloudClientModule as clientModule14 } from "@agents-in-the-cloud/vscode/client";
+import { agentsInTheCloudClientModule as clientModule15 } from "@agents-in-the-cloud/workspace-terminal/client";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const workspaceClientModules: WorkspaceClientModule[] = [
   clientModule0,
@@ -31,4 +32,5 @@ export const workspaceClientModules: WorkspaceClientModule[] = [
   clientModule12,
   clientModule13,
   clientModule14,
+  clientModule15,
 ];

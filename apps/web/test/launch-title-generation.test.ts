@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import * as agent from "@atelier/agent/server";
-import { atelierServerModule as codexModule } from "@atelier/codex-agent/server";
-import { createTestApp, deferred, postJson, temporaryAtelierDataDir } from "./support/test-web-app.ts";
+import * as agent from "@agents-in-the-cloud/agent/server";
+import { agentsInTheCloudServerModule as codexModule } from "@agents-in-the-cloud/codex-agent/server";
+import { createTestApp, deferred, postJson, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 
-const data = temporaryAtelierDataDir();
+const data = temporaryAgentsInTheCloudDataDir();
 beforeEach(data.setUp);
 afterEach(data.tearDown);
 

@@ -1,14 +1,14 @@
-import { AtelierCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@atelier/core";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { transientFeedbackHtml } from "@atelier/design-system/transient-feedback";
-import { warningBannerHtml } from "@atelier/design-system/warning-banner";
+import { AgentsInTheCloudCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@agents-in-the-cloud/core";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { transientFeedbackHtml } from "@agents-in-the-cloud/design-system/transient-feedback";
+import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import {
   addProject, createProjectEnvironmentVariable,
   createProjectSecret,
@@ -19,21 +19,21 @@ import {
   listProjectEnvironmentVariables, listProjectSecrets,
   listProjectSshKeys, listProjects, parseProjectSpec, renameProjectSshKey,
   projectSecretRoutingRevision, projectSecretValueInputSchema,
-  secretNeedsValue,
+  secretNeedsValue, projectSecretAllowsPath, projectSecretPathPermissionSchema,
   setProjectDockerfile, setProjectPreloadImages,
   setProjectSecretValue,
   setProjectSshKnownHosts,
   updateProject,
   updateProjectEnvironmentVariable, updateProjectSecret,
   type ProjectEnvironmentVariable, type ProjectSecretInput, type ProjectSecretSummary, type ProjectSshKeySummary, type ProjectSummary,
-} from "@atelier/projects";
-import { publicWorkspaceAppOrigin } from "@atelier/proxy-ingress";
-import { domId, escapeHtml, turboStreamResponse } from "@atelier/shared";
+} from "@agents-in-the-cloud/projects";
+import { publicWorkspaceAppOrigin } from "@agents-in-the-cloud/proxy-ingress";
+import { domId, escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
 import { jsonResponse } from "./http-responses.ts";
-import { replace, response, update, wantsStream } from "@atelier/shared/http";
+import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 const jsonStringSchema = Type.String();
 const jsonBooleanSchema = Type.Boolean();
@@ -111,7 +111,7 @@ export function createProjectRoutes(deps: {
 
   function projectDockerfileEditor(project: ProjectSummary, section?: ProjectSettingsSection): string {
     const example = [
-      "FROM atelier-workspace",
+      "FROM agents-in-the-cloud-workspace",
       "",
       "# Build against PostgreSQL and connect to your development database",
       "RUN apt-get update \\",
@@ -123,13 +123,13 @@ export function createProjectRoutes(deps: {
       "WORKDIR /work",
     ].join("\n");
     const fields = `<div class="project-dockerfile-form">
-      <div class="project-configuration-head"><p>You may paste your dockerfile here or commit it at <code>.atelier/Dockerfile</code> so others can use it too.</p></div>
+      <div class="project-configuration-head"><p>You may paste your dockerfile here or commit it at <code>.agents-in-the-cloud/Dockerfile</code> so others can use it too.</p></div>
       <form method="post" action="/projects/${encodeURIComponent(project.id)}/dockerfile" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving">
         <textarea class="textarea" aria-label="Custom Dockerfile" name="dockerfile" rows="12" spellcheck="false" autocomplete="off" placeholder="${escapeHtml(example)}">${escapeHtml(project.dockerfile ?? "")}</textarea>
       </form>
     </div>`;
     return `<section class="project-configuration-list" id="${domId("project_dockerfile", project.id)}"${revealSection(section, "dockerfile")}>
-      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a custom dockerfile to make sure workspaces for your project start up with all their system dependencies ready to go.</p></div>
+      <div class="project-configuration-head"><h3>Custom dockerfile</h3><p>Use a <code>./.agents-in-the-cloud/Dockerfile</code> to install the system dependencies your project’s workspaces need.</p></div>
       ${projectConfigurationDisclosure("Custom Dockerfile", fields, section === "dockerfile")}
     </section>`;
   }
@@ -156,6 +156,7 @@ export function createProjectRoutes(deps: {
   }
 
   function projectSecretRow(project: ProjectSummary, secret?: ProjectSecretSummary): string {
+    const allowInPath = secret ? projectSecretAllowsPath(secret) : undefined;
     const secretPath = `/projects/${encodeURIComponent(project.id)}/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`;
     const deleteButton = secret ? destructiveConfirmationHtml({
       id: domId("delete_secret", project.id, secret.id),
@@ -167,10 +168,21 @@ export function createProjectRoutes(deps: {
     const status = secret?.configured
       ? '<p class="project-secret-saved" role="status">✓ Secret stored</p>'
       : secret && secretNeedsValue(secret) ? warningBannerHtml({ title: "Mandatory secret — needs a value" }) : "";
-    return `<form class="project-secret${secret ? "" : " new"}" aria-label="${secret ? "Secret" : "Add secret"}" method="post" action="${secretPath}" data-turbo="true" data-controller="settings-autosave" data-action="focusout->settings-autosave#saveWhenLeaving${secret ? "" : " submit->settings-autosave#submit"}">
+    return `<form class="project-secret${secret ? "" : " new"}" aria-label="${secret ? "Secret" : "Add secret"}" method="post" action="${secretPath}" data-turbo="true" data-controller="settings-autosave${secret ? "" : " project-secret-path"}" data-action="focusout->settings-autosave#saveWhenLeaving${secret ? "" : " submit->settings-autosave#submit"}">
       ${status}
       <label><span>Environment variable</span><input class="text-field" name="envName" value="${escapeHtml(secret?.envName ?? "")}" placeholder="GOOGLE_MAPS_API_KEY" autocomplete="off"${secret ? "" : " required"}></label>
-      <label><span>Host</span><input class="text-field" name="hostPattern" value="${escapeHtml(secret?.hostPattern ?? "")}" placeholder="maps.googleapis.com" autocomplete="off"${secret ? "" : " required"}></label>
+      <label><span>Host</span><input class="text-field" name="hostPattern" value="${escapeHtml(secret?.hostPattern ?? "")}" placeholder="maps.googleapis.com" autocomplete="off"${secret ? "" : ' required data-project-secret-path-target="host" data-action="input->project-secret-path#useDefault"'}></label>
+      <div class="project-secret-requirement"><span>URL paths ${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: "?", label: "Only set to Allow if you need to have this secret injected into the URL path instead of in the headers" } })}</span><input type="hidden" name="allowInPath" value="${allowInPath ?? false}"${secret ? "" : ' data-project-secret-path-target="permission"'}>${toggleHtml({
+        variant: "button",
+        label: "Allow secret in URL paths",
+        name: "allowInPath",
+        value: String(allowInPath ?? false),
+        options: [{ value: "true", label: "Allow" }, { value: "false", label: "Disallow" }],
+        element: {
+          dataAction: `${secret ? "" : "click->project-secret-path#choose change->project-secret-path#choose "}change->settings-autosave#toggleChanged`,
+          data: secret ? undefined : { "project-secret-path-target": "toggle" },
+        },
+      })}</div>
       <label><span>Secret</span><input class="text-field" name="secretValue" type="password" data-1p-ignore data-action="change->settings-autosave#save" placeholder="${secret?.configured ? "Secret stored — leave blank to keep it" : "No secret stored — enter a value"}" autocomplete="new-password"></label>
       <label><span>Placeholder</span><input class="text-field" name="placeholder" value="${escapeHtml(secret?.placeholder ?? "")}" placeholder="You rarely need to fill this in" autocomplete="off"></label>
       <label><span>Needed for</span><textarea class="textarea" name="annotation" rows="2" placeholder="For example, running payment integration tests">${escapeHtml(secret?.annotation ?? "")}</textarea></label>
@@ -193,7 +205,7 @@ export function createProjectRoutes(deps: {
 
   function projectSecretEditor(project: ProjectSummary, secrets: ProjectSecretSummary[], section?: ProjectSettingsSection): string {
     return `<section class="project-configuration-list project-secrets" id="${domId("project_secrets", project.id)}"${revealSection(section, "secrets")}>
-      <div class="project-configuration-head"><h3>Secrets</h3><p>Atelier lets you use secrets without exposing them to agents. Your encrypted secret stays outside agent sandboxes. Agents receive a placeholder that Atelier replaces with the real secret in matching network requests. Secret changes apply to new connections from running workspaces. Reconnect existing clients: open HTTPS tunnels are not reconfigured. New workspaces receive placeholder environment variables automatically; existing processes need those variables set when started.</p></div>
+      <div class="project-configuration-head"><h3>Secrets</h3><p>Secrets let your agents connect to services without seeing your passwords or API keys.</p><p>Agents see a placeholder. AgentsInTheCloud intercepts network requests to services you specify and replaces the placeholder with the real secret.</p></div>
       ${collapsedSecretWarning(project, secrets)}
       ${projectConfigurationDisclosure("Configure secrets", projectSecretFields(project, secrets), section === "secrets" || secrets.some(secretNeedsValue))}
     </section>`;
@@ -273,12 +285,12 @@ export function createProjectRoutes(deps: {
       <div class="project-editor-page project-editor-detail-page">
         <div class="project-editor-detail-body">
           <section class="project-edit-section"${revealSection(section, "repository")}><form class="project-edit-form" aria-label="Repository" method="post" action="/projects/${encodeURIComponent(project.id)}" data-controller="settings-autosave" data-action="change->settings-autosave#save"><label class="project-edit-field"><span>Display name</span><input class="text-field" name="name" value="${escapeHtml(project.name)}" required></label><label class="project-edit-field"><span>Repository</span><input class="text-field" name="gitUrl" value="${escapeHtml(formatProjectSpec(project))}" required></label></form></section>
-          <section class="project-configuration-list"><div class="project-configuration-head"><h3>Set up with an agent</h3><p>Let an agent configure dependencies, environment variables and secrets for your project. Starts from the default image, even if your custom Dockerfile is broken.</p></div>${actionLinkHtml({ href: `/projects/${encodeURIComponent(project.id)}/onboarding`, variant: "secondary", content: { kind: "caption", caption: "Set up with agent" }, attributesHtml: 'data-turbo-stream="true"' })}</section>
+          <section class="project-configuration-list"><div class="project-configuration-head"><h3>Set up with an agent</h3><p>An agent can set up your project’s dependencies, environment variables and secrets.</p><p>It starts in a workspace without your custom Dockerfile, so setup still works if that file is broken.</p></div>${actionLinkHtml({ href: `/projects/${encodeURIComponent(project.id)}/onboarding`, variant: "secondary", content: { kind: "caption", caption: "Set up with agent" }, attributesHtml: 'data-turbo-stream="true"' })}</section>
           <div class="project-edit-config">${projectSecretEditor(project, secrets, section)}${projectSshKeyEditor(project, sshKeys, knownHosts, section)}${projectEnvironmentEditor(project, environment, section)}${projectDockerfileEditor(project, section)}${projectPreloadImagesEditor(project, section)}</div>
           <section class="project-edit-danger-zone"${revealSection(section, "danger")}>${projectConfigurationDisclosure("Danger zone", `<div class="project-edit-danger">${projectDeleteControl(project.id)}</div>`, section === "danger")}</section>
           <section class="project-configuration-list">
-            <div class="project-configuration-head"><h3>Atelier instance URL</h3><p>The external URL for this Atelier instance.</p></div>
-            <div class="project-instance-url"><a href="${escapeHtml(instanceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(instanceUrl)}</a>${copyButtonHtml({ label: "Copy Atelier instance URL", copyText: instanceUrl })}</div>
+            <div class="project-configuration-head"><h3>AgentsInTheCloud instance URL</h3><p>The external URL for this AgentsInTheCloud instance.</p></div>
+            <div class="project-instance-url"><a href="${escapeHtml(instanceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(instanceUrl)}</a>${copyButtonHtml({ label: "Copy AgentsInTheCloud instance URL", copyText: instanceUrl })}</div>
           </section>
         </div>
       </div>
@@ -325,7 +337,7 @@ export function createProjectRoutes(deps: {
   async function projectById(id: string): Promise<ProjectSummary> {
     const { projects } = await listProjects();
     const project = projects.find((candidate) => candidate.id === id);
-    if (!project) throw new AtelierCoreError("project_not_found", `project not found: ${id}`);
+    if (!project) throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${id}`);
     return project;
   }
 
@@ -361,7 +373,7 @@ export function createProjectRoutes(deps: {
     try {
       project = (await addProject(gitUrl)).project;
     } catch (error) {
-      if (!(error instanceof AtelierCoreError && error.code === "project_exists")) throw error;
+      if (!(error instanceof AgentsInTheCloudCoreError && error.code === "project_exists")) throw error;
       const specification = parseProjectSpec(gitUrl);
       const projects = (await listProjects()).projects;
       project = projects.find((candidate) => candidate.gitUrl === specification.gitUrl && candidate.branch === specification.branch)!;
@@ -452,7 +464,7 @@ export function createProjectRoutes(deps: {
   async function secretValueModal(projectId: string, secretId: string, purpose?: string): Promise<string> {
     const project = await projectById(projectId);
     const secret = (await listProjectSecrets(projectId)).find((secret) => secret.id === secretId);
-    if (!secret) throw new AtelierCoreError("project_secret_not_found", "Project secret not found");
+    if (!secret) throw new AgentsInTheCloudCoreError("project_secret_not_found", "Project secret not found");
     const formId = "project-secret-value-form";
     return dialogHtml({
       element: { id: "project-editor-modal", attributesHtml: 'data-dialog-auto-show data-secret-value-dialog' },
@@ -460,6 +472,7 @@ export function createProjectRoutes(deps: {
       titleCaption: "Provide a secret",
       bodyHtml: `<div class="secret-value-request"><p>${escapeHtml(purpose ?? secret.annotation)}</p>
         <p>Allowed destinations: <strong>${escapeHtml(secret.hostPattern)}</strong></p>
+        <p>Secret in URL paths: <strong>${projectSecretAllowsPath(secret) ? "allowed" : "not allowed"}</strong></p>
         <form id="${formId}" method="post" action="/projects/${encodeURIComponent(projectId)}/secrets/${encodeURIComponent(secretId)}/value" data-turbo="true" data-action="turbo:submit-end->dialog#submitted">
           <input type="hidden" name="expectedRoutingRevision" value="${projectSecretRoutingRevision(secret)}">
           <label class="secret-value-request__field"><span>${escapeHtml(secret.envName)}</span><input class="text-field" name="secretValue" type="password" autocomplete="new-password" data-1p-ignore autofocus required placeholder="Paste secret value"></label>
@@ -487,7 +500,10 @@ export function createProjectRoutes(deps: {
   async function projectSecretValues(request: Request): Promise<ProjectSecretInput> {
     if (!requestAcceptsJson(request)) {
       const formData = await request.formData();
+      const pathPermission = formData.get("allowInPath") ?? undefined;
+      if (pathPermission !== undefined && !["true", "false"].includes(String(pathPermission))) throw invalidArguments("Invalid URL path permission");
       return {
+        allowInPath: pathPermission === undefined ? undefined : pathPermission === "true",
         envName: String(formData.get("envName") ?? ""),
         hostPattern: String(formData.get("hostPattern") ?? ""),
         placeholder: String(formData.get("placeholder") ?? ""),
@@ -497,6 +513,8 @@ export function createProjectRoutes(deps: {
       };
     }
     const body = await readJsonObject(request);
+    const allowInPath = body.allowInPath;
+    if (allowInPath !== undefined && !Value.Check(projectSecretPathPermissionSchema, allowInPath)) throw invalidArguments("allowInPath must be a boolean");
     const optional = body.optional;
     if (optional !== undefined && !Value.Check(jsonBooleanSchema, optional)) throw invalidArguments("optional must be a boolean");
     return {
@@ -506,6 +524,7 @@ export function createProjectRoutes(deps: {
       secretValue: optionalJsonString(body, "secretValue"),
       annotation: optionalJsonString(body, "annotation"),
       optional,
+      allowInPath,
     };
   }
 
@@ -591,7 +610,7 @@ export function createProjectRoutes(deps: {
     const byName = projects.filter((project) => project.name === reference);
     if (byName.length === 1) return byName[0]!;
     if (byName.length > 1) throw invalidArguments(`project name is ambiguous: ${reference}`);
-    throw new AtelierCoreError("project_not_found", `project not found: ${reference}`);
+    throw new AgentsInTheCloudCoreError("project_not_found", `project not found: ${reference}`);
   }
 
   async function createProjectAgentWorkspaceEndpoint(projectId: string, request: Request): Promise<Response> {

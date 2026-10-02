@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { workspaceVSCodePort } from "@atelier/workspace";
+import { workspaceVSCodePort } from "@agents-in-the-cloud/workspace";
 import { createServer, type AddressInfo } from "node:net";
 import { mkdtemp, readlink, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,10 +14,10 @@ async function runStartup(port: number, identity?: { executable: string; entry: 
     await writeFile(launcher, `#!/bin/sh\necho launched > '${directory}/launched'\nexit 42\n`, { mode: 0o755 });
     const script = vscodeStartupScript(join(directory, "workspace.code-workspace"))
       .replaceAll(String(workspaceVSCodePort), String(port))
-      .replaceAll("/.atelier/vscode", join(directory, "state"))
-      .replaceAll("atelier-start-vscode", launcher)
-      .replaceAll("/opt/atelier/vscode-server/node", identity?.executable ?? "/opt/atelier/vscode-server/node")
-      .replaceAll("/opt/atelier/vscode-server/out/server-main.js", identity?.entry ?? "/opt/atelier/vscode-server/out/server-main.js");
+      .replaceAll("/.agents-in-the-cloud/vscode", join(directory, "state"))
+      .replaceAll("agents-in-the-cloud-start-vscode", launcher)
+      .replaceAll("/opt/agents-in-the-cloud/vscode-server/node", identity?.executable ?? "/opt/agents-in-the-cloud/vscode-server/node")
+      .replaceAll("/opt/agents-in-the-cloud/vscode-server/out/server-main.js", identity?.entry ?? "/opt/agents-in-the-cloud/vscode-server/out/server-main.js");
     const process = Bun.spawn(["sh", "-c", script], { stdout: "pipe", stderr: "pipe" });
     const [exitCode, stderr] = await Promise.all([process.exited, new Response(process.stderr).text()]);
     return { exitCode, stderr, launched: await Bun.file(join(directory, "launched")).exists() };

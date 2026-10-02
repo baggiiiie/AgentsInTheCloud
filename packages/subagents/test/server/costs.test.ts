@@ -46,7 +46,7 @@ test("rolls up all descendants, retaining closed agents and notifying idle ances
 });
 
 test("restores historical totals once and handles children interrupted before session creation", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-costs-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-costs-"));
   try {
     const path = join(directory, "child.jsonl");
     const manager = SessionManager.open(path);

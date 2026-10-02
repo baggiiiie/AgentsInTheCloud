@@ -1,24 +1,30 @@
-import type { WorkspaceClientModule } from "@atelier/shared";
-import { Type } from "typebox";
+import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { Value } from "typebox/value";
+import { desktopViewerMessage } from "../messages.ts";
 
-const statusMessage = Type.Object({
-  type: Type.Literal("atelier:desktop:status"),
-  token: Type.String(),
-  phase: Type.Union(["connecting", "connected", "disconnected", "starting", "stopped", "failed"].map(phase => Type.Literal(phase))),
-  detail: Type.String(),
-});
+const clipboardFeedbackLabels = {
+  pending: "Not sent yet",
+  sending: "Sending to remote clipboard",
+  sent: "Sent to remote clipboard",
+};
+type ClipboardState = "remote" | keyof typeof clipboardFeedbackLabels;
 
-export const atelierClientModule: WorkspaceClientModule = {
+export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "desktop",
   install({ application, Controller, hooks }) {
     class DesktopPaneController extends Controller {
-      static targets = ["frame", "fullscreen", "status", "detail"];
+      static targets = ["frame", "fullscreen", "status", "detail", "clipboardInput", "clipboardCopy", "clipboardFeedback", "clipboardFeedbackLabel"];
       declare readonly frameTarget: HTMLIFrameElement;
       declare readonly fullscreenTarget: HTMLButtonElement;
       declare readonly statusTargets: HTMLElement[];
       declare readonly detailTarget: HTMLElement;
+      declare readonly clipboardInputTarget: HTMLTextAreaElement;
+      declare readonly clipboardCopyTarget: HTMLButtonElement;
+      declare readonly clipboardFeedbackTarget: HTMLElement;
+      declare readonly clipboardFeedbackLabelTarget: HTMLElement;
+      private clipboardTimer?: ReturnType<typeof setTimeout>;
       private viewerOrigin?: string;
+      private clipboardState: ClipboardState = "remote";
 
       connect(): void {
         this.fullscreenTarget.hidden = !document.fullscreenEnabled;
@@ -26,8 +32,15 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.loaded();
       }
 
+      disconnect(): void {
+        this.cancelClipboardSend();
+      }
+
       reset(): void {
+        this.cancelClipboardSend();
         this.viewerOrigin = undefined;
+        this.clipboardInputTarget.value = "";
+        this.setClipboardState("remote");
         this.show("connecting", "");
       }
 
@@ -36,16 +49,67 @@ export const atelierClientModule: WorkspaceClientModule = {
         // The canonical iframe URL redirects to an assigned ingress origin.
         // This non-sensitive request discovers it; replies must prove possession
         // of the per-frame token before we pin and check that origin.
-        this.frameTarget.contentWindow?.postMessage({ type: "atelier:desktop:status-request" }, "*");
+        this.frameTarget.contentWindow?.postMessage({ type: "agents-in-the-cloud:desktop:status-request" }, "*");
       }
 
       receive(event: MessageEvent): void {
         const data = event.data;
         if (event.source !== this.frameTarget.contentWindow || event.origin === "null") return;
-        if (!Value.Check(statusMessage, data) || !this.frameTarget.dataset.statusToken || data.token !== this.frameTarget.dataset.statusToken) return;
+        if (!Value.Check(desktopViewerMessage, data) || !this.frameTarget.dataset.statusToken || data.token !== this.frameTarget.dataset.statusToken) return;
         if (this.viewerOrigin && event.origin !== this.viewerOrigin) return;
         this.viewerOrigin = event.origin;
-        this.show(data.phase, data.detail);
+        if (data.type === "agents-in-the-cloud:desktop:status") {
+          this.show(data.phase, data.detail);
+        } else if (data.type === "agents-in-the-cloud:desktop:clipboard") {
+          // VNC can echo text we just sent; that doesn't make it a remote copy.
+          if (data.text !== this.clipboardInputTarget.value) {
+            this.cancelClipboardSend();
+            this.clipboardInputTarget.value = data.text;
+            this.setClipboardState("remote");
+          }
+        } else if (this.clipboardState === "sending" && data.text === this.clipboardInputTarget.value) {
+          this.setClipboardState("sent");
+        }
+      }
+
+      queueClipboard(event: InputEvent | CompositionEvent): void {
+        this.cancelClipboardSend();
+        this.setClipboardState("pending");
+        if (event instanceof InputEvent && event.isComposing) return;
+        this.clipboardTimer = setTimeout(() => this.publishClipboard(), 300);
+      }
+
+      clipboardKeydown(event: KeyboardEvent): void {
+        if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+        event.preventDefault();
+        this.publishClipboard();
+      }
+
+      private publishClipboard(): void {
+        this.cancelClipboardSend();
+        this.setClipboardState("sending");
+        this.frameTarget.contentWindow!.postMessage({
+          type: "agents-in-the-cloud:desktop:clipboard-set",
+          token: this.frameTarget.dataset.statusToken,
+          text: this.clipboardInputTarget.value,
+        }, this.viewerOrigin!);
+      }
+
+      private cancelClipboardSend(): void {
+        clearTimeout(this.clipboardTimer);
+        this.clipboardTimer = undefined;
+      }
+
+      private setClipboardState(state: ClipboardState): void {
+        this.clipboardState = state;
+        this.clipboardCopyTarget.dataset.copyText = this.clipboardInputTarget.value;
+        this.clipboardCopyTarget.hidden = state !== "remote" || this.clipboardInputTarget.value.length === 0;
+        this.clipboardFeedbackTarget.hidden = state === "remote";
+        if (state !== "remote") {
+          this.clipboardFeedbackTarget.dataset.state = state;
+          this.clipboardFeedbackTarget.title = clipboardFeedbackLabels[state];
+          this.clipboardFeedbackLabelTarget.textContent = clipboardFeedbackLabels[state];
+        }
       }
 
       async toggleFullscreen(): Promise<void> {
@@ -58,6 +122,11 @@ export const atelierClientModule: WorkspaceClientModule = {
       }
 
       private show(phase: string, detail: string): void {
+        this.clipboardInputTarget.disabled = phase !== "connected";
+        if (phase !== "connected") {
+          this.cancelClipboardSend();
+          if (this.clipboardState !== "remote") this.setClipboardState("pending");
+        }
         for (const status of this.statusTargets) status.hidden = status.dataset.phase !== phase;
         this.detailTarget.textContent = detail;
       }

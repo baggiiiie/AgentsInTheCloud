@@ -1,6 +1,6 @@
 <p align="center">
-  <a href="https://lucasmeijer.com/atelier/">
-    <img src="docs/readme/logo.png" alt="Atelier — made for humans" width="340">
+  <a href="https://lucasmeijer.com/agents-in-the-cloud/">
+    <img src="docs/readme/logo.png" alt="AgentsInTheCloud — made for humans" width="340">
   </a>
 </p>
 
@@ -10,17 +10,17 @@
 - Free, [MIT licensed](LICENSE)
 
 <p align="center">
-  <a href="https://lucasmeijer.com/atelier/">Website</a> · <a href="#installation">Install Atelier</a> · <a href="#frequently-asked-questions">FAQ</a>
+  <a href="https://lucasmeijer.com/agents-in-the-cloud/">Website</a> · <a href="#installation">Install AgentsInTheCloud</a> · <a href="#frequently-asked-questions">FAQ</a>
 </p>
 
-## See Atelier in action
+## See AgentsInTheCloud in action
 
-Click a video preview to watch on Tella, or [watch the embedded videos on the website](https://lucasmeijer.com/atelier/).
+Click a video preview to watch on Tella, or [watch the embedded videos on the website](https://lucasmeijer.com/agents-in-the-cloud/).
 
 ### Elevator pitch
 
 <a href="https://www.tella.tv/video/vid_cmtrgqf7l01fh0agmatvu18vg">
-  <img src="docs/readme/elevator-pitch.jpg" alt="Watch the Atelier elevator pitch — give it a try" width="270">
+  <img src="docs/readme/elevator-pitch.jpg" alt="Watch the AgentsInTheCloud elevator pitch — give it a try" width="270">
 </a>
 
 [**▶ Play elevator pitch**](https://www.tella.tv/video/vid_cmtrgqf7l01fh0agmatvu18vg)
@@ -53,17 +53,17 @@ Click a video preview to watch on Tella, or [watch the embedded videos on the we
 
 [![Watch: Are cloud agents a good idea for me?](docs/readme/are-cloud-agents-a-good-idea-for-me.jpg)](https://www.tella.tv/video/vid_cmtmuv6vb000s0bgmfkq1aw6h)
 
-### Installing Atelier
+### Installing AgentsInTheCloud
 
-[![Watch: Installing Atelier](docs/readme/installing-atelier.jpg)](https://www.tella.tv/video/vid_cmtn2t2ic00g80agm1wce4yvs)
+[![Watch: Installing AgentsInTheCloud](docs/readme/installing-agents-in-the-cloud.jpg)](https://www.tella.tv/video/vid_cmtn2t2ic00g80agm1wce4yvs)
 
 ## Installation
 
-1. **Connect to your server.** SSH into a Linux server that will only be used for Atelier.
-2. **Install Atelier.** Run:
+1. **Connect to your server.** SSH into a Linux server that will only be used for AgentsInTheCloud.
+2. **Install AgentsInTheCloud.** Run:
 
    ```sh
-   curl -fsSL https://lucasmeijer.com/get-atelier | bash
+   curl -fsSL https://lucasmeijer.com/get-agents-in-the-cloud | bash
    ```
 
 ## Frequently asked questions
@@ -83,9 +83,9 @@ I use 8 CPU, 16 GB of memory, and a 320 GB disk in a data center that’s relati
 </details>
 
 <details>
-<summary>Why does Atelier use Tailscale?</summary>
+<summary>Why does AgentsInTheCloud use Tailscale?</summary>
 
-Atelier has access to your code and development tools, so it shouldn’t be open to the internet. Tailscale makes it easy to keep it accessible only to you.
+AgentsInTheCloud has access to your code and development tools, so it shouldn’t be open to the internet. Tailscale makes it easy to keep it accessible only to you.
 
 </details>
 

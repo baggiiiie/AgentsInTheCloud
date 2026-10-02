@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-for (const innerAtelier of [false, true]) for (const scenario of ["cached", "missing", "different-signature", "no-cache"] as const) {
-  test(`default image resolution: ${scenario}, inner=${innerAtelier}`, async () => {
+for (const innerAgentsInTheCloud of [false, true]) for (const scenario of ["cached", "missing", "different-signature", "no-cache"] as const) {
+  test(`default image resolution: ${scenario}, inner=${innerAgentsInTheCloud}`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "default-image-test-"));
     const namespace = directory.split("/").at(-1)!;
     try {
@@ -14,14 +14,19 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
       await writeFile(client, `
         import {mock} from 'bun:test';
         const fs = await import('node:fs');
-        mock.module('node:fs', () => ({...fs, existsSync: path => path === '/run/atelier-parent' ? ${innerAtelier} : fs.existsSync(path)}));
+        mock.module('node:fs', () => ({...fs, existsSync: path => path === '/run/agents-in-the-cloud-parent' ? ${innerAgentsInTheCloud} : fs.existsSync(path)}));
         const localPath = ${JSON.stringify(join(import.meta.dir, "local-images.ts"))};
         const local = await import(localPath);
-        const checks = [], builds = [];
+        const checks = [], builds = [], prunes = [];
+        // Building is simulated below, so its detached cleanup must also be
+        // simulated: otherwise this unit test prunes the developer's real images.
+        const prunePath = ${JSON.stringify(join(import.meta.dir, "prune.ts"))};
+        const prune = await import(prunePath);
+        mock.module(prunePath, () => ({...prune, pruneSupersededWorkspaceImages: kind => { prunes.push(kind); }}));
         mock.module(localPath, () => ({...local, reuseDefaultWorkspaceImage: async tag => {
           checks.push(tag);
           // A different signature must not count as the requested image.
-          return ${JSON.stringify(scenario)} === 'different-signature' ? tag === 'atelier-workspace:old-default' : ${scenario === "cached" || scenario === "no-cache"};
+          return ${JSON.stringify(scenario)} === 'different-signature' ? tag === 'agents-in-the-cloud-workspace:old-default' : ${scenario === "cached" || scenario === "no-cache"};
         }}));
         const observablePath = ${JSON.stringify(join(import.meta.dir, "../../observable-terminal/src/server/index.ts"))};
         const observable = await import(observablePath);
@@ -33,9 +38,9 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
         try {
           const first = await ensureDefaultWorkspaceImage();
           const second = await ensureDefaultWorkspaceImage();
-          console.log(JSON.stringify({first,second,checks,builds}));
+          console.log(JSON.stringify({first,second,checks,builds,prunes}));
         } catch (error) {
-          console.log(JSON.stringify({error: error.message,checks,builds}));
+          console.log(JSON.stringify({error: error.message,checks,builds,prunes}));
           process.exitCode = 1;
         }
       `);
@@ -49,20 +54,22 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
         const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
         expect(stderr).toBe("");
         const result = JSON.parse(stdout);
-        if (innerAtelier && (scenario === "missing" || scenario === "different-signature")) {
+        if (innerAgentsInTheCloud && (scenario === "missing" || scenario === "different-signature")) {
           expect(code).toBe(1);
           expect(result.checks).toHaveLength(1);
-          const signature = result.checks[0].slice("atelier-workspace:".length);
+          const signature = result.checks[0].slice("agents-in-the-cloud-workspace:".length);
           expect(signature).toMatch(/^[a-f0-9]{16}$/);
-          expect(result.error).toBe(`Inner Atelier needs a default workspace image with signature ${signature} but that has not been preloaded. Exiting instead of building this image, so we do not flood the outer atelier with many parallel image builds.`);
+          expect(result.error).toBe(`Inner AgentsInTheCloud needs a default workspace image with signature ${signature} but that has not been preloaded. Exiting instead of building this image, so we do not flood the outer agents-in-the-cloud with many parallel image builds.`);
           expect(result.builds).toEqual([]);
+          expect(result.prunes).toEqual([]);
           continue;
         }
         expect(code).toBe(0);
-        expect(result.first).toMatch(/^atelier-workspace:[a-f0-9]{16}$/);
+        expect(result.first).toMatch(/^agents-in-the-cloud-workspace:[a-f0-9]{16}$/);
         expect(result.second).toBe(result.first);
-        expect(result.checks).toEqual(!innerAtelier && scenario === "no-cache" ? [] : [result.first, result.first]);
-        expect(result.builds).toHaveLength(innerAtelier || scenario === "cached" ? 0 : 2);
+        expect(result.checks).toEqual(!innerAgentsInTheCloud && scenario === "no-cache" ? [] : [result.first, result.first]);
+        expect(result.builds).toHaveLength(innerAgentsInTheCloud || scenario === "cached" ? 0 : 2);
+        expect(result.prunes).toEqual(result.builds.map(() => "default"));
         for (const command of result.builds) {
           expect(command).toContain("docker");
           expect(command).toContain(result.first);
@@ -71,7 +78,7 @@ for (const innerAtelier of [false, true]) for (const scenario of ["cached", "mis
       }
     } finally {
       await rm(directory, { recursive: true });
-      await rm(join("/tmp/atelier-workspace-image-context", namespace), { recursive: true, force: true });
+      await rm(join("/tmp/agents-in-the-cloud-workspace-image-context", namespace), { recursive: true, force: true });
     }
   });
 }

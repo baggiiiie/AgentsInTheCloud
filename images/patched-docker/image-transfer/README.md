@@ -1,12 +1,12 @@
-# atelier-image-transfer
+# agents-in-the-cloud-image-transfer
 
-Transfer an image's metadata between Atelier's containerd instances while reusing
+Transfer an image's metadata between AgentsInTheCloud's containerd instances while reusing
 already prepared, shared EROFS layers. No registry, layer copying, persistent
 service, or network access is needed in the destination workspace.
 
 ## Why this exists
 
-Atelier System can build a default-workspace image locally. An agent in a separate
+AgentsInTheCloud System can build a default-workspace image locally. An agent in a separate
 workspace must be able to build from that exact image. The workspace has its own
 containerd image records and snapshots, even though both instances can see the
 same EROFS cache files. Merely sharing the cache does not install the image.
@@ -26,10 +26,10 @@ The same binary runs at both ends:
 
 ```sh
 # Sender: containerd has the image manifest and configuration.
-atelier-image-transfer export --platform linux/arm64 docker.io/library/example:dev
+agents-in-the-cloud-image-transfer export --platform linux/arm64 docker.io/library/example:dev
 
 # Receiver: read the metadata-only OCI tar archive from stdin.
-atelier-image-transfer import
+agents-in-the-cloud-image-transfer import
 ```
 
 `export` writes only archive bytes to stdout. `import` writes the usable
@@ -38,20 +38,20 @@ registration succeed. Diagnostics use stderr. Either command accepts `--address`
 and `--namespace`; defaults are `/run/containerd/containerd.sock` and `moby`.
 Flags precede the image argument. There are no configuration environment variables.
 
-Atelier can stream between processes over Docker exec, without a temporary file:
+AgentsInTheCloud can stream between processes over Docker exec, without a temporary file:
 
 ```sh
 set -o pipefail
-docker exec system atelier-image-transfer export docker.io/library/example:dev \
-  | docker exec -i workspace atelier-image-transfer import
+docker exec system agents-in-the-cloud-image-transfer export docker.io/library/example:dev \
+  | docker exec -i workspace agents-in-the-cloud-image-transfer import
 ```
 
 This example assumes the caller's Docker daemon manages both named containers.
-In Atelier's nested layout, the sender normally runs in the app container with
+In AgentsInTheCloud's nested layout, the sender normally runs in the app container with
 System's containerd socket mounted; the receiver runs through System's Docker
 socket inside the workspace. Do not use Docker exec's `--tty` for binary transport.
 
-Before transfer, Atelier must build or fetch the source image and prepare its
+Before transfer, AgentsInTheCloud must build or fetch the source image and prepare its
 cache, for example:
 
 ```sh
@@ -111,16 +111,16 @@ does not solve those operations.
 
 ## Build and test
 
-The parent Dockerfile builds `/usr/local/bin/atelier-image-transfer` for both
+The parent Dockerfile builds `/usr/local/bin/agents-in-the-cloud-image-transfer` for both
 linux/arm64 and linux/amd64. Its Go module pins containerd to the same
 `v2.4.0-beta.0` as the runtime. Update those together. The separate helper build
 uses Go 1.26.8 because the containerd module requires Go 1.26.3 or newer.
 
 ```sh
 (cd images/patched-docker/image-transfer && go test ./... && go vet ./...)
-images/patched-docker/build.sh atelier-image-transfer:test --builder desktop-linux --load
-bun images/patched-docker/image-transfer-test.ts atelier-image-transfer:test linux/arm64
-bun images/patched-docker/image-transfer-test.ts atelier-image-transfer:test linux/amd64
+images/patched-docker/build.sh agents-in-the-cloud-image-transfer:test --builder desktop-linux --load
+bun images/patched-docker/image-transfer-test.ts agents-in-the-cloud-image-transfer:test linux/arm64
+bun images/patched-docker/image-transfer-test.ts agents-in-the-cloud-image-transfer:test linux/amd64
 ```
 
 The integration test owns and removes its containers/volumes. It builds a local

@@ -1,11 +1,11 @@
-import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { atelierDataPath, getAtelierRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
-import type { AgentServiceTier } from "@atelier/shared";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
+import type { AgentServiceTier } from "@agents-in-the-cloud/shared";
 import { modelRefValue, type ModelRef } from "./model-reference.ts";
 
-function settingsPath(): string { return atelierDataPath(getAtelierRuntimeContext(), "pi-config", "models.json"); }
+function settingsPath(): string { return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "pi-config", "models.json"); }
 const stringSchema = Type.String();
 function object(value: JsonValue | undefined): JsonObject { return isJsonObject(value) ? value : {}; }
 

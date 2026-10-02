@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
-import { setToggleValue, type ToggleChangeEvent } from "@atelier/design-system/toggle/client";
-import { type WorkspaceClientControllerConstructor } from "@atelier/shared";
+import { setToggleValue, type ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
+import { type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
@@ -24,7 +24,7 @@ function fileDraft(url: string, file: EditableFileResponse): FileDraft {
     existing.changedOnDisk(file);
     return existing;
   }
-  const key = `atelier:file-draft:${url}`;
+  const key = `agents-in-the-cloud:file-draft:${url}`;
   const stored = localStorage.getItem(key);
   let base = file;
   let content = file.content;
@@ -121,8 +121,8 @@ export function createFileEditorController(Controller: WorkspaceClientController
         }
       }, { signal });
       // SAFETY: The files-refresh event carries EditorRefreshDetail.
-      window.addEventListener("atelier:files-refresh", this.refreshRequested as EventListener, { signal });
-      this.element.addEventListener("atelier:file-editor-refresh", this.refreshDisk, { signal });
+      window.addEventListener("agents-in-the-cloud:files-refresh", this.refreshRequested as EventListener, { signal });
+      this.element.addEventListener("agents-in-the-cloud:file-editor-refresh", this.refreshDisk, { signal });
       void this.load(signal).catch((error: Error) => {
         if (this.isCurrentConnection(signal)) this.showLoadError(error);
       });

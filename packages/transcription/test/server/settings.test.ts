@@ -8,7 +8,7 @@ import { transcriptionSettingsContribution } from "../../src/server/settings.ts"
 let directory: string | undefined;
 
 async function useTemporaryDataDirectory(): Promise<string> {
-  directory = await mkdtemp(join(tmpdir(), "atelier-transcription-settings-"));
+  directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-transcription-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   return directory;
 }
@@ -44,8 +44,8 @@ describe("transcription settings", () => {
     const form = new FormData();
     form.set("model", "nemotron-3.5");
     const response = await transcriptionSettingsContribution.handleAction!({
-      request: new Request("http://atelier/settings/transcription-model", { method: "POST", body: form }),
-      url: new URL("http://atelier/settings/transcription-model"),
+      request: new Request("http://agents-in-the-cloud/settings/transcription-model", { method: "POST", body: form }),
+      url: new URL("http://agents-in-the-cloud/settings/transcription-model"),
     });
     expect(response?.headers.get("content-type")).toContain("text/vnd.turbo-stream.html");
     expect(await readTranscriptionModel()).toBe("nemotron-3.5");

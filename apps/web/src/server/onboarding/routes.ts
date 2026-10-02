@@ -1,13 +1,13 @@
 import { finishOnboarding, onboardingCompleted } from "./state.ts";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { turboStreamResponse } from "@atelier/shared";
-import { hasWorkspaceGitHubToken } from "@atelier/proxy-egress";
-import { hasAvailableConfiguredModel, renderModelSetupDialog } from "@atelier/llm/server";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { agentsInTheCloudBrandIconHtml } from "@agents-in-the-cloud/design-system/icons";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { hasWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { hasAvailableConfiguredModel, renderModelSetupDialog } from "@agents-in-the-cloud/llm/server";
 import { renderGitHubConnectButton, renderGitHubSetup } from "../settings/github.ts";
-import { update } from "@atelier/shared/http";
+import { update } from "@agents-in-the-cloud/shared/http";
 
 export async function renderOnboardingDialog(options: { includeCompleted?: boolean; resumeAfter?: "github" } = {}): Promise<string> {
   if (!options.includeCompleted && !options.resumeAfter && await onboardingCompleted()) return "";
@@ -23,8 +23,8 @@ export async function renderOnboardingDialog(options: { includeCompleted?: boole
     : `<form method="post" action="/onboarding/finish" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption } })}</form>`;
   return dialogHtml({
     element: { id: "onboarding_dialog", attributesHtml: "data-dialog-auto-show" },
-    iconHtml: Icons.Atelier,
-    titleCaption: "Set up Atelier",
+    iconHtml: agentsInTheCloudBrandIconHtml,
+    titleCaption: "Set up AgentsInTheCloud",
     bodyHtml: `<div class="onboarding-progress" aria-label="Onboarding progress"><span class="onboarding-progress-item" aria-current="step"></span>${needsModelsStep ? '<span class="onboarding-progress-item"></span>' : ""}</div>
       <div class="onboarding-body form-stack"><h2 class="title">Connect GitHub</h2>${renderGitHubSetup("onboarding")}</div>`,
     bodyLayout: "full-bleed",

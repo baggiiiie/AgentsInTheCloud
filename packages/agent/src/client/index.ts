@@ -1,6 +1,6 @@
 export {
   agentClientModule,
-  agentClientModule as atelierClientModule,
+  agentClientModule as agentsInTheCloudClientModule,
   createHtmlAutocompleteController,
   PromptHistoryNavigator,
 } from "./agent-controllers.ts";

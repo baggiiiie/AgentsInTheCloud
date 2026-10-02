@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { buttonHtml } from "@atelier/design-system/button";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { escapeHtml } from "@atelier/shared";
-import { response } from "@atelier/shared/http";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
 
-const managed = () => existsSync("/run/atelier-system/access-v1");
+const managed = () => existsSync("/run/agents-in-the-cloud-system/access-v1");
 const schema = Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), connectionState: Type.String(), authUrl: Type.Optional(Type.String()), error: Type.Optional(Type.String()) });
 export async function renderAccessSettings(source = true): Promise<string> {
   if (!managed()) return "";

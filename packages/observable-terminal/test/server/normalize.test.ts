@@ -36,7 +36,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("interactive attachments configure tmux-owned scrollback before attaching", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 80, rows: 24, socketName: "isolated" });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 80, rows: 24, socketName: "isolated" });
     const bridge = JSON.parse(args.at(-1)!);
     expect(bridge.args).toEqual([
       "-L", "isolated",
@@ -52,7 +52,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("read-only attachments do not configure scrollback", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 80, rows: 24, readonly: true });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 80, rows: 24, readonly: true });
     expect(JSON.parse(args.at(-1)!).args).toEqual(["attach-session", "-r", "-t", "s"]);
   });
 
@@ -72,7 +72,7 @@ describe("observable terminal normalization", () => {
   });
 
   test("builds readonly fixed-size attach arguments", () => {
-    const args = buildAttachArgs({ containerName: "atelier-ws", session: "s", cols: 120, rows: 30, readonly: true, fixedSize: true });
+    const args = buildAttachArgs({ containerName: "agents-in-the-cloud-ws", session: "s", cols: 120, rows: 30, readonly: true, fixedSize: true });
     expect(args).toContain("-i");
     expect(args).not.toContain("-it");
     const bridge = JSON.parse(args.at(-1)!);
@@ -82,4 +82,26 @@ describe("observable terminal normalization", () => {
     expect(bridge.cols).toBe(120);
     expect(bridge.rows).toBe(30);
   });
+});
+
+test("receipt UUID sessions attach read-only to an existing server using a window target", async () => {
+  const socketName = `agents-in-the-cloud-attach-${crypto.randomUUID()}`;
+  const session = `agents-in-the-cloud-agent-${crypto.randomUUID()}`;
+  const run = async (args: string[]) => {
+    const process = Bun.spawn(["tmux", "-L", socketName, ...args], { stdout: "pipe", stderr: "pipe" });
+    return { code: await process.exited, output: await new Response(process.stdout).text(), error: await new Response(process.stderr).text() };
+  };
+  expect((await run(["new-session", "-d", "-s", session, "sleep 30"])).code).toBe(0);
+  try {
+    const args = buildAttachArgs({ containerName: "unused", session, cols: 120, rows: 30, readonly: true, fixedSize: true, requireExistingServer: true });
+    const bridge = JSON.parse(args.at(-1)!);
+    expect(bridge.args[0]).toBe("-N");
+    expect(bridge.args).not.toContain("-L");
+    // Execute the actual attach prelude against tmux. The old bare session
+    // target fails here with 'no such window' despite an existing session.
+    const prelude = bridge.args.slice(1, bridge.args.indexOf("attach-session") - 1);
+    expect(await run(prelude)).toMatchObject({ code: 0, error: "" });
+    expect((await run(["display-message", "-p", "-t", `${session}:`, "#{window_width}x#{window_height}"])).output.trim()).toBe("120x30");
+    expect(bridge.args.slice(-4)).toEqual(["attach-session", "-r", "-t", session]);
+  } finally { await run(["kill-server"]); }
 });

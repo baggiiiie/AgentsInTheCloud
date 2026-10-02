@@ -1,8 +1,8 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { invalidArguments, type JsonObject } from "@atelier/core";
-import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, createPiModelRuntime, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@atelier/llm/server";
-import type { AgentLaunchFooterContext } from "@atelier/shared";
+import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, createPiModelRuntime, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@agents-in-the-cloud/llm/server";
+import type { AgentLaunchFooterContext } from "@agents-in-the-cloud/shared";
 
 const settingsSchema = Type.Object({ model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()) });
 

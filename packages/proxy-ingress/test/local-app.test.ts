@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { WorkspaceHttpAppBackend } from "@atelier/shared";
+import type { WorkspaceHttpAppBackend } from "@agents-in-the-cloud/shared";
 import { adaptLocalAppResponse, isSameLocalApp, localAppHost, translateLocalAppOrigin } from "../src/ingress/local-app.ts";
 import { createWorkspaceIngress } from "../src/ingress/index.ts";
 
@@ -33,10 +33,42 @@ describe("local app compatibility", () => {
   });
 
   test("uses effective default ports and HTTP/HTTPS origins", () => {
-    expect(localAppHost(new URL("http://127.0.0.1/"))).toBe("localhost:80");
-    expect(localAppHost(new URL("https://127.0.0.1/"))).toBe("localhost:443");
-    expect(isSameLocalApp(new URL("https://127.0.0.1/"), new URL("https://localhost:443/"))).toBe(true);
-    expect(isSameLocalApp(new URL("https://127.0.0.1/"), new URL("http://localhost:443/"))).toBe(false);
+    const app = (target: string): WorkspaceHttpAppBackend => ({ kind: "http", target: new URL(target) });
+    expect(localAppHost(app("http://127.0.0.1/"))).toBe("localhost:80");
+    expect(localAppHost(app("https://127.0.0.1/"))).toBe("localhost:443");
+    expect(isSameLocalApp(app("https://127.0.0.1/"), new URL("https://localhost:443/"))).toBe(true);
+    expect(isSameLocalApp(app("https://127.0.0.1/"), new URL("http://localhost:443/"))).toBe(false);
+  });
+
+  describe("*.localhost apps", () => {
+    const subdomainApp: WorkspaceHttpAppBackend = { ...backend, appHost: "agents.localhost" };
+
+    test.each([
+      ["http://agents.localhost:5173/next", "https://preview.example:41000/next"],
+      ["http://AGENTS.localhost:5173/next", "https://preview.example:41000/next"],
+      ["/next", "https://preview.example:41000/next"],
+      ["http://localhost:5173/next", "http://localhost:5173/next"],
+      ["http://other.agents.localhost:5173/next", "http://other.agents.localhost:5173/next"],
+      ["http://agents.localhost:8080/next", "http://agents.localhost:8080/next"],
+    ])("rewrites only redirects to the same subdomain %s", (location, expected) => {
+      expect(patch(location, subdomainApp).headers.get("location")).toBe(expected);
+    });
+
+    test("plain localhost apps do not adopt subdomain redirects", () => {
+      expect(patch("http://agents.localhost:5173/next").headers.get("location")).toBe("http://agents.localhost:5173/next");
+    });
+
+    test("sends the subdomain as the app's host and origin", () => {
+      expect(localAppHost(subdomainApp)).toBe("agents.localhost:5173");
+      const headers = new Headers({ origin: "https://preview.example:41000" });
+      translateLocalAppOrigin(subdomainApp, headers, "https://preview.example:41000");
+      expect(headers.get("origin")).toBe("http://agents.localhost:5173");
+    });
+
+    test("makes subdomain cookies host-only", () => {
+      const response = adaptLocalAppResponse(subdomainApp, new Response(null, { headers: { "set-cookie": "session=x; Domain=agents.localhost; Path=/" } }), "https://preview.example");
+      expect(response.headers.getSetCookie()).toEqual(["session=x; Path=/"]);
+    });
   });
 
   test("makes explicitly local cookies host-only without combining cookies or weakening attributes", () => {
@@ -131,7 +163,7 @@ describe("local app compatibility", () => {
     });
     const publicOrigin = `https://preview.example:${port}`;
     const originHeader = requestOrigin === "same-origin" ? publicOrigin : requestOrigin === "missing" ? null : requestOrigin;
-    const headers = new Headers({ host: `preview.example:${port}`, "x-forwarded-proto": "https", "x-atelier-public-origin": "https://spoofed.example", forwarded: "host=spoofed.example;proto=https", referer: "https://attacker.example/form", cookie: "session=ok", authorization: "Bearer app-token" });
+    const headers = new Headers({ host: `preview.example:${port}`, "x-forwarded-proto": "https", "x-agents-in-the-cloud-public-origin": "https://spoofed.example", forwarded: "host=spoofed.example;proto=https", referer: "https://attacker.example/form", cookie: "session=ok", authorization: "Bearer app-token" });
     if (originHeader !== null) headers.set("origin", originHeader);
     try {
       await ingress.initialize();
@@ -154,7 +186,7 @@ describe("local app compatibility", () => {
       for (const request of observed) {
         expect(request.get("host")).toBe(`localhost:${upstream.port}`);
         expect(request.get("x-forwarded-host")).toBe(`localhost:${upstream.port}`);
-        expect(request.get("x-atelier-public-origin")).toBe(publicOrigin);
+        expect(request.get("x-agents-in-the-cloud-public-origin")).toBe(publicOrigin);
         expect(request.get("forwarded")).toBeNull();
         expect(request.get("x-forwarded-proto")).toBe("http");
         expect(request.get("x-forwarded-port")).toBe(String(upstream.port));

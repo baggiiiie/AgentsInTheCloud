@@ -1,7 +1,7 @@
-import { createKeyedOperationQueue, type AtelierEventBus } from "@atelier/core";
-import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@atelier/workspace";
+import { createKeyedOperationQueue, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@agents-in-the-cloud/workspace";
 import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
-import { cheapestAvailableProviderModel, createPiModelRuntime, type ModelRef } from "@atelier/llm/server";
+import { cheapestAvailableProviderModel, createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/server";
 import { listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 /**
@@ -72,7 +72,7 @@ interface AgentSessionTitleStore {
 }
 
 export function createAgentSessionTitleSetter(store: AgentSessionTitleStore) {
-  return async (agent: WorkspaceAgentConversationInfo, title: string, options: { events?: AtelierEventBus; onlyIfUnnamed?: boolean } = {}): Promise<WorkspaceAgentConversationInfo> => {
+  return async (agent: WorkspaceAgentConversationInfo, title: string, options: { events?: AgentsInTheCloudEventBus; onlyIfUnnamed?: boolean } = {}): Promise<WorkspaceAgentConversationInfo> => {
     const result = await serializeTitleOperation(agent.workspaceId, async () => {
       const current = (await store.listConversations(agent.workspaceId)).find((candidate) => candidate.conversationId === agent.conversationId);
       if (!current) throw new Error(`Agent conversation not found: ${agent.conversationId}`);
@@ -107,7 +107,7 @@ function logAgentTitleSuggestionError(agent: { workspaceId: string; conversation
   console.error("could not suggest Agent session title", { workspaceId: agent.workspaceId, conversationId: agent.conversationId, model: model ? `${model.provider}/${model.id}` : undefined, message, ...details });
 }
 
-function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string }, userMessages: string[], options: { events?: AtelierEventBus; agentModel?: ModelRef }): void {
+function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string }, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef }): void {
   const promptText = userMessages.map((message) => message.trim()).filter(Boolean).join("\n\n");
   if (!promptText) return;
 
@@ -198,10 +198,10 @@ export async function suggestSessionSlug(userPrompt: string, selectedModel?: Mod
   return normalizeSlug(textFromResponse(response));
 }
 
-export function maybeNameAgentFromPrompt(agent: WorkspaceAgentConversationInfo, userMessages: string[], options: { events?: AtelierEventBus; agentModel?: ModelRef } = {}): void {
+export function maybeNameAgentFromPrompt(agent: WorkspaceAgentConversationInfo, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef } = {}): void {
   suggestAgentTitle(agent, userMessages, options);
 }
 
-export function maybeNameWorkspaceFromPrompt(workspaceId: string, prompt: string, options: { events?: AtelierEventBus; agentModel?: ModelRef } = {}): void {
+export function maybeNameWorkspaceFromPrompt(workspaceId: string, prompt: string, options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef } = {}): void {
   suggestAgentTitle({ workspaceId }, [prompt], options);
 }

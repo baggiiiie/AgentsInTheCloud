@@ -1,5 +1,5 @@
-import { AtelierCoreError, invalidArguments, withCommandSignal, type AtelierEventBus } from "@atelier/core";
-import type { WorkspaceProvisionRecovery } from "@atelier/shared";
+import { AgentsInTheCloudCoreError, invalidArguments, withCommandSignal, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import type { WorkspaceProvisionRecovery } from "@agents-in-the-cloud/shared";
 
 export interface WorkspaceProvisionProgress {
   detail?: string;
@@ -22,8 +22,8 @@ export interface WorkspaceProvisionSnapshot {
   error?: string;
 }
 
-declare module "@atelier/core" {
-  interface AtelierEventMap {
+declare module "@agents-in-the-cloud/core" {
+  interface AgentsInTheCloudEventMap {
     /** Output from the operation executing in this workspace, never lifecycle state. */
     workspace_provision_progress: WorkspaceProvisionProgress & { workspaceId: string };
   }
@@ -56,7 +56,7 @@ interface ProvisioningState {
 }
 
 /** Owns execution order, progress, and recovery. Consumers render snapshots, not event patches. */
-export function createWorkspaceProvisioning(options: { events?: AtelierEventBus; onChange?: (workspaceId: string) => void; stepTimeoutMs?: number } = {}): WorkspaceProvisioning {
+export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloudEventBus; onChange?: (workspaceId: string) => void; stepTimeoutMs?: number } = {}): WorkspaceProvisioning {
   const runs = new Map<string, ProvisioningState>();
   function cancel(id: string): Promise<void> {
     const run = runs.get(id);
@@ -83,7 +83,7 @@ export function createWorkspaceProvisioning(options: { events?: AtelierEventBus;
     },
     resume(id, action) {
       const run = runs.get(id);
-      if (!run?.pending) throw new AtelierCoreError("workspace_not_ready", `workspace ${id} is not waiting for provisioning confirmation`);
+      if (!run?.pending) throw new AgentsInTheCloudCoreError("workspace_not_ready", `workspace ${id} is not waiting for provisioning confirmation`);
       const pending = run.pending;
       if (action === "continue" && !pending.continuable) throw invalidArguments("This step must succeed before continuing");
       if (action === "retry" && !pending.retryable) throw invalidArguments("This step does not support retry");

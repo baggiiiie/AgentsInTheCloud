@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { collectUnpushedCommits, type UnpushedCommit } from "@atelier/core";
-import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@atelier/shared";
-import { workspaceWorkHostPath } from "@atelier/workspace";
+import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
+import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
+import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, git, gitResult, type ReviewFileStats } from "./diff.ts";
 import { renderFileStats, renderFileSummary, renderReadOnlyReviewFile } from "./render.ts";
 

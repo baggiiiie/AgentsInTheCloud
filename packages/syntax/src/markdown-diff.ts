@@ -1,7 +1,8 @@
 import { createStyleElement, createThemeStyleElement, DiffHunksRenderer, parsePatchFiles, preloadHighlighter, wrapThemeCSS, type ParsedPatch } from "@pierre/diffs";
 import { renderHTML } from "@pierre/diffs/ssr";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { toolDiffOptions } from "./pierre.ts";
+import { wordDiffCSS } from "./diff-options.ts";
 import { HighlightCache } from "./highlight-cache.ts";
 
 // Markdown rendering is synchronous. Load the neutral diff theme up front;
@@ -26,17 +27,17 @@ export function renderMarkdownDiff(code: string, provisional = false): string {
   const html = patches.map((patch) => {
     const metadata = patch.patchMetadata ? renderSnippet(patch.patchMetadata) : "";
     return metadata + patch.files.map((file) => {
-      const renderer = new DiffHunksRenderer({ ...toolDiffOptions, diffIndicators: "classic", hunkSeparators: "metadata", lineDiffType: "none" });
+      const renderer = new DiffHunksRenderer({ ...toolDiffOptions, overflow: "wrap", diffIndicators: "classic", hunkSeparators: "metadata", lineDiffType: "word-alt" });
       const result = renderer.renderDiff({ ...file, lang: "text" })!;
       const rendered = renderHTML([
         createStyleElement(result.css, true),
         createThemeStyleElement(wrapThemeCSS(result.themeStyles, result.baseThemeType ?? "dark")),
-        createStyleElement(toolDiffOptions.unsafeCSS),
+        createStyleElement(`${toolDiffOptions.unsafeCSS} ${wordDiffCSS}`),
         renderer.renderFullAST(result),
       ]);
       renderer.cleanUp();
       const name = file.prevName && file.prevName !== file.name ? `${file.prevName} → ${file.name}` : file.name;
-      return `<section class="markdown-diff-file atelier-pierre-host"><div class="markdown-diff-filename">${escapeHtml(name)}</div><diffs-container data-controller="markdown-diff"><template data-markdown-diff-content>${rendered}</template></diffs-container></section>`;
+      return `<section class="markdown-diff-file agents-in-the-cloud-pierre-host"><div class="markdown-diff-filename">${escapeHtml(name)}</div><diffs-container data-controller="markdown-diff"><template data-markdown-diff-content>${rendered}</template></diffs-container></section>`;
     }).join("");
   }).join("");
   cache.set(code, { html });

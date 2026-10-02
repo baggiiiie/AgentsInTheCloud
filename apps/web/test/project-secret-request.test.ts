@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectSecret, deleteProjectSecret, listProjectSecrets, readProjectWorkspaceSettings, revealProjectSecrets, updateProjectSecret, setProjectSecretValue, projectSecretRoutingRevision } from "@atelier/projects";
+import { addProject, createProjectSecret, deleteProjectSecret, listProjectSecrets, readProjectWorkspaceSettings, revealProjectSecrets, updateProjectSecret, setProjectSecretValue, projectSecretRoutingRevision } from "@agents-in-the-cloud/projects";
 import { createProjectSecretRequester } from "../src/server/project-secret-request.ts";
 
 const request = { envName: "NPM_TOKEN", hostPattern: "registry.npmjs.org", purpose: "Install private dependencies" };
@@ -12,7 +12,7 @@ describe("secure project secret requests", () => {
   let previous: string | undefined;
   let projectId: string;
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "atelier-secret-request-"));
+    dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-secret-request-"));
     previous = process.env.ATELIER_DATA_DIR;
     process.env.ATELIER_DATA_DIR = dir;
     projectId = (await addProject("https://github.com/example/app.git")).project.id;
@@ -41,7 +41,7 @@ describe("secure project secret requests", () => {
     expect(result.status === "saved" && result.settingsRevision).not.toBe(initial.settingsRevision);
     expect(JSON.stringify([result, updates])).not.toContain("very-private-token");
     const secret = (await listProjectSecrets(projectId))[0]!;
-    const requestUrl = new URL(updates[0].details.secretRequestUrl, "http://atelier.local");
+    const requestUrl = new URL(updates[0].details.secretRequestUrl, "http://agents-in-the-cloud.local");
     expect(requestUrl.pathname).toBe(`/projects/${projectId}/secrets/${secret.id}/value`);
     expect(requestUrl.searchParams.get("purpose")).toBe(request.purpose);
   });
@@ -61,13 +61,14 @@ describe("secure project secret requests", () => {
 
   test.each([
     { hostPattern: "old.example.com" },
+    { hostPattern: request.hostPattern, allowInPath: true },
     { hostPattern: request.hostPattern, placeholder: "old-placeholder" },
   ])("rejects existing secrets with conflicting routing before asking for a value: %j", async (routing) => {
     await createProjectSecret(projectId, { ...request, ...routing, secretValue: "original" });
     const initial = await readProjectWorkspaceSettings(projectId);
     const ask = requester(async () => { throw new Error("Must not wait for input"); });
     const updates: any[] = [];
-    await expect(ask(projectId, request, undefined, (update) => updates.push(update))).rejects.toThrow("different host restrictions or placeholder");
+    await expect(ask(projectId, request, undefined, (update) => updates.push(update))).rejects.toThrow("different host restrictions, URL path permissions, or placeholder");
     expect(updates).toEqual([]);
     expect(await readProjectWorkspaceSettings(projectId)).toEqual(initial);
     expect((await revealProjectSecrets(projectId))[0]?.secretValue).toBe("original");
@@ -83,7 +84,7 @@ describe("secure project secret requests", () => {
   test("detects routing changes while a request waits instead of claiming the requested destination is ready", async () => {
     const secret = await createProjectSecret(projectId, request);
     const ask = requester(async () => { await updateProjectSecret(projectId, secret.id, { ...request, hostPattern: "other.example.com" }); });
-    await expect(ask(projectId, request, undefined, undefined)).rejects.toThrow("different host restrictions or placeholder");
+    await expect(ask(projectId, request, undefined, undefined)).rejects.toThrow("different host restrictions, URL path permissions, or placeholder");
     expect((await listProjectSecrets(projectId))[0]?.configured).toBe(false);
   });
 

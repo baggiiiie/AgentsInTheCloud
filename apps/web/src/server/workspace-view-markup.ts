@@ -1,7 +1,7 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 export interface ViewCloseAction {
   action: string;
   label: string;
@@ -23,7 +23,7 @@ export function busyAttentionIndicator(state: { busy?: boolean; requestingAttent
 }
 
 export function fullscreenViewAttributes(key: string, title: string): string {
-  return `data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="view" data-atelier-fullscreen-view-key-value="${escapeHtml(key)}" data-atelier-fullscreen-title-value="${escapeHtml(title)}"`;
+  return `data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="view" data-agents-in-the-cloud-fullscreen-view-key-value="${escapeHtml(key)}" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(title)}"`;
 }
 
 export function selectorCloseForm(close: ViewCloseAction): string {

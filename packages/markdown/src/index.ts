@@ -1,3 +1,4 @@
+export { registerMarkdownEmbed, type MarkdownEmbedContext, type MarkdownEmbedHandler } from "./embeds.ts";
 export { renderMarkdown, type MarkdownRenderOptions } from "./markdown.ts";
 export {
   StreamingMarkdownRenderer,

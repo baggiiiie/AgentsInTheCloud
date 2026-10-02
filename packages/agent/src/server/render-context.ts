@@ -1,5 +1,5 @@
-import type { ModelRef } from "@atelier/llm/server";
-import { domId } from "@atelier/shared";
+import type { ModelRef } from "@agents-in-the-cloud/llm/server";
+import { domId } from "@agents-in-the-cloud/shared";
 import type { SessionImageRef } from "./transcript.ts";
 
 export interface AgentRenderContext {
@@ -13,6 +13,8 @@ export interface AgentRenderContext {
   commentary?: boolean;
   /** Read-only external transcripts use their own detail routes. */
   transcriptBasePath?: string;
+  /** Preserve read-only native branch selection through lazy detail expansion. */
+  transcriptQuery?: string;
   readOnly?: boolean;
 }
 
@@ -56,7 +58,8 @@ export function agentPath(ctx: AgentRenderContext, suffix: string): string {
 }
 
 export function transcriptItemPath(ctx: AgentRenderContext, key: string, query = ""): string {
-  return `${agentPath(ctx, `/transcript-items/${encodeURIComponent(key)}`)}${query}`;
+  const params = [query.replace(/^\?/, ""), ctx.transcriptQuery].filter(Boolean).join("&");
+  return `${agentPath(ctx, `/transcript-items/${encodeURIComponent(key)}`)}${params ? `?${params}` : ""}`;
 }
 
 export function sessionImageUrl(ctx: AgentRenderContext, image: SessionImageRef): string {

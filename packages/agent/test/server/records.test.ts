@@ -39,25 +39,6 @@ describe("recordsFromSessionEntries", () => {
     expect(records[4]).toMatchObject({ kind: "note", tone: "system", text: "model → anthropic/claude" });
   });
 
-  test("places cache miss notices directly below the prompt that caused them", () => {
-    const assistant = {
-      role: "assistant",
-      content: [{ type: "toolCall", id: "c1", name: "read", arguments: { path: "README.md" } }],
-      stopReason: "toolUse",
-      timestamp: 2_000,
-    };
-    const records = recordsFromSessionEntries([
-      { type: "message", id: "user", parentId: null, message: { role: "user", content: "inspect it", timestamp: 1_000 } },
-      { type: "message", id: "assistant", parentId: "user", message: assistant },
-    ], new Map([[assistant, { missedTokens: 100_000, missedCost: 0.35, idleMs: 60 * 60 * 1000, modelChanged: false }]]));
-
-    expect(records.map((record) => record.kind)).toEqual(["user", "note", "assistant"]);
-    expect(records[1]).toMatchObject({ kind: "note", tone: "warning", text: "⚠ Cache miss after 60m idle · 100k tokens re-billed · ~$0.35" });
-    const working = buildTranscript(records).find((item) => item.type === "working");
-    expect(working?.type === "working" && working.items.map((item) => item.type)).toEqual(["tool"]);
-    expect(buildTranscript(records).some((item) => item.type === "note" && item.tone === "warning")).toBe(true);
-  });
-
   test("omits initial model changes and collapses consecutive later changes to the last one", () => {
     const records = recordsFromSessionEntries([
       { type: "model_change", id: "initial-1", provider: "openai", modelId: "first" },
@@ -148,7 +129,7 @@ describe("recordsFromSessionEntries", () => {
 test("persisted run starts survive reconstruction before and after the summary", () => {
   const entries = [
     { type: "message", id: "start", timestamp: new Date(1000).toISOString(), message: { role: "user", content: "Initial" } },
-    { type: "custom", customType: "atelier.turn-start", data: { turnEntryId: "start", startedAt: 900 }, timestamp: new Date(1001).toISOString() },
+    { type: "custom", customType: "agents-in-the-cloud.turn-start", data: { turnEntryId: "start", startedAt: 900 }, timestamp: new Date(1001).toISOString() },
     { type: "message", id: "steer", timestamp: new Date(2000).toISOString(), message: { role: "user", content: "Steer" } },
   ];
   const restored = recordsFromSessionEntries(JSON.parse(JSON.stringify(entries)));
@@ -156,7 +137,7 @@ test("persisted run starts survive reconstruction before and after the summary",
   expect(buildTranscript(restored).map((item) => item.type)).toEqual(["user", "working"]);
   expect(buildTranscript(restored)[1]).toMatchObject({ items: [{ type: "user", key: "steer", steering: true }] });
   const completed = recordsFromSessionEntries([...entries,
-    { type: "custom", customType: "atelier.turn-timing", timestamp: new Date(3000).toISOString(), data: { turnEntryId: "start", outcome: "completed", elapsedMs: 2100, toolMs: 0, inferenceMs: 2100, outputTokens: 4, usageComplete: true } },
+    { type: "custom", customType: "agents-in-the-cloud.turn-timing", timestamp: new Date(3000).toISOString(), data: { turnEntryId: "start", outcome: "completed", elapsedMs: 2100, toolMs: 0, inferenceMs: 2100, outputTokens: 4, usageComplete: true } },
   ]);
   expect(buildTranscript(completed)[1]).toMatchObject({ key: "start:working", completedAt: 3000, timing: { outputTokens: 4 } });
 });

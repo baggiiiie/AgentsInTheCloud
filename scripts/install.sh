@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-system_image=ghcr.io/lucasmeijer/atelier-system:latest
-app_image=ghcr.io/lucasmeijer/atelier:stable
+system_image=ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest
+app_image=ghcr.io/lucasmeijer/agents-in-the-cloud:latest
 action=""
 uninstall_requested=0
 access_mode=""
-system_name=atelier-system
+system_name=agents-in-the-cloud-system
 
 # Keep subprocess output available without turning the welcome into a log tail.
 log_file=""
+legacy_installer=""
 interactive=0
 violet="" cyan="" green="" amber="" dim="" reset=""
 if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
@@ -86,15 +87,16 @@ run_quiet() {
 cleanup() {
   local code=$?
   trap - ERR
+  if [ -n "$legacy_installer" ]; then rm -f "$legacy_installer"; fi
   finish_line
   if [ -n "$active_pid" ] && kill -0 "$active_pid" 2>/dev/null; then
     kill "$active_pid"
     wait "$active_pid" || :
   fi
   if [ "$code" -ne 0 ] && [ "$stop_on_failure" -eq 1 ]; then
-    printf '\n  Stopping Atelier services after installation failure.\n' >&2
+    printf '\n  Stopping AgentsInTheCloud services after installation failure.\n' >&2
     if ! docker stop --time 120 "$system_name" >>"$log_file" 2>&1; then
-      printf '  Could not stop Atelier services. Run: docker stop %s\n' "$system_name" >&2
+      printf '  Could not stop AgentsInTheCloud services. Run: docker stop %s\n' "$system_name" >&2
     fi
     printf '  Local diagnostics: docker logs %s\n' "$system_name" >&2
   fi
@@ -110,19 +112,20 @@ usage() {
   cat <<'HELP'
 Usage: install.sh [options]
 
-Installs Atelier System, or offers actions for an existing installation.
-System replacements preserve the atelier-system volume and interrupt workspaces.
-Update also installs the newest Atelier app on the installation's selected channel.
+Installs AgentsInTheCloud System, or offers actions for an existing installation.
+System replacements preserve the agents-in-the-cloud-system volume and interrupt workspaces.
+Update also installs the newest AgentsInTheCloud app on the installation's selected channel.
 
-  --system-image REF   System image (default: ghcr.io/lucasmeijer/atelier-system:latest)
-  --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/atelier:stable)
+  --system-image REF   System image (default: ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest)
+  --app-image REF      First-install app image (default: ghcr.io/lucasmeijer/agents-in-the-cloud:latest)
   --access-mode MODE  localhost or tailscale (default selected for this machine)
   --action ACTION     install, update, connect, or open
-  --uninstall         Permanently delete all workspaces, settings, and installation storage
+                      connect enables Tailscale without replacing an existing installation
+  --uninstall         Permanently delete installation data (also supports Atelier System)
   -h, --help          Show help
 
 The app image is only used when System has no persisted app selection.
-There is no migration from the previous Atelier installation layout.
+There is no migration from the previous AgentsInTheCloud installation layout.
 HELP
 }
 
@@ -167,7 +170,7 @@ case "$host_os" in
       docker_binary="$(command -v docker)" || fail "install and start Docker Desktop first"
       docker() { sudo -H -u "$SUDO_USER" "$docker_binary" "$@"; }
     fi ;;
-  *) fail "Atelier System requires Linux or macOS with Docker Desktop" ;;
+  *) fail "AgentsInTheCloud System requires Linux or macOS with Docker Desktop" ;;
 esac
 
 root_required=0
@@ -175,7 +178,7 @@ request_root() {
   if [ "$(id -u)" -ne 0 ] && [ "$root_required" -eq 0 ]; then
     command -v sudo >/dev/null || fail "sudo is required for Linux host setup; install sudo or run as root"
     finish_line
-    printf '  Atelier needs administrator access to prepare this Linux host.\n'
+    printf '  AgentsInTheCloud needs administrator access to prepare this Linux host.\n'
     sudo -v || fail "administrator access was not granted"
     root_required=1
   fi
@@ -185,8 +188,8 @@ run_root() {
   if [ "$root_required" -eq 1 ]; then sudo "$@"; else "$@"; fi
 }
 
-log_file="$(mktemp /tmp/atelier-install.XXXXXX)"
-printf "\n  %sLet's get your Atelier setup!%s\n\n" "$violet" "$reset"
+log_file="$(mktemp /tmp/agents-in-the-cloud-install.XXXXXX)"
+printf "\n  %sLet's get your AgentsInTheCloud setup!%s\n\n" "$violet" "$reset"
 status "Preparing your server"
 if ! command -v docker >/dev/null; then
   [ "$action" != uninstall ] || fail "Docker is not installed; no installation can be inspected or removed"
@@ -216,28 +219,59 @@ if [ "$action" != uninstall ] && [ "$host_os" = Linux ] && [ "$desktop" -eq 0 ];
   for filesystem in erofs overlay; do
     if ! grep -qw "$filesystem" /proc/filesystems; then
       if ! command -v modprobe >/dev/null || ! run_root modprobe "$filesystem"; then
-        fail "The Linux kernel that powers your Docker does not have $filesystem, which Atelier requires."
+        fail "The Linux kernel that powers your Docker does not have $filesystem, which AgentsInTheCloud requires."
       fi
-      grep -qw "$filesystem" /proc/filesystems || fail "The Linux kernel that powers your Docker does not have $filesystem, which Atelier requires."
+      grep -qw "$filesystem" /proc/filesystems || fail "The Linux kernel that powers your Docker does not have $filesystem, which AgentsInTheCloud requires."
     fi
   done
   run_root mkdir -p /etc/modules-load.d
-  printf 'erofs\noverlay\n' | run_root tee /etc/modules-load.d/atelier-system.conf >/dev/null
+  printf 'erofs\noverlay\n' | run_root tee /etc/modules-load.d/agents-in-the-cloud-system.conf >/dev/null
 fi
 
 installed=0
 if docker container inspect "$system_name" >/dev/null 2>&1; then installed=1; fi
-if [ "$installed" -eq 0 ] && docker container inspect atelier >/dev/null 2>&1; then
-  fail "an old Atelier container exists; this installer does not migrate old installations"
+# Keep the legacy cleanup implementation frozen: it knows Atelier's names,
+# socket, storage, inventory contract, and DELETE ATELIER confirmation.
+if [ "$action" = uninstall ]; then
+  new_volume="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
+  legacy_system=0
+  if docker container inspect atelier-system >/dev/null 2>&1; then legacy_system=1; fi
+  legacy_volume="$(docker volume ls --format '{{.Name}}' --filter 'name=^atelier-system$')"
+  legacy_container=0
+  if docker container inspect atelier >/dev/null 2>&1; then legacy_container=1; fi
+  if [ "$installed" -eq 1 ] || [ -n "$new_volume" ]; then
+    if [ "$legacy_system" -eq 1 ] || [ -n "$legacy_volume" ] || [ "$legacy_container" -eq 1 ]; then
+      printf '\n  Removing AgentsInTheCloud only. Atelier will remain; run --uninstall again to inspect it.\n'
+    fi
+  elif [ "$legacy_system" -eq 1 ] || [ -n "$legacy_volume" ]; then
+    finish_line
+    printf '\n  Atelier System found. Its legacy uninstaller will count workspaces and ask you to type DELETE ATELIER.\n'
+    printf '  Older System images may need an Atelier System update before uninstall is available. No update will be performed here.\n'
+    legacy_installer="$(mktemp /tmp/atelier-legacy-uninstall.XXXXXX)"
+    if ! curl -fsSL https://raw.githubusercontent.com/lucasmeijer/atelier/34cea8ec/scripts/install.sh -o "$legacy_installer"; then
+      fail "Could not download the legacy Atelier uninstaller. Nothing has been deleted."
+    fi
+    legacy_code=0
+    run_root bash "$legacy_installer" --uninstall || legacy_code=$?
+    exit "$legacy_code"
+  elif [ "$legacy_container" -eq 1 ]; then
+    fail "The old atelier container predates Atelier System. Automatic uninstall is not supported for that layout; its container and data have been retained."
+  fi
+fi
+if [ "$action" != uninstall ] && { docker container inspect atelier-system >/dev/null 2>&1 || docker container inspect atelier >/dev/null 2>&1; }; then
+  fail "Atelier is installed. Run this installer with --uninstall first; AgentsInTheCloud starts fresh and does not import Atelier data."
+fi
+if [ "$installed" -eq 0 ] && docker container inspect agents-in-the-cloud >/dev/null 2>&1; then
+  fail "an old AgentsInTheCloud container exists; this installer does not migrate old installations"
 fi
 if [ "$installed" -eq 0 ]; then
   case "$action" in
     uninstall) ;; # A previous removal may have left only the outer volume.
     ""|install|update) action=install ;;
-    *) fail "Atelier System is not installed" ;;
+    *) fail "AgentsInTheCloud System is not installed" ;;
   esac
 elif [ "$action" = install ]; then
-  fail "Atelier System is already installed; use --action update"
+  fail "AgentsInTheCloud System is already installed; use --action update"
 fi
 
 # The supervisor owns app lifecycle and routing. Query locally so the host
@@ -289,7 +323,7 @@ check_system_running() {
   if [ "$state" != running ]; then
     finish_line
     docker logs --tail 40 "$system_name" 2>&1 | tee -a "$log_file" >&2
-    fail "Atelier services are $state. Container logs are shown above."
+    fail "AgentsInTheCloud services are $state. Container logs are shown above."
   fi
 }
 update_app_channel() {
@@ -316,11 +350,11 @@ update_app_channel() {
     case "$code" in
       0) return ;;
       75) ;;
-      *) fail "Could not request the Atelier app update. See the bootstrap log for details." ;;
+      *) fail "Could not request the AgentsInTheCloud app update. See the bootstrap log for details." ;;
     esac
     # Startup can fail because the saved app is broken. Only the supervisor
     # needs to be available to accept an independent channel update.
-    description="Waiting to update Atelier on the selected channel"
+    description="Waiting to update AgentsInTheCloud on the selected channel"
     code=0
     reply="$(supervisor_status 2>>"$log_file")" || code=$?
     if [ "$code" -eq 0 ]; then
@@ -338,7 +372,7 @@ update_app_channel() {
       fail "The supervisor returned an invalid status."
     fi
     status "$description" "$((SECONDS-start))s"
-    [ "$((SECONDS-start))" -lt 2400 ] || fail "Atelier System did not accept the app update within 40 minutes."
+    [ "$((SECONDS-start))" -lt 2400 ] || fail "AgentsInTheCloud System did not accept the app update within 40 minutes."
     sleep 1
   done
 }
@@ -348,7 +382,7 @@ wait_for_system() {
   status_file="${log_file}.status"
   local request_connect=0 last_action="" current_action app_url
   local -a fields
-  [ "$action" != connect ] || request_connect=1
+  if [ "$action" = connect ] && [ "$access_mode" != localhost ]; then request_connect=1; fi
   while true; do
     check_system_running
     if [ "$request_connect" -eq 1 ]; then
@@ -392,7 +426,7 @@ wait_for_system() {
     fi
     if [ "${description%% · *}" != "$previous" ]; then activity_start=$SECONDS; previous="${description%% · *}"; fi
     status "$description" "$((SECONDS-activity_start))s" "$percent"
-    [ "$((SECONDS-start))" -lt 2400 ] || fail "Atelier did not finish starting within 40 minutes."
+    [ "$((SECONDS-start))" -lt 2400 ] || fail "AgentsInTheCloud did not finish starting within 40 minutes."
     for ((tick=0; tick<10; tick++)); do
       status "$description" "$((SECONDS-activity_start))s" "$percent"
       sleep 0.1
@@ -416,7 +450,7 @@ uninstall_system() {
       reply="$(docker exec --user root "$system_name" bun -e '
         let response;
         try {
-          response = await fetch("http://supervisor/uninstall", {unix:"/run/atelier-system/uninstall.sock", signal:AbortSignal.timeout(3000)});
+          response = await fetch("http://supervisor/uninstall", {unix:"/run/agents-in-the-cloud-system/uninstall.sock", signal:AbortSignal.timeout(3000)});
         } catch (error) { console.error(error); process.exit(75); }
         if (response.status === 503) process.exit(75);
         if (!response.ok) { console.error(await response.text()); process.exit(2); }
@@ -450,15 +484,15 @@ uninstall_system() {
     printf '\n  System was already removed, but its installation volume remains.\n  Workspace count unavailable: all remaining installation data will be deleted.\n'
   fi
   printf '\n  This also deletes workspace files, conversations, nested Docker data,\n  shared /persistent files, projects, settings, and locally saved credentials.\n  Nothing is imported into a new installation. Save anything you need first.\n\n'
-  prompt answer "  Type DELETE ATELIER to confirm, or anything else to cancel: "
-  if [ "$answer" != "DELETE ATELIER" ]; then
+  prompt answer "  Type DELETE AGENTSINTHECLOUD to confirm, or anything else to cancel: "
+  if [ "$answer" != "DELETE AGENTSINTHECLOUD" ]; then
     printf '\n  Uninstall cancelled. No data was deleted.\n'
     return
   fi
   if [ "$installed" -eq 1 ]; then
     docker exec --user root "$system_name" bun -e '
       const response = await fetch("http://supervisor/uninstall", {
-        unix:"/run/atelier-system/uninstall.sock", method:"POST",
+        unix:"/run/agents-in-the-cloud-system/uninstall.sock", method:"POST",
         headers:{"content-type":"application/json"}, body:JSON.stringify({token:process.argv[1]}),
         signal:AbortSignal.timeout(3000),
       });
@@ -495,9 +529,9 @@ uninstall_system() {
   [ -z "$remaining" ] || fail "System container still exists"
   remaining="$(docker volume ls --format '{{.Name}}' --filter "name=^${system_name}$")"
   [ -z "$remaining" ] || fail "Installation volume still exists"
-  if [ "$host_os" = Linux ] && [ -f /etc/modules-load.d/atelier-system.conf ]; then
+  if [ "$host_os" = Linux ] && [ -f /etc/modules-load.d/agents-in-the-cloud-system.conf ]; then
     request_root
-    run_root rm /etc/modules-load.d/atelier-system.conf
+    run_root rm /etc/modules-load.d/agents-in-the-cloud-system.conf
   fi
   finish_line
   printf '\n  %s✓ Uninstalled. System and all installation data have been removed.%s\n  Docker and unrelated host resources were left installed.\n\n' "$green" "$reset"
@@ -539,25 +573,26 @@ case "$action" in
       prompt answer "  Choose [1]: "
       case "${answer:-1}" in 1) ;; 2) access_mode="$alternate_mode" ;; *) fail "choose 1 or 2" ;; esac
     fi
-    run_quiet "Downloading Atelier services" docker pull "$system_image"
+    run_quiet "Downloading AgentsInTheCloud services" docker pull "$system_image"
     if [ "$installed" -eq 1 ]; then
-      run_quiet "Stopping Atelier services" docker stop --time 120 "$system_name"
-      run_quiet "Replacing Atelier services" docker rm "$system_name"
+      run_quiet "Stopping AgentsInTheCloud services" docker stop --time 120 "$system_name"
+      run_quiet "Replacing AgentsInTheCloud services" docker rm "$system_name"
     fi
     stop_on_failure=1
-    run_quiet "Starting Atelier services" docker run -d --name "$system_name" --hostname atelier-system --privileged --cgroupns=host --restart unless-stopped \
-      --stop-timeout 120 --tmpfs /run --mount source=atelier-system,target=/data --publish 127.0.0.1::3080 \
+    run_quiet "Starting AgentsInTheCloud services" docker run -d --name "$system_name" --hostname agents-in-the-cloud-system --privileged --cgroupns=host --restart unless-stopped \
+      --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1::3080 \
       "$system_image" --app-image "$app_image" --access-mode "${access_mode:-tailscale}"
     ;;
   connect)
+    access_mode="${access_mode:-tailscale}"
     if [ "$(docker inspect --format '{{.State.Running}}' "$system_name")" != true ]; then
       stop_on_failure=1
-      run_quiet "Starting Atelier services" docker start "$system_name"
+      run_quiet "Starting AgentsInTheCloud services" docker start "$system_name"
     fi
     ;;
   open) ;;
 esac
-if [ "$action" = install ] || [ "$action" = update ]; then
+if [ "$action" = install ] || [ "$action" = update ] || [ "$action" = connect ] || [ -n "$access_mode" ]; then
   local_port="$(docker inspect --format '{{(index (index .NetworkSettings.Ports "3080/tcp") 0).HostPort}}' "$system_name")"
   for ((attempt=0; attempt<60; attempt++)); do
     check_system_running
@@ -572,7 +607,7 @@ if [ "$action" = install ] || [ "$action" = update ]; then
     ' "$local_port" "$access_mode" >>"$log_file" 2>&1; then break; fi
     sleep 1
   done
-  [ "$attempt" -lt 60 ] || fail "Could not configure local access"
+  [ "$attempt" -lt 60 ] || fail "Could not configure access"
 fi
 if [ "$action" = update ]; then update_app_channel; fi
 wait_for_system

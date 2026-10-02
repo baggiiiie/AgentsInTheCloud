@@ -13,7 +13,7 @@ export class ActionItemController extends Controller<HTMLElement> {
     this.element.addEventListener("mouseout", this.stopPointerLabelScroll);
     this.element.addEventListener("focusin", this.startLabelScroll);
     this.element.addEventListener("focusout", this.stopFocusLabelScroll);
-    this.element.addEventListener("turbo:before-morph-element", this.preserveLabelScroll);
+    this.element.addEventListener("turbo:before-morph-element", this.preserveBrowserState);
   }
 
   disconnect(): void {
@@ -21,15 +21,18 @@ export class ActionItemController extends Controller<HTMLElement> {
     this.element.removeEventListener("mouseout", this.stopPointerLabelScroll);
     this.element.removeEventListener("focusin", this.startLabelScroll);
     this.element.removeEventListener("focusout", this.stopFocusLabelScroll);
-    this.element.removeEventListener("turbo:before-morph-element", this.preserveLabelScroll);
+    this.element.removeEventListener("turbo:before-morph-element", this.preserveBrowserState);
   }
 
-  private readonly preserveLabelScroll = (event: Event): void => {
+  private readonly preserveBrowserState = (event: Event): void => {
     const item = event.target;
-    if (!(item instanceof HTMLElement) || !item.matches(`${actionItemSelector}.${scrollingClass}`)) return;
+    if (!(item instanceof HTMLElement) || !item.matches(actionItemSelector)) return;
     // SAFETY: Turbo's before-morph-element event supplies newElement except for removals.
     const { newElement } = (event as CustomEvent<{ newElement?: Element }>).detail;
     if (!(newElement instanceof HTMLElement) || !newElement.matches(actionItemSelector)) return;
+    const actionsWidth = item.style.getPropertyValue("--action-item-actions-width");
+    if (actionsWidth) newElement.style.setProperty("--action-item-actions-width", actionsWidth);
+    if (!item.classList.contains(scrollingClass)) return;
     // Merge only browser-owned animation state into the incoming markup. Keeping
     // the animation applied continuously preserves its progress, while allowing
     // server-owned classes, styles, and contents to morph normally.

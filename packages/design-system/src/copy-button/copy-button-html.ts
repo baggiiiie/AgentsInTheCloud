@@ -1,5 +1,5 @@
 import { Icons } from "../icons/icons-html.ts";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { classNames } from "../html.ts";
 import { transientFeedbackMarkup } from "../transient-feedback/transient-feedback-html.ts";
 

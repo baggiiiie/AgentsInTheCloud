@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { ButtonVariant } from "../button/button-html.ts";
 import { attributesHtml, classNames, htmlContent, type HtmlContent } from "../html.ts";
 

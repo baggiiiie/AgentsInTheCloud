@@ -1,14 +1,14 @@
 import { agentDelegation } from "./delegation.ts";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 import { parseDiffFromFile, processPatch, type FileDiffMetadata } from "@pierre/diffs";
 import { diffStats, type DiffOperation } from "./diff.ts";
 import { embeddedBashCommand, formatBashCommandForDisplay, highlightedBashCommandHtml } from "./embedded-code.ts";
-import { domId, escapeHtml } from "@atelier/shared";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { isBashTool, formatDuration, formatTokens, type ToolView, type ToolViewDetails } from "./transcript.ts";
 import { ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptActionItemHtml } from "./render-markup.ts";
@@ -224,7 +224,7 @@ function renderBashDetail(ctx: AgentRenderContext, key: string, tool: ToolView, 
 }
 
 function fullscreenSourceRegion(title: string, inlineHtml: string, fullHtml: string): string {
-  return `<div class="agent-detail-fullscreen"${fullscreenAttributes(title)}>${inlineHtml}<template data-atelier-fullscreen-target="content">${fullHtml}</template></div>`;
+  return `<div class="agent-detail-fullscreen"${fullscreenAttributes(title)}>${inlineHtml}<template data-agents-in-the-cloud-fullscreen-target="content">${fullHtml}</template></div>`;
 }
 
 function renderReadDetail(ctx: AgentRenderContext, key: string, tool: ToolView, count: number): string {
@@ -272,7 +272,7 @@ function editDiffHtml(tool: ToolView, contextual: boolean): string {
   const diffs = editDiffs(tool, contextual);
   if (!diffs.length) return "";
   const model = JSON.stringify(diffs).replaceAll("<", "\\u003c").replaceAll("&", "\\u0026");
-  return `<div class="atelier-pierre-host agent-edit-pierre" data-controller="agent-edit-diff">${diffs.map(() => "<diffs-container></diffs-container>").join("")}<script type="application/json" data-agent-edit-diff-target="model">${model}</script></div>`;
+  return `<div class="agents-in-the-cloud-pierre-host agent-edit-pierre" data-controller="agent-edit-diff">${diffs.map(() => "<diffs-container></diffs-container>").join("")}<script type="application/json" data-agent-edit-diff-target="model">${model}</script></div>`;
 }
 
 function renderEditDetail(tool: ToolView): string {

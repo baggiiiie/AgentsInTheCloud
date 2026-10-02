@@ -1,4 +1,4 @@
-import { type WorkspaceClientModule } from "@atelier/shared";
+import { type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 declare global {
   interface Window {
@@ -6,8 +6,8 @@ declare global {
   }
 }
 
-export const atelierClientModule: WorkspaceClientModule = {
-  id: "atelier-update",
+export const agentsInTheCloudClientModule: WorkspaceClientModule = {
+  id: "agents-in-the-cloud-update",
   install({ application, Controller }) {
     class UpdateRestartController extends Controller {
       static targets = ["error"];
@@ -25,7 +25,7 @@ export const atelierClientModule: WorkspaceClientModule = {
 
         try {
           const response = await fetch(action, { method: "POST", headers: { Accept: "text/vnd.turbo-stream.html" }, credentials: "same-origin" });
-          if (response.headers.get("x-atelier-reload") === "true") {
+          if (response.headers.get("x-agents-in-the-cloud-reload") === "true") {
             // The app origin now points at the System supervisor, not workspace routes.
             window.location.replace("/");
             return;

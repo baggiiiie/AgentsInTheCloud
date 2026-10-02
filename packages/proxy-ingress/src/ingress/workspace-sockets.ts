@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { isWorkspaceAppPort } from "@atelier/shared";
+import { isWorkspaceAppPort } from "@agents-in-the-cloud/shared";
 import { mkdir, chmod, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import type { WorkspaceIngress } from "./index.ts";

@@ -1,4 +1,4 @@
-import type { JsonObject } from "@atelier/core";
+import type { JsonObject } from "@agents-in-the-cloud/core";
 import { expect, test } from "bun:test";
 import { anthropicUsageFromHeaders, createAnthropicUsageSource, fetchAnthropicAccountUsage, probeAnthropicSubscriptionUsage } from "../../src/server/anthropic-subscription-usage.ts";
 

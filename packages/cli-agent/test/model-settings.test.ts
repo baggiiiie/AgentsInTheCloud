@@ -8,11 +8,11 @@ test("CLI model preferences persist across processes, remain agent-specific, and
   async function run(script: string) {
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
-      const llm = await import("@atelier/llm/server");
+      const llm = await import("@agents-in-the-cloud/llm/server");
       let favorites = [{ provider: "example", id: "first", label: "First" }, { provider: "example", id: "second", label: "Second" }];
       let available = new Set(["first", "second"]);
       let levels = ["low", "medium", "high"];
-      mock.module("@atelier/llm/server", () => ({
+      mock.module("@agents-in-the-cloud/llm/server", () => ({
         ...llm,
         createPiModelRuntime: async () => ({ getModel: () => ({}), getProviderAuthStatus: () => ({ configured: true }) }),
         getConfiguredModels: async () => favorites,

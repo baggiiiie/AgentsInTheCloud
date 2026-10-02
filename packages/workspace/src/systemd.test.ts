@@ -11,7 +11,7 @@ test("provisioning supplies setup and PID 1 requirements without replacing image
     const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
     await prepareWorkspaceSystemd(plan, directory, "echo setup");
     expect(plan.extraArgs).toEqual(["--privileged", "--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3"]);
-    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.atelier/init.sh" }]);
+    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.agents-in-the-cloud/init.sh" }]);
     expect(await readFile(join(directory, "init.sh"), "utf8")).toBe("echo setup");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

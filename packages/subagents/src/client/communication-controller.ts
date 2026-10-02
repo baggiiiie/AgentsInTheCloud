@@ -1,4 +1,4 @@
-import type { WorkspaceClientControllerConstructor } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 
 const expandedMessages = new Map<string, boolean>();
 

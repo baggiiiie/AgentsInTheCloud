@@ -8,7 +8,7 @@ import { openSubagentHistory, preserveLegacySubagentHistories, subagentHistoryDi
 let dataDir: string;
 afterEach(async () => { if (dataDir) await rm(dataDir, { recursive: true, force: true }); });
 async function setup() {
-  dataDir = await mkdtemp(join(tmpdir(), "atelier-subagent-history-"));
+  dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-subagent-history-"));
   return dataDir;
 }
 async function project(workspaceId: string, shareKey: string) {

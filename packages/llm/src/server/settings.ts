@@ -1,16 +1,18 @@
 import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { anthropicSubscriptionNotice, usesProviderSubscription } from "./subscription.ts";
 import { providerConnections, type ProviderConnection } from "./provider-connections.ts";
+import { providerAccountSummary } from "./provider-accounts.ts";
+import { providerUsageFrameId, supportedUsageProviders } from "./provider-usage.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef } from "./model-reference.ts";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { warningBannerHtml } from "@atelier/design-system/warning-banner";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import {
   connectModelProviderApiKey,
   ProviderCatalogueRefreshError,
@@ -25,20 +27,22 @@ import {
   type ConfiguredModel,
   type PiAuthPrompt,
 } from "./pi-config-models.ts";
-import { domId, escapeHtml, providerBadgeHtml } from "@atelier/shared";
-import { append, remove, replace, replaceTargets, response, stream, update, wantsStream } from "@atelier/shared/http";
+import { domId, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
+import { append, remove, replace, replaceTargets, response, stream, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
-type ProviderSummary = { provider: string; label: string; connection: ProviderConnection; methods: string[] };
+type ProviderSummary = { provider: string; label: string; connection: ProviderConnection; subscription: boolean; account?: string; methods: string[] };
 
 async function providerSummaries(): Promise<ProviderSummary[]> {
   const runtime = await createPiModelRuntime();
   const connections = await providerConnections(runtime);
-  return runtime.getProviders().map((provider): ProviderSummary => ({
+  return (await Promise.all(runtime.getProviders().map(async (provider): Promise<ProviderSummary> => ({
     provider: provider.id,
     label: provider.id === "openai-codex" ? "ChatGPT / Codex" : provider.id === "openai" ? "OpenAI" : provider.name ?? provider.id,
     connection: connections.get(provider.id)!,
+    subscription: await usesProviderSubscription(runtime, provider.id),
+    account: connections.get(provider.id) === "connected" ? await providerAccountSummary(runtime, provider.id) : undefined,
     methods: [provider.auth.oauth && "oauth", provider.auth.apiKey?.login && "api_key"].filter((method): method is string => Boolean(method)),
-  })).sort((a, b) => (getPopularProviderRank(a.provider) ?? Number.MAX_SAFE_INTEGER) - (getPopularProviderRank(b.provider) ?? Number.MAX_SAFE_INTEGER) || a.label.localeCompare(b.label));
+  })))).sort((a, b) => (getPopularProviderRank(a.provider) ?? Number.MAX_SAFE_INTEGER) - (getPopularProviderRank(b.provider) ?? Number.MAX_SAFE_INTEGER) || a.label.localeCompare(b.label));
 }
 
 type ModelSetupSurface = "settings" | "onboarding" | "dialog" | "settings-dialog";
@@ -112,9 +116,68 @@ function renderProvider(provider: ProviderSummary, surface: ModelSetupSurface): 
     kind: "single",
     element: { tag: "button", attributesHtml: `type="submit"${provider.connection === "needs_attention" ? ` aria-describedby="${attentionId}"` : ""}` },
     label: { kind: "text", text: provider.label },
+    description: provider.account,
     leadingHtml: `<span aria-hidden="true">${providerBadgeHtml(provider.provider, provider.label, "settings-provider-icon")}</span>`,
     trailingHtml: attention,
   })}</form>`;
+}
+function inlineModelsFrameId(surface: ModelSetupSurface, provider: string): string { return domId("model_inline", surface, provider); }
+/** Why a provider row can't show usage, or undefined when it can. */
+function usageUnavailableReason(provider: ProviderSummary): string | undefined {
+  if (provider.connection === "needs_attention") return "Sign in again to see usage.";
+  if (!supportedUsageProviders.some((supported) => supported.id === provider.provider)) {
+    return provider.subscription ? `AgentsInTheCloud can’t read ${provider.label} usage limits yet.` : "Only subscriptions report usage limits.";
+  }
+  return undefined;
+}
+function disclosureHtml(options: { className: string; label: string; description?: string; leadingHtml?: string; trailingHtml?: string; bodyHtml: string }): string {
+  return `<details class="${options.className}">${actionItemHtml({
+    kind: "single",
+    element: { tag: "summary" },
+    label: { kind: "text", text: options.label },
+    description: options.description,
+    leadingHtml: options.leadingHtml,
+    trailingHtml: options.trailingHtml,
+  })}<div class="${options.className}__body">${options.bodyHtml}</div></details>`;
+}
+/** A connected provider opens to nested Usage and Models disclosures; rings summarize usage while closed. */
+function renderConnectedProvider(provider: ProviderSummary, surface: ModelSetupSurface): string {
+  const unavailable = usageUnavailableReason(provider);
+  const usagePath = `/usage/providers/${encodeURIComponent(provider.provider)}`;
+  const rings = unavailable ? "" : `<turbo-frame class="usage-rings" id="${providerUsageFrameId("rings", provider.provider, surface)}" src="${usagePath}/rings?scope=${surface}"></turbo-frame>`;
+  const reconnectFormId = domId("reconnect_provider", surface, provider.provider);
+  const reconnect = provider.connection === "needs_attention"
+    ? buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Sign in again" }, attributesHtml: `form="${reconnectFormId}"` })
+    : "";
+  const usage = unavailable
+    ? actionItemHtml({ kind: "single", element: { tag: "div", attributesHtml: 'aria-disabled="true"' }, primary: false, label: { kind: "text", text: "Usage not available" }, description: unavailable, leadingHtml: Icons.Usage })
+    : disclosureHtml({
+      className: "model-provider-section",
+      label: "Usage",
+      leadingHtml: Icons.Disclosure,
+      bodyHtml: `<turbo-frame class="model-provider-usage" id="${providerUsageFrameId("limits", provider.provider, surface)}" src="${usagePath}/limits?scope=${surface}" loading="lazy"><p class="usage-caption" role="status"><span class="status-spinner" aria-hidden="true"></span> Checking usage…</p></turbo-frame>`,
+    });
+  const models = provider.connection === "connected" ? disclosureHtml({
+    className: "model-provider-section",
+    label: "Models",
+    leadingHtml: Icons.Disclosure,
+    bodyHtml: `<turbo-frame class="model-provider-inline-models form-stack" id="${inlineModelsFrameId(surface, provider.provider)}" src="/settings/models/inline?surface=${surface}&provider=${encodeURIComponent(provider.provider)}" loading="lazy"><p class="usage-caption" role="status"><span class="status-spinner" aria-hidden="true"></span> Loading models…</p></turbo-frame>`,
+  }) : "";
+  const forgetCaption = `Forget ${provider.label.replace(" / ", "/")} credentials`;
+  const forget = `<form class="model-connected-provider__forget" method="post" action="/settings/providers/${encodeURIComponent(provider.provider)}/disconnect?surface=${surface}" data-turbo="true">${destructiveConfirmationHtml({
+    id: `disconnect_provider_${provider.provider}_${surface}`,
+    trigger: { type: "button", variant: "secondary", content: { kind: "caption", caption: forgetCaption } },
+    confirmCaption: forgetCaption,
+    cancelCaption: "Cancel",
+  })}</form>`;
+  return disclosureHtml({
+    className: "model-connected-provider",
+    label: provider.label,
+    description: provider.connection === "needs_attention" ? "Sign-in needs attention" : provider.account,
+    leadingHtml: `<span aria-hidden="true">${providerBadgeHtml(provider.provider, provider.label, "settings-provider-icon")}</span>`,
+    trailingHtml: `${rings}${reconnect}${Icons.Disclosure}`,
+    bodyHtml: `${usage}${models}${forget}${reconnect ? `<form id="${reconnectFormId}" method="post" action="${setupUrl(surface, provider.provider)}" data-turbo="true"></form>` : ""}`,
+  });
 }
 function renderProviderList(providers: ProviderSummary[], surface: ModelSetupSurface, query = ""): string {
   const normalized = query.trim().toLowerCase();
@@ -147,15 +210,19 @@ async function providerHasFavorite(provider: string): Promise<boolean> {
   const available = new Set((await availableProviderModels(await createPiModelRuntime(), provider)).map((model) => model.id));
   return (await getConfiguredModels()).some((model) => model.provider === provider && available.has(model.id));
 }
-async function renderModelSelection(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
+/** Favorites and the searchable catalogue, shared by the models dialog and settings' inline list. */
+async function renderModelLists(provider: ProviderSummary, surface: ModelSetupSurface): Promise<string> {
   const frameId = providerFrameId(surface, provider.provider);
   const subscriptionNotice = provider.provider === "anthropic" && await usesProviderSubscription(await createPiModelRuntime(), "anthropic") ? warningBannerHtml(anthropicSubscriptionNotice) : "";
-  return setupFrame(surface, `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}${subscriptionNotice}
+  return `${subscriptionNotice}
     ${renderFavorites(await getConfiguredModels(), surface, provider.provider)}
     <div class="model-all-models"><p>All models</p><div class="managed-list" data-managed-list-server-filter="true"><form class="managed-list__filter" method="get" action="/settings/models/catalogue" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${frameId}">
       <input type="hidden" name="surface" value="${surface}"><input type="hidden" name="provider" value="${escapeHtml(provider.provider)}">
       <input class="text-field" type="search" name="q" placeholder="Find a model…" aria-label="Find a model" autocomplete="off"><button type="submit" hidden>Search</button>
-    </form>${renderProviderModels(await providerCatalogue(provider.provider), surface, provider, "")}</div></div>
+    </form>${renderProviderModels(await providerCatalogue(provider.provider), surface, provider, "")}</div></div>`;
+}
+async function renderModelSelection(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
+  return setupFrame(surface, `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}${await renderModelLists(provider, surface)}
     <div class="model-setup-actions model-selection-actions">${surface === "dialog" ? setupBack(surface) : ""}${setupSkip(surface)}<form method="post" action="/settings/models/finish?surface=${surface}&provider=${encodeURIComponent(provider.provider)}" data-turbo="true">${continueButton(provider.provider, await providerHasFavorite(provider.provider))}</form></div>`);
 }
 
@@ -202,7 +269,7 @@ function renderCustomModelsSettings(view: CustomModelsView): string {
 function renderProviderPicker(providers: ProviderSummary[], surface: ModelSetupSurface, customModels?: CustomModelsView): string {
   if (surface !== "onboarding") {
     const configured = providers.filter((provider) => provider.connection !== "disconnected");
-    return setupFrame(surface, `<p>Your providers</p><div class="model-popular-providers">${configured.map((provider) => renderProvider(provider, surface)).join("") || '<p class="model-empty-providers">No connected providers.</p>'}</div>
+    return setupFrame(surface, `<p>Your providers</p><div class="model-connected-providers">${configured.map((provider) => renderConnectedProvider(provider, surface)).join("") || '<p class="model-empty-providers">No connected providers.</p>'}</div>
       <p>Connect more providers</p>
       ${renderProviderChoices(providers.filter((provider) => provider.connection === "disconnected"), surface)}
       ${customModels ? renderCustomModelsSettings(customModels) : ""}`);
@@ -225,7 +292,7 @@ async function renderModelSetup(surface: ModelSetupSurface = "settings", customM
   return renderProviderPicker(await providerSummaries(), surface, customModels);
 }
 function modelSetupDialog(body: string, surface: ModelSetupSurface = "dialog"): string {
-  return dialogHtml({ element: { id: surface === "onboarding" ? "onboarding_dialog" : "model_setup_dialog", attributesHtml: "data-dialog-auto-show" }, iconHtml: Icons.Settings, titleCaption: surface === "onboarding" ? "Set up Atelier" : "Models", bodyHtml: body, omitCancelButton: surface === "onboarding" });
+  return dialogHtml({ element: { id: surface === "onboarding" ? "onboarding_dialog" : "model_setup_dialog", attributesHtml: "data-dialog-auto-show" }, iconHtml: Icons.Settings, titleCaption: surface === "onboarding" ? "Set up AgentsInTheCloud" : "Models", bodyHtml: body, omitCancelButton: surface === "onboarding" });
 }
 async function modelSelectionDialog(provider: ProviderSummary, surface: ModelSetupSurface, error = ""): Promise<string> {
   const forgetCaption = `Forget ${provider.label.replace(" / ", "/")} credentials`;
@@ -512,6 +579,11 @@ export async function handleModelSettingsRequest(request: Request, url: URL, ren
     const choices = surface === "onboarding" ? providers : providers.filter((provider) => provider.connection === "disconnected");
     return response(renderProviderList(groupModelProviders(choices).other, surface, url.searchParams.get("q") ?? ""));
   }
+  if (url.pathname === "/settings/models/inline" && request.method === "GET") {
+    const provider = (await providerSummaries()).find((candidate) => candidate.provider === url.searchParams.get("provider"));
+    if (!provider || provider.connection !== "connected") return response("Unknown provider", { status: 400 });
+    return response(`<turbo-frame class="model-provider-inline-models form-stack" id="${inlineModelsFrameId(surface, provider.provider)}">${await renderModelLists(provider, surface)}</turbo-frame>`);
+  }
   if (url.pathname === "/settings/models/catalogue" && request.method === "GET") {
     const provider = (await providerSummaries()).find((candidate) => candidate.provider === url.searchParams.get("provider"));
     if (!provider) return response("Unknown provider", { status: 400 });
@@ -608,7 +680,9 @@ export async function handleModelSettingsRequest(request: Request, url: URL, ren
   if (match && request.method === "POST") {
     const provider = decodeURIComponent(match[1]!);
     await disconnectModelProvider(provider);
-    return stream(remove("model_setup_dialog") + await refreshConnectedProviders() + await renderPickerUpdates());
+    // The provider list stays open where it was forgotten; a provider's own models dialog closes.
+    const listUpdate = surface === "dialog" ? replace(setupId(surface), await renderModelSetup(surface)) : remove("model_setup_dialog");
+    return stream(listUpdate + await refreshConnectedProviders() + await renderPickerUpdates());
   }
   if (["/settings/models/add", "/settings/models/remove"].includes(url.pathname) && request.method === "POST") return await handleModelPickerAction(request, url.pathname, renderPickerUpdates);
   return undefined;

@@ -13,7 +13,7 @@ let queries: string[];
 beforeEach(async () => {
   previousDataDir = process.env.ATELIER_DATA_DIR;
   previousToken = process.env.GH_TOKEN;
-  dataDir = await mkdtemp(join(tmpdir(), "atelier-repo-search-"));
+  dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-repo-search-"));
   process.env.ATELIER_DATA_DIR = dataDir;
   process.env.GH_TOKEN = crypto.randomUUID();
   queries = [];

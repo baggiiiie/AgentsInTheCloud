@@ -1,8 +1,8 @@
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
-import { publishSessionSnapshot, sessionShareDir, workspaceSessionShareKey } from "@atelier/agent/server";
-import { workspaceRoot } from "@atelier/workspace";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { publishSessionSnapshot, sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 
 export async function nativeJsonlFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
@@ -20,12 +20,12 @@ export async function nativeJsonlFiles(directory: string): Promise<string[]> {
 
 /** Copy only native conversation files, never config, MCP tokens or authentication files. */
 export async function exportCliHistory(workspaceId: string, provider: string, tabId: string, slug: string): Promise<void> {
-  const dataDir = getAtelierRuntimeContext().atelierDataDir;
+  const dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir;
   const workspaceShare = join(dataDir, "workspaces", workspaceId, "home-local", ".local", "share");
   let sources: string[];
   switch (provider) {
     case "pi": sources = await nativeJsonlFiles(join(workspaceShare, "pi", "sessions", tabId)); break;
-    case "codex": sources = await nativeJsonlFiles(join(workspaceShare, "atelier-agents", tabId, "codex", "sessions")); break;
+    case "codex": sources = await nativeJsonlFiles(join(workspaceShare, "agents-in-the-cloud-agents", tabId, "codex", "sessions")); break;
     case "claude": {
       const path = join(dataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${tabId}.jsonl`);
       sources = await Bun.file(path).exists() ? [path] : [];

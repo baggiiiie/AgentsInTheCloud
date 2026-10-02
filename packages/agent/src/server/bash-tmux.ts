@@ -1,6 +1,6 @@
-import { shellQuote } from "@atelier/core";
-import type { WorkspaceServerSocketSession } from "@atelier/shared";
-import { execWorkspaceShell, workspaceContainerName, workspaceRoot } from "@atelier/workspace";
+import { shellQuote } from "@agents-in-the-cloud/core";
+import type { WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { execWorkspaceShell, workspaceContainerName, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import {
   createObservableTerminalSocket,
   buildCapturePaneCommand,
@@ -14,7 +14,7 @@ import {
   observableTerminalRows,
   stripObservablePaneFraming,
   stripTerminalControls,
-} from "@atelier/observable-terminal/server";
+} from "@agents-in-the-cloud/observable-terminal/server";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
@@ -33,7 +33,7 @@ import { Type } from "typebox";
  * tool result is captured from tmux's rendered scrollback and active screen.
  */
 
-export const agentTmuxPrefix = "atelier-agent-";
+export const agentTmuxPrefix = "agents-in-the-cloud-agent-";
 
 /** Fixed terminal size for agent bash commands (a normal desktop terminal). */
 export const agentTermCols = observableTerminalCols;
@@ -96,18 +96,44 @@ export function stripTmuxPaneFraming(text: string): string {
   return stripObservablePaneFraming(text);
 }
 
+export function formatBashOutput(modelPane: string, displayPane: string, fullOutputPath: string) {
+  const modelLines = limitModelLines(plainModelOutput(stripTmuxPaneFraming(modelPane)));
+  const modelLimited = truncateTail(modelLines.text);
+  let output = modelLimited.content;
+  const modelTruncated = modelLimited.truncated || modelLines.linesTruncated > 0;
+  let truncationNotice = "";
+  if (modelTruncated) {
+    const reasons = [];
+    if (modelLimited.truncated) reasons.push(`showing the last ${formatSize(modelLimited.outputBytes)} of output`);
+    if (modelLines.linesTruncated > 0) reasons.push(`${modelLines.linesTruncated} line${modelLines.linesTruncated === 1 ? "" : "s"} shortened to ${maxModelLineChars} characters`);
+    truncationNotice = `[Output truncated: ${reasons.join("; ")}. Full output: ${fullOutputPath}]`;
+    output += `\n\n${truncationNotice}`;
+  }
+
+  const displayLimited = truncateTail(stripTmuxPaneFraming(displayPane), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
+  let displayAnsi = normalizeCarriageReturns(displayLimited.content).trimEnd();
+  if (displayLimited.truncated) displayAnsi = `… output truncated to last ${maxDisplayAnsiBytes} bytes\n${displayAnsi}`;
+  if (truncationNotice) displayAnsi += `\n\n${truncationNotice}`;
+
+  return { output, displayAnsi, modelTruncated };
+}
+
+export const bashToolDefinition = {
+  name: "bash",
+  label: "Bash",
+  description: `the bash toolcall will be executed inside of a tmux session for visibility. the visualizer supports ANSI colors; use them whenever possible, but colors are stripped before output is returned to the model. output shown to the model is limited to the last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB, and individual lines are shortened to ${maxModelLineChars} characters; truncated full output is saved to a temporary file. avoid redirecting output to nowhere. avoid the programs you're invoking from attempting to read from stdin, as that will hang the toolcall.`,
+  parameters: Type.Object({
+    command: Type.String({ description: "The bash command to execute" }),
+    timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default 600)" })),
+  }),
+};
+
 export function createTmuxBashTool(
   workspaceId: string,
   runWorkspaceShell: ExecWorkspaceShell = execWorkspaceShell,
 ): ToolDefinition<any, any> {
   return defineTool({
-    name: "bash",
-    label: "Bash",
-    description: `the bash toolcall will be executed inside of a tmux session for visibility. the visualizer supports ANSI colors; use them whenever possible, but colors are stripped before output is returned to the model. output shown to the model is limited to the last ${DEFAULT_MAX_LINES} lines or ${DEFAULT_MAX_BYTES / 1024}KB, and individual lines are shortened to ${maxModelLineChars} characters; truncated full output is saved to a temporary file. avoid redirecting output to nowhere. avoid the programs you're invoking from attempting to read from stdin, as that will hang the toolcall.`,
-    parameters: Type.Object({
-      command: Type.String({ description: "The bash command to execute" }),
-      timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (default 600)" })),
-    }),
+    ...bashToolDefinition,
     execute: async (_toolCallId: string, params: { command: string; timeout?: number }, signal?: AbortSignal, onUpdate?: (partial: any) => void) => {
       const sessionName = `${agentTmuxPrefix}${crypto.randomUUID().slice(0, 8)}`;
       const exitFile = `/tmp/${sessionName}.exit`;
@@ -125,7 +151,7 @@ export function createTmuxBashTool(
       const guards = shellExport({ EDITOR: "true", GIT_EDITOR: "true", VISUAL: "true", GIT_PAGER: "cat", PAGER: "cat", GIT_TERMINAL_PROMPT: 0 });
       // Encourage color even when a tool second-guesses the PTY. NO_COLOR must
       // be removed because it is the standard opt-out and may be inherited from
-      // the Atelier process. NINJA_STATUS has no boolean color switch, so give
+      // the AgentsInTheCloud process. NINJA_STATUS has no boolean color switch, so give
       // direct Ninja invocations an explicitly colored progress prefix.
       const colorEnv = `unset NO_COLOR; ${shellExport({ ...forcedColorEnvironment, COLUMNS: agentTermCols, LINES: agentTermRows })}`;
       const ninjaStatus = "export NINJA_STATUS=$(printf '\\033[36m[%%f/%%t %%p]\\033[0m ')";
@@ -181,23 +207,7 @@ printf '%s\\n' "$status" > ${shellQuote(exitFile)}`;
       const modelPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit, ansi: false }));
       const displayPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit }));
 
-      const modelLines = limitModelLines(plainModelOutput(stripTmuxPaneFraming(modelPane.stdout)));
-      const modelLimited = truncateTail(modelLines.text);
-      let output = modelLimited.content;
-      const modelTruncated = modelLimited.truncated || modelLines.linesTruncated > 0;
-      let truncationNotice = "";
-      if (modelTruncated) {
-        const reasons = [];
-        if (modelLimited.truncated) reasons.push(`showing the last ${formatSize(modelLimited.outputBytes)} of output`);
-        if (modelLines.linesTruncated > 0) reasons.push(`${modelLines.linesTruncated} line${modelLines.linesTruncated === 1 ? "" : "s"} shortened to ${maxModelLineChars} characters`);
-        truncationNotice = `[Output truncated: ${reasons.join("; ")}. Full output: ${fullOutputPath}]`;
-        output += `\n\n${truncationNotice}`;
-      }
-
-      const displayLimited = truncateTail(stripTmuxPaneFraming(displayPane.stdout), { maxBytes: maxDisplayAnsiBytes, maxLines: Number.MAX_SAFE_INTEGER });
-      let displayAnsi = normalizeCarriageReturns(displayLimited.content).trimEnd();
-      if (displayLimited.truncated) displayAnsi = `… output truncated to last ${maxDisplayAnsiBytes} bytes\n${displayAnsi}`;
-      if (truncationNotice) displayAnsi += `\n\n${truncationNotice}`;
+      const { output, displayAnsi, modelTruncated } = formatBashOutput(modelPane.stdout, displayPane.stdout, fullOutputPath);
 
       const removeFullOutput = modelTruncated ? "" : `rm -f ${shellQuote(fullOutputPath)}; `;
       await runWorkspaceShell(workspaceId, `${buildKillSessionCommand(sessionName)}; rm -f ${shellQuote(exitFile)}; ${removeFullOutput}true`);
@@ -232,14 +242,16 @@ export function createAgentTermSocketSession(url: URL): WorkspaceServerSocketSes
   if (!match) return undefined;
   const workspaceId = decodeURIComponent(match[1]);
   const session = decodeURIComponent(match[2]);
-  if (!session.startsWith(agentTmuxPrefix)) return undefined;
+  if (!/^agents-in-the-cloud-agent-(?:[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.test(session)) return undefined;
   return createObservableTerminalSocket({
     containerName: workspaceContainerName(workspaceId),
     session,
+    // Receipt supervisor and legacy bash both use the default workspace server.
+    requireExistingServer: true,
     // Inline terminals must never resize the agent's fixed-size command pane.
     cols: agentTermCols,
     rows: agentTermRows,
-    user: "atelier",
+    user: "agents-in-the-cloud",
     readonly: true,
     fixedSize: true,
   });

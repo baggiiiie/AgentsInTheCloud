@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import type { WorkspaceClientControllerConstructor, WorkspaceClientModule } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor, WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 function createBrowserAddressController(Controller: WorkspaceClientControllerConstructor): WorkspaceClientControllerConstructor {
   return class BrowserAddressController extends Controller {
@@ -15,6 +15,10 @@ function createBrowserAddressController(Controller: WorkspaceClientControllerCon
       const input = this.input();
       if (!input) return;
       input.value = normalizeBrowserInput(input.value);
+    }
+
+    showQr(): void {
+      this.element.closest(".browser-shell")!.querySelector<HTMLDialogElement>("[data-browser-qr-dialog]")!.showModal();
     }
 
     reload(event?: Event): void {
@@ -47,4 +51,4 @@ const browserClientModule: WorkspaceClientModule = {
   },
 };
 
-export { browserClientModule as atelierClientModule };
+export { browserClientModule as agentsInTheCloudClientModule };

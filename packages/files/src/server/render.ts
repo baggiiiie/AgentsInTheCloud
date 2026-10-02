@@ -1,13 +1,13 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { toggleHtml } from "@atelier/design-system/toggle";
-import { domId, escapeHtml, workspaceFileOpenUrl, workspaceProxyUrl, type WorkspaceWorkViewPresentation } from "@atelier/shared";
-import { workspaceRoot } from "@atelier/workspace";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
+import { domId, escapeHtml, workspaceFileOpenUrl, workspaceProxyUrl, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { posix } from "node:path";
 import type { FileEntry } from "./files.ts";
 import { defaultFilesViewId, filesDiskGeneration, filesNavigationRequest, type FilesView } from "./state.ts";
@@ -158,7 +158,7 @@ export function renderFilesTreeFrame(workspaceId: string, viewId: string, entrie
     attributesHtml: 'data-action="files#cancel"',
   });
   return `<turbo-frame id="${filesTreeFrameId(workspaceId, viewId)}" data-turbo-permanent class="files-frame">
-    <div class="files-browser" data-controller="files" data-files-workspace-id-value="${escapeHtml(workspaceId)}" data-files-path-value="${escapeHtml(workspaceRoot)}" data-files-upload-url-value="/workspaces/${encodeURIComponent(workspaceId)}/file-browser/upload" data-action="atelier:files-refresh@window->files#diskChanged formdata->files#preserveExpandedDirectories dragenter->files#dragEnter dragover->files#dragOver dragleave->files#dragLeave drop->files#drop keydown->files#keydown">
+    <div class="files-browser" data-controller="files" data-files-workspace-id-value="${escapeHtml(workspaceId)}" data-files-path-value="${escapeHtml(workspaceRoot)}" data-files-upload-url-value="/workspaces/${encodeURIComponent(workspaceId)}/file-browser/upload" data-action="agents-in-the-cloud:files-refresh@window->files#diskChanged formdata->files#preserveExpandedDirectories dragenter->files#dragEnter dragover->files#dragOver dragleave->files#dragLeave drop->files#drop keydown->files#keydown">
       <form class="managed-list__filter files-filter" method="get" action="/workspaces/${encodeURIComponent(workspaceId)}/files" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${resultsFrameId}">
         <input type="hidden" name="filesView" value="${escapeHtml(viewId)}">
         <input class="text-field" type="search" name="q" placeholder="Filter files…" aria-label="Filter files by name" autocomplete="off">
@@ -179,13 +179,13 @@ function fileConflictDialog(): string {
   const useTheirsButton = buttonHtml({
     type: "button",
     variant: "secondary",
-    content: { kind: "caption", caption: "Use theirs" },
+    content: { kind: "caption", caption: "Keep saved file" },
     attributesHtml: 'data-action="file-editor#useTheirs"',
   });
   const useMineButton = buttonHtml({
     type: "button",
-    variant: "primary",
-    content: { kind: "caption", caption: "Use mine" },
+    variant: "secondary",
+    content: { kind: "caption", caption: "Keep my edits" },
     attributesHtml: 'data-action="file-editor#useMine"',
   });
   return dialogHtml({
@@ -196,9 +196,9 @@ function fileConflictDialog(): string {
     iconHtml: Icons.Files,
     titleCaption: "File changed on disk",
     bodyHtml: `<div class="file-conflict-comparison">
-      <p>Compare both versions before choosing. Use theirs discards your edits. Use mine overwrites the file on disk. Dismiss to keep editing without resolving the conflict.</p>
-      <label>Theirs — current file on disk<textarea class="textarea" data-file-editor-target="conflictTheirs" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
-      <label>Mine — your unsaved edits<textarea class="textarea" data-file-editor-target="conflictMine" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
+      <p>The saved file changed while you were editing it.</p><p>Choose which version to keep. The other version’s changes will be lost.</p>
+      <label>Saved file<textarea class="textarea" data-file-editor-target="conflictTheirs" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
+      <label>Your unsaved edits<textarea class="textarea" data-file-editor-target="conflictMine" readonly rows="10" spellcheck="false" wrap="off"></textarea></label>
     </div>`,
     footerHtml: `${useTheirsButton}${useMineButton}`,
     closeLabel: "Dismiss file conflict",

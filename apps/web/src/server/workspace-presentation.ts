@@ -1,18 +1,17 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml, type ButtonVariant } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { panelHtml } from "@atelier/design-system/panel";
-import { popupHtml } from "@atelier/design-system/popup";
-import { tabHtml, tabStripHtml } from "@atelier/design-system/tab-strip";
-import { domId, escapeHtml, turboStream, workspaceWorkViewLabelDomId } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml, type ButtonVariant } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
+import { tabHtml, tabStripHtml } from "@agents-in-the-cloud/design-system/tab-strip";
+import { domId, escapeHtml, turboStream, workspaceWorkViewLabelDomId } from "@agents-in-the-cloud/shared";
 import { renderAgentPane, renderMobileAgentAttention, type AgentPaneContribution } from "./agent-pane.ts";
-import { atelierEasterEggHtml } from "./atelier-easter-egg.ts";
 import { renderPwaReminder } from "./pwa-reminder.ts";
 import type { WorkspaceDeletionState } from "./workspace-registry.ts";
-import type { WorkspaceWorkViewState } from "@atelier/workspace";
+import type { WorkspaceWorkViewState } from "@agents-in-the-cloud/workspace";
 import { barButton, behaviorTurboStream, busyAttentionIndicator, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
 
 export type WorkViewAvailability =
@@ -96,7 +95,7 @@ function renderWorkspaceRowStatus(workspace: WorkspacePaneEntry): string {
     return workspaceStatusSlot(busyAttentionIndicator(workspace));
   }
   const issues = (workspace.issues ?? []).map((issue) => issue.message);
-  if (workspace.outdated) issues.push("Workspace created with an older version of Atelier. Some newer features may require a new workspace.");
+  if (workspace.outdated) issues.push("Workspace created with an older version of AgentsInTheCloud. Some newer features may require a new workspace.");
   return issues.length
     ? workspaceStatusSlot(`<i class="fixed-shell-workspace-warning" aria-label="${escapeHtml(issues.join("\n"))}" title="${escapeHtml(issues.join("\n"))}">⚠︎</i>`)
     : "";
@@ -173,7 +172,7 @@ function renderProjectsPane(presentation: WorkspacePanePresentation): string {
     content: { kind: "icon-only", iconHtml: Icons.Disclosure, label: "Collapse Projects pane" },
     attributesHtml: 'data-action="projects-pane#toggle" data-projects-pane-target="toggle" aria-expanded="true" aria-controls="workspace_projects_list"',
   });
-  return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane">${panelHtml({
+  return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane" data-action="scroll->projects-pane#scrolled:capture:passive">${panelHtml({
     element: { tag: "section", attributesHtml: 'aria-label="Projects"' },
     headerHtml: `<span class="panel__title">${Icons.Projects}Projects</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${collapseProjects}${addProject}` })}`,
     bodyOverflow: "scroll",
@@ -193,7 +192,7 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
   });
   return `<div class="fixed-shell-workspace-pane"><div class="fixed-shell-workspace-main">${panelHtml({
     element: { tag: "aside",  attributesHtml: 'aria-label="Workspaces"' },
-    headerHtml: `<strong class="panel__title">${atelierEasterEggHtml()}Atelier</strong>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}`,
+    headerHtml: `<span class="panel__title">${Icons.Cloud}Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}`,
     bodyHtml: `<div class="fixed-shell-pane-collections" data-workspace-pane-collections>
       <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${workspaceRows(presentation).map((row) => row.html).join("")}</div>
       <section id="global_sidebar_contributions">${sidebarContributionsHtml}</section>
@@ -201,17 +200,17 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
   })}</div>${renderProjectsPane(presentation)}</div>`;
 }
 
-const atelierNextAttentionDomId = "fixed_shell_atelier_next_attention";
+const agentsInTheCloudNextAttentionDomId = "fixed_shell_agents-in-the-cloud_next_attention";
 
-function renderAtelierNextAttentionButton(): string {
+function renderAgentsInTheCloudNextAttentionButton(): string {
   const icon = `${Icons.Next}<i class="status-dot attention" aria-hidden="true"></i>`;
-  return barButton("Next workspace requesting attention", "click->atelier-shortcuts#openAttentionWorkspace", icon, `id="${atelierNextAttentionDomId}" disabled`);
+  return barButton("Next workspace requesting attention", "click->agents-in-the-cloud-shortcuts#openAttentionWorkspace", icon, `id="${agentsInTheCloudNextAttentionDomId}" disabled`);
 }
 
-export function renderAtelierBar(): string {
+export function renderAgentsInTheCloudBar(): string {
   const close = barButton("Close workspace list", "click->workspace-navigation#closeWorkspacePane", Icons.Close, "data-close-workspace-pane disabled");
-  const newWorkspace = barButton("New Workspace With Same Project", "click->atelier-shortcuts#runCommand", Icons.Plus, 'data-command-id="agent.open-launch-composer"');
-  return `<nav class="fixed-shell-mobile-nav fixed-shell-atelier-bar" data-popular-button aria-label="Atelier">${close}${renderAtelierNextAttentionButton()}${newWorkspace}</nav>`;
+  const newWorkspace = barButton("New Workspace With Same Project", "click->agents-in-the-cloud-shortcuts#runCommand", Icons.Plus, 'data-command-id="agent.open-launch-composer"');
+  return `<nav class="fixed-shell-mobile-nav fixed-shell-agents-in-the-cloud-bar" data-popular-button aria-label="AgentsInTheCloud">${close}${renderAgentsInTheCloudNextAttentionButton()}${newWorkspace}</nav>`;
 }
 
 export function workspacePresentationDomId(workspaceId: string): string {
@@ -238,7 +237,7 @@ function renderWorkViewSelector(workspaceId: string, view: WorkPaneContribution)
     selected: false,
     label: { kind: "text", text: view.label, textAttributesHtml },
     iconHtml: view.iconHtml ?? Icons.Plus,
-    metadataHtml: view.attentionSequence === undefined ? "" : '<i class="status-dot attention action-item__status" aria-label="Attention"></i>',
+    status: { requestingAttention: view.attentionSequence !== undefined },
     containerAttributesHtml: `id="${workViewSelectorDomId(workspaceId, view.key)}" draggable="true" data-work-view-reorder-key="${escapeHtml(view.key)}" data-action="dragstart->workspace-presentation#beginWorkReorder dragover->workspace-presentation#allowWorkReorder drop->workspace-presentation#finishWorkReorder"`,
     primary: { tag: "button", attributesHtml: `type="button" data-work-view-key="${escapeHtml(view.key)}" data-work-view-kind="${view.kind}"${view.attentionSequence === undefined ? "" : ` data-attention-sequence="${view.attentionSequence}"`} ${fullscreenViewAttributes(view.sourceKey ?? view.key, view.label)} data-action="click->workspace-presentation#selectWorkView"` },
     closeHtml: view.close ? selectorCloseForm(view.close) : "",
@@ -256,7 +255,7 @@ export function workContentId(workspaceId: string, key: string): string {
 function renderWorkViewPane(workspaceId: string, view: WorkPaneContribution, active: boolean): string {
   const body = view.bodyHtml ?? "";
   const source = view.sourceKey ? ` data-source-work-view-key="${escapeHtml(view.sourceKey)}"` : "";
-  return `<section id="${workViewPaneDomId(workspaceId, view.key)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="work" data-workspace-pane-id="${escapeHtml(view.key)}" data-atelier-fullscreen-view-key="${escapeHtml(view.sourceKey ?? view.key)}" data-workspace-logically-visible="false"${source} tabindex="-1"><div id="${workViewAvailabilityDomId(workspaceId, view.key)}">${renderAvailability(view)}</div><div id="${workViewActionsDomId(workspaceId, view.key)}" class="fixed-shell-work-actions">${view.actionsHtml ?? ""}</div><div class="fixed-shell-live-body" id="${workContentId(workspaceId, view.key)}" data-turbo-permanent>${body}</div></section>`;
+  return `<section id="${workViewPaneDomId(workspaceId, view.key)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="work" data-workspace-pane-id="${escapeHtml(view.key)}" data-agents-in-the-cloud-fullscreen-view-key="${escapeHtml(view.sourceKey ?? view.key)}" data-workspace-logically-visible="false"${source} tabindex="-1"><div id="${workViewAvailabilityDomId(workspaceId, view.key)}">${renderAvailability(view)}</div><div id="${workViewActionsDomId(workspaceId, view.key)}" class="fixed-shell-work-actions">${view.actionsHtml ?? ""}</div><div class="fixed-shell-live-body" id="${workContentId(workspaceId, view.key)}" data-turbo-permanent>${body}</div></section>`;
 }
 
 
@@ -304,7 +303,7 @@ function renderWorkPane(presentation: WorkspacePresentation): string {
   }) : "";
   return `<div class="fixed-shell-work-pane">${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="work" data-workspace-presentation-target="workPane" aria-label="Work"' },
-    headerHtml: `${tabStripHtml({ label: "Work views", tabsHtml: selectors, attributesHtml: `id="${workViewDomId(presentation.workspace.id, "selectors")}"` })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
+    headerHtml: `${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
     bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || `<div id="${workViewDomId(presentation.workspace.id, "empty")}" class="fixed-shell-empty-work empty-state">Open Files, a file, terminal, or browser to work alongside the Agent.</div>`}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
   })}</div>`;
 }
@@ -389,10 +388,10 @@ export function renderWorkspaceDeletionPresentation(workspaceId: string, deletio
   });
   let content: string;
   if (deletion.status === "checking") {
-    content = '<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>Checking if it’s safe to delete…</h1><p>Atelier is checking for uncommitted changes and unpushed commits.</p></div>';
+    content = '<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>Checking if it’s safe to delete…</h1><p>AgentsInTheCloud is checking for uncommitted changes and unpushed commits.</p></div>';
   } else if (deletion.status === "deleting") {
     const title = deletion.forced ? "Force deleting workspace…" : "Deleting workspace…";
-    const detail = deletion.forced ? "Local changes may be discarded." : "The safety check passed. Atelier is removing the workspace.";
+    const detail = deletion.forced ? "Local changes may be discarded." : "The safety check passed. AgentsInTheCloud is removing the workspace.";
     content = `<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>${title}</h1><p>${detail}</p></div>`;
   } else if (deletion.status === "blocked") {
     content = `<div class="workspace-deletion-evidence" aria-label="Git work that may be lost">${evidenceHtml}</div><footer class="workspace-deletion-actions"><form method="post" action="/workspaces/${id}/delete/cancel" data-turbo="true">${deletionButton("Cancel deletion")}</form><form method="post" action="/workspaces/${id}/delete/confirm" data-turbo="true" data-controller="submit-shortcut" data-action="keydown@window->submit-shortcut#windowKeydown submit->submit-shortcut#submit turbo:submit-end->submit-shortcut#submitted"><input type="hidden" name="fingerprint" value="${escapeHtml(deletion.fingerprint)}">${deletionButton("Delete anyway", "danger")}</form></footer>`;
@@ -418,7 +417,7 @@ export function presentWorkViewTurboStream(workspaceId: string, key: string): st
   return behaviorTurboStream("present-work-view", workspaceId, { "work-view-key": key });
 }
 
-export function workspacePaneCollectionsRegions(presentation: WorkspacePanePresentation): import("@atelier/shared").LiveRegion[] {
+export function workspacePaneCollectionsRegions(presentation: WorkspacePanePresentation): import("@agents-in-the-cloud/shared").LiveRegion[] {
   return [
     { target: workspacePaneScrollDomId, html: workspaceRows(presentation).map(row => row.html).join("") },
     { target: workspaceProjectsPaneDomId, html: renderProjectsPane(presentation), action: "replace" },

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { createAtelierEventBus } from "@atelier/core";
-import { addProject, createProjectEnvironmentVariable, projectWorkspaceInit, registerProjectWorkspaceInitEvents, setProjectPreloadImages } from "@atelier/projects";
-import type { WorkspaceDockerPlan } from "@atelier/workspace";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { addProject, createProjectEnvironmentVariable, projectWorkspaceInit, registerProjectWorkspaceInitEvents, setProjectPreloadImages } from "@agents-in-the-cloud/projects";
+import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 describe("project environment", () => {
   let previousDataDir: string | undefined;
@@ -11,7 +11,7 @@ describe("project environment", () => {
 
   beforeEach(async () => {
     previousDataDir = process.env.ATELIER_DATA_DIR;
-    dataDir = await mkdtemp(`${tmpdir()}/atelier-project-environment-`);
+    dataDir = await mkdtemp(`${tmpdir()}/agents-in-the-cloud-project-environment-`);
     process.env.ATELIER_DATA_DIR = dataDir;
   });
 
@@ -26,7 +26,7 @@ describe("project environment", () => {
     await createProjectEnvironmentVariable(project.id, { name: "API_URL", value: "https://api.example.com" });
     await createProjectEnvironmentVariable(project.id, { name: "EMPTY", value: "" });
     await setProjectPreloadImages(project.id, ["docker.io/library/postgres:17"]);
-    const events = createAtelierEventBus();
+    const events = createAgentsInTheCloudEventBus();
     registerProjectWorkspaceInitEvents(events);
     const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
 

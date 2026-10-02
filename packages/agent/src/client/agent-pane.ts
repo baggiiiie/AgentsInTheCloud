@@ -1,14 +1,16 @@
-import { setActivityButtonState } from "@atelier/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { setActivityButtonState } from "@agents-in-the-cloud/design-system/activity-button/client";
+import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
 import { TranscriptNavigation } from "./transcript-navigation.ts";
 
+const admissionSchema = Type.Object({ payload: Type.String(), requestId: Type.String({ pattern: "^[a-zA-Z0-9_-]{1,128}$" }) });
+
 type TurboSubmitEndEvent = CustomEvent<{ success: boolean; fetchResponse?: { response: Response } }>;
 
 declare global {
-  interface Window { AtelierCable?: import("@atelier/shared").AtelierCableClient; }
+  interface Window { AgentsInTheCloudCable?: import("@agents-in-the-cloud/shared").AgentsInTheCloudCableClient; }
 }
 
 interface AgentPaneControllerInstance {
@@ -50,7 +52,23 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private composerMutationObserver?: MutationObserver;
     private connected = false;
     private composerRevision = 0;
-    private submittedComposer?: { revision: number; attachmentIds: string[] };
+    private submittedComposer?: { revision: number; attachmentIds: string[]; requestId: string };
+    private readonly identifySubmission = (event: FormDataEvent): void => {
+      const body = event.formData;
+      // Mode may change from send to steer while an uncertain request retries.
+      const payload = JSON.stringify([...body.entries()].filter(([key]) => key !== "requestId" && key !== "mode"));
+      const key = `${this.composerTextStorageKey}:admission`;
+      const prior = this.pendingAdmission();
+      const requestId = prior?.payload === payload ? prior.requestId : crypto.randomUUID();
+      sessionStorage.setItem(key, JSON.stringify({ payload, requestId }));
+      body.set("requestId", requestId);
+    };
+    private pendingAdmission() {
+      const stored = sessionStorage.getItem(`${this.composerTextStorageKey}:admission`);
+      let value: unknown;
+      try { value = stored === null ? undefined : JSON.parse(stored); } catch { return undefined; }
+      return Value.Check(admissionSchema, value) ? value : undefined;
+    }
     private readonly promptHistory = new PromptHistoryNavigator();
     private readonly turnRevealed = (event: Event): void => {
       // SAFETY: The agent-turn controller produces this event with the loaded target element.
@@ -78,9 +96,11 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private readonly submitting = (): void => {
       const submittedText = this.inputTarget.value;
       const submittedRevision = this.composerRevision;
+      const body = new FormData(this.formTarget);
       this.submittedComposer = {
         revision: submittedRevision,
-        attachmentIds: new FormData(this.formTarget).getAll("attachment").map(String),
+        attachmentIds: body.getAll("attachment").map(String),
+        requestId: String(body.get("requestId")),
       };
       if (/^\/compact(?:\s|$)/.test(submittedText.trim())) {
         queueMicrotask(() => {
@@ -95,6 +115,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.element.dataset.agentConnectionActive = "false";
       this.element.addEventListener("agent:turn-reveal", this.turnRevealed);
       document.addEventListener("visibilitychange", this.onVisibilityChange);
+      this.formTarget.addEventListener("formdata", this.identifySubmission);
       this.formTarget.addEventListener("submit", this.submitting);
       this.composerMutationObserver = new MutationObserver(() => this.updateSendStopButton());
       this.composerMutationObserver.observe(this.formTarget, { childList: true, subtree: true });
@@ -112,6 +133,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.composerMutationObserver?.disconnect();
       this.element.removeEventListener("agent:turn-reveal", this.turnRevealed);
       document.removeEventListener("visibilitychange", this.onVisibilityChange);
+      this.formTarget.removeEventListener("formdata", this.identifySubmission);
       this.formTarget.removeEventListener("submit", this.submitting);
       this.logicallyVisible = false;
       this.stopConnection();
@@ -184,7 +206,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private subscribe(): void {
       this.element.dataset.agentPresentationReady = "false";
       if (this.hasBeenReady) this.setReconnecting(true);
-      this.cableSubscription = window.AtelierCable?.subscribe(
+      this.cableSubscription = window.AgentsInTheCloudCable?.subscribe(
         CableTopics.agent(this.workspaceIdValue, this.conversationIdValue),
         { onReady: this.cableReady, onDisconnected: this.cableDisconnected },
       );
@@ -317,6 +339,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     async sendPrompt(event: CustomEvent<AgentComposerSendPromptDetail>): Promise<void> {
       const body = new FormData();
       body.set("text", event.detail.text);
+      body.set("requestId", crypto.randomUUID());
       body.set("attachmentDraft", String(new FormData(this.formTarget).get("attachmentDraft")));
       const response = await fetch(this.formTarget.action, { method: "POST", body, headers: { Accept: "text/vnd.turbo-stream.html" } });
       if (!response.ok) throw new Error(`Could not send ${event.detail.text}: HTTP ${response.status}`);
@@ -328,11 +351,13 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       const submission = this.submittedComposer;
       this.submittedComposer = undefined;
       if (!event.detail.success) return;
+      const key = `${this.composerTextStorageKey}:admission`;
+      if (submission && this.pendingAdmission()?.requestId === submission.requestId) sessionStorage.removeItem(key);
       if (submission && this.composerRevision === submission.revision) {
         this.setInputValue("");
         localStorage.removeItem(this.composerTextStorageKey);
       }
-      if (event.detail.fetchResponse?.response.headers.get("x-atelier-attachment-draft-consumed") === "true") {
+      if (event.detail.fetchResponse?.response.headers.get("x-agents-in-the-cloud-attachment-draft-consumed") === "true") {
         const consumed = new Set(submission?.attachmentIds ?? []);
         this.formTarget.querySelectorAll<HTMLInputElement>('input[name="attachment"]').forEach((input) => {
           if (consumed.has(input.value)) input.closest(".agent-chip")!.remove();

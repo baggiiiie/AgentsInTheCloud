@@ -1,8 +1,8 @@
-import { nativeJsonlRows, nativeJsonlText, nativeImageTypes, nativeImageResponse } from "@atelier/cli-agent/server";
+import { nativeJsonlRows, nativeJsonlText, nativeImageTypes, nativeImageResponse } from "@agents-in-the-cloud/cli-agent/server";
 import { join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
-import type { TranscriptRecord } from "@atelier/agent/server";
-import { workspaceRoot } from "@atelier/workspace";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -102,7 +102,7 @@ export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
 }
 
 function nativeSessionPath(sessionId: string): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
 }
 export async function loadClaudeTranscript(_workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
   const text = await nativeJsonlText(nativeSessionPath(sessionId));
@@ -119,4 +119,8 @@ export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId:
     return nativeImageResponse(source.data, source.media_type);
   }
   return new Response("Not found", { status: 404 });
+}
+
+export async function hasClaudeSession(sessionId: string): Promise<boolean> {
+  return Bun.file(nativeSessionPath(sessionId)).exists();
 }

@@ -1,4 +1,4 @@
-/** Import only delegation text; never import Codex's CLI base prompt into Atelier. */
+/** Import only delegation text; never import Codex's CLI base prompt into AgentsInTheCloud. */
 import { resolve } from "node:path";
 import { Type } from "typebox";
 import { Value } from "typebox/value";

@@ -4,20 +4,20 @@ import { appendFile, mkdir, readFile, readdir, realpath, rename, rm, stat, write
 import { platform } from "node:os";
 import { join, resolve } from "node:path";
 import {
-  atelierDataPath,
+  agentsInTheCloudDataPath,
   runCommand,
   createKeyedOperationQueue,
-  AtelierCoreError,
+  AgentsInTheCloudCoreError,
   discoverHostGitHubToken,
-  dockerHostAtelierDataPath,
-  getAtelierRuntimeContext,
+  dockerHostAgentsInTheCloudDataPath,
+  getAgentsInTheCloudRuntimeContext,
   gitHubCredentialHelperCommand,
   invalidArguments,
   shellQuote,
-  type AtelierEventBus,
+  type AgentsInTheCloudEventBus,
   type CommandResult,
-} from "@atelier/core";
-import { runHostObservableCommand, tailTerminalText } from "@atelier/observable-terminal/server";
+} from "@agents-in-the-cloud/core";
+import { runHostObservableCommand, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { getProjectConfiguration, listProjects, isGitProjectInit } from "./project.ts";
@@ -55,7 +55,7 @@ const reflinkSupportByDir = new Map<string, Promise<boolean>>();
 const regularCopyWarnings = new Set<string>();
 
 function sourceRoot(): string {
-  return getAtelierRuntimeContext().atelierDataDir;
+  return getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir;
 }
 
 function templateKey(gitUrl: string, branch: string | null): string {
@@ -85,10 +85,10 @@ export function projectDataDirKey(projectId: string): string {
 }
 
 export async function projectPersistentMount(projectId: string): Promise<{ source: string; target: "/persistent" }> {
-  const runtime = getAtelierRuntimeContext();
+  const runtime = getAgentsInTheCloudRuntimeContext();
   const key = projectDataDirKey(projectId);
-  await mkdir(atelierDataPath(runtime, "projects", key, "persistent"), { recursive: true });
-  return { source: dockerHostAtelierDataPath(runtime, "projects", key, "persistent"), target: "/persistent" };
+  await mkdir(agentsInTheCloudDataPath(runtime, "projects", key, "persistent"), { recursive: true });
+  return { source: dockerHostAgentsInTheCloudDataPath(runtime, "projects", key, "persistent"), target: "/persistent" };
 }
 
 function workspaceWorktreePath(workspaceId: string): string {
@@ -103,7 +103,7 @@ async function command(name: string, args: string[], options: { env?: Record<str
 async function requireCommand(name: string, args: string[], options: { env?: Record<string, string | undefined>; errorCode?: string } = {}): Promise<CommandResult> {
   const result = await command(name, args, options);
   if (result.exitCode !== 0) {
-    throw new AtelierCoreError(options.errorCode ?? "workspace_source_failed", (result.stderr || result.stdout).trim() || `${name} ${args.join(" ")} failed`);
+    throw new AgentsInTheCloudCoreError(options.errorCode ?? "workspace_source_failed", (result.stderr || result.stdout).trim() || `${name} ${args.join(" ")} failed`);
   }
   return result;
 }
@@ -120,7 +120,7 @@ async function pathExists(path: string): Promise<boolean> {
   return await stat(path).then(() => true, () => false);
 }
 
-async function ensureTemplate(gitUrl: string, branch: string | null, key: string, options: { workspaceId: string; events?: AtelierEventBus; logPath: string; sshEnv: Record<string, string> }): Promise<{ repoPath: string; resolvedCommit: string | null; effectiveBranch: string | null }> {
+async function ensureTemplate(gitUrl: string, branch: string | null, key: string, options: { workspaceId: string; events?: AgentsInTheCloudEventBus; logPath: string; sshEnv: Record<string, string> }): Promise<{ repoPath: string; resolvedCommit: string | null; effectiveBranch: string | null }> {
   const dir = templateDir(key);
   const repoPath = templateRepoPath(key);
   const tmpPath = join(dir, `repo.tmp-${process.pid}-${Date.now()}`);
@@ -213,7 +213,7 @@ printf '%s\n' "$effective_branch" > "$effective_branch_file"
   const env = { ...options.sshEnv };
   if (token) env.GH_TOKEN = token;
   const result = await runHostObservableCommand({
-    session: `atelier-provision-git-${crypto.randomUUID().slice(0, 8)}`,
+    session: `agents-in-the-cloud-provision-git-${crypto.randomUUID().slice(0, 8)}`,
     cwd: dir,
     command: script,
     env,
@@ -223,12 +223,12 @@ printf '%s\n' "$effective_branch" > "$effective_branch_file"
   });
   await appendFile(options.logPath, result.output).catch(() => undefined);
   if (result.exitCode === branchNotFoundExitCode) {
-    throw new AtelierCoreError("branch_not_found", `Branch "${branch}" was not found. Open Project settings and correct the branch after # in Repository, or remove it to use the default branch. Then create a new workspace.`);
+    throw new AgentsInTheCloudCoreError("branch_not_found", `Branch "${branch}" was not found. Open Project settings and correct the branch after # in Repository, or remove it to use the default branch. Then create a new workspace.`);
   }
   if (result.exitCode !== 0) {
     const detail = tailTerminalText(result.output) || `git provisioning failed with exit code ${result.exitCode}`;
     const trustHelp = result.output.includes("Host key verification failed") ? "\nConfigure verified server keys in Project settings → Trusted SSH servers, then retry workspace creation." : "";
-    throw new AtelierCoreError("git_error", `${detail}${trustHelp}`);
+    throw new AgentsInTheCloudCoreError("git_error", `${detail}${trustHelp}`);
   }
 
   const effectiveBranch = (await readFile(effectiveBranchPath, "utf8")).trim() || null;
@@ -277,7 +277,7 @@ async function detectReflinkSupport(dir: string): Promise<boolean> {
     const dest = join(probeDir, "dest");
     try {
       await mkdir(probeDir, { recursive: true });
-      await writeFile(src, "atelier reflink probe\n");
+      await writeFile(src, "agents-in-the-cloud reflink probe\n");
       const result = await command("cp", reflinkCopyArgs(src, dest)!);
       return result.exitCode === 0;
     } finally {
@@ -292,20 +292,20 @@ async function detectReflinkSupport(dir: string): Promise<boolean> {
 function warnRegularCopy(dir: string): void {
   if (regularCopyWarnings.has(dir)) return;
   regularCopyWarnings.add(dir);
-  console.warn(`Atelier warning: ${dir} does not appear to support copy-on-write/reflink copies; workspace creation will use regular copies and may be slower than ideal.`);
+  console.warn(`AgentsInTheCloud warning: ${dir} does not appear to support copy-on-write/reflink copies; workspace creation will use regular copies and may be slower than ideal.`);
 }
 
 async function copyWorkspaceTemplate(src: string, dest: string, supportProbeDir: string): Promise<void> {
   if (await detectReflinkSupport(supportProbeDir)) {
     const args = reflinkCopyArgs(src, dest);
-    if (!args) throw new AtelierCoreError("cow_unavailable", `copy-on-write workspace copies are not supported on ${platform()}`);
+    if (!args) throw new AgentsInTheCloudCoreError("cow_unavailable", `copy-on-write workspace copies are not supported on ${platform()}`);
     await requireCommand("cp", args, { errorCode: "cow_unavailable" });
     return;
   }
 
   warnRegularCopy(supportProbeDir);
   const args = regularCopyArgs(src, dest);
-  if (!args) throw new AtelierCoreError("copy_unavailable", `workspace template copies are not supported on ${platform()}`);
+  if (!args) throw new AgentsInTheCloudCoreError("copy_unavailable", `workspace template copies are not supported on ${platform()}`);
   await requireCommand("cp", args, { errorCode: "copy_unavailable" });
 }
 
@@ -315,14 +315,14 @@ async function verifyStandaloneWorktree(worktreePath: string): Promise<void> {
   const commonDir = await realpath(resolve(common.stdout.trim()));
   const expected = await realpath(resolve(join(worktreePath, ".git")));
   if (commonDir !== expected) {
-    throw new AtelierCoreError("workspace_source_invalid", `workspace git common dir is ${commonDir}, expected ${expected}`);
+    throw new AgentsInTheCloudCoreError("workspace_source_invalid", `workspace git common dir is ${commonDir}, expected ${expected}`);
   }
   if (await pathExists(join(worktreePath, ".git", "objects", "info", "alternates"))) {
-    throw new AtelierCoreError("workspace_source_invalid", "workspace git checkout unexpectedly uses alternates");
+    throw new AgentsInTheCloudCoreError("workspace_source_invalid", "workspace git checkout unexpectedly uses alternates");
   }
 }
 
-export async function prepareWorkspaceSource(options: { workspaceId: string; gitUrl: string; branch: string | null; worktreePath?: string; projectId?: string; events?: AtelierEventBus }): Promise<PreparedWorkspaceSource> {
+export async function prepareWorkspaceSource(options: { workspaceId: string; gitUrl: string; branch: string | null; worktreePath?: string; projectId?: string; events?: AgentsInTheCloudEventBus }): Promise<PreparedWorkspaceSource> {
   const gitUrl = options.gitUrl.trim();
   if (!gitUrl) throw invalidArguments("missing git URL");
   const branch = options.branch?.trim() || null;
@@ -334,7 +334,7 @@ export async function prepareWorkspaceSource(options: { workspaceId: string; git
     await mkdir(cleanupPath, { recursive: true });
     if (await pathExists(worktreePath)) {
       const entries = await readdir(worktreePath);
-      if (entries.length > 0) throw new AtelierCoreError("workspace_source_exists", `workspace source is not empty: ${worktreePath}`);
+      if (entries.length > 0) throw new AgentsInTheCloudCoreError("workspace_source_exists", `workspace source is not empty: ${worktreePath}`);
     }
     const tmpWorkPath = join(cleanupPath, `work.tmp-${process.pid}-${Date.now()}`);
     await rm(tmpWorkPath, { recursive: true, force: true });
@@ -379,7 +379,7 @@ export async function prepareWorkspaceSource(options: { workspaceId: string; git
   });
 }
 
-export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): void {
+export function registerProjectWorkspaceInitEvents(events: AgentsInTheCloudEventBus): void {
   events.on("workspace_image_configure", async (configuration) => {
     if (!isGitProjectInit(configuration.init)) return;
     const projectId = configuration.init.projectId;
@@ -401,7 +401,7 @@ export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): voi
     const metadataPath = join(workspaceSourceDir(workspaceId), "metadata.json");
     if (!existsSync(metadataPath)) return;
     const metadata = Value.Parse(workspaceSourceMetadataSchema, JSON.parse(await readFile(metadataPath, "utf8")));
-    if (metadata.resolvedCommit !== null) plan.labels["com.atelier.source-commit"] = metadata.resolvedCommit;
-    plan.labels["com.atelier.source-template"] = metadata.templateKey;
+    if (metadata.resolvedCommit !== null) plan.labels["com.agents-in-the-cloud.source-commit"] = metadata.resolvedCommit;
+    plan.labels["com.agents-in-the-cloud.source-template"] = metadata.templateKey;
   });
 }

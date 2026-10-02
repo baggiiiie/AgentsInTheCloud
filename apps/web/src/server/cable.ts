@@ -1,4 +1,4 @@
-import { AtelierCoreError, type AtelierEventBus } from "@atelier/core";
+import { AgentsInTheCloudCoreError, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import {
   decodeCableClientMessage,
   serializeCableIdentifier,
@@ -6,7 +6,7 @@ import {
   type CableClientMessage,
   type CableIdentifier,
   type CableServerMessage,
-} from "@atelier/shared";
+} from "@agents-in-the-cloud/shared";
 import type { WorkspaceRegistry } from "./workspace-registry.ts";
 
 export interface CableSocketData {
@@ -31,7 +31,7 @@ type SocketSubscriptionAttempt = {
 
 export interface CableServerOptions {
   registry: WorkspaceRegistry;
-  events: AtelierEventBus;
+  events: AgentsInTheCloudEventBus;
   channels?: CableChannelAdapter[];
   logError?: (message: string) => void;
 }
@@ -79,7 +79,7 @@ export function createCableServer(options: CableServerOptions): CableServer {
   function authorize(identifier: CableIdentifier): void {
     if (identifier.channel === "shell") return;
     if (identifier.channel === "module") {
-      if (!options.registry.get(identifier.workspaceId)) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${identifier.workspaceId}`);
+      if (!options.registry.get(identifier.workspaceId)) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${identifier.workspaceId}`);
     }
   }
 

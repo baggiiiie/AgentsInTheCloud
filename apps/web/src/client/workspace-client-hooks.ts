@@ -6,7 +6,7 @@ import {
   type WorkspacePaletteItem,
   type WorkspacePaletteProvider,
   type WorkspacePaletteSearchContext,
-} from "@atelier/shared";
+} from "@agents-in-the-cloud/shared";
 
 class WorkspaceClientHookRegistry implements WorkspaceClientHooks {
   private readonly becomeVisibleHandlers: Array<(context: WorkspaceClientSurfaceVisibilityContext) => void> = [];

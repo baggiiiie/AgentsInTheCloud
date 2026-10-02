@@ -1,4 +1,4 @@
-import { recentWorkspaceProjectStorageKey } from "@atelier/shared";
+import { recentWorkspaceProjectStorageKey } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers, residencyController } from "./workspace-controller-registry.ts";
 import { markActiveWorkspaceRow } from "./workspace-presentation.ts";
@@ -50,15 +50,35 @@ class ProjectsPaneController extends Controller<HTMLElement> {
   static targets = ["toggle", "list"];
   declare readonly toggleTarget: HTMLButtonElement;
   declare readonly listTarget: HTMLElement;
+  private hideScrollbarTimer?: ReturnType<typeof setTimeout>;
+  private scrollbarObserver?: ResizeObserver;
 
   connect(): void {
-    this.setCollapsed(localStorage.getItem("atelier:projects-pane-collapsed") === "true");
+    this.setCollapsed(localStorage.getItem("agents-in-the-cloud:projects-pane-collapsed") === "true");
+    const scrollBody = this.listTarget.parentElement!;
+    this.scrollbarObserver = new ResizeObserver(() => {
+      const scrollbarWidth = scrollBody.offsetWidth - scrollBody.clientWidth;
+      this.element.style.setProperty("--projects-scrollbar-width", `${scrollbarWidth}px`);
+    });
+    this.scrollbarObserver.observe(scrollBody);
+  }
+
+  disconnect(): void {
+    this.scrollbarObserver?.disconnect();
+    clearTimeout(this.hideScrollbarTimer);
+    this.element.classList.remove("is-scrolling");
+  }
+
+  scrolled(): void {
+    this.element.classList.add("is-scrolling");
+    clearTimeout(this.hideScrollbarTimer);
+    this.hideScrollbarTimer = setTimeout(() => this.element.classList.remove("is-scrolling"), 800);
   }
 
   toggle(): void {
     const collapsed = !this.element.classList.contains("is-collapsed");
     this.setCollapsed(collapsed);
-    localStorage.setItem("atelier:projects-pane-collapsed", String(collapsed));
+    localStorage.setItem("agents-in-the-cloud:projects-pane-collapsed", String(collapsed));
   }
 
   private setCollapsed(collapsed: boolean): void {
@@ -77,18 +97,18 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   connect(): void {
     this.scrollTarget.addEventListener("scroll", this.scrolled, { passive: true });
-    this.element.addEventListener("atelier:mobile-resident-destination-selected", this.mobileResidentDestinationSelected);
-    document.addEventListener("atelier:workspace-pane-changed", this.workspacePaneChanged);
-    const scroll = Number(localStorage.getItem("atelier:workspace-pane-scroll"));
+    this.element.addEventListener("agents-in-the-cloud:mobile-resident-destination-selected", this.mobileResidentDestinationSelected);
+    document.addEventListener("agents-in-the-cloud:workspace-pane-changed", this.workspacePaneChanged);
+    const scroll = Number(localStorage.getItem("agents-in-the-cloud:workspace-pane-scroll"));
     if (Number.isFinite(scroll)) this.scrollTarget.scrollTop = scroll;
     this.setWorkspacePaneOpen(!this.element.querySelector(".workspace-detail-resident.visible"));
-    this.setWorkspacePaneCollapsed(sessionStorage.getItem("atelier:workspace-pane-collapsed") === "true" && Boolean(this.visibleWorkspacePaneToggle()));
+    this.setWorkspacePaneCollapsed(sessionStorage.getItem("agents-in-the-cloud:workspace-pane-collapsed") === "true" && Boolean(this.visibleWorkspacePaneToggle()));
   }
 
   disconnect(): void {
     this.scrollTarget.removeEventListener("scroll", this.scrolled);
-    this.element.removeEventListener("atelier:mobile-resident-destination-selected", this.mobileResidentDestinationSelected);
-    document.removeEventListener("atelier:workspace-pane-changed", this.workspacePaneChanged);
+    this.element.removeEventListener("agents-in-the-cloud:mobile-resident-destination-selected", this.mobileResidentDestinationSelected);
+    document.removeEventListener("agents-in-the-cloud:workspace-pane-changed", this.workspacePaneChanged);
     if (this.scrollTimer) clearTimeout(this.scrollTimer);
   }
 
@@ -113,7 +133,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   private setWorkspacePaneCollapsed(collapsed: boolean): void {
     this.element.classList.toggle("is-workspace-pane-collapsed", collapsed);
-    sessionStorage.setItem("atelier:workspace-pane-collapsed", String(collapsed));
+    sessionStorage.setItem("agents-in-the-cloud:workspace-pane-collapsed", String(collapsed));
   }
 
   private visibleWorkspacePaneToggle(): HTMLButtonElement | null {
@@ -122,7 +142,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   private setWorkspacePaneOpen(open: boolean): void {
     this.element.classList.toggle("is-mobile-workspace-pane-open", open);
-    document.dispatchEvent(new CustomEvent("atelier:mobile-workspace-pane-changed"));
+    document.dispatchEvent(new CustomEvent("agents-in-the-cloud:mobile-workspace-pane-changed"));
   }
 
   private readonly mobileResidentDestinationSelected = (): void => this.setWorkspacePaneOpen(false);
@@ -183,7 +203,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   private scrolled = (): void => {
     if (this.scrollTimer) clearTimeout(this.scrollTimer);
-    this.scrollTimer = setTimeout(() => localStorage.setItem("atelier:workspace-pane-scroll", String(this.scrollTarget.scrollTop)), 80);
+    this.scrollTimer = setTimeout(() => localStorage.setItem("agents-in-the-cloud:workspace-pane-scroll", String(this.scrollTarget.scrollTop)), 80);
   };
 }
 

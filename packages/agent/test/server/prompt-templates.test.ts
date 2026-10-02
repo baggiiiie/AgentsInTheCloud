@@ -5,11 +5,11 @@ import { describe, expect, test } from "bun:test";
 import { expandPromptTemplateText, loadPromptTemplatesFromRoot, parseCompactCommand, parseAgentSessionNameCommand } from "../../src/server/prompt-templates.ts";
 
 describe("prompt templates", () => {
-  test("loads .atelier and .pi prompt templates", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-prompts-"));
-    await mkdir(join(root, ".atelier/prompts"), { recursive: true });
+  test("loads .agents-in-the-cloud and .pi prompt templates", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
+    await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
     await mkdir(join(root, ".pi/prompts"), { recursive: true });
-    await writeFile(join(root, ".atelier/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\nquick-launch: true\nhotkey: L\n---\ncommit to ${"$"}{1:-main}`);
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\nquick-launch: true\nhotkey: L\n---\ncommit to ${"$"}{1:-main}`);
     await writeFile(join(root, ".pi/prompts/review.md"), "---\nhotkey: command-r\n---\nReview $ARGUMENTS");
 
     const templates = await loadPromptTemplatesFromRoot(root);
@@ -26,7 +26,7 @@ describe("prompt templates", () => {
   });
 
   test("includes builtin land template when repository does not provide one", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-prompts-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
 
     const templates = await loadPromptTemplatesFromRoot(root);
     expect(templates.map((template) => template.trigger)).toEqual(["/compact", "/land", "/name", "/new", "/park"]);

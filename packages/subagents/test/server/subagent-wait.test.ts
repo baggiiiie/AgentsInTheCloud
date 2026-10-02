@@ -5,13 +5,13 @@ import { join } from "node:path";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
 import { createAgentSession, ModelRuntime, SessionManager, SettingsManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { createAtelierResourceLoader } from "../../../agent/src/server/system-prompt.ts";
+import { createAgentsInTheCloudResourceLoader } from "../../../agent/src/server/system-prompt.ts";
 import { bindSubagentSession, getSubagents, shutdownSubagents } from "../../src/server/subagents.ts";
 import type { SubagentRuntime } from "../../src/server/subagent-runtime.ts";
 
 // Exercise the real Pi queue and lifecycle, with a scripted model and no network.
 async function withSession(run: (session: AgentSession, coordinator: SubagentRuntime, probe: (callback: () => Promise<void>) => void) => Promise<void>, agentId = "root") {
-  const dir = await mkdtemp(join(tmpdir(), "atelier-wait-"));
+  const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-wait-"));
   const previous = process.env.ATELIER_DATA_DIR;
   process.env.ATELIER_DATA_DIR = dir;
   const workspaceId = "wait-session";
@@ -27,7 +27,7 @@ async function withSession(run: (session: AgentSession, coordinator: SubagentRun
     ({ session } = await createAgentSession({
       cwd: dir, agentDir: dir, modelRuntime, model, thinkingLevel: "off",
       sessionManager: SessionManager.inMemory(), settingsManager: SettingsManager.inMemory({ compaction: { enabled: false } }),
-      resourceLoader: createAtelierResourceLoader(), tools: ["probe"],
+      resourceLoader: createAgentsInTheCloudResourceLoader(), tools: ["probe"],
       customTools: [{ name: "probe", label: "Probe", description: "Inspect pending input", parameters: Type.Object({}), async execute() {
         await callback();
         return { content: [{ type: "text", text: "Probe complete" }], details: {} };
@@ -49,7 +49,7 @@ async function withSession(run: (session: AgentSession, coordinator: SubagentRun
     if (agentId === "child") {
       coordinator.state.agents.push({ id: agentId, parentId: "root", rootId: "root", taskName: "child", task: "Task", depth: 1, status: "completed", thinkingLevel: "off" });
       ({ session: parent } = await createAgentSession({
-        cwd: dir, agentDir: dir, modelRuntime, model, resourceLoader: createAtelierResourceLoader(), tools: [],
+        cwd: dir, agentDir: dir, modelRuntime, model, resourceLoader: createAgentsInTheCloudResourceLoader(), tools: [],
         sessionManager: SessionManager.inMemory(), settingsManager: SettingsManager.inMemory(),
       }));
       disposeParent = bindSubagentSession(workspaceId, "root", parent, coordinator).dispose;

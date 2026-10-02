@@ -1,18 +1,18 @@
 import { SubagentCosts } from "./costs.ts";
 import { openSubagentHistory, subagentHistoryDirectory } from "./history-store.ts";
 import { inheritedContextEntryType, selectForkHistory } from "./fork-history.ts";
-import type { AgentSessionAttachment } from "@atelier/agent/server";
+import type { AgentSessionAttachment } from "@agents-in-the-cloud/agent/server";
 import { modelDeliveryBatch, parseSubagentDelivery, subagentDeliveryType } from "./subagent-delivery.ts";
-import { finalAssistantText } from "@atelier/agent/server";
+import { finalAssistantText } from "@agents-in-the-cloud/agent/server";
 import { messageEnvelope, modelMessage } from "./subagent-protocol.ts";
 import { SubagentModelInput } from "./subagent-model-input.ts";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { type AtelierEventBus } from "@atelier/core";
+import { type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { getWorkspaceAgentRuntime } from "@atelier/agent/server";
-import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "@atelier/agent/server";
+import { getWorkspaceAgentController } from "@agents-in-the-cloud/agent/server";
+import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "@agents-in-the-cloud/agent/server";
 import { SubagentRuntime, type SubagentPeer, type SubagentRecord, type SubagentState } from "./subagent-runtime.ts";
 
 const recordSchema = Type.Object({
@@ -65,7 +65,7 @@ export function forkSubagentHistory(workspaceId: string, child: SubagentRecord, 
 export async function subagentConversation(workspaceId: string, agent: SubagentRecord): Promise<WorkspaceAgentConversationInfo> {
   return { workspaceId, conversationId: agent.id, label: agent.taskName, title: agent.taskName, path: join(await subagentHistoryDirectory(workspaceId), `${agent.id}.jsonl`) };
 }
-export function getSubagents(workspaceId: string, events?: AtelierEventBus): Promise<SubagentRuntime> {
+export function getSubagents(workspaceId: string, events?: AgentsInTheCloudEventBus): Promise<SubagentRuntime> {
   let runtime = coordinators.get(workspaceId);
   if (!runtime) {
     runtime = (async () => {
@@ -77,13 +77,13 @@ export function getSubagents(workspaceId: string, events?: AtelierEventBus): Pro
       for (const agent of state.agents) {
         if (agent.status === "running" || agent.status === "starting") {
           agent.status = "interrupted";
-          agent.result = "Atelier restarted during this task. Use followup_task to continue.";
+          agent.result = "AgentsInTheCloud restarted during this task. Use followup_task to continue.";
         }
       }
       for (const message of state.messages) {
         if (message.delivery === "queued") {
           message.delivery = "failed";
-          message.error = "Atelier restarted before transcript delivery was acknowledged. Inspect the transcript before resending.";
+          message.error = "AgentsInTheCloud restarted before transcript delivery was acknowledged. Inspect the transcript before resending.";
         }
       }
       const rootsWithSubagents = new Set(state.agents.map((agent) => agent.rootId));
@@ -107,7 +107,7 @@ export function getSubagents(workspaceId: string, events?: AtelierEventBus): Pro
             const child = state.agents.find((agent) => agent.id === id);
             const conversation = child ? await subagentConversation(workspaceId, child) : (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === id);
             if (!conversation) throw new Error(`Agent conversation not found: ${id}`);
-            await getWorkspaceAgentRuntime(conversation, { events });
+            await getWorkspaceAgentController(conversation, { events });
           }
           const peer = peers.get(key);
           if (!peer) throw new Error(`Agent session not bound: ${id}`);

@@ -1,4 +1,4 @@
-ARG ATELIER_RUNTIME_IMAGE=ghcr.io/lucasmeijer/atelier-docker@sha256:978097dea150b4e9c4a17b82ca9422337eb2d68a98bfa7503c1e8c842eb31fba
+ARG ATELIER_RUNTIME_IMAGE=ghcr.io/lucasmeijer/agents-in-the-cloud-docker@sha256:144a54ae19731c822e750b1020bdfc5e2098348b4092e76e42b7f0cc576ca232
 FROM oven/bun:1.4.0 AS bun-dist
 
 FROM ubuntu:26.04 AS transcription-runtime
@@ -59,8 +59,8 @@ ENV ATELIER_DATA_DIR=/data/app
 
 COPY --from=deps /app/node_modules /app/node_modules
 COPY --from=build --exclude=node_modules /app /app
-RUN printf '%s\n' '#!/usr/bin/env sh' 'exec /usr/local/bin/bun /app/packages/proxy-ingress/src/ingress/tailscale-serve-helper.ts "$@"' > /usr/local/bin/atelier-tailscale-serve-helper \
- && chmod 755 /usr/local/bin/atelier-tailscale-serve-helper /app/apps/web/docker-entrypoint.sh
+RUN printf '%s\n' '#!/usr/bin/env sh' 'exec /usr/local/bin/bun /app/packages/proxy-ingress/src/ingress/tailscale-serve-helper.ts "$@"' > /usr/local/bin/agents-in-the-cloud-tailscale-serve-helper \
+ && chmod 755 /usr/local/bin/agents-in-the-cloud-tailscale-serve-helper /app/apps/web/docker-entrypoint.sh
 
 ARG ATELIER_COMMIT_ID
 ARG ATELIER_COMMIT_DESCRIPTION
@@ -71,7 +71,7 @@ ENV ATELIER_COMMIT_DESCRIPTION=${ATELIER_COMMIT_DESCRIPTION}
 LABEL org.opencontainers.image.source="https://github.com/lucasmeijer/atelier" \
       org.opencontainers.image.revision="${ATELIER_COMMIT_ID}" \
       eagerly-preload="${ATELIER_EAGERLY_PRELOAD}"
-RUN printf '%s\n' "$ATELIER_DEFAULT_WORKSPACE_IMAGE" > /app/.atelier-default-workspace-image
+RUN printf '%s\n' "$ATELIER_DEFAULT_WORKSPACE_IMAGE" > /app/.agents-in-the-cloud-default-workspace-image
 
 EXPOSE 3000
 

@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/agent",
+  "name": "@agents-in-the-cloud/agent",
   "private": true,
   "type": "module",
   "exports": {
@@ -12,26 +12,31 @@
     "@wasm-fmt/biome_fmt": "0.2.9",
     "@wasm-fmt/ruff_fmt": "0.15.20",
     "@wasm-fmt/shfmt": "0.2.7",
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/markdown": "workspace:*",
-    "@atelier/observable-terminal": "workspace:*",
-    "@atelier/projects": "workspace:*",
-    "@atelier/shared": "workspace:*",
-    "@atelier/syntax": "workspace:*",
-    "@atelier/transcription": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/markdown": "workspace:*",
+    "@agents-in-the-cloud/observable-terminal": "workspace:*",
+    "@agents-in-the-cloud/projects": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
+    "@agents-in-the-cloud/syntax": "workspace:*",
+    "@agents-in-the-cloud/transcription": "workspace:*",
     "@pierre/diffs": "1.3.6",
     "beautiful-mermaid": "1.1.3",
     "@earendil-works/pi-ai": "catalog:",
     "@earendil-works/pi-coding-agent": "catalog:",
     "typebox": "^1.0.57",
-    "@atelier/workspace": "workspace:*",
+    "@agents-in-the-cloud/workspace": "workspace:*",
     "web-push": "3.6.7",
-    "@atelier/llm": "workspace:*",
-    "@atelier/prompt": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.30.0"
+    "@agents-in-the-cloud/llm": "workspace:*",
+    "@agents-in-the-cloud/prompt": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@earendil-works/pi-durable": "catalog:",
+    "@earendil-works/chord": "catalog:",
+    "proper-lockfile": "4.1.2",
+    "@agents-in-the-cloud/legacy-converter": "workspace:*"
   },
   "devDependencies": {
-    "@types/web-push": "3.6.4"
+    "@types/web-push": "3.6.4",
+    "@types/proper-lockfile": "4.1.4"
   }
 }

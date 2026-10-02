@@ -1,10 +1,11 @@
-import { withCommandSignal } from "@atelier/core";
-import type { WorkspaceProvisioning, WorkspaceProvisionRun } from "@atelier/workspace";
+import { withCommandSignal } from "@agents-in-the-cloud/core";
+import type { WorkspaceProvisioning, WorkspaceProvisionRun } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceRegistry } from "./workspace-registry.ts";
 
 interface WorkspaceReadinessOperations {
   checkReadiness(id: string, report: (detail: string) => void): Promise<void>;
   provisioning: WorkspaceProvisioning;
+  runtimeReady?(id: string): Promise<void>;
 }
 
 async function prepare(id: string, registry: WorkspaceRegistry, operations: WorkspaceReadinessOperations, run: WorkspaceProvisionRun): Promise<void> {
@@ -23,6 +24,7 @@ async function prepare(id: string, registry: WorkspaceRegistry, operations: Work
       throw error;
     }
   }, "retry-or-continue");
+  if (current()) await operations.runtimeReady?.(id);
 }
 
 /** Readiness failures retain the container and pause until retry or explicit bypass. */

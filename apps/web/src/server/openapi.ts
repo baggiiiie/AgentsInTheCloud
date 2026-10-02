@@ -1,5 +1,5 @@
-import { projectSecretValueInputSchema } from "@atelier/projects";
-import { emptyWorkspaceCommandInputSchema, type WorkspaceModuleCommandHandler } from "@atelier/shared";
+import { projectSecretValueInputSchema, projectSecretPathPermissionSchema } from "@agents-in-the-cloud/projects";
+import { emptyWorkspaceCommandInputSchema, type WorkspaceModuleCommandHandler } from "@agents-in-the-cloud/shared";
 import type { TSchema } from "typebox";
 import { closeWorkViewRequestSchema, reorderWorkViewRequestSchema, workViewReferenceSchema } from "./work-view-api.ts";
 
@@ -29,7 +29,7 @@ const agentConversationId = { name: "conversationId", in: "path", required: true
 const jsonBody = (schema: TSchema) => ({ required: true, content: { "application/json": { schema } } });
 const emptyObjectSchema = { type: "object", additionalProperties: false };
 const workspaceIssuesSchema = { type: "array", items: { type: "object", required: ["kind", "message"], properties: { kind: { type: "string", enum: ["readiness", "image"] }, message: { type: "string" } }, additionalProperties: false } };
-const projectSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
+const projectSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
 const sshKnownHostsSchema = { type: "object", required: ["knownHosts"], properties: { knownHosts: { type: "string", description: "Operator-verified known_hosts entries; empty clears additional trust. GitHub is trusted by default." } } };
 const projectSummaryProperties = { lastWorkspaceCreatedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent workspace creation for this project; absent if none has been recorded" }, configurationFingerprint: { type: "string", description: "Opaque fingerprint of workspace setup settings" }, id: { type: "string" }, name: { type: "string" }, gitUrl: { type: "string" }, branch: { type: ["string", "null"] }, sessionShareKey: { type: "string" }, dockerfile: { type: "string" }, preloadImages: { type: "array", items: { type: "string" }, description: "Images prepared before newly created workspaces become ready. Does not change existing workspaces." } };
 const agentConversationSummarySchema = {
@@ -39,7 +39,7 @@ const agentConversationSummarySchema = {
   additionalProperties: false,
 };
 
-export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contributedPaths: Record<string, import("@atelier/core").JsonObject> = {}) {
+export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[], contributedPaths: Record<string, import("@agents-in-the-cloud/core").JsonObject> = {}) {
   const commandSchemas = Object.fromEntries(commands.map((command) => [command.id, command.inputSchema ?? emptyWorkspaceCommandInputSchema]));
   const closeAgentConversationPath = { post: {
     summary: "Close an Agent conversation using its provider lifecycle",
@@ -57,15 +57,15 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
   return {
     openapi: "3.1.0",
     info: {
-      title: "Atelier automation interface",
+      title: "AgentsInTheCloud automation interface",
       version: "1.0.0",
-      description: "JSON representations of Atelier's content-negotiated UI operations. Send Accept: application/json.",
+      description: "JSON representations of AgentsInTheCloud's content-negotiated UI operations. Send Accept: application/json.",
     },
     paths: {
       "/agent-providers": { get: { summary: "List available agent providers, default first", responses: jsonResponse("Providers and installation-wide default", { type: "object", properties: { defaultProviderId: { type: "string" }, providers: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } } } } } }) } },
       "/design-system-catalogue.html": { get: { summary: "Browse design-system components, usage and edge-case playgrounds", responses: { "200": { description: "Server-rendered package catalogue", content: { "text/html": { schema: { type: "string" } } } } } } },
       ...contributedPaths,
-      "/up": { get: { summary: "Health check", responses: { "200": { description: "Atelier is healthy", content: { "text/plain": { schema: { type: "string" } } } } } } },
+      "/up": { get: { summary: "Health check", responses: { "200": { description: "AgentsInTheCloud is healthy", content: { "text/plain": { schema: { type: "string" } } } } } } },
       "/workspaces": {
         get: { summary: "List workspaces", responses: jsonResponse("Workspace summaries", { type: "object", required: ["workspaces"], properties: { workspaces: { type: "array", items: { $ref: "#/components/schemas/WorkspaceSummary" } } } }) },
         post: { summary: "Create a workspace asynchronously", requestBody: jsonBody({ $ref: "#/components/schemas/CreateWorkspace" }), responses: { ...jsonResponse("Workspace creation accepted", { $ref: "#/components/schemas/WorkspaceEnvelope" }, "202"), "409": { ...errorResponse, description: "Agent setup required; error.setupUrl identifies its connection flow" } } },
@@ -74,9 +74,9 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
         get: { summary: "List projects", responses: jsonResponse("Project summaries", { type: "object", required: ["projects"], properties: { projects: { type: "array", items: { $ref: "#/components/schemas/ProjectSummary" } } } }) },
         post: { summary: "Create or resolve a project", description: "Creates a project, or resolves and returns the existing project when the same repository specification was previously added.", requestBody: jsonBody({ type: "object", required: ["gitUrl"], properties: { gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Project created or resolved", { $ref: "#/components/schemas/ProjectEnvelope" }) },
       },
-      "/projects/new": { get: { summary: "Present the new-project screen", responses: htmlSurfaceResponses("Atelier with the new-project screen open") } },
-      "/workspaces/new": { get: { summary: "Present the new projectless workspace composer", responses: htmlSurfaceResponses("Atelier with the workspace composer open") } },
-      "/settings": { get: { summary: "Present Atelier settings", parameters: [settingsSection], responses: htmlSurfaceResponses("Atelier with settings open") } },
+      "/projects/new": { get: { summary: "Present the new-project screen", responses: htmlSurfaceResponses("AgentsInTheCloud with the new-project screen open") } },
+      "/workspaces/new": { get: { summary: "Present the new projectless workspace composer", responses: htmlSurfaceResponses("AgentsInTheCloud with the workspace composer open") } },
+      "/settings": { get: { summary: "Present AgentsInTheCloud settings", parameters: [settingsSection], responses: htmlSurfaceResponses("AgentsInTheCloud with settings open") } },
       "/projects/{projectId}": {
         get: { summary: "Inspect project configuration", parameters: [projectId], responses: jsonResponse("Project configuration", { $ref: "#/components/schemas/ProjectConfigurationEnvelope" }) },
         post: { summary: "Update a project", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["name", "gitUrl"], properties: { name: { type: "string" }, gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Project updated", { $ref: "#/components/schemas/ProjectEnvelope" }) },
@@ -95,9 +95,9 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
       "/projects/{projectId}/settings": {
         get: {
           summary: "Present project settings",
-          description: "A browser-navigable Atelier surface. Use its URL with the presentation tool.",
+          description: "A browser-navigable AgentsInTheCloud surface. Use its URL with the presentation tool.",
           parameters: [projectId, projectSettingsSection],
-          responses: htmlSurfaceResponses("Atelier with project settings open"),
+          responses: htmlSurfaceResponses("AgentsInTheCloud with project settings open"),
         },
       },
       "/projects/{projectId}/onboarding": {
@@ -109,9 +109,9 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
           responses: jsonResponse("Onboarding workspace creation started", { $ref: "#/components/schemas/WorkspaceEnvelope" }, "202"),
         },
       },
-      "/projects/{projectId}/workspaces/new": { get: { summary: "Present a new project workspace composer", parameters: [projectId], responses: htmlSurfaceResponses("Atelier with the project workspace composer open") } },
+      "/projects/{projectId}/workspaces/new": { get: { summary: "Present a new project workspace composer", parameters: [projectId], responses: htmlSurfaceResponses("AgentsInTheCloud with the project workspace composer open") } },
       "/projects/{projectId}/preload-images": { post: { summary: "Set images to preload in future project workspaces", description: "Replaces the image list. An empty array disables preloading. Existing workspaces are unchanged.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["preloadImages"], properties: { preloadImages: { type: "array", items: { type: "string" } } }, additionalProperties: false }), responses: jsonResponse("Preload images saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
-      "/projects/{projectId}/dockerfile": { post: { summary: "Set the project workspace Dockerfile override", description: "Must start with FROM atelier-workspace. An empty string clears the override. Takes priority over .atelier/Dockerfile for new workspaces.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["dockerfile"], properties: { dockerfile: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Dockerfile saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
+      "/projects/{projectId}/dockerfile": { post: { summary: "Set the project workspace Dockerfile override", description: "Must start with FROM agents-in-the-cloud-workspace. An empty string clears the override. Takes priority over .agents-in-the-cloud/Dockerfile for new workspaces.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["dockerfile"], properties: { dockerfile: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Dockerfile saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
       "/projects/{projectId}/environment": { post: { summary: "Create a project environment variable", parameters: [projectId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable created", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
       "/projects/{projectId}/environment/{variableId}": { post: { summary: "Update a project environment variable", parameters: [projectId, variableId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable updated", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
       "/projects/{projectId}/environment/{variableId}/delete": { post: { summary: "Delete a project environment variable", parameters: [projectId, variableId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Environment variable deleted", { type: "object", required: ["deleted", "environmentVariable"], properties: { deleted: { const: true }, environmentVariable: { $ref: "#/components/schemas/EnvironmentVariable" } } }) } },
@@ -127,7 +127,7 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
       "/workspaces/{id}/sidebar-title": { post: { summary: "Rename a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", required: ["title"], properties: { title: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace renamed", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
       "/workspaces/{id}/warnings/{kind}/dismiss": { post: { summary: "Dismiss the current workspace warning state", parameters: [workspaceId, { name: "kind", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ type: "object", required: ["state"], properties: { state: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Warning dismissed", { type: "object", required: ["dismissed"], properties: { dismissed: { const: true } } }) } },
       "/workspaces/{id}/provisioning/continue": { post: { summary: "Retry preparation or explicitly continue after a recoverable failure", parameters: [workspaceId, { name: "action", in: "query", schema: { type: "string", enum: ["retry"] }, description: "Retry failed workspace runtime preparation instead of bypassing it." }], responses: { ...jsonResponse("Workspace provisioning resumed", { type: "object", required: ["continued", "stepId"], properties: { continued: { const: true }, stepId: { type: "string" } }, additionalProperties: false }), "409": errorResponse } } },
-      "/workspaces/{id}/commands/{commandId}": { post: { summary: "Execute a workspace command", parameters: [workspaceId, { name: "commandId", in: "path", required: true, schema: { type: "string", enum: Object.keys(commandSchemas) } }], requestBody: jsonBody({ anyOf: Object.values(commandSchemas) }), responses: { ...jsonResponse("Command executed", { $ref: "#/components/schemas/CommandResult" }), "409": { ...errorResponse, description: "Agent setup required; error.setupUrl identifies its connection flow" } }, "x-atelier-command-schemas": commandSchemas } },
+      "/workspaces/{id}/commands/{commandId}": { post: { summary: "Execute a workspace command", parameters: [workspaceId, { name: "commandId", in: "path", required: true, schema: { type: "string", enum: Object.keys(commandSchemas) } }], requestBody: jsonBody({ anyOf: Object.values(commandSchemas) }), responses: { ...jsonResponse("Command executed", { $ref: "#/components/schemas/CommandResult" }), "409": { ...errorResponse, description: "Agent setup required; error.setupUrl identifies its connection flow" } }, "x-agents-in-the-cloud-command-schemas": commandSchemas } },
       "/workspaces/{id}/browser/{browserId}/navigate": { post: { summary: "Navigate a Browser Work view", parameters: [workspaceId, { name: "browserId", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ type: "object", required: ["url"], properties: { url: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Browser navigated", { type: "object" }) } },
       "/workspaces/{id}/work-views/reorder": { post: { summary: "Reorder a typed Work view", parameters: [workspaceId], requestBody: jsonBody(reorderWorkViewRequestSchema), responses: jsonResponse("Work views reordered", { $ref: "#/components/schemas/WorkViewsEnvelope" }) } },
       "/workspaces/{id}/work-views/{key}/attention/request": { post: { summary: "Request attention for a Work view without changing the visible destination", parameters: [workspaceId, { name: "key", in: "path", required: true, schema: { type: "string" } }], responses: jsonResponse("Attention requested", { type: "object" }) } },
@@ -136,10 +136,9 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
       "/workspaces/{id}/park": { post: { summary: "Park a workspace", parameters: [workspaceId, { name: "force", in: "query", schema: { type: "string", enum: ["1"] }, description: "Close terminal and VS Code views before parking. Without confirmation, returns 409 if these views are open." }], responses: { ...jsonResponse("Workspace parked", { type: "object" }), "409": errorResponse } } },
       "/workspaces/{id}/unpark": { post: { summary: "Unpark a workspace", parameters: [workspaceId], responses: jsonResponse("Workspace unparked", { type: "object" }) } },
       "/workspaces/{id}/delete": { post: { summary: "Delete a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", properties: { force: { type: "boolean" } }, additionalProperties: false }), responses: jsonResponse("Workspace deletion scheduled or blocked", { type: "object" }) } },
-      "/workspaces/{id}/agents/{conversationId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
+      "/workspaces/{id}/agents/{conversationId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,128}$", description: "Caller-generated message identity. Reuse on retries. Currently forwarded to the runtime; deduplication requires the native Durable runtime." }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
       "/workspaces/{id}/agents/{conversationId}/model": { post: { summary: "Select an agent model", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["model"], properties: { model: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Model selected", { $ref: "#/components/schemas/AgentModelEnvelope" }) } },
       "/workspaces/{id}/agents/{conversationId}/thinking": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["level"], properties: { level: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingEnvelope" }) } },
-      "/workspaces/{id}/agents/{conversationId}/service-tier": { post: { summary: "Select an agent inference service tier", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["serviceTier"], properties: { serviceTier: { type: "string", enum: ["default", "priority"] } }, additionalProperties: false }), responses: jsonResponse("Service tier selected", { $ref: "#/components/schemas/AgentServiceTierEnvelope" }) } },
       "/workspaces/{id}/agents/{conversationId}/abort": { post: { summary: "Abort the active agent turn", parameters: [workspaceId, agentConversationId], responses: jsonResponse("Agent aborted", { $ref: "#/components/schemas/AgentStateEnvelope" }) } },
     },
     components: {
@@ -179,7 +178,7 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
         SecretSummary: {
           type: "object",
           required: ["id", "projectId", "envName", "hostPattern", "createdAt", "updatedAt", "annotation", "optional", "configured"],
-          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, valueRevision: { type: "string", description: "Opaque version of the saved value; unchanged by metadata edits" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
+          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, valueRevision: { type: "string", description: "Opaque version of the saved value; unchanged by metadata edits" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
           additionalProperties: false,
         },
         CreateSecret: projectSecretInputSchema,
@@ -249,12 +248,6 @@ export function atelierOpenApi(commands: WorkspaceModuleCommandHandler[], contri
           type: "object",
           required: ["agent"],
           properties: { agent: { type: "object", required: ["conversationId", "thinkingLevel"], properties: { conversationId: { type: "string", format: "uuid" }, thinkingLevel: { type: "string" } }, additionalProperties: false } },
-          additionalProperties: false,
-        },
-        AgentServiceTierEnvelope: {
-          type: "object",
-          required: ["agent"],
-          properties: { agent: { type: "object", required: ["conversationId", "serviceTier"], properties: { conversationId: { type: "string", format: "uuid" }, serviceTier: { type: "string", enum: ["default", "priority"] } }, additionalProperties: false } },
           additionalProperties: false,
         },
         WorkViewReference: workViewReferenceSchema,

@@ -1,6 +1,6 @@
 import { handleAccessSettings } from "./access.ts";
 import { handleGitHubSettingsRequest } from "./github.ts";
-import { handleModelSettingsRequest } from "@atelier/llm/server";
+import { handleModelSettingsRequest } from "@agents-in-the-cloud/llm/server";
 import { finishOnboarding } from "../onboarding/state.ts";
 import { handleSettingsPageRequest, type WorkspaceCleanupResult } from "./page.ts";
 import { listSettingsContributions } from "./registry.ts";

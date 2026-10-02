@@ -30,7 +30,7 @@ async function reviewFiles(root: string): Promise<ReviewFile[]> {
 
 describe("Review collection", () => {
   test("reports a non-repository without throwing", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-review-not-git-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-not-git-"));
     roots.push(root);
     expect((await collectReviewIndex(root)).phase).toBe("not-git");
   });
@@ -70,7 +70,7 @@ describe("Review collection", () => {
   });
 
   test("collects stats before the repository has its first commit", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-review-unborn-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-unborn-"));
     roots.push(root);
     await command(root, "git", "init");
     await writeFile(join(root, "first.ts"), "export const first = true;\n");
@@ -217,7 +217,7 @@ Comment: I don't think we need these tests`);
 
 describe("Review settings", () => {
   test("persists review diff presentation settings", async () => {
-    const root = await mkdtemp(join(tmpdir(), "atelier-review-settings-"));
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-settings-"));
     roots.push(root);
     const path = join(root, "review-settings.json");
 

@@ -1,5 +1,5 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { escapeHtml } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 const terminalAccessoryButtons = [
   { key: "control", label: "Ctrl", ariaLabel: "Control for next keystroke" },

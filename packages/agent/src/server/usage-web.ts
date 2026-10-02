@@ -1,10 +1,11 @@
-import { response } from "@atelier/shared/http";
-import { requestAcceptsJson } from "@atelier/core";
-import { providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@atelier/llm/server";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@atelier/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
+import { requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@agents-in-the-cloud/llm/server";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
 
 function jsonResponse<Body extends object>(body: Body, status = 200): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -13,7 +14,7 @@ function jsonResponse<Body extends object>(body: Body, status = 200): Response {
 export function renderUsagePaneAction(): string {
   const button = usageButtonHtml();
   const actions = [
-    "atelier:usage:refreshed@document->usage-button#refresh",
+    "agents-in-the-cloud:usage:refreshed@document->usage-button#refresh",
     "visibilitychange@document->usage-button#refresh",
     "focus@window->usage-button#refresh",
   ].join(" ");
@@ -66,22 +67,33 @@ function renderUsageWindow({ reported: window, timing }: PacedUsageWindow): stri
   </article>`;
 }
 
+function shownUsageWindows(windows: PacedUsageWindow[]) {
+  return {
+    used: windows.filter(({ reported }) => reported.usedPercent > 0),
+    unused: windows.filter(({ reported }) => reported.usedPercent === 0 && reported.meteredFeature !== "chatpass"),
+  };
+}
+
 function renderUsageLimits({ reported, error, windows }: ProviderUsageOverview): string {
   if (error) return `<p class="usage-error" role="alert">${escapeHtml(error)}</p>`;
   if (!reported) return "<p>Disconnected.</p>";
-  const used = windows.filter(({ reported }) => reported.usedPercent > 0);
-  const unused = windows.filter(({ reported }) => reported.usedPercent === 0 && reported.meteredFeature !== "chatpass");
-  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length ? "" : '<p>No limits reported.</p>'}`;
+  const { used, unused } = shownUsageWindows(windows);
+  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length || reported.balance ? "" : '<p>No limits reported.</p>'}`;
+}
+
+function money(amount: number, currency: string): string {
+  return amount.toLocaleString("en-US", { style: "currency", currency });
 }
 
 function renderUsageAccount({ reported, error }: ProviderUsageOverview): string {
   if (!reported || error) return "";
-  const { credits, resets } = reported;
+  const { credits, resets, balance } = reported;
   const rows: string[] = [];
+  if (balance) rows.push(`<div class="usage-limit-heading"><dt>Available credit</dt><dd><strong>${money(balance.available, balance.currency)}</strong></dd></div>`, `<div class="usage-limit-heading"><dt>Spent this month</dt><dd><strong>${money(balance.monthSpend, balance.currency)}</strong></dd></div>`);
   if (resets) rows.push(`<div class="usage-limit-heading"><dt>Available resets</dt><dd><strong>${number(resets.available)}</strong></dd></div>`);
   if (credits) rows.push(`<div class="usage-limit-heading"><dt>Credit balance</dt><dd><strong>${credits.unlimited ? "Unlimited" : credits.balance !== null ? Number(credits.balance).toLocaleString("en-US", { maximumFractionDigits: 0 }) : "Not reported"}</strong></dd></div>`);
   if (!rows.length) return "";
-  return `<article class="usage-limit"><h3>Account allowance</h3><dl class="usage-account">${rows.join("")}</dl></article>`;
+  return `<article class="usage-limit"><h3>${balance ? "Credits" : "Account allowance"}</h3><dl class="usage-account">${rows.join("")}</dl></article>`;
 }
 
 function renderUsageProvider(overview: ProviderUsageOverview): string {
@@ -92,6 +104,24 @@ function renderUsageProvider(overview: ProviderUsageOverview): string {
       ${renderUsageAccount(overview)}
     </section>
   </section>`;
+}
+
+/** Prepaid providers show their balance instead. One small ring per limit: its length for main allowances ("5h"), the first letters of a feature's name ("Op") otherwise. */
+function renderUsageRings({ provider, reported, error, windows }: ProviderUsageOverview, scope: string): string {
+  const { used, unused } = shownUsageWindows(windows);
+  const rings = reported && !error ? [...used, ...unused].map(({ reported: window, timing }) => comparisonRingHtml({
+    caption: window.meteredFeature === null ? usageDuration(window.durationSeconds).split(" ")[0]! : window.limitName.slice(0, 2),
+    referencePercent: timing.elapsedPercent ?? 0,
+    valuePercent: window.usedPercent,
+    label: `${window.limitName} · ${usageDuration(window.durationSeconds)}: ${timing.elapsedPercent === null ? "reset time unavailable" : `Time ${number(timing.elapsedPercent)}%`}, Usage ${number(window.usedPercent)}%`,
+  })).join("") : "";
+  const balance = reported?.balance && !error ? `<span class="usage-caption">${money(reported.balance.available, reported.balance.currency)} left</span>` : "";
+  return `<turbo-frame class="usage-rings" id="${providerUsageFrameId("rings", provider.id, scope)}">${rings || balance || `<span class="usage-caption"${error ? ` title="${escapeHtml(error)}"` : ""}>Usage unavailable</span>`}</turbo-frame>`;
+}
+
+/** Limits alone, for surfaces that already name the provider. */
+function renderUsageProviderLimits(overview: ProviderUsageOverview, scope: string): string {
+  return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section></turbo-frame>`;
 }
 
 function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: number }, label = "Usage"): string {
@@ -147,10 +177,15 @@ export async function handleUsageRequest(request: Request, url: URL, context: Wo
       : context.renderModalPage(dialog);
   }
   if (url.pathname === "/usage/overview") return response(await renderUsageOverview(refresh));
-  const match = url.pathname.match(/^\/usage\/providers\/([^/]+)$/);
+  const match = url.pathname.match(/^\/usage\/providers\/([^/]+)(?:\/(limits|rings))?$/);
   if (!match) return undefined;
   const provider = supportedUsageProviders.find((provider) => provider.id === match[1]);
   if (!provider) return jsonResponse({ error: { code: "unsupported_usage_provider", message: "Subscription usage is not supported for this provider." } }, 404);
   const overview = await getProviderUsageOverview(provider, { refresh });
-  return json ? jsonResponse(overview) : response(`<turbo-frame id="${providerFrameId(provider.id)}">${renderUsageProvider(overview)}</turbo-frame>`);
+  if (json) return jsonResponse(overview);
+  // Surfaces that embed these frames name their scope so their frame ids match.
+  const scope = url.searchParams.get("scope") ?? "";
+  if (match[2] === "limits") return response(renderUsageProviderLimits(overview, scope));
+  if (match[2] === "rings") return response(renderUsageRings(overview, scope));
+  return response(`<turbo-frame id="${providerFrameId(provider.id)}">${renderUsageProvider(overview)}</turbo-frame>`);
 }

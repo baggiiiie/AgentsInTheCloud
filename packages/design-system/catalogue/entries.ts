@@ -4,6 +4,7 @@
 import { tabHtml, tabStripHtml } from "../src/tab-strip/tab-strip-html.ts";
 import { buttonHtml } from "../src/button/button-html.ts";
 import { actionLinkHtml } from "../src/action-link/action-link-html.ts";
+import { comparisonRingHtml } from "../src/comparison-ring/comparison-ring-html.ts";
 import { buttonGroupHtml } from "../src/button-group/button-group-html.ts";
 import { actionItemHtml } from "../src/action-item/action-item-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
@@ -17,7 +18,7 @@ import { toggleHtml } from "../src/toggle/toggle-html.ts";
 import { autocompleteHtml } from "../src/autocomplete/autocomplete-html.ts";
 import { transientFeedbackHtml } from "../src/transient-feedback/transient-feedback-html.ts";
 import { warningBannerHtml } from "../src/warning-banner/warning-banner-html.ts";
-import { Icons } from "../src/icons/icons-html.ts";
+import { agentsInTheCloudBrandIconHtml, Icons } from "../src/icons/icons-html.ts";
 
 export interface CatalogueEntry {
   id: string;
@@ -32,11 +33,32 @@ export interface CatalogueEntry {
 }
 export const entries: CatalogueEntry[] = [
   {
-    id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Work and Host terminals.",
-    contract: "Shared action-item anatomy and roving tabindex. Left/Right/Home/End activate tabs. Features own selection, close forms, and optional reordering.",
-    imports: { "tab-strip": "tabHtml, tabStripHtml" },
-    sources: ["src/tab-strip/tab-strip-html.ts", "src/tab-strip/tab-strip-controller.ts", "src/tab-strip/tab-strip.css"],
-    examples: [{ title: "Terminal tabs", render: () => tabStripHtml({ label: "Example terminals", tabsHtml: ["Shell", "Diagnostics"].map((text, index) => tabHtml({ label: { kind: "text", text }, selected: index === 0, primary: { tag: "button", attributesHtml: 'type="button"' }, iconHtml: Icons.Terminal })).join("") }) }],
+    id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Agent, Work and Host terminals.",
+    contract: "Provide a page-unique stable id for Turbo updates and scrollbar linkage. Content-sized short tabs; long titles shrink to 7rem (maximum 20rem) before scrolling. The strip owns edge fades, title fades, an overlay scrollbar, mouse-wheel scrolling, and Left/Right/Home/End navigation. Busy and attention share one status slot; desktop close replaces status on engagement without resizing tabs. On mobile/touch, only the selected tab shows close; unselected tabs retain status. Features supply selection, status, icons and close forms, with fixed pane actions beside the strip—no tab styling overrides.",
+    imports: { "tab-strip": "tabHtml, tabStripHtml", "tab-strip/client": "setTabStatus", button: "buttonHtml", "button-group": "buttonGroupHtml", "destructive-confirmation": "destructiveConfirmationHtml", panel: "panelHtml", icons: "Icons" },
+    sources: ["tab-strip/tab-strip-controller.ts", "tab-strip/tab-strip.css"],
+    examples: [{
+      title: "Content sizing · hover, scroll and change the selected tab’s status",
+      render: () => `<div class="form-stack" data-catalogue-tab-demo data-action="submit->catalogue#submit">
+        ${buttonGroupHtml({ semantics: "group", label: "Selected tab status", orientation: "horizontal", itemsHtml: '<label><input type="checkbox" data-tab-busy data-action="change->catalogue#tabStatus"> Busy</label><label><input type="checkbox" data-tab-attention data-action="change->catalogue#tabStatus"> Attention</label>' })}${panelHtml({
+          element: { tag: "section" },
+          headerHtml: tabStripHtml({
+            id: "catalogue_work_views", label: "Example work views",
+            tabsHtml: ["Shell", "Investigate terminal reconnect and attention handling", "Review", "Dev server", "Changes"].map((text, index) => tabHtml({
+              label: { kind: "text", text }, selected: index === 0,
+              primary: { tag: "button", attributesHtml: 'type="button" data-action="catalogue#selectTab"' },
+              iconHtml: index === 1 ? Icons.Browser : Icons.Terminal,
+              status: { busy: index === 1, requestingAttention: index === 1 || index === 2 },
+              closeHtml: `<form>${destructiveConfirmationHtml({
+                id: `catalogue_tab_close_${index}`,
+                trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Close, label: `Close ${text}` } },
+                confirmCaption: "Yes, close", cancelCaption: "Oops",
+              })}</form>`,
+            })).join(""),
+          }) + `<form>${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "New view" } })}</form>`,
+          bodyLayout: "padded", bodyHtml: '<span data-tab-selected-title>Shell</span><output></output>',
+        })}</div>`,
+    }],
   },
   {
     id: "motion",
@@ -216,7 +238,7 @@ export const entries: CatalogueEntry[] = [
             kind: "results",
             label: "Example suggestions",
             attributesHtml: 'id="motion-suggestions" hidden',
-            contentHtml: ["atelier/design-system", "atelier/workspace"]
+            contentHtml: ["agents-in-the-cloud/design-system", "agents-in-the-cloud/workspace"]
               .map((text) =>
                 actionItemHtml({
                   kind: "single",
@@ -297,8 +319,8 @@ export const entries: CatalogueEntry[] = [
     title: "Foundations & composition",
     when: "Role tokens and shared layout primitives, not a second set of component sizes.",
     contract:
-      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
-    sources: ["design-system.css"],
+      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Action items, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
+    sources: ["design-system.css", "surface-lighting.css"],
     examples: [
       {
         title: "Semantic colors · title · form spacing",
@@ -326,7 +348,7 @@ export const entries: CatalogueEntry[] = [
     id: "button",
     compareButtonSizes: true,
     title: "Button",
-    when: "An action, not navigation. Primary for the main action, secondary for supporting actions, danger for destructive actions.",
+    when: "An action with a quiet directional rim and background light, not navigation. Primary for the main action, secondary for supporting actions, danger for destructive actions. Progress and usage rings retain their own perimeter treatment.",
     contract:
       "Choose caption OR icon-only with a mandatory accessible label. On narrow screens (≤700px) or coarse pointers, regular icon-only controls are 42.5px with 17.85px icons. Add data-popular-button to a button (via attributesHtml) or containing group for 62.5px controls and 26.25px icons. Popular caption buttons also have a 62.5px minimum height; ordinary caption buttons are unchanged. Desktop popular sizes are fixed: 38.24px icon controls with 20.59px icons, and 36.93px minimum-height caption controls with 18.38px icons. Native type and disabled are explicit. Do not add classes or override component anatomy via attributesHtml.",
     imports: { button: "buttonHtml", icons: "Icons" },
@@ -385,6 +407,22 @@ export const entries: CatalogueEntry[] = [
           }),
       },
     ],
+  },
+  {
+    id: "comparison-ring",
+    title: "Comparison ring",
+    when: "Glanceable, non-interactive progress against a schedule, such as several usage limits in one row. For a link, use Action link's perimeterComparison.",
+    contract: "referencePercent and valuePercent (0–100) share one ring clockwise from twelve, drawn exactly like Action link's comparison. caption is at most three characters inside the ring. label is the accessible name and tooltip; include both values and their meaning.",
+    imports: { "comparison-ring": "comparisonRingHtml" },
+    sources: ["comparison-ring/comparison-ring-html.ts", "comparison-ring/comparison-ring.css"],
+    examples: [{
+      title: "Limits · ahead, behind and unused",
+      render: () => `<div style="display:flex;gap:6px">${[
+        { caption: "5h", referencePercent: 60, valuePercent: 80 },
+        { caption: "7d", referencePercent: 73, valuePercent: 32 },
+        { caption: "Op", referencePercent: 20, valuePercent: 0 },
+      ].map((ring) => comparisonRingHtml({ ...ring, label: `${ring.caption}: Time ${ring.referencePercent}%, Usage ${ring.valuePercent}%` })).join("")}</div>`,
+    }],
   },
   {
     id: "action-link",
@@ -472,9 +510,9 @@ export const entries: CatalogueEntry[] = [
     id: "action-item",
     compareButtonSizes: true,
     title: "Action item",
-    when: "Rows in menus, navigation, trees and action lists. Use compound when a row has separately actionable trailing controls.",
+    when: "Rows in menus, navigation, trees and action lists. Selected, hovered and keyboard-focused rows have a subtle directional rim reflection; idle rows stay plain. Use compound when a row has separately actionable trailing controls.",
     contract:
-      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement.",
+      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
     imports: {
       "action-item": "actionItemHtml",
       "copy-button": "copyButtonHtml",
@@ -672,7 +710,7 @@ export const entries: CatalogueEntry[] = [
         render: () =>
           copyButtonHtml({
             label: "Copy example",
-            copyText: "Copied from Atelier design system",
+            copyText: "Copied from AgentsInTheCloud design system",
           }) +
           copyButtonHtml({
             label: "Copy command",
@@ -888,9 +926,9 @@ export const entries: CatalogueEntry[] = [
   {
     id: "panel",
     title: "Panel",
-    when: "A bounded surface with fixed chrome and flexible body. Dialog composes this; workspace panes use it directly.",
+    when: "A bounded surface with a continuous outline, soft upper-left rim reflection and faint localized background light, fixed chrome and flexible body. Dialog composes this; workspace panes use it directly.",
     contract:
-      "Supply semantic element tag, trusted header/body and optional footer. Use an outer layout container for dimensions. bodyLayout: padded/full-bleed and bodyOverflow: scroll/contained are the supported body behaviors. No root or body classes. panel__title uses normal body text and accepts a leading icon; strong.panel__title adds emphasis for the Atelier identity.",
+      "Supply semantic element tag, trusted header/body and optional footer. Use an outer layout container for dimensions. bodyLayout: padded/full-bleed and bodyOverflow: scroll/contained are the supported body behaviors. No root or body classes. panel__title uses normal body text and accepts a leading icon; strong.panel__title adds emphasis for the AgentsInTheCloud identity.",
     imports: { panel: "panelHtml", icons: "Icons" },
     examples: [
       {
@@ -925,7 +963,7 @@ export const entries: CatalogueEntry[] = [
             label: "Repositories",
             contentHtml: actionItemHtml({
               kind: "single",
-              label: { kind: "text", text: "atelier/design-system" },
+              label: { kind: "text", text: "agents-in-the-cloud/design-system" },
               element: {
                 tag: "div",
                 attributesHtml: 'role="option" aria-selected="false"',
@@ -1033,9 +1071,13 @@ export const entries: CatalogueEntry[] = [
     title: "Icons",
     when: "Shared decorative vocabulary. Use icon-only Button for standalone icon actions.",
     contract:
-      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. atelierLogoPathsHtml exports the same logo geometry without a nested SVG viewport for animated scenes using 24×24 user units. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
+      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for dialogs and agent controls. Icons.AgentsInTheCloud and agentsInTheCloudLogoPathsHtml retain the old easel SVG only for the sidebar animation. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
     imports: { icons: "Icons" },
     examples: [
+      {
+        title: "Product brand mark",
+        render: () => `<span class="catalogue-icon">${agentsInTheCloudBrandIconHtml}<span>AgentsInTheCloud</span></span>`,
+      },
       {
         title: "Icon vocabulary",
         render: () =>

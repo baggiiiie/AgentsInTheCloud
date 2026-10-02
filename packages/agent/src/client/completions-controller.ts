@@ -1,6 +1,6 @@
-import { setActionItemLabel } from "@atelier/design-system/action-item/client";
-import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { agentComposerSendPromptEvent, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@atelier/shared";
+import { setActionItemLabel } from "@agents-in-the-cloud/design-system/action-item/client";
+import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { agentComposerSendPromptEvent, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 import { agentCompletionRequest, insertFileCompletion, insertSlashCommand } from "./completion-input.ts";
 import { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 import { handleAgentTreeKeydown, handleAgentTreeMenuEvent, selectAgentTreeOption } from "./session-tree.ts";

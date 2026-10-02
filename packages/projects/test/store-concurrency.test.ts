@@ -2,14 +2,14 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, listProjectEnvironmentVariables, listProjects, revealProjectSecrets, updateProject, updateProjectSecret } from "@atelier/projects";
+import { addProject, createProjectEnvironmentVariable, createProjectSecret, listProjectEnvironmentVariables, listProjects, revealProjectSecrets, updateProject, updateProjectSecret } from "@agents-in-the-cloud/projects";
 
 let directory: string;
 let file: string;
 let keyFile: string;
 
 beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), "atelier-project-transactions-"));
+  directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-transactions-"));
   file = join(directory, "projects.json");
   keyFile = join(directory, "project-secrets.key");
 });

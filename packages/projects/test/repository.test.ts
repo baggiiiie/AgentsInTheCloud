@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProject, deleteProjectEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createProjectSshKey, deriveProjectSshPublicKey, listProjectEnvironmentVariables, listProjectSecrets, listProjectSshKeys, listProjects, parseProjectSpec, revealProjectSecrets, revealProjectSshKeys, renameProjectSshKey, setGitIdentity, updateProject, updateProjectEnvironmentVariable, updateProjectSecret } from "@atelier/projects";
+import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProject, deleteProjectEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createProjectSshKey, deriveProjectSshPublicKey, listProjectEnvironmentVariables, listProjectSecrets, listProjectSshKeys, listProjects, parseProjectSpec, revealProjectSecrets, revealProjectSshKeys, renameProjectSshKey, setGitIdentity, updateProject, updateProjectEnvironmentVariable, updateProjectSecret } from "@agents-in-the-cloud/projects";
 
 describe("projects", () => {
   test("parseProjectSpec supports an optional #branch suffix", () => {
@@ -13,14 +13,14 @@ describe("projects", () => {
   });
 
   test("rejects malformed persisted projects", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     await writeFile(file, JSON.stringify({ projects: [{ id: 42 }] }));
 
     expect(listProjects(file)).rejects.toThrow();
   });
 
   test("addProject records a remote URL without cloning it", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
 
     const result = await addProject("https://github.com/org/repo.git#feature", file);
     expect(result.project.name).toBe("repo");
@@ -31,14 +31,14 @@ describe("projects", () => {
   });
 
   test("addProject accepts a GitHub URL without a scheme and matches its HTTPS equivalent", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const project = (await addProject("github.com/octocat/Hello-World", file)).project;
     expect(project.gitUrl).toBe("https://github.com/octocat/Hello-World");
     expect(addProject("https://github.com/octocat/Hello-World", file)).rejects.toThrow("project already exists");
   });
 
   test("addProject includes the branch in the name only for an existing repository", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const first = (await addProject("https://github.com/org/repo.git#main", file)).project;
     const second = (await addProject("https://github.com/org/repo.git#feature/search", file)).project;
     const defaultBranch = (await addProject("https://github.com/org/repo.git", file)).project;
@@ -54,7 +54,7 @@ describe("projects", () => {
   });
 
   test("updateProject edits project fields without changing id", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const project = (await addProject("https://github.com/org/repo.git", file)).project;
 
     const result = await updateProject(project.id, { name: "Renamed", spec: "https://github.com/org/renamed.git#main" }, file);
@@ -63,7 +63,7 @@ describe("projects", () => {
   });
 
   test("project secrets are encrypted at rest and decryptable by the host", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "atelier-project-secrets-"));
+    const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-secrets-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "project-secrets.key");
     const project = (await addProject("https://github.com/org/secret-project.git", file)).project;
@@ -82,7 +82,7 @@ describe("projects", () => {
   });
 
   test("secret requirements can be saved, annotated, made optional, and filled later", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "atelier-secret-requirements-"));
+    const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-secret-requirements-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "key");
     const project = (await addProject("https://github.com/org/requirements.git", file)).project;
@@ -101,7 +101,7 @@ describe("projects", () => {
   });
 
   test("older persisted secrets remain configured and default to required with no annotation", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "atelier-old-secrets-"));
+    const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-old-secrets-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "key");
     const project = (await addProject("https://github.com/org/old.git", file)).project;
@@ -114,7 +114,7 @@ describe("projects", () => {
   });
 
   test("project SSH private keys are encrypted at rest", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "atelier-project-ssh-key-"));
+    const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-ssh-key-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "project-secrets.key");
     const project = (await addProject("git@example.com:org/repo.git", file)).project;
@@ -154,7 +154,7 @@ describe("projects", () => {
   });
 
   test("project environment variables support empty values", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-project-environment-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-environment-")), "projects.json");
     const project = (await addProject("https://github.com/org/environment-project.git", file)).project;
 
     const created = await createProjectEnvironmentVariable(project.id, { name: "API_URL", value: "https://api.example.com" }, file);
@@ -173,7 +173,7 @@ describe("projects", () => {
   });
 
   test("deleteProject removes a project by id", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-projects-")), "projects.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const first = (await addProject("https://github.com/org/first.git", file)).project;
     const second = (await addProject("https://github.com/org/second.git", file)).project;
 
@@ -183,7 +183,7 @@ describe("projects", () => {
   });
 
   test("git identity settings are stored by the projects module", async () => {
-    const file = join(await mkdtemp(join(tmpdir(), "atelier-project-settings-")), "project-settings.json");
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-settings-")), "project-settings.json");
 
     expect(await hasGitIdentity(file)).toBe(false);
     await setGitIdentity({ name: " Ada Lovelace ", email: " ada@example.com " }, file);
@@ -195,8 +195,8 @@ describe("projects", () => {
   test("git identity adopts the host global git config when app settings are empty", async () => {
     const previousDataDir = process.env.ATELIER_DATA_DIR;
     const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
-    const dataDir = await mkdtemp(join(tmpdir(), "atelier-project-settings-"));
-    const gitConfig = join(await mkdtemp(join(tmpdir(), "atelier-git-config-")), ".gitconfig");
+    const dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-project-settings-"));
+    const gitConfig = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-git-config-")), ".gitconfig");
     process.env.ATELIER_DATA_DIR = dataDir;
     process.env.GIT_CONFIG_GLOBAL = gitConfig;
     try {

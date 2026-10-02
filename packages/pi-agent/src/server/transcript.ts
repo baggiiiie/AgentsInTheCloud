@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getAtelierRuntimeContext } from "@atelier/core";
-import { recordsFromSessionEntries, type TranscriptRecord } from "@atelier/agent/server";
-import { nativeImageResponse, nativeImageTypes, nativeJsonlFiles, nativeJsonlRows } from "@atelier/cli-agent/server";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { recordsFromSessionEntries, type TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import { nativeImageResponse, nativeImageTypes, nativeJsonlFiles, nativeJsonlRows } from "@agents-in-the-cloud/cli-agent/server";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -28,7 +28,7 @@ export function piTranscriptRecords(jsonl: string): TranscriptRecord[] {
 }
 
 function sessionDirectory(workspaceId: string, sessionId: string): string {
-  return join(getAtelierRuntimeContext().atelierDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "pi", "sessions", sessionId);
+  return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "pi", "sessions", sessionId);
 }
 async function sessionFiles(workspaceId: string, sessionId: string): Promise<string[]> {
   return (await nativeJsonlFiles(sessionDirectory(workspaceId, sessionId))).sort();
@@ -47,4 +47,10 @@ export async function loadPiTranscriptImage(workspaceId: string, sessionId: stri
     }
   }
   return new Response("Not found", { status: 404 });
+}
+
+/** Session storage is private to this tab, not the workspace's most recent agent. */
+export async function piResumePath(workspaceId: string, sessionId: string): Promise<string | undefined> {
+  const file = (await sessionFiles(workspaceId, sessionId)).at(-1);
+  return file?.replace(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local"), "/home/agents-in-the-cloud");
 }

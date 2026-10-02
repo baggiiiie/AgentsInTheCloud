@@ -1,13 +1,14 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { Icons } from "@atelier/design-system/icons";
-import { panelHtml } from "@atelier/design-system/panel";
-import { popupHtml } from "@atelier/design-system/popup";
-import { domId, escapeHtml } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
+import { tabHtml, tabStripHtml } from "@agents-in-the-cloud/design-system/tab-strip";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import type { WorkspacePresentation } from "./workspace-presentation.ts";
-import { barButton, behaviorTurboStream, busyAttentionIndicator, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
+import { barButton, behaviorTurboStream, fullscreenViewAttributes, selectorCloseForm, type ViewCloseAction } from "./workspace-view-markup.ts";
 
 export interface AgentPaneContribution {
   bodyHtml?: string;
@@ -50,12 +51,6 @@ export function agentContentId(workspaceId: string, conversationId: string): str
   return domId("agent_content", workspaceId, conversationId);
 }
 
-function agentStateDomId(workspaceId: string, conversationId: string): string { return domId("agent_state", workspaceId, conversationId); }
-
-function renderAgentState(workspaceId: string, conversationId: string, state: { busy?: boolean; requestingAttention?: boolean; attentionSequence?: number }): string {
-  return `<span id="${agentStateDomId(workspaceId, conversationId)}" data-agent-attention-id="${escapeHtml(conversationId)}"${state.attentionSequence === undefined ? "" : ` data-attention-sequence="${state.attentionSequence}"`}${state.busy || state.requestingAttention ? "" : " hidden"}>${busyAttentionIndicator(state)}</span>`;
-}
-
 function mobileAgentAttentionHtml(agents: readonly AgentPaneContribution[]): string {
   return agents.some((agent) => agent.requestingAttention) ? '<i class="status-dot attention" aria-label="Agent requesting attention"></i>' : "";
 }
@@ -65,15 +60,18 @@ export function renderMobileAgentAttention(workspaceId: string, agents: readonly
 }
 
 function renderAgentTab(workspaceId: string, agent: AgentPaneContribution): string {
-  return `<div class="fixed-shell-agent-tab">${actionItemHtml({
-    kind: "compound",
+  return tabHtml({
+    selected: false,
     label: { kind: "text", text: agent.title },
-    leadingHtml: `<span class="fixed-shell-agent-icon">${agent.iconHtml}</span>`,
-    trailingHtml: renderAgentState(workspaceId, agent.id, agent),
-    container: {  attributesHtml: `id="${agentTabDomId(workspaceId, agent.id)}"` },
-    primary: { tag: "button", attributesHtml: `type="button" role="tab" aria-selected="false" tabindex="-1" data-agent-conversation-id="${escapeHtml(agent.id)}" ${fullscreenViewAttributes(agent.id, agent.title)} data-action="click->workspace-presentation#selectAgent"` },
-    engagedActionsHtml: agent.close ? selectorCloseForm(agent.close) : "",
-  })}</div>`;
+    iconHtml: agent.iconHtml,
+    status: {
+      busy: agent.busy, requestingAttention: agent.requestingAttention,
+      attributesHtml: `data-agent-attention-id="${escapeHtml(agent.id)}"${agent.attentionSequence === undefined ? "" : ` data-attention-sequence="${agent.attentionSequence}"`}`,
+    },
+    containerAttributesHtml: `id="${agentTabDomId(workspaceId, agent.id)}"`,
+    primary: { tag: "button", attributesHtml: `type="button" data-agent-conversation-id="${escapeHtml(agent.id)}" ${fullscreenViewAttributes(agent.id, agent.title)} data-action="click->workspace-presentation#selectAgent"` },
+    closeHtml: agent.close ? selectorCloseForm(agent.close) : "",
+  });
 }
 
 function providerOptions(presentation: WorkspacePresentation, menu: boolean): string {
@@ -89,7 +87,11 @@ function providerOptions(presentation: WorkspacePresentation, menu: boolean): st
 
 export function renderAgentNavigation(presentation: WorkspacePresentation): string {
   const conversations = presentation.agentConversations.length
-    ? `<div id="${agentTabListDomId(presentation.workspace.id)}" class="fixed-shell-agent-conversations" role="tablist" aria-label="Agent conversations">${presentation.agentConversations.map((agent) => renderAgentTab(presentation.workspace.id, { ...agent, title: presentation.agentConversations.length === 1 && agent.untitled ? presentation.workspace.title : agent.title })).join("")}</div>`
+    ? tabStripHtml({
+      label: "Agent conversations",
+      id: agentTabListDomId(presentation.workspace.id),
+      tabsHtml: presentation.agentConversations.map((agent) => renderAgentTab(presentation.workspace.id, { ...agent, title: presentation.agentConversations.length === 1 && agent.untitled ? presentation.workspace.title : agent.title })).join(""),
+    })
     : `<div class="fixed-shell-workspace-title"><strong>${escapeHtml(presentation.workspace.title)}</strong></div>`;
   const menu = popupHtml({
     id: domId("agent_providers", presentation.workspace.id), label: "New agent",
@@ -106,7 +108,7 @@ function renderAgentEmpty(presentation: WorkspacePresentation): string {
 }
 
 function renderAgentPaneSlot(workspaceId: string, agent: AgentPaneContribution, active: boolean): string {
-  return `<section id="${agentPaneSlotDomId(workspaceId, agent.id)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="agent" data-workspace-pane-id="${escapeHtml(agent.id)}" data-atelier-fullscreen-view-key="${escapeHtml(agent.id)}" data-workspace-logically-visible="false" tabindex="-1"><div class="fixed-shell-live-body" id="${agentContentId(workspaceId, agent.id)}" data-turbo-permanent>${agent.bodyHtml ?? ""}</div></section>`;
+  return `<section id="${agentPaneSlotDomId(workspaceId, agent.id)}" class="fixed-shell-surface${active ? " is-active" : ""}" data-workspace-pane-role="agent" data-workspace-pane-id="${escapeHtml(agent.id)}" data-agents-in-the-cloud-fullscreen-view-key="${escapeHtml(agent.id)}" data-workspace-logically-visible="false" tabindex="-1"><div class="fixed-shell-live-body" id="${agentContentId(workspaceId, agent.id)}" data-turbo-permanent>${agent.bodyHtml ?? ""}</div></section>`;
 }
 
 function renderAgentActions(presentation: WorkspacePresentation): string {
@@ -127,7 +129,7 @@ export function renderAgentPane(presentation: WorkspacePresentation): string {
   const panes = presentation.agentConversations.map((agent) => renderAgentPaneSlot(presentation.workspace.id, agent, agent.id === (presentation.initialSelection?.agent ?? presentation.agentConversations[0]?.id))).join("");
   return `<div class="fixed-shell-agent-pane"><div class="workspace-warning-stack" id="${domId("workspace_warnings", presentation.workspace.id)}">${presentation.warningsHtml ?? ""}</div>${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="agent" data-workspace-presentation-target="agentPane" aria-label="Agent"' },
-    headerHtml: `${barButton("Show Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-show-workspace-pane")}<div class="fixed-shell-agent-header-scroll"><div id="${agentNavigationDomId(presentation.workspace.id)}" class="fixed-shell-agent-navigation">${renderAgentNavigation(presentation)}</div><div id="${agentActionsDomId(presentation.workspace.id)}" class="fixed-shell-agent-actions">${renderAgentActions(presentation)}</div></div>`,
+    headerHtml: `${barButton("Show Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-show-workspace-pane")}<div id="${agentNavigationDomId(presentation.workspace.id)}" class="fixed-shell-agent-navigation">${renderAgentNavigation(presentation)}</div><div id="${agentActionsDomId(presentation.workspace.id)}" class="fixed-shell-agent-actions">${renderAgentActions(presentation)}</div>`,
     bodyHtml: `<div id="${agentBodiesDomId(presentation.workspace.id)}" class="fixed-shell-agent-bodies">${panes || renderAgentEmpty(presentation)}</div>`,
   })}</div>`;
 }

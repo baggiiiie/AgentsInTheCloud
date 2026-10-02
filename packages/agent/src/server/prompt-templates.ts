@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { workspaceWorkHostPath } from "@atelier/workspace";
+import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 
 export interface PromptTemplate {
   name: string;
@@ -25,7 +25,7 @@ interface ParsedPromptFrontmatter {
   body: string;
 }
 
-const promptDirs = [".atelier/prompts", ".pi/prompts"] as const;
+const promptDirs = [".agents-in-the-cloud/prompts", ".pi/prompts"] as const;
 
 const builtinLandPrompt = "Commit and push your work, rebasing when necessary. When successful, delete this workspace.";
 const builtinApplicationCommands: PromptTemplate[] = [{

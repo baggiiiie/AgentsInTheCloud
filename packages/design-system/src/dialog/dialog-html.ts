@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { buttonHtml } from "../button/button-html.ts";
 import { Icons } from "../icons/icons-html.ts";
 import { attributesHtml } from "../html.ts";

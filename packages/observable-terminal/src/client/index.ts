@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import type { TerminalTheme } from "@gespenst/core";
-import { copyTextToClipboard } from "@atelier/shared";
+import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
 import { encodeObservableTerminalMessage } from "../shared/index.ts";
 import { terminalFileAt, type TerminalFileLink } from "./file-links.ts";
 
@@ -29,11 +29,11 @@ function themeColor(name: string, fallbackKey: keyof typeof DEFAULT_OBSERVABLE_T
 }
 
 /**
- * Map Atelier's active UI theme onto Gespenst's complete 16-color ANSI palette.
+ * Map AgentsInTheCloud's active UI theme onto Gespenst's complete 16-color ANSI palette.
  * Agent themes (Claude, Codex, Pi) draw with these slots, so the roles are a
  * contract: bright white emphasizes, bright black recedes, blue is the accent.
  */
-export function atelierObservableTerminalTheme(): ObservableTerminalTheme {
+export function agentsInTheCloudObservableTerminalTheme(): ObservableTerminalTheme {
   const background = themeColor("--bg", "background");
   const foreground = themeColor("--text", "foreground");
   const accent = themeColor("--accent", "brightBlue");
@@ -319,7 +319,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     let historyCursorHidden = false;
     let focused = false;
     let cursorHidden = false;
-    // The application's own cursor visibility, restored when Atelier stops hiding it.
+    // The application's own cursor visibility, restored when AgentsInTheCloud stops hiding it.
     let cursorWasVisible: boolean | undefined;
     let cursorVisibilityRevision = 0;
     const hideCursor = (): void => {

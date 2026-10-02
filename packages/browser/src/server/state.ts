@@ -1,6 +1,6 @@
-import type { JsonValue } from "@atelier/core";
-import { domId } from "@atelier/shared";
-import { createWorkspaceMetadataState } from "@atelier/workspace";
+import type { JsonValue } from "@agents-in-the-cloud/core";
+import { domId } from "@agents-in-the-cloud/shared";
+import { createWorkspaceMetadataState } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 

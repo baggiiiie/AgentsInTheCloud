@@ -1,9 +1,9 @@
-import { renderWorkspaceCompletionCatalog } from "@atelier/agent/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@atelier/prompt/server";
-import { transcriptionComposerController } from "@atelier/transcription/server";
-import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@atelier/observable-terminal/server";
-import { domId, escapeHtml, type WorkspaceModule } from "@atelier/shared";
-import type { AtelierEventBus } from "@atelier/core";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
+import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
+import { domId, escapeHtml, type WorkspaceModule } from "@agents-in-the-cloud/shared";
+import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
@@ -18,7 +18,7 @@ function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string
 
 /** One adapter supplies CLI policy; this module owns the complete terminal-agent lifecycle. */
 export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule {
-  let events: AtelierEventBus;
+  let events: AgentsInTheCloudEventBus;
   const sessions = createCliSessions(adapter, (workspaceId, conversationId, title) => events.emit("workspace_agent_conversation_title_changed", { workspaceId, conversationId, title }));
   function failureStatus(error: string) { return `Could not start ${escapeHtml(adapter.label)}: ${escapeHtml(error)}`; }
   return {
@@ -32,8 +32,12 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
       context.registerSocketHandler(cliSocketHandler(adapter.id, sessions));
       context.events.on("workspace_agent_turn_finished", ({ workspaceId, conversationId }) => {
         if (sessions.list(workspaceId).some((session) => session.id === conversationId)) {
+          context.registry.requestAttention(workspaceId);
           void sessions.exportHistory(workspaceId, conversationId).catch((error) => console.error(`Could not export ${adapter.label} session ${conversationId}`, error));
         }
+      });
+      context.events.on("workspace_runtime_ready", async ({ workspaceId }) => {
+        await sessions.restoreWorkspace(workspaceId);
       });
       context.events.on("workspace_deleting", async ({ workspaceId }) => {
         await sessions.exportWorkspaceHistory(workspaceId);
@@ -68,7 +72,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
             </div>
           </div>` : "";
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${composerAttachmentAttributes(draftId, rowId, `atelier:workspace-pane-visible@window->cli-terminal#refresh atelier:workspace-agent-focus->cli-terminal#focus atelier:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${composerAttachmentAttributes(draftId, rowId, `agents-in-the-cloud:workspace-pane-visible@window->cli-terminal#refresh agents-in-the-cloud:workspace-agent-focus->cli-terminal#focus agents-in-the-cloud:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             <div class="cli-agent-stage">
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}

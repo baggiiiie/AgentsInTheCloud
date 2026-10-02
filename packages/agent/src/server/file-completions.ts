@@ -1,8 +1,8 @@
 import { posix } from "node:path";
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { execWorkspaceCommand, workspaceRoot } from "@atelier/workspace";
-import { escapeHtml } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { execWorkspaceCommand, workspaceRoot } from "@agents-in-the-cloud/workspace";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 export type FileCompletionMode = "direct" | "fuzzy";
 

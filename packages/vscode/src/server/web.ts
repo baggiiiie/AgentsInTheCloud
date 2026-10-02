@@ -1,6 +1,6 @@
-import { Icons } from "@atelier/design-system/icons";
-import type { JsonValue } from "@atelier/core";
-import { turboStreamResponse, type WorkspaceFileTarget, type WorkspaceModuleRouteContext, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@atelier/shared";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import type { JsonValue } from "@agents-in-the-cloud/core";
+import { turboStreamResponse, type WorkspaceFileTarget, type WorkspaceModuleRouteContext, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { renderVSCodePane, vscodeViewKey, renderVSCodeNavigationSignal, vscodeFileNavigationStream } from "./render.ts";
 import { createWorkspaceVSCodeView, deleteWorkspaceVSCodeState, deleteWorkspaceVSCodeView, listWorkspaceVSCodeViews, openFileInConnectedVSCodeWindows, type WorkspaceVSCodeView } from "./workspace-vscode.ts";
 import { patchVSCodeWorkspaceAppResponse, resolveVSCodeWorkspaceAppBackend, vscodeAppKey } from "./proxy.ts";

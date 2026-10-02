@@ -2,8 +2,8 @@ import type { Api, AuthResult, Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { HttpRequestBlockedError } from "@atelier/proxy-egress/server";
-import { availableProviderModels, anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@atelier/llm/server";
+import { HttpRequestBlockedError, type SecretRequestTransform } from "@agents-in-the-cloud/proxy-egress/server";
+import { availableProviderModels, anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@agents-in-the-cloud/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
 // Every use is checked against the *current* host-side catalogue and authentication.
@@ -16,10 +16,10 @@ const markerSchema = Type.Object({
 });
 type Marker = Static<typeof markerSchema>;
 type Runtime = Pick<ModelRuntime, "getAvailable" | "getModel" | "checkAuth"> & { getAuth(model: Model<Api>): Promise<AuthResult | undefined> };
-const markerPattern = /atelier-pi-([A-Za-z0-9_-]+)-end/g;
+const markerPattern = /agents-in-the-cloud-pi-([A-Za-z0-9_-]+)-end/g;
 
 function markerToken(marker: Marker): string {
-  return `atelier-pi-${Buffer.from(JSON.stringify(marker)).toString("base64url")}-end`;
+  return `agents-in-the-cloud-pi-${Buffer.from(JSON.stringify(marker)).toString("base64url")}-end`;
 }
 function placeholder(marker: Marker): string {
   const token = markerToken(marker);
@@ -80,7 +80,7 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
     if (unsupportedAuth(model, auth)) continue;
     const baseUrl = endpoint(model, auth).href.replace(/\/$/, "");
     const style = model.api === "openai-codex-responses" ? "codex" : auth.auth.apiKey?.startsWith("sk-") ? "sk" : "plain";
-    const key = auth.auth.apiKey ? placeholder({ provider: model.provider, model: model.id, field: "key", style }) : "atelier-pi-no-key";
+    const key = auth.auth.apiKey ? placeholder({ provider: model.provider, model: model.id, field: "key", style }) : "agents-in-the-cloud-pi-no-key";
     const provider = result.models.providers[model.provider] ??= { apiKey: key, models: [] };
     result.auth[model.provider] = { type: "api_key", key: provider.apiKey };
     const headers = Object.fromEntries(Object.keys(auth.auth.headers ?? {}).map((header) => [header,
@@ -106,11 +106,15 @@ export async function piCliCredentialHosts(runtime: Runtime): Promise<string[]> 
 }
 
 /** Resolve only markers addressed to a currently configured endpoint. OAuth refresh stays in ModelRuntime. */
-export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime>): (request: Request) => Promise<Request> {
-  return async (request) => {
+export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime>): SecretRequestTransform {
+  return async (request, registerSecret) => {
     const url = new URL(request.url);
-    const values = [...request.headers.values(), url.pathname, ...[...url.searchParams].flat()];
-    if (!values.some((value) => value.match(markerPattern) || value.includes("atelier-pi-no-key"))) return request;
+    // Pi model APIs use headers or query parameters for credentials, never paths.
+    if (url.pathname.match(markerPattern) || url.pathname.includes("agents-in-the-cloud-pi-no-key")) {
+      throw new HttpRequestBlockedError("Pi credentials cannot be injected into URL paths");
+    }
+    const values = [...request.headers.values(), ...[...url.searchParams].flat()];
+    if (!values.some((value) => value.match(markerPattern) || value.includes("agents-in-the-cloud-pi-no-key"))) return request;
     const runtime = await getRuntime();
     const resolutions = new Map<string, Promise<{ model: Model<Api>; auth: AuthResult }>>();
     async function resolve(ref: ModelRef) {
@@ -119,9 +123,9 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
       if (!pending) {
         pending = (async () => {
           const model = runtime.getModel(ref.provider, ref.id);
-          if (!model) throw new HttpRequestBlockedError("Pi model is no longer configured in Atelier");
+          if (!model) throw new HttpRequestBlockedError("Pi model is no longer configured in AgentsInTheCloud");
           const auth = await runtime.getAuth(model);
-          if (!auth) throw new HttpRequestBlockedError("Pi provider is no longer connected in Atelier");
+          if (!auth) throw new HttpRequestBlockedError("Pi provider is no longer connected in AgentsInTheCloud");
           const unsupported = unsupportedAuth(model, auth);
           if (unsupported) throw new HttpRequestBlockedError(unsupported);
           return { model, auth };
@@ -151,19 +155,20 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
             replacement = claims["https://api.openai.com/auth"].chatgpt_account_id;
           } catch {
             // Credential parsing errors must not include any part of a real token in proxy diagnostics.
-            throw new HttpRequestBlockedError("Could not resolve the Pi Codex account; reconnect the provider in Atelier");
+            throw new HttpRequestBlockedError("Could not resolve the Pi Codex account; reconnect the provider in AgentsInTheCloud");
           }
         }
         if (replacement === undefined) throw new HttpRequestBlockedError("Pi authentication changed; launch a new Pi tab to refresh its configuration");
         const expected = placeholder(marker);
         if (!value.includes(expected)) throw new HttpRequestBlockedError("Malformed Pi credential placeholder");
+        if (replacement) registerSecret(replacement);
         value = value.replaceAll(expected, replacement ?? "");
       }
       return value;
     }
     const headers = new Headers();
     for (const [name, value] of request.headers) {
-      if (value.includes("atelier-pi-no-key")) continue;
+      if (value.includes("agents-in-the-cloud-pi-no-key")) continue;
       const replaced = await replace(value);
       if (replaced) headers.set(name, replaced);
     }
@@ -171,7 +176,6 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
     const query = new URLSearchParams();
     for (const [name, value] of url.searchParams) query.append(await replace(name), await replace(value));
     url.search = query.toString();
-    url.pathname = await replace(url.pathname);
     const init: RequestInit & { duplex: "half" } = { method: request.method, headers, body: request.body, duplex: "half" };
     return new Request(url, init);
   };

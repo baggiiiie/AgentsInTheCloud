@@ -1,7 +1,7 @@
-export const atelierPierreTheme = "atelier";
+export const agentsInTheCloudPierreTheme = "agents-in-the-cloud";
 
 const changedLineCSS = `[data-line-type="change-addition"], [data-line-type="change-deletion"] { --mix-light: 80%; --mix-dark: 80%; }`;
-const reviewWordDiffCSS = `[data-line-type="change-addition"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-addition-base) 48%, transparent); } [data-line-type="change-deletion"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-deletion-base) 48%, transparent); }`;
+export const wordDiffCSS = `[data-line-type="change-addition"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-addition-base) 48%, transparent); } [data-line-type="change-deletion"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-deletion-base) 48%, transparent); }`;
 const reviewLayoutCSS = `[data-code] { padding-block: 0; overflow-x: auto; scrollbar-gutter: auto; }`;
 const annotationCSS = `[data-line-annotation]:has(slot[name^="annotation-additions-"]), [data-line-annotation]:has(slot[name^="annotation-deletions-"]) { --diffs-annotation-bg: var(--diffs-bg-context); background: var(--diffs-bg-context); } [data-gutter-buffer="annotation"] { --diffs-annotation-bg: var(--diffs-bg-context-gutter); background: var(--diffs-bg-context-gutter); }`;
 
@@ -9,7 +9,7 @@ function diffOptions(presentation: "review" | "tool") {
   const review = presentation === "review";
   return {
     preferredHighlighter: "shiki-wasm" as const,
-    theme: atelierPierreTheme,
+    theme: agentsInTheCloudPierreTheme,
     themeType: "dark" as const,
     diffStyle: "unified" as const,
     overflow: review ? "wrap" as const : "scroll" as const,
@@ -20,7 +20,7 @@ function diffOptions(presentation: "review" | "tool") {
     collapsedContextThreshold: review ? 6 : 0,
     lineDiffType: review ? "none" as const : "word-alt" as const,
     stickyHeader: false,
-    unsafeCSS: review ? `${changedLineCSS} ${reviewWordDiffCSS} ${reviewLayoutCSS} ${annotationCSS}` : changedLineCSS,
+    unsafeCSS: review ? `${changedLineCSS} ${wordDiffCSS} ${reviewLayoutCSS} ${annotationCSS}` : changedLineCSS,
   };
 }
 

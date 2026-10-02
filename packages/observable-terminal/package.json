@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/observable-terminal",
+  "name": "@agents-in-the-cloud/observable-terminal",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,9 +9,9 @@
     "./shared": "./src/shared/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "@gespenst/core": "catalog:"
   }
 }

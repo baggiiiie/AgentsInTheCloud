@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
+import { projectSecretHosts, projectSecretAllowsPath, secretPathInjectionDefaultHosts } from "./secret-path-policy.ts";
 import { createHash, randomUUID } from "node:crypto";
-import { AtelierCoreError } from "@atelier/core";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { decryptProjectValue, encryptProjectValue } from "./secret-crypto.ts";
 import { findProjectRecord, projectSecretSummary, projectSecretSummaries, projectsFile, readProjectStore, updateProjectStore, type ProjectRecord, type ProjectSecretSummary, type StoredProjectSecret } from "./project.ts";
 
@@ -12,6 +13,7 @@ export interface ProjectSecretInput {
   envName: string;
   hostPattern: string;
   placeholder?: string;
+  allowInPath?: boolean;
   annotation?: string;
   optional?: boolean;
   secretValue?: string;
@@ -23,13 +25,13 @@ export function secretNeedsValue(secret: ProjectSecretSummary): boolean {
 
 function normalizeEnvName(value: string): string {
   const envName = value.trim();
-  if (!/^[A-Z_][A-Z0-9_]*$/.test(envName)) throw new AtelierCoreError("invalid_arguments", "ENV must be an uppercase environment variable name");
+  if (!/^[A-Z_][A-Z0-9_]*$/.test(envName)) throw new AgentsInTheCloudCoreError("invalid_arguments", "ENV must be an uppercase environment variable name");
   return envName;
 }
 
 function normalizeHostPattern(value: string): string {
   const hostPattern = value.trim().toLowerCase();
-  if (!hostPattern) throw new AtelierCoreError("invalid_arguments", "HOST is required");
+  if (!hostPattern) throw new AgentsInTheCloudCoreError("invalid_arguments", "HOST is required");
   return hostPattern;
 }
 
@@ -39,12 +41,12 @@ function normalizePlaceholder(value: string | undefined): string | undefined {
 
 function findProjectSecret(project: ProjectRecord, secretId: string): StoredProjectSecret {
   const secret = project.secrets?.find((candidate) => candidate.id === secretId);
-  if (!secret) throw new AtelierCoreError("project_secret_not_found", `project secret not found: ${secretId}`);
+  if (!secret) throw new AgentsInTheCloudCoreError("project_secret_not_found", `project secret not found: ${secretId}`);
   return secret;
 }
 
 function assertEnvNameAvailable(project: ProjectRecord, envName: string, exceptSecretId?: string): void {
-  if (project.secrets?.some((secret) => secret.id !== exceptSecretId && secret.envName === envName)) throw new AtelierCoreError("project_secret_exists", "project secret already exists");
+  if (project.secrets?.some((secret) => secret.id !== exceptSecretId && secret.envName === envName)) throw new AgentsInTheCloudCoreError("project_secret_exists", "project secret already exists");
 }
 
 export async function listProjectSecrets(projectId: string, file = projectsFile()): Promise<ProjectSecretSummary[]> {
@@ -63,7 +65,7 @@ export async function createProjectSecret(projectId: string, values: ProjectSecr
     assertEnvNameAvailable(project, envName);
     const now = new Date().toISOString();
     const id = randomUUID();
-    const stored: StoredProjectSecret = { id, projectId, envName, hostPattern, placeholder, annotation: values.annotation?.trim() ?? "", optional: values.optional ?? false, encryptedSecret: secretValue ? await encryptProjectValue(projectId, id, secretValue, keyFile) : undefined, createdAt: now, updatedAt: now };
+    const stored: StoredProjectSecret = { id, projectId, envName, hostPattern, placeholder, allowInPath: projectSecretAllowsPath(values), annotation: values.annotation?.trim() ?? "", optional: values.optional ?? false, encryptedSecret: secretValue ? await encryptProjectValue(projectId, id, secretValue, keyFile) : undefined, createdAt: now, updatedAt: now };
     project.secrets.push(stored);
     return projectSecretSummary(stored);
   });
@@ -83,6 +85,7 @@ export async function updateProjectSecret(projectId: string, secretId: string, v
       if (placeholder) secret.placeholder = placeholder;
       else delete secret.placeholder;
     }
+    if (values.allowInPath !== undefined) secret.allowInPath = values.allowInPath;
     if (values.annotation !== undefined) secret.annotation = values.annotation.trim();
     if (values.optional !== undefined) secret.optional = values.optional;
     if (values.secretValue) secret.encryptedSecret = await encryptProjectValue(projectId, secretId, values.secretValue, keyFile);
@@ -95,13 +98,13 @@ export function projectSecretPlaceholder(name: string): string {
   return `ATELIER_PROXY_READY_${name.replaceAll(/[^A-Za-z0-9_]/g, "_").toUpperCase()}`;
 }
 
-export function projectSecretHosts(pattern: string): string[] {
-  return [...new Set(pattern.split(/[,;]/).map((host) => host.trim().toLowerCase()).filter(Boolean))];
-}
+export const projectSecretPathPermissionSchema = Type.Boolean({
+  description: `Allow secret substitution in URL paths. Defaults to true only when all hosts are exact matches in: ${secretPathInjectionDefaultHosts.join(", ")}. Otherwise false. Omit on updates to keep the saved permission.`,
+});
 
 /** Binds a value-entry confirmation to the exact routing metadata the user reviewed. */
-export function projectSecretRoutingRevision(secret: Pick<ProjectSecretSummary, "envName" | "hostPattern" | "placeholder">): string {
-  return createHash("sha256").update(JSON.stringify([secret.envName.trim(), projectSecretHosts(secret.hostPattern).sort(), secret.placeholder?.trim() || projectSecretPlaceholder(secret.envName.trim())])).digest("hex");
+export function projectSecretRoutingRevision(secret: Pick<ProjectSecretSummary, "envName" | "hostPattern" | "placeholder" | "allowInPath">): string {
+  return createHash("sha256").update(JSON.stringify([secret.envName.trim(), projectSecretHosts(secret.hostPattern).sort(), secret.placeholder?.trim() || projectSecretPlaceholder(secret.envName.trim()), projectSecretAllowsPath(secret)])).digest("hex");
 }
 
 export const projectSecretValueInputSchema = Type.Object({
@@ -113,10 +116,10 @@ export type ProjectSecretValueInput = Static<typeof projectSecretValueInputSchem
 /** Value-only entry must not overwrite metadata that changed while its dialog was open. */
 export async function setProjectSecretValue(projectId: string, secretId: string, input: ProjectSecretValueInput, file = projectsFile(), keyFile?: string): Promise<ProjectSecretSummary> {
   const { secretValue, expectedRoutingRevision } = input;
-  if (!secretValue.trim()) throw new AtelierCoreError("invalid_arguments", "Enter a secret value");
+  if (!secretValue.trim()) throw new AgentsInTheCloudCoreError("invalid_arguments", "Enter a secret value");
   return updateProjectStore(file, async (store) => {
     const secret = findProjectSecret(findProjectRecord(store, projectId), secretId);
-    if (projectSecretRoutingRevision(secret) !== expectedRoutingRevision) throw new AtelierCoreError("project_secret_routing_changed", "Secret destination or placeholder changed. Reopen the secret dialog and review its restrictions before saving.");
+    if (projectSecretRoutingRevision(secret) !== expectedRoutingRevision) throw new AgentsInTheCloudCoreError("project_secret_routing_changed", "Secret destination, path permission, or placeholder changed. Reopen the secret dialog and review its restrictions before saving.");
     secret.encryptedSecret = await encryptProjectValue(projectId, secretId, secretValue, keyFile);
     secret.updatedAt = new Date().toISOString();
     return projectSecretSummary(secret);

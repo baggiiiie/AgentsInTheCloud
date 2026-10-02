@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { cheapestProviderModel } from "@atelier/llm/server";
+import { cheapestProviderModel } from "@agents-in-the-cloud/llm/server";
 import type { WorkspaceAgentConversationInfo } from "../../src/server/session-store.ts";
 import { agentTitleRequestOptions, createAutomaticWorkspaceNamingGate, createAgentSessionTitleSetter } from "../../src/server/agent-title-suggestion.ts";
 
@@ -16,7 +16,7 @@ const agent = (title = "Untitled"): WorkspaceAgentConversationInfo => ({
 function titleHarness(workspaceUnnamed: boolean, initialTitle = "Untitled", workspaceFollowsAgentTitle = workspaceUnnamed) {
   let conversation = agent(initialTitle);
   const workspaceTitles: string[] = [];
-  const events = createAtelierEventBus();
+  const events = createAgentsInTheCloudEventBus();
   const emitted: string[] = [];
   events.on("workspace_agent_conversation_title_changed", ({ title }) => { emitted.push(`agent:${title}`); });
   events.on("workspace_title_changed", ({ title }) => { emitted.push(`workspace:${title}`); });

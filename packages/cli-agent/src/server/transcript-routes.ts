@@ -1,8 +1,8 @@
-import { ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, type AgentRenderContext } from "@atelier/agent/server";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml } from "@atelier/shared";
+import { ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, type AgentRenderContext } from "@agents-in-the-cloud/agent/server";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { CliAgentAdapter } from "./adapter.ts";
 import type { CliSessions } from "./sessions.ts";
 

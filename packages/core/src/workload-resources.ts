@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-const descriptor = "/run/atelier-system/resources.json";
+const descriptor = "/run/agents-in-the-cloud-system/resources.json";
 async function resources(): Promise<
   { workloadsCgroupParent: string } | undefined
 > {
@@ -21,8 +21,8 @@ export async function workloadCommand(args: string[]): Promise<string[]> {
   return [
     "sh",
     "-ec",
-    'echo $$ > /run/atelier-system/workload-processes/cgroup.procs; exec "$@"',
-    "atelier-workload",
+    'echo $$ > /run/agents-in-the-cloud-system/workload-processes/cgroup.procs; exec "$@"',
+    "agents-in-the-cloud-workload",
     ...args,
   ];
 }

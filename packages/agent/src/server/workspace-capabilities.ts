@@ -1,4 +1,4 @@
-import { createWorkspaceMetadataState } from "@atelier/workspace";
+import { createWorkspaceMetadataState } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 

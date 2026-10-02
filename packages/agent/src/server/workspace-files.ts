@@ -1,5 +1,5 @@
-import { workspaceContainerName } from "@atelier/workspace";
-import { extensionOf, imageMimeByExtension } from "@atelier/prompt/server";
+import { workspaceContainerName } from "@agents-in-the-cloud/workspace";
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
 
 interface WorkspaceFileMimeRegistry {
   [extension: string]: string;

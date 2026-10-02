@@ -1,17 +1,17 @@
 import { createHash } from "node:crypto";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { actionItemHtml, type ActionItemLabel } from "@atelier/design-system/action-item";
-import { activityButtonHtml } from "@atelier/design-system/activity-button";
-import { buttonHtml } from "@atelier/design-system/button";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { Icons } from "@atelier/design-system/icons";
-import { toggleHtml } from "@atelier/design-system/toggle";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { actionItemHtml, type ActionItemLabel } from "@agents-in-the-cloud/design-system/action-item";
+import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { preloadDiffHTML } from "@pierre/diffs/ssr";
-import { domId, escapeHtml, type WorkspaceWorkViewPresentation } from "@atelier/shared";
+import { domId, escapeHtml, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import type { ReviewFile, ReviewFileStats, ReviewFileSummary, ReviewIndex } from "./diff.ts";
 import { defaultReviewSettings, reviewCommentsPrompt, type ReviewCommentModel, type ReviewSettings } from "../model.ts";
-import { reviewDiffOptions } from "@atelier/syntax/pierre";
+import { reviewDiffOptions } from "@agents-in-the-cloud/syntax/pierre";
 import type { ReviewComment } from "./state.ts";
 
 export const reviewReference = { type: "review" } as const;
@@ -52,7 +52,7 @@ async function renderTextFile(file: ReviewFile, comments: ReviewComment[], targe
   const annotations = comments.map(commentModel);
   const pierreAnnotations = annotations.map((comment) => ({ side: comment.side, lineNumber: comment.startLine, metadata: comment }));
   const prerendered = await preloadDiffHTML({ fileDiff: file.diff!, options: reviewDiffOptions, annotations: pierreAnnotations });
-  return `<div class="atelier-pierre-host review-pierre-host" data-${target}-target="diff" data-review-path="${escapeHtml(file.path)}"><diffs-container><template shadowrootmode="open">${prerendered}</template></diffs-container>${modelHtml}</div>`;
+  return `<div class="agents-in-the-cloud-pierre-host review-pierre-host" data-${target}-target="diff" data-review-path="${escapeHtml(file.path)}"><diffs-container><template shadowrootmode="open">${prerendered}</template></diffs-container>${modelHtml}</div>`;
 }
 
 function renderSpecialFile(file: ReviewFile): string {

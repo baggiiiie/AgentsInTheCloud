@@ -1,4 +1,4 @@
-import type { WorkspacePresenterDefinition } from "@atelier/agent/server";
+import type { WorkspacePresenterDefinition } from "@agents-in-the-cloud/agent/server";
 import { Type } from "typebox";
 import { createWorkspaceBrowserView, listWorkspaceBrowserViews, setWorkspaceBrowserTarget, type WorkspaceBrowserView } from "./state.ts";
 
@@ -9,7 +9,7 @@ interface BrowserPresenterDeps {
 export function createBrowserPresenter(workspaceId: string, deps: BrowserPresenterDeps): WorkspacePresenterDefinition<{ kind: "browser"; url: string }> {
   return {
     kind: "browser",
-    description: "Present a URL in Atelier's inline preview browser.",
+    description: "Present a URL in AgentsInTheCloud's inline preview browser.",
     parameters: {
       url: Type.String({
         description: "URL to load in the preview browser, written from the network perspective of the workspace container.",

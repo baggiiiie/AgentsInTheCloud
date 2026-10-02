@@ -28,3 +28,5 @@
 .usage-account { display: grid; gap: 8px; margin: 0; font-size: var(--text-small); }
 .usage-account dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
 .usage-unused > .usage-account { margin-top: 12px; }
+
+.usage-rings { display: flex; align-items: center; gap: 4px; }

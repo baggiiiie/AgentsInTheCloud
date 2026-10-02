@@ -1,8 +1,8 @@
-import type { WorkspaceClientControllerConstructor } from "@atelier/shared";
+import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 
 export function createUsageControllers(Controller: WorkspaceClientControllerConstructor) {
   class UsageSnapshotController extends Controller {
-    connect(): void { this.element.dispatchEvent(new CustomEvent("atelier:usage:refreshed", { bubbles: true })); }
+    connect(): void { this.element.dispatchEvent(new CustomEvent("agents-in-the-cloud:usage:refreshed", { bubbles: true })); }
   }
 
   class UsageButtonController extends Controller {

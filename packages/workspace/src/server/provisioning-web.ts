@@ -1,11 +1,11 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { panelHtml } from "@atelier/design-system/panel";
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { Icons } from "@atelier/design-system/icons";
-import { buttonGroupHtml } from "@atelier/design-system/button-group";
-import { buttonHtml } from "@atelier/design-system/button";
-import { observableTerminalStaticFiles } from "@atelier/observable-terminal/server";
-import { domId, escapeHtml } from "@atelier/shared";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import type { WorkspaceProvisionStep, WorkspaceProvisionSnapshot, WorkspaceProvisionStepStatus } from "../provisioning.ts";
 
 export const workspaceProvisioningStaticFiles = {

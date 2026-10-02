@@ -1,5 +1,5 @@
-import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentSessionNameCommand } from "@atelier/agent/server";
-import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@atelier/prompt/server";
+import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentSessionNameCommand } from "@agents-in-the-cloud/agent/server";
+import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import type { CliSessions } from "./sessions.ts";
 
 export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
@@ -47,7 +47,7 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     if (!text.trim() && !attachments.length) return new Response("Enter a prompt or attach a file", { status: 422 });
     const notes: string[] = [];
     for (const attachment of attachments) {
-      const path = `/tmp/atelier-attachments/${providerId}-${conversationId}/${attachment.id}/${attachment.name}`;
+      const path = `/tmp/agents-in-the-cloud-attachments/${providerId}-${conversationId}/${attachment.id}/${attachment.name}`;
       await copyAttachmentIntoWorkspace(workspaceId, attachment, path);
       notes.push(`[Attached ${attachment.isImage ? "image" : "file"} available at ${path}]`);
     }

@@ -1,9 +1,9 @@
-import { configureAgentDelegation, configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@atelier/agent/server";
-import { createAtelierEventBus, getAtelierRuntimeContext } from "@atelier/core";
-import { designSystemCatalogueHtml } from "@atelier/design-system/catalogue";
-import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@atelier/observable-terminal/server";
-import { deliverAttachmentDraft, removeAttachmentDraft, validDraftId } from "@atelier/prompt/server";
-import { requestWorkspaceSshTrust } from "@atelier/projects";
+import { configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@agents-in-the-cloud/agent/server";
+import { createAgentsInTheCloudEventBus, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { designSystemCatalogueHtml } from "@agents-in-the-cloud/design-system/catalogue";
+import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@agents-in-the-cloud/observable-terminal/server";
+import { deliverAttachmentDraft, removeAttachmentDraft, validDraftId } from "@agents-in-the-cloud/prompt/server";
+import { requestWorkspaceSshTrust } from "@agents-in-the-cloud/projects";
 import {
   createFileOriginIdentityStore,
   createWorkspaceIngress,
@@ -12,11 +12,10 @@ import {
   publicOriginPortRangeFromEnv,
   publicWorkspaceAppOrigin,
   StoppedWorkspaceError,
-} from "@atelier/proxy-ingress/server";
-import { atelierName, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@atelier/shared";
-import { subagentsDelegation } from "@atelier/subagents/server";
-import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@atelier/workspace";
-import { ensureDefaultWorkspaceImage } from "@atelier/workspace-image";
+} from "@agents-in-the-cloud/proxy-ingress/server";
+import { agentsInTheCloudName, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
+import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { ServerWebSocket } from "bun";
 import { timingSafeEqual as timingSafeEqualBytes } from "node:crypto";
 import { join } from "node:path";
@@ -33,13 +32,10 @@ import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
 import { createFileWorkspaceActivityStore, createFileWorkspaceAttentionStore, createFileWorkspaceDeletionStore, createWorkspaceRegistry } from "./workspace-registry.ts";
 
-// Explicit feature assembly; workspace-module discovery still owns routes, views and assets.
-configureAgentDelegation(workspaceModules.some((module) => module.id === "subagents") ? subagentsDelegation : undefined);
-
 const requestedPort = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? "0.0.0.0";
 const allowPortFallback = process.env.ATELIER_PORT_FALLBACK === "1";
-const devReloadFile = process.argv.find((argument) => argument.startsWith("--atelier-dev-reload-file="))?.slice("--atelier-dev-reload-file=".length);
+const devReloadFile = process.argv.find((argument) => argument.startsWith("--agents-in-the-cloud-dev-reload-file="))?.slice("--agents-in-the-cloud-dev-reload-file=".length);
 
 const authPassword = process.env.ATELIER_PASSWORD ?? "";
 
@@ -48,7 +44,7 @@ function displayUrl(host: string, port: number): string {
   const formattedHost = displayHost.includes(":") && !displayHost.startsWith("[") ? `[${displayHost}]` : displayHost;
   return `http://${formattedHost}${port === 80 ? "" : `:${port}`}`;
 }
-const authCookieName = "atelier_session";
+const authCookieName = "agents-in-the-cloud_session";
 const authCookieMaxAgeSeconds = 60 * 60 * 24 * 30;
 const authSessionPayloadSchema = Type.Object({
   expires: Type.Integer(),
@@ -139,13 +135,13 @@ function loginPage(next: string, error = ""): Response {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(atelierName)}</title>
+<title>${escapeHtml(agentsInTheCloudName)}</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#172033">
+<meta name="theme-color" content="#eadcc6">
 <style>
   html { touch-action: manipulation; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f8fc; color: #172033; }
@@ -159,7 +155,7 @@ function loginPage(next: string, error = ""): Response {
 </head>
 <body>
 <form method="post" action="/login">
-  <h1>Sign in to ${escapeHtml(atelierName)}</h1>
+  <h1>Sign in to ${escapeHtml(agentsInTheCloudName)}</h1>
   ${error ? `<div class="error">${escapeHtml(error)}</div>` : `<div class="error"></div>`}
   <input type="hidden" name="next" value="${escapeHtml(next)}">
   <input name="password" type="password" placeholder="Password" autocomplete="current-password" autofocus required>
@@ -200,50 +196,52 @@ async function authResponse(request: Request): Promise<Response | undefined> {
   return new Response("unauthorized\n", { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
 }
 
-const atelierEvents = createAtelierEventBus();
-configureAgentMcp(atelierEvents);
+const agentsInTheCloudEvents = createAgentsInTheCloudEventBus();
+configureAgentMcp(agentsInTheCloudEvents);
 const socketHandlers: WorkspaceServerSocketHandler[] = [];
 const workspaceAppResolvers: WorkspaceServerAppResolver[] = [];
 const provisioningHooks: WorkspaceServerProvisioningHook[] = [workspaceSetupProvisioningHook];
 const workspaceRemovedHandlers: Array<(workspaceId: string) => void | Promise<void>> = [];
 
-const runtimeContext = getAtelierRuntimeContext();
+const runtimeContext = getAgentsInTheCloudRuntimeContext();
 
 const publicOriginPortRange = publicOriginPortRangeFromEnv();
 
 const parentOriginPublisher = await detectParentOriginPublisher(publicOriginPortRange);
 
 const registry = createWorkspaceRegistry({
-  activityStore: createFileWorkspaceActivityStore(join(runtimeContext.atelierDataDir, "view-state", "workspace-activity.json")),
-  attentionStore: createFileWorkspaceAttentionStore(join(runtimeContext.atelierDataDir, "view-state", "workspace-attention.json")),
-  deletionStore: createFileWorkspaceDeletionStore(join(runtimeContext.atelierDataDir, "view-state", "workspace-deletions.json")),
+  activityStore: createFileWorkspaceActivityStore(join(runtimeContext.agentsInTheCloudDataDir, "view-state", "workspace-activity.json")),
+  attentionStore: createFileWorkspaceAttentionStore(join(runtimeContext.agentsInTheCloudDataDir, "view-state", "workspace-attention.json")),
+  deletionStore: createFileWorkspaceDeletionStore(join(runtimeContext.agentsInTheCloudDataDir, "view-state", "workspace-deletions.json")),
 });
 let app: WebApp;
 const workspaceStartupOperations = {
   setRunning: setWorkspaceContainerRunning,
   checkReadiness: checkWorkspaceReadiness,
-  imageOutdated: (id: string) => workspaceImageOutdated(id, undefined, atelierEvents),
+  runtimeReady: (workspaceId: string) => agentsInTheCloudEvents.emit("workspace_runtime_ready", { workspaceId }),
+  imageOutdated: (id: string) => workspaceImageOutdated(id, undefined, agentsInTheCloudEvents),
   get provisioning() { return app.provisioning; },
 };
-const cableServer = createCableServer({ registry, channels: [...workspaceModules.flatMap((module) => module.cableChannels ?? []), { name: "surface", subscribe: (identifier, listener) => app.subscribeSurface(identifier, listener) }, { name: "shell", subscribe: (_identifier, listener) => app.subscribeShell(listener) }], events: atelierEvents });
+const cableServer = createCableServer({ registry, channels: [...workspaceModules.flatMap((module) => module.cableChannels ?? []), { name: "surface", subscribe: (identifier, listener) => app.subscribeSurface(identifier, listener) }, { name: "shell", subscribe: (_identifier, listener) => app.subscribeShell(listener) }], events: agentsInTheCloudEvents });
 
 app = createWebApp({
   registry,
-  events: atelierEvents,
+  events: agentsInTheCloudEvents,
   devReload: devReloadFile !== undefined,
   workspaceRemovedHandlers,
   async provisionWorkspace(id, options) {
-    await createWorkspace({ id, events: atelierEvents, init: options.init, context: options.context, run: options.run });
+    await createWorkspace({ id, events: agentsInTheCloudEvents, init: options.init, context: options.context, run: options.run });
     for (const hook of provisioningHooks) {
-      const work = () => hook.run({ workspaceId: id, creationContext: options.context, events: atelierEvents });
+      const work = () => hook.run({ workspaceId: id, creationContext: options.context, events: agentsInTheCloudEvents });
       await options.run.step(hook.id, hook.label, work, hook.recovery);
     }
-    await options.run.step("workspace.integrations", "Run workspace startup integrations", () => atelierEvents.emit("workspace_created", { workspaceId: id, init: options.init, context: options.context }));
-    await rememberAgentProvider(options.context?.agent?.provider ?? "builtin", atelierEvents);
+    await options.run.step("workspace.integrations", "Run workspace startup integrations", () => agentsInTheCloudEvents.emit("workspace_created", { workspaceId: id, init: options.init, context: options.context }));
+    await rememberAgentProvider(options.context?.agent?.provider ?? "builtin", agentsInTheCloudEvents);
     const draft = options.context?.agent?.attachmentDraft;
     if (draft && validDraftId(draft)) await removeAttachmentDraft(draft);
   },
   async persistWorkspaceParked(id, parked) {
+    if (parked) await agentsInTheCloudEvents.emit("workspace_suspending", { workspaceId: id });
     await setWorkspaceParked(id, parked);
     if (!parked && registry.get(id)!.phase.kind === "runningPhase") {
       registry.startProvisioning(id);
@@ -251,21 +249,21 @@ app = createWebApp({
     }
   },
   destroyWorkspace: async (id) => {
-    await deleteWorkspace(id, { force: true, events: atelierEvents });
+    await deleteWorkspace(id, { force: true, events: agentsInTheCloudEvents });
   },
 });
 
 configureOnboardingTools({ deleteWorkspace: app.deleteCurrentWorkspaceFromAgent, createWorkspace: app.createWorkspaceFromAgent, requestSecretValue: createProjectSecretRequester() });
 
-atelierEvents.on("workspace_user_activity", ({ workspaceId }) => registry.touch(workspaceId));
-atelierEvents.on("workspace_title_changed", ({ workspaceId, title }) => registry.setTitle(workspaceId, title || null));
+agentsInTheCloudEvents.on("workspace_user_activity", ({ workspaceId }) => registry.touch(workspaceId));
+agentsInTheCloudEvents.on("workspace_title_changed", ({ workspaceId, title }) => registry.setTitle(workspaceId, title || null));
 // Discover identity and project metadata before serving. Runtime health is checked in the background.
 const persistedWorkspaces = (await listWorkspaces({ inspectImages: false })).workspaces;
 await registry.seed(persistedWorkspaces.map((workspace) => ({ ...workspace, provisioning: !workspace.parked })));
 
 for (const module of workspaceModules) {
   await module.initialize?.({
-    events: atelierEvents,
+    events: agentsInTheCloudEvents,
     registry,
     globalSidebarContributions: app.globalSidebarContributions,
     createWorkView: (workspaceId, reference) => app.createWorkView(workspaceId, reference),
@@ -273,7 +271,7 @@ for (const module of workspaceModules) {
     invalidateWorkspace: workspaceId => app.invalidateWorkspace(workspaceId),
     deleteCurrentWorkspace: (workspaceId, force) => app.deleteCurrentWorkspaceFromAgent(workspaceId, force),
     registerSocketHandler: (handler) => socketHandlers.push(handler),
-    publishWorkspacePort: (workspaceId, port, protocol) => workspaceIngress.publishPort(workspaceId, port, protocol),
+    publishWorkspacePort: (workspaceId, port, protocol, hostname) => workspaceIngress.publishPort(workspaceId, port, protocol, hostname),
     registerWorkspaceAppResolver: (resolver) => workspaceAppResolvers.push(resolver),
     registerProvisioningHook: (hook) => provisioningHooks.push(hook),
     onWorkspaceRemoved: (handler) => workspaceRemovedHandlers.push(handler),
@@ -311,7 +309,7 @@ function requestAcceptsGzip(request: Request): boolean {
 }
 
 async function serveStatic(pathname: string, request: Request): Promise<Response | undefined> {
-  if (pathname === "/design-system-catalogue.html") return new Response(await designSystemCatalogueHtml({ reloadUrl: devReloadFile ? "/__atelier_dev_reload" : undefined }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if (pathname === "/design-system-catalogue.html") return new Response(await designSystemCatalogueHtml({ reloadUrl: devReloadFile ? "/__agents-in-the-cloud_dev_reload" : undefined }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   let assetCacheControl = "public, max-age=31536000, immutable";
   if (pathname === "/design-system.js") {
     const manifest = parseAssetManifest(await Bun.file(new URL("../../public/assets-manifest.json", import.meta.url)).text());
@@ -394,7 +392,7 @@ const workspaceIngress = createWorkspaceIngress({
   originIdentityStore: createFileOriginIdentityStore(),
 });
 
-const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runtimeContext.atelierDataDir, "workspace-sockets"), async (request, workspaceId) => {
+const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runtimeContext.agentsInTheCloudDataDir, "workspace-sockets"), async (request, workspaceId) => {
   if (new URL(request.url).pathname === "/ssh/host-keys" && request.method === "POST") {
     const form = await request.formData();
     const host = form.get("host");
@@ -410,8 +408,8 @@ const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runt
   }
   return handleAgentMcpRequest(request, workspaceId);
 });
-atelierEvents.on("workspace_plan_prepare", ({ workspaceId }) => ingressSockets.ensure(workspaceId));
-atelierEvents.on("workspace_deleted", ({ workspaceId }) => ingressSockets.remove(workspaceId));
+agentsInTheCloudEvents.on("workspace_plan_prepare", ({ workspaceId }) => ingressSockets.ensure(workspaceId));
+agentsInTheCloudEvents.on("workspace_deleted", ({ workspaceId }) => ingressSockets.remove(workspaceId));
 
 async function handleCanonicalProxyRequest(url: URL): Promise<Response | undefined> {
   const appMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/apps\/([^/]+)(\/.*)?$/);
@@ -446,7 +444,7 @@ async function validateSocket(request: Request, url: URL): Promise<SocketData | 
   const provisionMatch = url.pathname.match(/^\/provision-term\/([^/]+)\/ws$/);
   if (provisionMatch) {
     const session = decodeURIComponent(provisionMatch[1]);
-    if (!session.startsWith("atelier-provision-")) return undefined;
+    if (!session.startsWith("agents-in-the-cloud-provision-")) return undefined;
     return { kind: "provision-term", session };
   }
   for (const handler of socketHandlers) {
@@ -521,7 +519,7 @@ for (let attempt = 0; attempt < maxPortAttempts; attempt++) {
           return new Response(JSON.stringify({ cable: cableServer.stats(), ingress: workspaceIngress.inspect() }, null, 2), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
         }
 
-        if (devReloadFile && url.pathname === "/__atelier_dev_reload" && request.method === "GET") {
+        if (devReloadFile && url.pathname === "/__agents-in-the-cloud_dev_reload" && request.method === "GET") {
           return new Response(Bun.file(devReloadFile), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
         }
 
@@ -557,11 +555,11 @@ for (let attempt = 0; attempt < maxPortAttempts; attempt++) {
 
 if (serverPort === 0) throw new Error(`No available port found from ${requestedPort} through ${requestedPort + maxPortAttempts - 1}`);
 
-void atelierEvents.emit("atelier_host_started", {
+void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_started", {
   workspaces: persistedWorkspaces.map(({ id, parked }) => ({ id, parked: Boolean(parked) })),
-}).catch((error) => console.error("Atelier startup handlers failed", error));
+}).catch((error) => console.error("AgentsInTheCloud startup handlers failed", error));
 
-console.log(`${atelierName} is available at ${process.env.ATELIER_PUBLIC_URL || displayUrl(hostname, serverPort)}`);
+console.log(`${agentsInTheCloudName} is available at ${process.env.ATELIER_PUBLIC_URL || displayUrl(hostname, serverPort)}`);
 
 void recoverWorkspaces(registry, workspaceStartupOperations).catch((error) => console.error("Workspace recovery failed", error));
 
@@ -572,3 +570,14 @@ function resumeWorkspace(id: string): void {
     if (registry.get(id) === entry && !entry.phase.deletion && !entry.parked) registry.startRunning(id);
   }).catch((error) => console.error(`Workspace startup failed for ${id}`, error));
 }
+
+// Release durable writer leases without turning host shutdown into user Stop.
+let hostStopping = false;
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => {
+  if (hostStopping) return;
+  hostStopping = true;
+  void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_stopping", {}).then(() => process.exit(0), error => {
+    console.error("AgentsInTheCloud shutdown failed", error);
+    process.exit(1);
+  });
+});

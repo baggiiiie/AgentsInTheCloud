@@ -1,12 +1,12 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { destructiveConfirmationHtml } from "@atelier/design-system/destructive-confirmation";
-import { clearWorkspaceGitHubToken, hasWorkspaceGitHubToken, setWorkspaceGitHubToken } from "@atelier/proxy-egress";
-import { getStoredGitIdentity, setGitIdentity } from "@atelier/projects";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { clearWorkspaceGitHubToken, hasWorkspaceGitHubToken, setWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { getStoredGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
 import { validateGitHubToken } from "../github-auth.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
-import { replace, stream, update } from "@atelier/shared/http";
+import { replace, stream, update } from "@agents-in-the-cloud/shared/http";
 import { renderSettingsDialog } from "./page.ts";
-import { domId, escapeHtml, providerBadgeHtml } from "@atelier/shared";
+import { domId, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
 import { registerSettingsContribution } from "./registry.ts";
 
 type SettingsSurface = "settings" | "onboarding";
@@ -32,10 +32,10 @@ function githubConnectionForm(surface: SettingsSurface, error: string): string {
   const rowClass = surface === "settings" ? " github-connect-form--row" : "";
   const connectButton = surface === "onboarding" ? "" : renderGitHubConnectButton(surface);
   return `<form id="${domId(surface, "github-connect-form")}" class="github-connect-form${rowClass} form-stack" method="post" action="${action}" data-turbo="true">
-    <p>On your machine, sign in with GitHub CLI if needed, then print your token:</p>
+    <p>Run these commands on your own computer:</p>
     <pre class="settings-command">gh auth login
 gh auth token</pre>
-    <p>Paste the token output below. Atelier stores and encrypts it outside of the agent sandbox so the agent never sees it, but can still read and write from your github repo’s.</p>
+    <p>Paste the token output below. AgentsInTheCloud stores and encrypts it outside of the agent sandbox so the agent never sees it, but can still read and write from your github repo’s.</p>
     ${error ? `<p class="settings-error">${escapeHtml(error)}</p>` : ""}
     <div class="github-connect-controls"><input class="settings-input text-field" type="password" data-1p-ignore name="token" placeholder="Paste output from gh auth token" aria-label="GitHub token" autocomplete="off" required>${connectButton}</div>
   </form>`;

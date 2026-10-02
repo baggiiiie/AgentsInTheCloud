@@ -1,7 +1,8 @@
-import type { StaticFileContribution } from "@atelier/shared";
+import type { StaticFileContribution } from "@agents-in-the-cloud/shared";
 
 /** Mount these logical URLs; the host may fingerprint them and rewrite CSS imports. */
 export const designSystemStaticFiles = {
+  "/agents-in-the-cloud-brand.png": { url: new URL("./icons/agents-in-the-cloud-brand.png", import.meta.url), contentType: "image/png" },
   "/tab-strip.css": { url: new URL("./tab-strip/tab-strip.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   "/warning-banner.css": { url: new URL("./warning-banner/warning-banner.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   "/text-entry.css": {
@@ -40,6 +41,10 @@ export const designSystemStaticFiles = {
     url: new URL("./activity-button/activity-button.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/comparison-ring.css": {
+    url: new URL("./comparison-ring/comparison-ring.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
   "/button.css": {
     url: new URL("./button/button.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
@@ -69,6 +74,10 @@ export const designSystemStaticFiles = {
   },
   "/icons.css": {
     url: new URL("./icons/icons.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
+  "/surface-lighting.css": {
+    url: new URL("./surface-lighting.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
   "/panel.css": {

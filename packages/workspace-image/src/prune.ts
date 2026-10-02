@@ -1,9 +1,9 @@
-import { runDocker } from "@atelier/core";
+import { runDocker } from "@agents-in-the-cloud/core";
 import { dockerImageStoreQueue } from "./image-store-queue.ts";
 
 export type WorkspaceImageKind = "default" | "repository";
 
-export const workspaceImageKindLabel = "com.atelier.workspace-image.kind";
+export const workspaceImageKindLabel = "com.agents-in-the-cloud.workspace-image.kind";
 
 export function workspaceImagePruneArgs(kind: WorkspaceImageKind, buildStartedAt: Date): string[] {
   return [

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProjectEnvironmentVariable, deleteProjectSecret, getProjectConfiguration, isGitProjectInit, listProjects, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, setProjectDockerfile, updateProjectSecret } from "@atelier/projects";
+import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProjectEnvironmentVariable, deleteProjectSecret, getProjectConfiguration, isGitProjectInit, listProjects, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, setProjectDockerfile, updateProjectSecret } from "@agents-in-the-cloud/projects";
 import { workspaceWarnings } from "../src/server/workspace-warnings.ts";
 import type { WorkspaceEntry } from "../src/server/workspace-registry.ts";
-import { temporaryAtelierDataDir } from "./support/test-web-app.ts";
+import { temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 
-const dataDir = temporaryAtelierDataDir();
+const dataDir = temporaryAgentsInTheCloudDataDir();
 beforeEach(dataDir.setUp);
 afterEach(dataDir.tearDown);
 
@@ -27,7 +27,7 @@ test("setup changes are compared to creation, survive reconstruction, and revert
   expect(await warningsFor(entry(projectWorkspaceInit((await listProjects()).projects[0]!)))).toEqual([]);
   await deleteProjectEnvironmentVariable(project.id, variable.id);
   expect(await warningsFor(workspace)).toEqual([]);
-  await setProjectDockerfile(project.id, "FROM atelier-workspace\nRUN echo ready");
+  await setProjectDockerfile(project.id, "FROM agents-in-the-cloud-workspace\nRUN echo ready");
   expect((await warningsFor(workspace))[0]!.state).not.toBe(changed[0]!.state);
 });
 
@@ -91,13 +91,13 @@ test("one project snapshot supplies consistent warnings to every workspace in a 
 
 test("intentional settings snapshots suppress drift across resume without suppressing genuine issues", async () => {
   const { project } = await addProject("https://github.com/org/onboarding.git");
-  await setProjectDockerfile(project.id, "FROM atelier-workspace\nRUN exit 1");
+  await setProjectDockerfile(project.id, "FROM agents-in-the-cloud-workspace\nRUN exit 1");
   const current = await readProjectWorkspaceSettings(project.id);
   const init = await projectWorkspaceInitWithSettings(project.id, current.settingsRevision, {
-    dockerfile: "FROM atelier-workspace", environment: [], preloadImages: [],
+    dockerfile: "FROM agents-in-the-cloud-workspace", environment: [], preloadImages: [],
   }, undefined);
   expect(await warningsFor(entry(init))).toEqual([]);
-  await setProjectDockerfile(project.id, "FROM atelier-workspace\nRUN echo fixed");
+  await setProjectDockerfile(project.id, "FROM agents-in-the-cloud-workspace\nRUN echo fixed");
   const resumed = entry(JSON.parse(JSON.stringify(init)));
   expect(await warningsFor(resumed)).toEqual([]);
   await createProjectSecret(project.id, { envName: "TOKEN", hostPattern: "api.example.com" });

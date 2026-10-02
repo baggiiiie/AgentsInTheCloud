@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { WorkspaceVisibilityReport } from "@atelier/shared";
-import type { WorkspaceInitInstruction } from "@atelier/workspace";
+import type { WorkspaceVisibilityReport } from "@agents-in-the-cloud/shared";
+import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 
@@ -241,7 +241,7 @@ export function createWorkspaceRegistry(options: WorkspaceRegistryOptions = {}):
     setDeletion(id, deletion) {
       const entry = requireEntry(id);
       const provisioningError = entry.phase.kind === "provisioningPhase"
-        ? entry.phase.error ?? "Workspace preparation was cancelled. Delete this workspace or restart Atelier to retry startup."
+        ? entry.phase.error ?? "Workspace preparation was cancelled. Delete this workspace or restart AgentsInTheCloud to retry startup."
         : entry.phase.deletion?.provisioningError;
       deletion = { ...deletion, provisioningError };
       deletions[id] = deletion;

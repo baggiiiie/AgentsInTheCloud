@@ -63,9 +63,9 @@ function handshake(path = "/echo", authorization = "ATELIER_WS_PLACEHOLDER", ext
 }
 
 async function fixture() {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-ws-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-ws-test-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
-  const ca = await ensureMitmCa({ atelierDataDir: directory, dockerHostAtelierDataDir: directory, dockerBridgeHost: "127.0.0.1" });
+  const ca = await ensureMitmCa({ agentsInTheCloudDataDir: directory, dockerHostAgentsInTheCloudDataDir: directory, dockerBridgeHost: "127.0.0.1" });
   const leaf = await ensureLeafCertificate(ca, "localhost");
   const caPem = await readFile(ca.certPath, "utf8");
   const received: Headers[] = [];
@@ -77,9 +77,10 @@ async function fixture() {
       received.push(request.headers);
       const path = new URL(request.url).pathname;
       if (path === "/reject") return new Response("subscription unavailable", { status: 429, headers: { "retry-after": "10" } });
-      if (path === "/redirect") return new Response(null, { status: 302, headers: { location: "https://example.com/" } });
+      if (path === "/redirect") return new Response(null, { status: 302, headers: { location: `https://example.com/${request.headers.get("authorization")}` } });
       const headers = new Headers();
-      if (request.headers.has("sec-websocket-protocol")) headers.set("sec-websocket-protocol", "atelier-test");
+      headers.set("x-echo-authorization", request.headers.get("authorization")!);
+      if (request.headers.has("sec-websocket-protocol")) headers.set("sec-websocket-protocol", "agents-in-the-cloud-test");
       if (server.upgrade(request, { headers })) return;
       return new Response("Expected WebSocket", { status: 405 });
     },
@@ -135,11 +136,12 @@ test("MITM WebSockets preserve workspace identity, negotiation, head bytes, bina
   for (const [id, proxy] of [["alpha", alpha], ["beta", beta]] as const) {
     const wire = await proxy.connect();
     // A frame arriving with the HTTP headers exercises the parser's client head buffer.
-    wire.socket.write(Buffer.concat([Buffer.from(handshake("/echo", "ATELIER_WS_PLACEHOLDER", "Sec-WebSocket-Protocol: atelier-test\r\n")), frame(Buffer.from("early"))]));
+    wire.socket.write(Buffer.concat([Buffer.from(handshake("/echo", "ATELIER_WS_PLACEHOLDER", "Sec-WebSocket-Protocol: agents-in-the-cloud-test\r\n")), frame(Buffer.from("early"))]));
     const headers = await wire.headers();
+    expect(headers).toContain("x-echo-authorization: Bearer [REDACTED]");
     expect(headers).toContain("101 Switching Protocols");
     expect(headers).toContain(`sec-websocket-accept: ${accept}`);
-    expect(headers).toContain("sec-websocket-protocol: atelier-test");
+    expect(headers).toContain("sec-websocket-protocol: agents-in-the-cloud-test");
     expect((await wire.frame()).data.toString()).toBe("ready");
     expect((await wire.frame()).data.toString()).toBe("early");
     expect(f.received.at(-1)!.get("authorization")).toBe(`Bearer ${id}-secret`);
@@ -172,7 +174,10 @@ test("WebSocket rejection status/body and redirects are forwarded without retrie
   expect((await rejected.read(Buffer.byteLength("subscription unavailable"))).toString()).toBe("subscription unavailable");
   const redirected = await proxy.connect();
   redirected.socket.write(handshake("/redirect"));
-  expect(await redirected.headers()).toContain("302");
+  const redirectHeaders = await redirected.headers();
+  expect(redirectHeaders).toContain("302");
+  expect(redirectHeaders).toContain("https://example.com/Bearer [REDACTED]");
+  expect(redirectHeaders).not.toContain("alpha-secret");
   expect(f.upgrades).toBe(2);
 });
 
@@ -241,9 +246,9 @@ test("closing a workspace proxy closes active upgraded connections", async () =>
 });
 
 test("plain ws upgrades preserve early upstream bytes and reject invalid upstream handshakes", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-ws-plain-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-ws-plain-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
-  const ca = await ensureMitmCa({ atelierDataDir: directory, dockerHostAtelierDataDir: directory, dockerBridgeHost: "127.0.0.1" });
+  const ca = await ensureMitmCa({ agentsInTheCloudDataDir: directory, dockerHostAgentsInTheCloudDataDir: directory, dockerBridgeHost: "127.0.0.1" });
   const upstream = createServer();
   upstream.on("upgrade", (req, socket) => {
     cleanup.push(() => { socket.destroy(); });

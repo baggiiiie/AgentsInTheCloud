@@ -1,4 +1,4 @@
-import { createAtelierEventBus } from "@atelier/core";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,9 +14,9 @@ function context() {
     sidebar,
     broadcasts,
     ctx: {
-      events: createAtelierEventBus(),
+      events: createAgentsInTheCloudEventBus(),
       registry: { setAgentBusy: () => {}, requestSurfaceAttention: () => undefined, requestAttention: () => undefined },
-      globalSidebarContributions: { set: (_id: string, html?: string, regions?: readonly import("@atelier/shared").LiveRegion[]) => {
+      globalSidebarContributions: { set: (_id: string, html?: string, regions?: readonly import("@agents-in-the-cloud/shared").LiveRegion[]) => {
         sidebar.push(html ?? "");
         broadcasts.push(regions?.map(region => region.html).join("") ?? "");
       } },
@@ -45,7 +45,7 @@ function deferred<T = void>() {
 const oldDigest = `sha256:${"a".repeat(64)}`;
 const newDigest = `sha256:${"b".repeat(64)}`;
 const newerDigest = `sha256:${"c".repeat(64)}`;
-const exact = `ghcr.io/lucasmeijer/atelier@${newDigest}`;
+const exact = `ghcr.io/lucasmeijer/agents-in-the-cloud@${newDigest}`;
 function manager(extra: UpdateManagerDeps = {}) {
   return new UpdateManager({
     detectRuntime: async () => ({ currentDigest: oldDigest }),
@@ -114,13 +114,13 @@ test("restart route acknowledges same-origin reload only after supervisor accept
   const instance = manager({ requestUpdate: async () => accepted.promise });
   await instance.initialize(context().ctx); await instance.startPull();
   const route = createUpdateRouteHandler(instance);
-  const url = new URL("https://atelier.example/update/restart?surface=settings");
+  const url = new URL("https://agents-in-the-cloud.example/update/restart?surface=settings");
   const pending = route(new Request(url, { method: "POST" }), url);
   expect(instance.snapshot().state).toBe("restarting");
   accepted.resolve();
   const response = (await pending)!;
   expect(response.status).toBe(204);
-  expect(response.headers.get("x-atelier-reload")).toBe("true");
+  expect(response.headers.get("x-agents-in-the-cloud-reload")).toBe("true");
   expect(response.headers.has("location")).toBe(false);
 });
 test("background checks cannot replace a pinned download or prepared target", async () => {
@@ -139,9 +139,10 @@ test("background checks cannot replace a pinned download or prepared target", as
 });
 test("channel changes persist, discard prior prepared images, and survive manager restart", async () => {
   const previous = process.env.ATELIER_DATA_DIR;
-  const directory = await mkdtemp(join(tmpdir(), "atelier-update-settings-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-update-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   try {
+    await writeStoredReleaseChannel("stable");
     const dependencies = { readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel };
     const instance = manager(dependencies);
     await instance.initialize(context().ctx); await instance.startPull();
@@ -158,7 +159,7 @@ test("channel changes persist, discard prior prepared images, and survive manage
 test("a superseded channel check cannot publish success or failure", async () => {
   for (const fail of [false, true]) {
     const pending = deferred<{ digest: string }>();
-    const instance = manager({ fetchMetadata: async (channel) => channel === "latest" ? pending.promise : { digest: newDigest } });
+    const instance = manager({ readChannel: async () => "stable", fetchMetadata: async (channel) => channel === "latest" ? pending.promise : { digest: newDigest } });
     await instance.initialize(context().ctx);
     const stale = instance.setReleaseChannel("latest");
     await Bun.sleep(0);
@@ -177,4 +178,64 @@ test("supervisor protocol sends only immutable image ID and requires acceptance"
   });
   await requestSupervisorUpdate("sha256:prepared", fetcher);
   await expect(requestSupervisorUpdate("sha256:prepared", async () => new Response("busy", { status: 409 }))).rejects.toThrow("busy");
+});
+
+test("new installations discover latest updates and pin their immutable image", async () => {
+  const channels: string[] = [];
+  const prepared: string[] = [];
+  const instance = manager({
+    readChannel: async () => undefined,
+    fetchMetadata: async (channel) => { channels.push(channel); return { digest: newDigest }; },
+    prepareUpdate: async (reference) => { prepared.push(reference); return { reference, imageId: "sha256:latest-image" }; },
+  });
+  expect(instance.snapshot().releaseChannel).toBe("latest");
+  await instance.initialize(context().ctx);
+  expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available" });
+  expect(channels).toEqual(["latest"]);
+  await instance.startPull();
+  expect(prepared).toEqual([exact]);
+  expect(instance.snapshot().state).toBe("ready_to_restart");
+});
+
+test.each(["stable", "latest"] as const)("stored %s channel overrides the latest default", async (channel) => {
+  const channels: string[] = [];
+  const instance = manager({
+    readChannel: async () => channel,
+    fetchMetadata: async (selected) => { channels.push(selected); return { digest: newDigest }; },
+  });
+  await instance.initialize(context().ctx);
+  expect(instance.snapshot().releaseChannel).toBe(channel);
+  expect(channels).toEqual([channel]);
+});
+
+test("switching from stable to latest persists the channel and refreshes the target", async () => {
+  const previous = process.env.ATELIER_DATA_DIR;
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-latest-settings-"));
+  process.env.ATELIER_DATA_DIR = directory;
+  try {
+    await writeStoredReleaseChannel("stable");
+    const channels: string[] = [];
+    const dependencies = {
+      readChannel: readStoredReleaseChannel,
+      writeChannel: writeStoredReleaseChannel,
+      fetchMetadata: async (channel: "stable" | "latest") => {
+        channels.push(channel);
+        return { digest: channel === "latest" ? newerDigest : newDigest };
+      },
+    };
+    const instance = manager(dependencies);
+    await instance.initialize(context().ctx);
+    await instance.startPull();
+    await instance.setReleaseChannel("latest");
+    expect(channels).toEqual(["stable", "latest"]);
+    expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available", target: { digest: newerDigest } });
+    await expect(instance.restart()).rejects.toThrow("No prepared update");
+    expect(await readStoredReleaseChannel()).toBe("latest");
+    const restarted = manager(dependencies);
+    await restarted.initialize(context().ctx);
+    expect(restarted.snapshot().releaseChannel).toBe("latest");
+  } finally {
+    if (previous === undefined) delete process.env.ATELIER_DATA_DIR; else process.env.ATELIER_DATA_DIR = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
 });

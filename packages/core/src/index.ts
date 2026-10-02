@@ -1,8 +1,8 @@
 export {
-  createAtelierEventBus,
-  type AtelierEventBus,
-  type AtelierEventHandler,
-  type AtelierEventMap,
+  createAgentsInTheCloudEventBus,
+  type AgentsInTheCloudEventBus,
+  type AgentsInTheCloudEventHandler,
+  type AgentsInTheCloudEventMap,
   type AgentSystemPromptPrepareEvent,
 } from "./events.ts";
 
@@ -17,9 +17,9 @@ export {
 } from "./docker.ts";
 
 export {
-  AtelierCoreError,
+  AgentsInTheCloudCoreError,
   invalidArguments,
-  type AtelierError,
+  type AgentsInTheCloudError,
 } from "./errors.ts";
 
 export {
@@ -43,11 +43,11 @@ export {
 } from "./shell.ts";
 
 export {
-  atelierDataPath,
-  dockerHostAtelierDataPath,
-  getAtelierRuntimeContext,
-  resetAtelierRuntimeContextForTests,
-  type AtelierRuntimeContext,
+  agentsInTheCloudDataPath,
+  dockerHostAgentsInTheCloudDataPath,
+  getAgentsInTheCloudRuntimeContext,
+  resetAgentsInTheCloudRuntimeContextForTests,
+  type AgentsInTheCloudRuntimeContext,
 } from "./runtime-context.ts";
 
 export {

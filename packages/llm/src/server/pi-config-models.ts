@@ -1,14 +1,14 @@
 import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { providerAvailability } from "./provider-availability.ts";
 import type { ModelRef } from "./model-reference.ts";
-import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { syncSubscriptionClis } from "./subscription-cli.ts";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { forgetSubscriptionInference } from "./recent-subscription-activity.ts";
 import { defaultProviderModels, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { atelierDataPath, getAtelierRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@atelier/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 import type { AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
@@ -23,7 +23,7 @@ export interface CustomModelsSaveResult {
   skippedOfficialModels: ModelRef[];
 }
 
-function piConfigDir(): string { return atelierDataPath(getAtelierRuntimeContext(), "pi-config"); }
+function piConfigDir(): string { return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "pi-config"); }
 function piModelsJsonPath(): string { return join(piConfigDir(), "models.json"); }
 function piCustomModelsJsonPath(): string { return join(piConfigDir(), "custom-models.json"); }
 function piAuthJsonPath(): string { return join(piConfigDir(), "auth.json"); }

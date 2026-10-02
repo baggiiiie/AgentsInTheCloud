@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AtelierCoreError } from "@atelier/core";
+import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { findProjectRecord, projectsFile, readProjectStore, updateProjectStore, type ProjectEnvironmentVariable, type ProjectRecord } from "./project.ts";
 
 function normalizeName(value: string): string {
@@ -9,17 +9,17 @@ function normalizeName(value: string): string {
 }
 
 export function validateProjectEnvironmentName(name: string): void {
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new AtelierCoreError("invalid_arguments", "NAME must be an environment variable name");
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new AgentsInTheCloudCoreError("invalid_arguments", "NAME must be an environment variable name");
 }
 
 function findVariable(project: ProjectRecord, variableId: string): ProjectEnvironmentVariable {
   const variable = project.environment?.find((candidate) => candidate.id === variableId);
-  if (!variable) throw new AtelierCoreError("project_environment_variable_not_found", `project environment variable not found: ${variableId}`);
+  if (!variable) throw new AgentsInTheCloudCoreError("project_environment_variable_not_found", `project environment variable not found: ${variableId}`);
   return variable;
 }
 
 function assertNameAvailable(project: ProjectRecord, name: string, exceptVariableId?: string): void {
-  if (project.environment?.some((variable) => variable.id !== exceptVariableId && variable.name === name)) throw new AtelierCoreError("project_environment_variable_exists", "project environment variable already exists");
+  if (project.environment?.some((variable) => variable.id !== exceptVariableId && variable.name === name)) throw new AgentsInTheCloudCoreError("project_environment_variable_exists", "project environment variable already exists");
 }
 
 export async function listProjectEnvironmentVariables(projectId: string, file = projectsFile()): Promise<ProjectEnvironmentVariable[]> {

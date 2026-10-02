@@ -1,8 +1,8 @@
-import { actionItemHtml } from "@atelier/design-system/action-item";
-import { autocompleteHtml } from "@atelier/design-system/autocomplete";
-import { buttonHtml } from "@atelier/design-system/button";
+import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import type { Skill } from "@earendil-works/pi-coding-agent";
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { PromptTemplate } from "./prompt-templates.ts";
 
 interface SlashCommand {
@@ -47,11 +47,11 @@ export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], 
     return actionItemHtml({
       kind: "single",
       label: { kind: "text", text: `${command.trigger}${command.argumentHint ? ` ${command.argumentHint}` : ""} — ${command.description}` },
-      trailingHtml: command.prompt === undefined ? "" : `<template data-atelier-fullscreen-target="content"><pre class="agent-template-preview">${escapeHtml(command.prompt)}</pre></template>`,
+      trailingHtml: command.prompt === undefined ? "" : `<template data-agents-in-the-cloud-fullscreen-target="content"><pre class="agent-template-preview">${escapeHtml(command.prompt)}</pre></template>`,
       element: {
         tag: "button",
 
-        attributesHtml: `type="button" role="option" aria-selected="${index === 0 ? "true" : "false"}" data-completion-kind="${command.kind}" data-command-trigger="${escapeHtml(command.trigger)}"${command.hotkey ? ` data-prompt-template-hotkey="${escapeHtml(command.hotkey)}"` : ""}${command.trigger === "/tree" ? ` data-command-action="notice" data-command-message="/tree feature is coming soon!"` : ""}${template ? ` data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="template" data-atelier-fullscreen-title-value="${escapeHtml(command.trigger)}"` : ""}`,
+        attributesHtml: `type="button" role="option" aria-selected="${index === 0 ? "true" : "false"}" data-completion-kind="${command.kind}" data-command-trigger="${escapeHtml(command.trigger)}"${command.hotkey ? ` data-prompt-template-hotkey="${escapeHtml(command.hotkey)}"` : ""}${command.trigger === "/tree" ? ` data-command-action="notice" data-command-message="/tree feature is coming soon!"` : ""}${template ? ` data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="template" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(command.trigger)}"` : ""}`,
       },
     });
   }).join("") });

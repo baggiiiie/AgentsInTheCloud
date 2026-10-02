@@ -1,7 +1,7 @@
-import { CableTopics, type CableSubscription } from "@atelier/shared";
+import { CableTopics, type CableSubscription } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { renderCableStreams } from "./cable-stream-renderer.ts";
-import { createAtelierCableClient } from "./cable.ts";
+import { createAgentsInTheCloudCableClient } from "./cable.ts";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
 
 class CableShellController extends Controller<HTMLElement> {
@@ -10,7 +10,7 @@ class CableShellController extends Controller<HTMLElement> {
     document.addEventListener("live:connection", this.changed);
     document.addEventListener("submit", this.guard, true);
     document.addEventListener("turbo:before-morph-attribute", this.preserveDisclosure);
-    this.subscription = window.AtelierCable!.subscribe(CableTopics.shell());
+    this.subscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.shell());
     this.changed();
   }
   disconnect(): void {
@@ -20,13 +20,13 @@ class CableShellController extends Controller<HTMLElement> {
     document.removeEventListener("turbo:before-morph-attribute", this.preserveDisclosure);
   }
   private readonly changed = (): void => {
-    const ready = window.AtelierCable!.ready();
+    const ready = window.AgentsInTheCloudCable!.ready();
     this.element.dataset.liveReady = String(ready);
     const status = document.getElementById("live-connection-status");
     if (status) status.hidden = ready;
   };
   private readonly guard = (event: Event): void => {
-    if (!window.AtelierCable!.ready()) {
+    if (!window.AgentsInTheCloudCable!.ready()) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -38,6 +38,6 @@ class CableShellController extends Controller<HTMLElement> {
   };
 }
 export function installWorkspaceCable(): void {
-  window.AtelierCable ??= createAtelierCableClient(renderCableStreams);
+  window.AgentsInTheCloudCable ??= createAgentsInTheCloudCableClient(renderCableStreams);
   registerWorkspaceControllers({ "cable-shell": CableShellController });
 }

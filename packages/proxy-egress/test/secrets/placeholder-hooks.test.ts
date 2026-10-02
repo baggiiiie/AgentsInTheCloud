@@ -28,17 +28,17 @@ describe("secret placeholder hooks", () => {
   });
 
   test("preserves unrelated headers and request ownership during repeated secret injection", async () => {
-    for (const replaceSecretsInPath of [false, true]) {
-      const hooks = createHttpHooks({ replaceSecretsInPath, secrets: { TOKEN: { value: "real-secret", hosts: ["example.com"], placeholder: "ATELIER_SECRET_fake" } } });
+    for (const allowInPath of [false, true]) {
+      const hooks = createHttpHooks({ secrets: { TOKEN: { allowInPath, value: "real-secret", hosts: ["example.com"], placeholder: "ATELIER_SECRET_fake" } } });
       for (let attempt = 0; attempt < 2; attempt++) {
         const request = new Request("https://example.com/ATELIER_SECRET_fake", {
           headers: { authorization: "Bearer ATELIER_SECRET_fake", "x-request-id": String(attempt) },
         });
         const result = await hooks.httpHooks.onRequest(request);
-        expect(result === request).toBe(!replaceSecretsInPath);
+        expect(result === request).toBe(!allowInPath);
         expect(result.headers.get("authorization")).toBe("Bearer real-secret");
         expect(result.headers.get("x-request-id")).toBe(String(attempt));
-        expect(request.headers.get("authorization")).toBe(replaceSecretsInPath ? "Bearer ATELIER_SECRET_fake" : "Bearer real-secret");
+        expect(request.headers.get("authorization")).toBe(allowInPath ? "Bearer ATELIER_SECRET_fake" : "Bearer real-secret");
       }
     }
   });
@@ -66,21 +66,31 @@ describe("secret placeholder hooks", () => {
   });
 
   test("optionally replaces a URL path placeholder for an allowed host", async () => {
-    const hooks = createHttpHooks({ replaceSecretsInPath: true, secrets: { API_TOKEN: { value: "123:secret", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
+    const hooks = createHttpHooks({ secrets: { API_TOKEN: { allowInPath: true, value: "123:secret", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
     const result = await hooks.httpHooks.onRequest!(new Request("https://api.example.com/botATELIER_SECRET_fake/getMe"));
     expectRequest(result);
     expect(result.url).toBe("https://api.example.com/bot123:secret/getMe");
   });
 
+  test("one secret's path permission does not enable another secret on the same host", async () => {
+    const { httpHooks } = createHttpHooks({ secrets: {
+      A: { value: "allowed", hosts: ["example.com"], placeholder: "PLACEHOLDER_A", allowInPath: true },
+      B: { value: "header-only", hosts: ["example.com"], placeholder: "PLACEHOLDER_B" },
+    } });
+    const result = await httpHooks.onRequest(new Request("https://example.com/PLACEHOLDER_A/PLACEHOLDER_B?token=PLACEHOLDER_A", { headers: { authorization: "Bearer PLACEHOLDER_B" } }));
+    expect(result.url).toBe("https://example.com/allowed/PLACEHOLDER_B?token=PLACEHOLDER_A");
+    expect(result.headers.get("authorization")).toBe("Bearer header-only");
+  });
+
   test("leaves a URL path placeholder unchanged for a nonmatching host", async () => {
-    const hooks = createHttpHooks({ replaceSecretsInPath: true, secrets: { API_TOKEN: { value: "123:secret", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
+    const hooks = createHttpHooks({ secrets: { API_TOKEN: { allowInPath: true, value: "123:secret", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
     const result = await hooks.httpHooks.onRequest!(new Request("https://example.com/botATELIER_SECRET_fake/getMe"));
     expectRequest(result);
     expect(result.url).toBe("https://example.com/botATELIER_SECRET_fake/getMe");
   });
 
   test("URL-encodes reserved characters injected into a path", async () => {
-    const hooks = createHttpHooks({ replaceSecretsInPath: true, secrets: { API_TOKEN: { value: "secret value?#", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
+    const hooks = createHttpHooks({ secrets: { API_TOKEN: { allowInPath: true, value: "secret value?#", hosts: ["api.example.com"], placeholder: "ATELIER_SECRET_fake" } } });
     const result = await hooks.httpHooks.onRequest!(new Request("https://api.example.com/token/ATELIER_SECRET_fake"));
     expectRequest(result);
     expect(result.url).toBe("https://api.example.com/token/secret%20value%3F%23");
@@ -163,4 +173,58 @@ describe("refreshable subscription secrets", () => {
     } } });
     await expect(hooks.httpHooks.onRequest(new Request("https://chatgpt.com/backend-api/codex/responses", { headers: { authorization: "Bearer subscription-placeholder" } }))).rejects.toThrow("Subscription disconnected");
   });
+});
+
+describe("response header scrubbing", () => {
+  test("scrubs all known secrets, repeated and overlapping matches, without cascading replacements", () => {
+    const { httpHooks } = createHttpHooks({ secrets: {
+      A: { value: "abcde", hosts: ["github.com"] },
+      B: { value: "defgh", hosts: ["other.example"] },
+      C: { value: "REDACTED", hosts: ["other.example"] },
+      empty: { value: "", hosts: ["github.com"] },
+    } });
+    const request = new Request("https://github.com");
+    expect(httpHooks.scrubResponseHeader("abcdefgh abcde defgh", request)).toBe("[REDACTED] [REDACTED] [REDACTED]");
+    expect(httpHooks.scrubResponseHeader("unrelated", request)).toBe("unrelated");
+  });
+
+  test("scrubs URL representations of secrets", () => {
+    const { httpHooks } = createHttpHooks({ secrets: { A: { value: "secret value?#", hosts: ["github.com"] } } });
+    for (const value of ["secret value?#", "secret%20value%3F%23", "secret+value%3F%23"]) {
+      expect(httpHooks.scrubResponseHeader(`https://github.com/${value}`, new Request("https://github.com"))).toBe("https://github.com/[REDACTED]");
+    }
+  });
+
+  test("keeps refreshed credentials request-scoped across concurrent responses", async () => {
+    let version = 0;
+    const { httpHooks } = createHttpHooks({ secrets: { A: { allowInPath: true,
+      value: "", hosts: ["github.com"], placeholder: "PLACEHOLDER", resolve: async () => `credential-${++version}`,
+    } } });
+    const first = await httpHooks.onRequest(new Request("http://github.com/PLACEHOLDER"));
+    const second = await httpHooks.onRequest(new Request("http://github.com/PLACEHOLDER"));
+    expect(httpHooks.scrubResponseHeader(second.url, second)).toBe("http://github.com/[REDACTED]");
+    expect(httpHooks.scrubResponseHeader(first.url, first)).toBe("http://github.com/[REDACTED]");
+    expect(version).toBe(2);
+  });
+});
+
+test("Basic-auth scrubbing tracks the combined username/password across refreshes and URL cloning", async () => {
+  let version = 0;
+  const { httpHooks: hooks } = createHttpHooks({ secrets: { TOKEN: {
+    value: "", hosts: ["example.com"], placeholder: "PLACEHOLDER", allowInPath: true,
+    resolve: async () => `credential-${++version}`,
+  } } });
+  const request = () => new Request("https://example.com/PLACEHOLDER", {
+    headers: { authorization: `Basic ${Buffer.from("user:PLACEHOLDER").toString("base64")}` },
+  });
+  const first = await hooks.onRequest(request());
+  const second = await hooks.onRequest(request());
+  for (const outbound of [second, first]) {
+    const authorization = outbound.headers.get("authorization")!;
+    const encoded = authorization.slice("Basic ".length);
+    expect(hooks.scrubResponseHeader(authorization, outbound)).toBe("Basic [REDACTED]");
+    expect(hooks.scrubResponseHeader(`https://example.com/${encoded}`, outbound)).toBe("https://example.com/[REDACTED]");
+    expect(hooks.scrubResponseHeader(`https://example.com/?auth=${encodeURIComponent(encoded)}`, outbound)).toBe("https://example.com/?auth=[REDACTED]");
+    expect(hooks.scrubResponseHeader(outbound.url, outbound)).toBe("https://example.com/[REDACTED]");
+  }
 });

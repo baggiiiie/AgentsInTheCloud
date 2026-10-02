@@ -68,16 +68,16 @@ a { color: inherit; text-decoration: none; }
 .avatar { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg,#8a8ae6,#c0a0e6); display: inline-block; }
 
 /* workspace view */
-.atelier-fullscreen-open { overflow: hidden; }
-.atelier-fullscreen-bar { position: relative; z-index: 10001; min-height: 45px; }
-.atelier-fullscreen-title { min-width: 0; flex: 1; overflow: hidden; color: var(--text-bright); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-.atelier-fullscreen-live { position: fixed !important; z-index: 10000; inset: 53px 8px 8px !important; display: block !important; width: auto !important; height: auto !important; min-height: 0 !important; overflow: auto; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius-overlay) var(--radius-overlay); background: var(--panel); }
-.atelier-fullscreen-live-bar { position: fixed; top: 8px; left: 8px; right: 8px; border: 1px solid var(--line); border-radius: var(--radius-overlay) var(--radius-overlay) 0 0; }
-.atelier-fullscreen-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 8px; border: 0; background: var(--bg); color: var(--text-bright); }
-.atelier-fullscreen-surface { width: 100%; height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-overlay); background: var(--panel); }
-.atelier-fullscreen-frame { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #fff; }
-.atelier-fullscreen-image, .atelier-fullscreen-video { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; background: #000; }
-.atelier-fullscreen-html { height: 100%; min-height: 0; overflow: auto; padding: 12px; background: var(--bg); }
+.agents-in-the-cloud-fullscreen-open { overflow: hidden; }
+.agents-in-the-cloud-fullscreen-bar { position: relative; z-index: 10001; min-height: 45px; }
+.agents-in-the-cloud-fullscreen-title { min-width: 0; flex: 1; overflow: hidden; color: var(--text-bright); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.agents-in-the-cloud-fullscreen-live { position: fixed !important; z-index: 10000; inset: 53px 8px 8px !important; display: block !important; width: auto !important; height: auto !important; min-height: 0 !important; overflow: auto; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--radius-overlay) var(--radius-overlay); background: var(--panel); }
+.agents-in-the-cloud-fullscreen-live-bar { position: fixed; top: 8px; left: 8px; right: 8px; border: 1px solid var(--line); border-radius: var(--radius-overlay) var(--radius-overlay) 0 0; }
+.agents-in-the-cloud-fullscreen-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 8px; border: 0; background: var(--bg); color: var(--text-bright); }
+.agents-in-the-cloud-fullscreen-surface { width: 100%; height: 100%; min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-overlay); background: var(--panel); }
+.agents-in-the-cloud-fullscreen-frame { display: block; width: 100%; height: 100%; min-height: 0; border: 0; background: #fff; }
+.agents-in-the-cloud-fullscreen-image, .agents-in-the-cloud-fullscreen-video { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; background: #000; }
+.agents-in-the-cloud-fullscreen-html { height: 100%; min-height: 0; overflow: auto; padding: 12px; background: var(--bg); }
 .empty-group { height: 100%; min-height: 260px; display: grid; place-content: center; gap: 12px; text-align: center; color: var(--text); background: repeating-linear-gradient(135deg,#fff,#fff 12px,#f9fbff 12px,#f9fbff 24px); }
 .workspace-wide { max-width: 940px; margin: 0 auto; }
 .workspace-grid { display: grid; grid-template-columns: 1fr 380px; gap: 16px; align-items: start; }
@@ -217,6 +217,7 @@ turbo-frame { display: contents; }
 .workspace-empty-onboarding-arrow marker path { fill: var(--accent); stroke: none; }
 .workspace-detail-resident:not(.visible) { display: none; }
 .workspace-detail-resident.visible { display: block; }
+.fixed-shell-work-pane .fixed-shell-live-body { background-image: var(--work-background-image); }
 .fixed-shell-live-body, .fixed-shell-live-body > * { width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .fixed-shell-app *, .fixed-shell-app *::before, .fixed-shell-app *::after { box-sizing: border-box; }
 
@@ -236,6 +237,7 @@ turbo-frame { display: contents; }
 .fixed-shell-pane-collections { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .fixed-shell-pane-collections > #global_sidebar_contributions { flex: 0 0 auto; }
 .fixed-shell-workspace-main { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
+.fixed-shell-workspace-main > .panel > .panel__header > .button-group { gap: 2px; }
 /* Reserve space once, then slide a full-sized Projects panel below the shell.
  * Its header remains visible; list contents never resize during the animation. */
 .fixed-shell-app > .fixed-shell-workspace-pane {
@@ -243,7 +245,8 @@ turbo-frame { display: contents; }
   --projects-pane-height: calc(47px + 9 * var(--project-row-height) + 8 * 2px + 16px);
   display: grid;
   grid-template-rows: minmax(0, 1fr) min(var(--projects-pane-height), 50%);
-  overflow: clip;
+  overflow: visible;
+  clip-path: inset(0 -18px 0 0);
 }
 .fixed-shell-app > .fixed-shell-workspace-pane:has(.fixed-shell-projects-pane.is-collapsed) { grid-template-rows: minmax(0, 1fr) 47px; }
 .fixed-shell-projects-pane {
@@ -260,10 +263,25 @@ turbo-frame { display: contents; }
 .fixed-shell-projects-pane > .panel > .panel__body { transition: opacity 160ms ease-out, visibility 160ms; }
 .fixed-shell-projects-pane.is-collapsed > .panel > .panel__body { opacity: 0; visibility: hidden; pointer-events: none; }
 .fixed-shell-projects-pane.is-collapsed [data-projects-pane-target="toggle"] svg { transform: rotate(180deg); }
-/* Keep rows as wide as the header even when the body reserves scrollbar space. */
-.fixed-shell-projects-pane > .panel { container-type: inline-size; }
-.fixed-shell-projects-pane > .panel > .panel__body { overflow-x: hidden; }
-.fixed-shell-projects-list { width: 100cqw; padding: 8px 0 8px 8px; }
+/* Extend only the scroll body into the gap; rows keep the full panel width. */
+.fixed-shell-projects-pane > .panel { overflow: visible; }
+.fixed-shell-projects-pane > .panel > .panel__body {
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  margin-inline-end: calc(-1 * var(--projects-scrollbar-width, 0px));
+}
+.fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body { scrollbar-color: transparent transparent; }
+.fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body::-webkit-scrollbar-thumb { background-color: transparent; }
+@supports selector(::-webkit-scrollbar) {
+  .fixed-shell-projects-pane > .panel > .panel__body,
+  .fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body { scrollbar-color: auto; }
+  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar { width: 16px; }
+  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar-thumb { border-inline-width: 6px; }
+  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar-button { display: none; }
+}
+/* Row actions have their own 2px inset; together these match the header's 8px. */
+.fixed-shell-projects-list { padding: 8px 6px 8px 8px; }
 .fixed-shell-projects-empty { position: relative; margin: 0; padding: 16px 56px 16px 8px; color: var(--text-muted); }
 .fixed-shell-projects-empty-arrow { position: absolute; top: 0; right: 10px; pointer-events: none; }
 @media (max-width: 700px), (pointer: coarse) {
@@ -300,22 +318,13 @@ turbo-frame { display: contents; }
 .workspace-warning-stack:not(:empty) { display: grid; gap: 8px; margin-bottom: 8px; max-height: 40vh; overflow: auto; }
 .fixed-shell-agent-pane { min-width: 380px; flex: 0 0 var(--fixed-agent-width); }
 .fixed-workspace-presentation:not(.is-work-pane-open) .fixed-shell-agent-pane { flex: 1; }
-.fixed-shell-agent-header-scroll, .fixed-shell-agent-navigation { flex: 1; align-self: stretch; display: flex; align-items: center; gap: 8px; }
-.fixed-shell-agent-header-scroll { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-.fixed-shell-agent-header-scroll::-webkit-scrollbar { display: none; }
+.fixed-shell-agent-navigation { min-width: 0; flex: 1; align-self: stretch; display: flex; align-items: center; gap: 8px; }
 .fixed-shell-agent-navigation > .popup-menu-anchor { flex: 0 0 auto; }
 .fixed-shell-agent-actions { flex: 0 0 auto; }
 .fixed-shell-park-workspace, .fixed-shell-delete-workspace { display: flex; flex: 0 0 auto; margin: 0; }
 .fixed-shell-workspace-title { min-width: 0; flex: 0 1 auto; display: flex; align-items: center; gap: 8px; }
 .fixed-shell-workspace-title strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 var(--text-body)/var(--leading-standard) var(--font-sans); }
 .fixed-shell-workspace-title small { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fixed-shell-agent-conversations { display: flex; align-self: stretch; align-items: center; gap: 4px; }
-/* Short titles stay content-sized; long titles shrink from 18rem to the
-   tappable minimum before the whole header scrolls, including swipes on tabs. */
-.fixed-shell-agent-tab { display: grid; flex: 0 1 18rem; min-width: 9.5rem; max-width: max-content; user-select: none; -webkit-user-select: none; }
-.fixed-shell-work-pane .tab-strip { flex: 1; align-self: stretch; }
-.fixed-shell-agent-icon { width: 16px; height: 16px; flex: 0 0 auto; display: grid; place-items: center; color: var(--text); }
-.fixed-shell-agent-icon svg { width: 16px; height: 16px; }
 .fixed-shell-agent-bodies, .fixed-shell-work-bodies { position: relative; height: 100%; min-height: 0; overflow: hidden; }
 .fixed-shell-surface { position: absolute; inset: 0; display: none; min-width: 0; min-height: 0; overflow: auto; }
 .fixed-shell-surface:focus { outline: none; }
@@ -331,7 +340,7 @@ turbo-frame { display: contents; }
     transform: translateX(0);
     transition: transform 160ms ease-out, opacity 160ms ease-out, visibility 160ms;
   }
-  .fixed-shell-app > .fixed-shell-app-main { margin-left: calc(var(--fixed-workspace-width) + var(--fixed-shell-gap)); }
+  .fixed-shell-app > .fixed-shell-app-main { margin-left: calc(var(--fixed-workspace-width) + 18px); }
   .fixed-shell-app.is-workspace-pane-collapsed > .fixed-shell-app-main { margin-left: 0; }
   .fixed-shell-app.is-workspace-pane-collapsed > .fixed-shell-workspace-pane {
     transform: translateX(calc(-100% - var(--fixed-shell-gap)));
@@ -352,7 +361,7 @@ turbo-frame { display: contents; }
   /* A transformed ancestor confines fixed-position fullscreen surfaces to the
    * Work pane. Keep the live content in place, but release that containing block
    * immediately while fullscreen is open. */
-  .fixed-shell-work-pane:has(.atelier-fullscreen-live) {
+  .fixed-shell-work-pane:has(.agents-in-the-cloud-fullscreen-live) {
     transform: none;
     transition: none;
   }
@@ -402,7 +411,7 @@ html.software-keyboard-visible .fixed-shell-app .fixed-shell-mobile-nav { displa
     height: var(--keyboard-viewport-height);
   }
   /* Resident workspaces own their bar; the overlaid workspace list uses the
-   * outer grid's Atelier-bar row independently. */
+   * outer grid's AgentsInTheCloud-bar row independently. */
   .fixed-shell-app-main { grid-area: 1 / 1 / -1 / -1; }
   .fixed-workspace-presentation, .workspace-boot { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr); padding: 0; }
   .fixed-shell-main { position: relative; display: block; grid-area: 1 / 1; }
@@ -423,17 +432,17 @@ html.software-keyboard-visible .fixed-shell-app .fixed-shell-mobile-nav { displa
   .fixed-shell-work-pane > .panel > .panel__header { display: none; }
   .fixed-shell-work-resizer, [data-show-work-pane], [data-show-workspace-pane], [data-collapse-workspace-pane] { display: none; }
   .fixed-shell-mobile-nav { position: relative; grid-area: 2 / 1; z-index: 30; min-width: 0; display: flex; align-items: center; gap: 8px; margin-top: 2px; padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--fixed-shell-border); background: var(--panel); }
-  .fixed-shell-atelier-bar { display: none; align-items: center; }
-  .fixed-shell-app:where(.is-mobile-workspace-pane-open, :not(:has(.workspace-detail-resident.visible))) > .fixed-shell-atelier-bar { display: flex; }
+  .fixed-shell-agents-in-the-cloud-bar { display: none; align-items: center; }
+  .fixed-shell-app:where(.is-mobile-workspace-pane-open, :not(:has(.workspace-detail-resident.visible))) > .fixed-shell-agents-in-the-cloud-bar { display: flex; }
   .fixed-shell-app.is-mobile-workspace-pane-open .fixed-shell-workspace-bar { visibility: hidden; pointer-events: none; }
   #workspace_empty_onboarding { display: none; }
   /* Clearance inside the overflow strip also accommodates the pressed offset. */
   .fixed-shell-mobile-scroll { min-width: 0; display: flex; align-items: center; flex: 1; padding-block: 1px; overflow: hidden; }
-  .fixed-shell-atelier-bar, .fixed-shell-mobile-scroll { gap: 20px; }
+  .fixed-shell-agents-in-the-cloud-bar, .fixed-shell-mobile-scroll { gap: 20px; }
   .fixed-shell-mobile-scroll.is-compact { gap: 8px; }
   .fixed-shell-mobile-nav [hidden] { display: none; }
   .fixed-shell-mobile-nav button > svg { width: 21px; height: 21px; }
-  .fixed-shell-mobile-nav :is([data-mobile-destination], [data-mobile-more], #fixed_shell_atelier_next_attention) > .status-dot.attention { position: absolute; top: 7px; right: calc(50% - 15px); }
+  .fixed-shell-mobile-nav :is([data-mobile-destination], [data-mobile-more], #fixed_shell_agents-in-the-cloud_next_attention) > .status-dot.attention { position: absolute; top: 7px; right: calc(50% - 15px); }
   .fixed-shell-more-close-section:has([data-more-close-destination]:not([hidden])) { margin-top: 4px; padding-top: 5px; border-top: 1px solid var(--line); }
 }
 
@@ -519,6 +528,16 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .model-popular-providers { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .model-popular-providers > form { flex: 0 1 auto; max-width: 100%; }
 .model-popular-providers .action-item { min-height: 56px; border: 1px solid var(--line); border-radius: var(--radius-control); }
+/* Disclosures are unboxed rows; nested content aligns with the provider's name. */
+.model-connected-providers { display: grid; gap: 2px; width: min(520px, 100%); min-width: 0; }
+.model-connected-provider > summary.action-item { min-height: 52px; cursor: pointer; }
+.model-connected-provider__body { display: grid; gap: 2px; padding: 2px 0 12px 40px; min-width: 0; }
+.model-provider-section > summary.action-item { cursor: pointer; }
+.model-provider-section__body { padding: 4px 8px 12px 28px; min-width: 0; }
+.model-connected-provider__forget { margin: 8px 0 0 8px; }
+.model-provider-usage { display: block; }
+.model-provider-usage .usage-limit { padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; }
+.model-provider-usage .usage-limit:first-child { padding-top: 0; border-top: 0; }
 .model-provider-groups form { margin: 0; }
 .model-provider-groups .action-item { width: 100%; }
 .model-provider-models form { margin: 0; }
@@ -600,8 +619,8 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .fixed-shell-workspace-pane, .fixed-shell-agent-pane, .fixed-shell-work-pane { display: flex; flex-direction: column; min-height: 0; }
 .fixed-shell-agent-pane > .panel, .fixed-shell-work-pane > .panel { flex: 1; min-height: 0; }
 
-#fixed_shell_atelier_next_attention { position: relative; }
-#fixed_shell_atelier_next_attention:not([data-preloaded-attention]) .status-dot { display: none; }
+#fixed_shell_agents-in-the-cloud_next_attention { position: relative; }
+#fixed_shell_agents-in-the-cloud_next_attention:not([data-preloaded-attention]) .status-dot { display: none; }
 
 /* Installation help composes shared dialog and controls. */
 .pwa-reminder-body { display: grid; gap: 16px; }
@@ -615,28 +634,28 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .project-dockerfile-form .textarea { font-family: var(--font-mono); line-height: var(--leading-standard); }
 
 /* A bare brand mark, not a standard action button. Keep native keyboard semantics. */
-.atelier-easter-egg { position: relative; display: inline-flex; flex: 0 0 auto; }
-.atelier-easter-egg__trigger { display: inline-flex; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
-.atelier-easter-egg__trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-indicator); }
-.atelier-easter-egg__rest { display: inline-flex; }
+.agents-in-the-cloud-easter-egg { position: relative; display: inline-flex; flex: 0 0 auto; }
+.agents-in-the-cloud-easter-egg__trigger { display: inline-flex; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
+.agents-in-the-cloud-easter-egg__trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-indicator); }
+.agents-in-the-cloud-easter-egg__rest { display: inline-flex; }
 /* Clip in the logo's own coordinate system, without a second scaling viewport. */
-.atelier-easter-egg__actor { display: none; position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1; pointer-events: none; overflow: visible; }
-.atelier-easter-egg__performer { transform-origin: 12px 12px; }
-.atelier-easter-egg__eyes, .atelier-easter-egg__panic, .atelier-easter-egg__portal { opacity: 0; }
-.atelier-easter-egg__eyes > ellipse { fill: var(--panel); stroke-width: 1; }
-.atelier-easter-egg__pupils { fill: currentColor; stroke: none; }
-.atelier-easter-egg__mouth { fill: var(--panel); stroke-width: 1; transform-origin: 12px 18px; }
-.atelier-easter-egg__portal { stroke: var(--accent); fill: var(--panel); transform-box: fill-box; transform-origin: center; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__rest { visibility: hidden; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__actor { display: block; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__performer { animation: atelier-easter-egg-journey 7s ease-in-out both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__eyes { animation: atelier-easter-egg-eyes 7s linear both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__pupils { animation: atelier-easter-egg-look 7s ease-in-out both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__panic { animation: atelier-easter-egg-panic 7s linear both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__mouth { animation: atelier-easter-egg-scream 7s ease-in-out both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__portal--bottom { animation: atelier-easter-egg-floor 7s ease-in-out both; }
-.atelier-easter-egg.is-playing .atelier-easter-egg__portal--top { animation: atelier-easter-egg-ceiling 7s ease-in-out both; }
-@keyframes atelier-easter-egg-journey {
+.agents-in-the-cloud-easter-egg__actor { display: none; position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 1; pointer-events: none; overflow: visible; }
+.agents-in-the-cloud-easter-egg__performer { transform-origin: 12px 12px; }
+.agents-in-the-cloud-easter-egg__eyes, .agents-in-the-cloud-easter-egg__panic, .agents-in-the-cloud-easter-egg__portal { opacity: 0; }
+.agents-in-the-cloud-easter-egg__eyes > ellipse { fill: var(--panel); stroke-width: 1; }
+.agents-in-the-cloud-easter-egg__pupils { fill: currentColor; stroke: none; }
+.agents-in-the-cloud-easter-egg__mouth { fill: var(--panel); stroke-width: 1; transform-origin: 12px 18px; }
+.agents-in-the-cloud-easter-egg__portal { stroke: var(--accent); fill: var(--panel); transform-box: fill-box; transform-origin: center; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__rest { visibility: hidden; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__actor { display: block; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__performer { animation: agents-in-the-cloud-easter-egg-journey 7s ease-in-out both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__eyes { animation: agents-in-the-cloud-easter-egg-eyes 7s linear both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__pupils { animation: agents-in-the-cloud-easter-egg-look 7s ease-in-out both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__panic { animation: agents-in-the-cloud-easter-egg-panic 7s linear both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__mouth { animation: agents-in-the-cloud-easter-egg-scream 7s ease-in-out both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__portal--bottom { animation: agents-in-the-cloud-easter-egg-floor 7s ease-in-out both; }
+.agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__portal--top { animation: agents-in-the-cloud-easter-egg-ceiling 7s ease-in-out both; }
+@keyframes agents-in-the-cloud-easter-egg-journey {
   0%, 28% { transform: none; visibility: visible; }
   34.4%, 40.8% { transform: translateY(-3px) scale(.9, 1.1); visibility: visible; }
   49.6% { transform: translateY(60px) scale(.7, 1.35); visibility: hidden; }
@@ -648,35 +667,35 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
   96.8% { transform: translateY(-2px); visibility: visible; }
   100% { transform: none; visibility: visible; }
 }
-@keyframes atelier-easter-egg-eyes {
+@keyframes agents-in-the-cloud-easter-egg-eyes {
   0%, 3.6%, 46.8%, 100% { opacity: 0; }
   5.6%, 44.8% { opacity: 1; }
 }
-@keyframes atelier-easter-egg-look {
+@keyframes agents-in-the-cloud-easter-egg-look {
   0%, 32.8%, 100% { transform: none; }
   22.4%, 28.8% { transform: translateY(2px); }
 }
-@keyframes atelier-easter-egg-panic {
+@keyframes agents-in-the-cloud-easter-egg-panic {
   0%, 29.2%, 48.4%, 100% { opacity: 0; }
   31.2%, 46.4% { opacity: 1; }
 }
-@keyframes atelier-easter-egg-scream {
+@keyframes agents-in-the-cloud-easter-egg-scream {
   0%, 31.2% { transform: scale(.7); }
   38.8% { transform: scale(1.3); }
   46.4%, 100% { transform: scale(1); }
 }
-@keyframes atelier-easter-egg-floor {
+@keyframes agents-in-the-cloud-easter-egg-floor {
   0%, 14.4%, 59.2%, 100% { opacity: 0; transform: scaleX(0); }
   20%, 52.8% { opacity: 1; transform: scaleX(1); }
 }
-@keyframes atelier-easter-egg-ceiling {
+@keyframes agents-in-the-cloud-easter-egg-ceiling {
   0%, 82.4%, 94%, 100% { opacity: 0; transform: scaleX(0); }
   84.4%, 92% { opacity: 1; transform: scaleX(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .atelier-easter-egg.is-playing .atelier-easter-egg__actor { display: none; }
-  .atelier-easter-egg.is-playing .atelier-easter-egg__rest { visibility: visible; }
-  .atelier-easter-egg.is-playing .atelier-easter-egg__actor * { animation: none; }
+  .agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__actor { display: none; }
+  .agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__rest { visibility: visible; }
+  .agents-in-the-cloud-easter-egg.is-playing .agents-in-the-cloud-easter-egg__actor * { animation: none; }
 }
 
 /* Model setup leaves composer drafts and attachments usable. */

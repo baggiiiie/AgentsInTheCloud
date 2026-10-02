@@ -1,11 +1,13 @@
 import { Application, Controller } from "@hotwired/stimulus";
 import RFB from "@novnc/novnc";
+import { Value } from "typebox/value";
+import { desktopClipboardSetMessage, type DesktopPhase, type DesktopViewerPayload } from "../messages.ts";
 
 class DesktopController extends Controller {
   static targets = ["screen", "runtime"];
   declare readonly screenTarget: HTMLElement;
   declare readonly runtimeTarget: HTMLElement;
-  private phase = "connecting";
+  private phase: DesktopPhase = "connecting";
   private detail = "";
   private readonly params = new URL(window.location.href).searchParams;
   private rfb?: RFB;
@@ -29,19 +31,29 @@ class DesktopController extends Controller {
   }
 
   receive(event: MessageEvent): void {
-    if (event.source !== window.parent || event.origin !== this.params.get("parentOrigin") || event.data?.type !== "atelier:desktop:status-request") return;
-    this.report(this.phase, this.detail);
+    if (event.source !== window.parent || event.origin !== this.params.get("parentOrigin")) return;
+    if (event.data?.type === "agents-in-the-cloud:desktop:status-request") {
+      this.report(this.phase, this.detail);
+    } else if (Value.Check(desktopClipboardSetMessage, event.data) && event.data.token === this.params.get("statusToken") && this.phase === "connected") {
+      this.rfb!.clipboardPasteFrom(event.data.text);
+      this.postToParent({ type: "agents-in-the-cloud:desktop:clipboard-sent", text: event.data.text });
+    }
   }
 
-  private report(phase: string, detail = ""): void {
+  private report(phase: DesktopPhase, detail = ""): void {
     this.phase = phase;
     this.detail = detail;
+    this.postToParent({ type: "agents-in-the-cloud:desktop:status", phase, detail });
+  }
+
+  private postToParent(message: DesktopViewerPayload): void {
     const parentOrigin = this.params.get("parentOrigin");
-    if (window.parent !== window && parentOrigin) window.parent.postMessage({ type: "atelier:desktop:status", token: this.params.get("statusToken"), phase, detail }, parentOrigin);
+    if (window.parent !== window && parentOrigin) window.parent.postMessage({ ...message, token: this.params.get("statusToken") }, parentOrigin);
   }
 
   private reportRuntime(): void {
-    const phase = this.runtimeTarget.firstElementChild!.getAttribute("data-phase")!;
+    // SAFETY: the server renders this attribute from its validated desktop runtime status.
+    const phase = this.runtimeTarget.firstElementChild!.getAttribute("data-phase") as DesktopPhase | "running";
     this.report(phase === "running" ? "connecting" : phase, this.runtimeTarget.querySelector(".desktop-status-detail")?.textContent ?? "");
   }
 
@@ -56,6 +68,11 @@ class DesktopController extends Controller {
     rfb.showDotCursor = true;
     rfb.qualityLevel = 6;
     rfb.compressionLevel = 2;
+    rfb.addEventListener("clipboard", (event) => {
+      // SAFETY: noVNC's clipboard event is a CustomEvent with detail.text containing the remote text.
+      const text = (event as CustomEvent<{ text: string }>).detail.text;
+      this.postToParent({ type: "agents-in-the-cloud:desktop:clipboard", text });
+    });
     rfb.addEventListener("connect", () => {
       this.report("connected");
     });

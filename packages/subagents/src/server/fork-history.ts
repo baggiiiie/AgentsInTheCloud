@@ -1,11 +1,11 @@
-import { assistantTextPhase, isFinalAssistantMessage } from "@atelier/agent/server";
-import { isJsonObject } from "@atelier/core";
+import { assistantTextPhase, isFinalAssistantMessage } from "@agents-in-the-cloud/agent/server";
+import { isJsonObject } from "@agents-in-the-cloud/core";
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { contentText } from "@earendil-works/pi-ai";
 import { parseForkTurns } from "./subagent-protocol.ts";
 
 /** Everything before this payload-free session marker is inherited context. */
-export const inheritedContextEntryType = "atelier.subagent.inherited-context";
+export const inheritedContextEntryType = "agents-in-the-cloud.subagent.inherited-context";
 
 type SessionMessage = AgentSession["messages"][number];
 

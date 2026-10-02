@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/syntax",
+  "name": "@agents-in-the-cloud/syntax",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,7 +10,7 @@
     "./shader-languages": "./src/shader-languages.ts"
   },
   "dependencies": {
-    "@atelier/shared": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*",
     "@lezer/common": "1.5.2",
     "@lezer/css": "1.3.4",
     "@lezer/highlight": "1.2.3",

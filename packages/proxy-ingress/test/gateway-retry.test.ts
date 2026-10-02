@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { workspaceGatewayErrorHeader } from "@atelier/shared";
+import { workspaceGatewayErrorHeader } from "@agents-in-the-cloud/shared";
 import { createWorkspaceIngress, type WorkspaceIngress } from "../src/ingress/index.ts";
 
 async function withGateway(

@@ -1,4 +1,4 @@
-import type { AtelierEventBus, JsonObject, JsonValue } from "@atelier/core";
+import type { AgentsInTheCloudEventBus, JsonObject, JsonValue } from "@agents-in-the-cloud/core";
 import type { TSchema } from "typebox";
 import { escapeHtml } from "./html.ts";
 import { focusLikelyOpensSoftwareKeyboard } from "./software-keyboard.ts";
@@ -9,7 +9,7 @@ export { providerBadgeHtml, providerBrandColor, providerBrandIconHtml } from "./
 export { escapeHtml } from "./html.ts";
 export { hopByHopHeaderNames, isHopByHopHeader, stripHopByHopHeaders } from "./proxy-headers.ts";
 
-export const atelierName = "Atelier" as const;
+export const agentsInTheCloudName = "AgentsInTheCloud" as const;
 
 export { parseWorkspaceFileTarget, workspaceFileOpenUrl, type WorkspaceFileTarget } from "./file-target.ts";
 
@@ -71,7 +71,7 @@ export function turboStreamResponse(body: string, init: ResponseInit = {}): Resp
 export interface WorkspaceAttachContext {
   workspaceId: string;
   init?: unknown;
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
 }
 
 export interface WorkspaceAgentTabSummary {
@@ -175,7 +175,7 @@ export interface WorkspaceModuleCommandResult {
 
 export interface WorkspaceModuleCommandContext<Input = unknown> {
   workspaceId: string;
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
   input: Input;
 }
 
@@ -188,14 +188,16 @@ export interface WorkspaceModuleCommandHandler<Input = unknown> {
   execute(context: WorkspaceModuleCommandContext<Input>): Promise<WorkspaceModuleCommandResult> | WorkspaceModuleCommandResult;
 }
 
-/** One active module dialog, shared by module routes and the Atelier shell. */
+/** One active module dialog, shared by module routes and the AgentsInTheCloud shell. */
 export const workspaceModuleModalFrameId = "workspace_module_modal_host";
 
 export interface WorkspaceModuleRouteContext {
-  events?: AtelierEventBus;
+  /** Full themed page with the host's fingerprinted assets. */
+  renderPage?(body: string): Response;
+  events?: AgentsInTheCloudEventBus;
   /** Refresh server-owned Work-view presentation, opening the view if needed. */
   openWorkView(workspaceId: string, reference: WorkspaceWorkViewReference, options?: { select?: boolean }): Promise<Response>;
-  /** Render a full Atelier page with this server-rendered dialog body in the shared modal frame. */
+  /** Render a full AgentsInTheCloud page with this server-rendered dialog body in the shared modal frame. */
   renderModalPage(dialogHtml: string): Promise<Response>;
 }
 
@@ -237,6 +239,8 @@ export interface WorkspaceAppRef {
 export interface WorkspaceHttpAppBackend {
   kind: "http";
   target: URL;
+  /** Host the app expects, such as a *.localhost subdomain; defaults to localhost. */
+  appHost?: string;
   gateway?: WorkspaceGateway;
   adaptRequestHeaders?(headers: Headers, request: Request): Promise<Headers> | Headers;
   adaptResponse?(response: Response, request: Request): Promise<Response> | Response;
@@ -261,7 +265,7 @@ export interface WorkspaceServerProvisioningHook {
   id: string;
   label: string;
   recovery?: WorkspaceProvisionRecovery;
-  run(context: { workspaceId: string; creationContext?: WorkspaceCreationContext; events?: AtelierEventBus }): Promise<void> | void;
+  run(context: { workspaceId: string; creationContext?: WorkspaceCreationContext; events?: AgentsInTheCloudEventBus }): Promise<void> | void;
 }
 
 export interface GlobalSidebarContributionRegistry {
@@ -300,7 +304,7 @@ export interface WorkspaceAgentInput {
 
 export interface AgentWorkspaceParameters {
   provider?: string;
-  /** Filled by Atelier before prepareWorkspace and workspace_created. */
+  /** Filled by AgentsInTheCloud before prepareWorkspace and workspace_created. */
   input?: WorkspaceAgentInput;
   initialPrompt?: string;
   initialPromptMode?: "composer";
@@ -317,7 +321,7 @@ export interface WorkspaceCreationContext extends Record<string, unknown> {
 }
 
 export interface WorkspaceServerModuleContext {
-  events: AtelierEventBus;
+  events: AgentsInTheCloudEventBus;
   registry: {
     setAgentBusy(workspaceId: string, agentKey: string, busy: boolean): void;
     requestSurfaceAttention(workspaceId: string, surfaceKey: string): void;
@@ -330,7 +334,7 @@ export interface WorkspaceServerModuleContext {
   invalidateWorkspace(workspaceId: string): void;
   deleteCurrentWorkspace(workspaceId: string, force: boolean): Promise<DeleteCurrentWorkspaceResult>;
   registerSocketHandler(handler: WorkspaceServerSocketHandler): void;
-  publishWorkspacePort(workspaceId: string, port: number, protocol?: "http" | "https"): Promise<string>;
+  publishWorkspacePort(workspaceId: string, port: number, protocol?: "http" | "https", hostname?: string): Promise<string>;
   registerWorkspaceAppResolver(resolver: WorkspaceServerAppResolver): void;
   registerProvisioningHook(hook: WorkspaceServerProvisioningHook): void;
   onWorkspaceRemoved(handler: (workspaceId: string) => void | Promise<void>): void;
@@ -343,7 +347,7 @@ export interface WorkspaceModule {
   cableChannels?: import("./cable.ts").CableChannelAdapter[];
   /** Declarative lazy surfaces. The host owns loading, publication, subscriptions and invalidation. */
   liveSurfaces?: { name: string; load(context: { workspaceId: string; key: string }): Promise<readonly import("./live-presentation.ts").LiveRegion[]> }[];
-  openApiPaths?: Record<string, import("@atelier/core").JsonObject>;
+  openApiPaths?: Record<string, import("@agents-in-the-cloud/core").JsonObject>;
   id: string;
   staticFiles?: Record<string, StaticFileContribution>;
   settingsContributions?: SettingsContribution[];
@@ -441,7 +445,7 @@ export interface WorkspacePaletteProvider {
   search(context: WorkspacePaletteSearchContext): WorkspacePaletteItem[] | Promise<WorkspacePaletteItem[]>;
 }
 
-export const recentWorkspaceProjectStorageKey = "atelier:recent-workspace-project-id";
+export const recentWorkspaceProjectStorageKey = "agents-in-the-cloud:recent-workspace-project-id";
 
 export interface WorkspaceClientCommand {
   id: string;
@@ -480,7 +484,7 @@ export {
   decodeCableClientMessage,
   decodeCableServerMessage,
   serializeCableIdentifier,
-  type AtelierCableClient, type CableClientMessage,
+  type AgentsInTheCloudCableClient, type CableClientMessage,
   type CableIdentifier,
   type CableServerMessage,
   type CableSubscription,
@@ -501,7 +505,7 @@ export type { CableChannelAdapter, CableChannelSubscription } from "./cable.ts";
 export function selectedWorkspaceAgent(element: Element): string | undefined {
   return element.closest<HTMLElement>("[data-workspace-selected-agent]")?.dataset.workspaceSelectedAgent || undefined;
 }
-export const workspaceAgentSelectionEvent = "atelier:workspace-agent-selected";
+export const workspaceAgentSelectionEvent = "agents-in-the-cloud:workspace-agent-selected";
 
 export interface AgentLaunchFooterContext {
   frameId: string;
@@ -519,7 +523,7 @@ export interface WorkspaceAgentLaunch {
   refreshConfiguration?(frameId: string): Promise<string>;
 }
 
-/** Providers own contents and lifecycle; Atelier owns tabs, chrome and creation UI.
+/** Providers own contents and lifecycle; AgentsInTheCloud owns tabs, chrome and creation UI.
  * Conversation IDs must be globally unique within a workspace (UUIDs are recommended).
  * Metadata listing must not create an agent or boot a runtime.
  */
@@ -528,7 +532,7 @@ export interface WorkspaceAgentProvider {
   label: string;
   iconHtml: string;
   tabs: WorkspaceAgentTabProvider;
-  create(context: { workspaceId: string; events?: AtelierEventBus }): Promise<string>;
+  create(context: { workspaceId: string; events?: AgentsInTheCloudEventBus }): Promise<string>;
   launch: WorkspaceAgentLaunch;
 }
 

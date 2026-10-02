@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createAtelierEventBus } from "@atelier/core";
-import type { WorkspaceDockerPlan } from "@atelier/workspace";
+import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 import { addProject, createProjectSecret, getProjectConfiguration, isGitProjectInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, registerProjectWorkspaceInitEvents, setProjectPreloadImages, updateProjectSecret, validateProjectWorkspaceSettings, writeProjectWorkspaceSettings, type ProjectWorkspaceSettings } from "../src/index.ts";
 
 const defaults: ProjectWorkspaceSettings = { dockerfile: "", preloadImages: [], environment: [] };
@@ -13,7 +13,7 @@ describe("complete project workspace settings", () => {
   let previous: string | undefined;
   let projectId: string;
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "atelier-workspace-settings-"));
+    dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-settings-"));
     previous = process.env.ATELIER_DATA_DIR;
     process.env.ATELIER_DATA_DIR = dir;
     projectId = (await addProject("https://github.com/example/app.git#main")).project.id;
@@ -29,7 +29,7 @@ describe("complete project workspace settings", () => {
     const result = await readProjectWorkspaceSettings(projectId);
     expect(result.settings).toEqual(defaults);
     expect(result.project.branch).toBe("main");
-    expect(result.secrets).toEqual([{ envName: "TOKEN", hostPattern: "api.example.com", placeholder: "ATELIER_PROXY_READY_TOKEN", configured: true }]);
+    expect(result.secrets).toEqual([{ envName: "TOKEN", hostPattern: "api.example.com", placeholder: "ATELIER_PROXY_READY_TOKEN", configured: true, allowInPath: false }]);
     expect(JSON.stringify(result)).not.toContain("private-credential");
     expect(JSON.stringify(result)).not.toContain("encryptedSecret");
   });
@@ -38,7 +38,7 @@ describe("complete project workspace settings", () => {
     const other = (await addProject("https://github.com/example/other.git")).project;
     const secret = await createProjectSecret(projectId, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "private-credential" });
     const initial = await readProjectWorkspaceSettings(projectId);
-    const settings = { dockerfile: "FROM atelier-workspace\nRUN echo custom", preloadImages: ["postgres:17"], environment: [{ name: "PORT", value: "3000" }] };
+    const settings = { dockerfile: "FROM agents-in-the-cloud-workspace\nRUN echo custom", preloadImages: ["postgres:17"], environment: [{ name: "PORT", value: "3000" }] };
     const saved = await writeProjectWorkspaceSettings(projectId, initial.settingsRevision, settings);
     expect(saved.settings).toEqual(settings);
     expect(saved.settingsRevision).not.toBe(initial.settingsRevision);
@@ -101,7 +101,7 @@ describe("complete project workspace settings", () => {
     await setProjectPreloadImages(projectId, ["redis:7"]);
     await expect(projectWorkspaceInitWithSettings(projectId, initial.settingsRevision, defaults, { workspaceId: "parent", conversationId: "agent-1" })).rejects.toThrow("configuration changed");
 
-    const events = createAtelierEventBus();
+    const events = createAgentsInTheCloudEventBus();
     registerProjectWorkspaceInitEvents(events);
     const image = { init, dockerfile: "should be replaced" };
     await events.emit("workspace_image_configure", image);

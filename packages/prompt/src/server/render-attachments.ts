@@ -1,6 +1,6 @@
-import { buttonHtml } from "@atelier/design-system/button";
-import { Icons } from "@atelier/design-system/icons";
-import { escapeHtml, domId } from "@atelier/shared";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { escapeHtml, domId } from "@agents-in-the-cloud/shared";
 
 export function renderAttachmentChip(attachment: { id: string; name: string; size: number; isImage: boolean }, draftId: string): string {
   const chipId = domId("agent_draft_chip", draftId, attachment.id);
@@ -9,7 +9,7 @@ export function renderAttachmentChip(attachment: { id: string; name: string; siz
     ? buttonHtml({
       type: "button", variant: "secondary",
       content: { kind: "caption", caption: attachment.name, iconHtml: `<img class="agent-chip-thumbnail" src="${escapeHtml(previewUrl)}" alt="${escapeHtml(attachment.name)}">` },
-      attributesHtml: `data-draft-image-preview aria-description="Open image preview" aria-haspopup="dialog" data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="media" data-atelier-fullscreen-title-value="${escapeHtml(attachment.name)}" data-action="atelier-fullscreen#open"`,
+      attributesHtml: `data-draft-image-preview aria-description="Open image preview" aria-haspopup="dialog" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(attachment.name)}" data-action="agents-in-the-cloud-fullscreen#open"`,
     })
     : `<span class="agent-chip-ico">📄</span><span class="agent-chip-name">${escapeHtml(attachment.name)}</span>`;
   return `<span class="agent-chip" id="${chipId}">

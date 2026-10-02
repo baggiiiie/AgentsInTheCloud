@@ -9,19 +9,20 @@ async function scenario(script: string): Promise<void> {
   try {
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
-      const workspace = await import("@atelier/workspace");
+      const workspace = await import("@agents-in-the-cloud/workspace");
       const calls = [];
       const launches = [];
       const preparations = [];
       let setupError;
       let preparationError;
+      let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
-      mock.module("@atelier/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return result; } }));
-      const agentServer = await import("@atelier/agent/server");
+      mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
+      const agentServer = await import("@agents-in-the-cloud/agent/server");
       const slugRequests = [];
       let suggestedSlug;
       let slugDelay;
-      mock.module("@atelier/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
+      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",
@@ -52,7 +53,7 @@ test("creation materializes images and passes input and settings to the adapter 
   await provider.launch.prepareWorkspace("initial", { agent: settings });
   const [tab] = await list("initial");
   expect(calls).toHaveLength(4);
-  const image = "/tmp/atelier-attachments/example-" + tab.id + "/0.png";
+  const image = "/tmp/agents-in-the-cloud-attachments/example-" + tab.id + "/0.png";
   expect(calls[0][1]).toContain(image);
   expect(calls[0][2]).toEqual({ stdin: "aW1hZ2U=" });
   expect(calls[3][1]).toContain("tmux -N new-session");
@@ -80,7 +81,7 @@ test("CLI composer /name renames the tab without sending text to the terminal", 
   const id = await provider.create({ workspaceId: "rename" });
   const route = module.routes[0].handle;
   const url = new URL("http://localhost/workspaces/rename/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("rename", "example:" + id) }) });
   const explicit = await route(form("/name manual-title"), url);
   expect(explicit.status).toBe(204);
@@ -99,7 +100,7 @@ test("a late automatic title cannot replace a manual CLI /name", () => scenario(
   const [{ id }] = await list("race");
   while (!slugRequests.length) await Bun.sleep(1);
   const url = new URL("http://localhost/workspaces/race/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const response = await module.routes[0].handle(new Request(url, { method: "POST", body: new URLSearchParams({ text: "/name manual-title", attachmentDraft: agentAttachmentDraftId("race", "example:" + id) }) }), url);
   expect(response.status).toBe(204);
   slugDelay.resolve();
@@ -112,7 +113,7 @@ test("a late automatic title cannot replace a manual CLI /name", () => scenario(
 test("CLI composer /name uses the saved prompt when no title is supplied", () => scenario(`
   const id = await provider.create({ workspaceId: "context" });
   const url = new URL("http://localhost/workspaces/context/example-agents/" + id + "/composer");
-  const { agentAttachmentDraftId } = await import("@atelier/prompt/server");
+  const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("context", "example:" + id) }) });
   expect((await module.routes[0].handle(form("Investigate the timeout"), url)).status).toBe(200);
   suggestedSlug = "investigate-timeout";
@@ -274,11 +275,13 @@ test("failed startup releases readiness waiters but rejects socket admission", (
 `));
 
 test("authenticated turn boundaries identify the exact CLI session and close revokes it", () => scenario(`
-  const { createAtelierEventBus } = await import("@atelier/core");
-  const { configureAgentMcp, handleAgentMcpRequest, subscribeWorkspaceAgentBusy } = await import("@atelier/agent/server");
-  const events = createAtelierEventBus();
+  const { createAgentsInTheCloudEventBus } = await import("@agents-in-the-cloud/core");
+  const { configureAgentMcp, handleAgentMcpRequest, subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  const events = createAgentsInTheCloudEventBus();
   const finished = [];
   const busy = [];
+  const attention = [];
+  module.initialize({ events, registry: { requestAttention(workspaceId) { attention.push(workspaceId); } }, registerSocketHandler() {} });
   events.on("workspace_agent_turn_finished", event => { finished.push(event); });
   subscribeWorkspaceAgentBusy(event => { busy.push(event); });
   configureAgentMcp(events);
@@ -292,20 +295,26 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
   expect((await handleAgentMcpRequest(request({ authorization: "Bearer invalid" }), "completion")).status).toBe(401);
   expect(finished).toEqual([]);
   expect(busy).toEqual([]);
+  expect(attention).toEqual([]);
   expect((await handleAgentMcpRequest(request({}, "POST", "started"), "completion")).status).toBe(204);
   expect(finished).toEqual([]);
+  expect(attention).toEqual([]);
   expect((await handleAgentMcpRequest(request(), "completion")).status).toBe(204);
   expect(busy).toEqual([
     { workspaceId: "completion", agentKey: "agent:" + id, busy: true },
     { workspaceId: "completion", agentKey: "agent:" + id, busy: false },
   ]);
   expect(finished).toEqual([{ workspaceId: "completion", conversationId: id }]);
+  expect(attention).toEqual(["completion"]);
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "completion", conversationId: "delegated-or-other-provider" });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "another-workspace", conversationId: id });
+  expect(attention).toEqual(["completion"]);
   await provider.tabs.close({ workspaceId: "completion", conversationId: id });
   expect((await handleAgentMcpRequest(request({}, "POST", "started"), "completion")).status).toBe(401);
 `));
 
 test("startup failure revokes credentials issued before adapter preparation", () => scenario(`
-  const { handleAgentMcpRequest } = await import("@atelier/agent/server");
+  const { handleAgentMcpRequest } = await import("@agents-in-the-cloud/agent/server");
   let token;
   adapter.prepareSession = async (_workspaceId, _sessionId, mcp) => {
     token = mcp.token;
@@ -316,4 +325,46 @@ test("startup failure revokes credentials issued before adapter preparation", ()
   expect(launches).toHaveLength(0);
   const request = new Request("http://localhost/agent-turn-finished", { method: "POST", headers: { authorization: "Bearer " + token } });
   expect((await handleAgentMcpRequest(request, "failed-credentials")).status).toBe(401);
+`));
+
+
+test("automatic recovery restores missing processes once without replaying saved input", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const resumed = [];
+  const sessions = createCliSessions({ ...adapter, resumeScript: async (...args) => { resumed.push(args); inspectionResult = { ...result, stdout: "0:\\n" }; return "printf resumed"; } }, async () => {});
+  const settings = { model: "provider::saved", thinkingLevel: "high", input: { text: "NEVER REPLAY", images: [], attachmentNotes: ["original attachment"] } };
+  const id = await sessions.create("restore", settings);
+  inspectionResult = { ...result, exitCode: 1 };
+  await Promise.all([sessions.restoreWorkspace("restore"), sessions.restoreWorkspace("restore")]);
+  expect(resumed).toHaveLength(1);
+  expect(resumed[0][0]).toBe("restore");
+  expect(resumed[0][1]).toEqual({ model: settings.model, thinkingLevel: settings.thinkingLevel });
+  expect(resumed[0][2].id).toBe(id);
+  expect(launches).toHaveLength(1);
+  expect((await saved("restore")).sessions[0]).toMatchObject({ id, input: settings.input });
+`));
+
+test("recovery leaves existing live and dead panes alone", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const sessions = createCliSessions({ ...adapter, resumeScript: async () => { throw new Error("must not resume"); } }, async () => {});
+  await sessions.create("existing");
+  for (const stdout of ["0:\\n", "1:42\\n"]) {
+    inspectionResult = { ...result, stdout };
+    await sessions.restoreWorkspace("existing");
+  }
+  expect((await saved("existing")).sessions[0].error).toBeUndefined();
+  expect(launches).toHaveLength(1);
+`));
+
+test("one restoration failure preserves its tab and does not block other agents", () => scenario(`
+  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const resumed = [];
+  const sessions = createCliSessions({ ...adapter, resumeScript: async (_workspaceId, _settings, session) => { resumed.push(session.id); if (resumed.length === 1) throw new Error("native history could not be loaded"); return "printf resumed"; } }, async () => {});
+  const first = await sessions.create("failure");
+  const second = await sessions.create("failure");
+  inspectionResult = { ...result, exitCode: 1 };
+  await sessions.restoreWorkspace("failure");
+  expect(resumed).toEqual([first, second]);
+  expect((await saved("failure")).sessions[0]).toMatchObject({ id: first, error: "native history could not be loaded" });
+  expect((await saved("failure")).sessions[1].error).toBeUndefined();
 `));

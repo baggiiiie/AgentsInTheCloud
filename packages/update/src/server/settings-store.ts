@@ -1,10 +1,10 @@
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import { readJsonSettings, updateJsonSettings } from "@atelier/core/json-settings";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { Value } from "typebox/value";
 import { releaseChannelSchema, type ReleaseChannel } from "./channels.ts";
 
 function settingsPath(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "update.json");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "update.json");
 }
 
 export async function readStoredReleaseChannel(): Promise<ReleaseChannel | undefined> {

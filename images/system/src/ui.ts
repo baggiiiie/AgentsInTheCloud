@@ -3,7 +3,7 @@ import { buttonHtml } from "../../../packages/design-system/src/button/button-ht
 import { actionItemHtml } from "../../../packages/design-system/src/action-item/action-item-html.ts";
 import { Icons } from "../../../packages/design-system/src/icons/icons-html.ts";
 import { escapeHtml } from "../../../packages/shared/src/html.ts";
-import type { AtelierTheme } from "../../../packages/shared/src/theme.ts";
+import type { AgentsInTheCloudTheme } from "../../../packages/shared/src/theme.ts";
 
 export const button = (caption: string) =>
   buttonHtml({
@@ -11,7 +11,7 @@ export const button = (caption: string) =>
     variant: "primary",
     content: { kind: "caption", caption },
   });
-export function page(title: string, content: string, assetOrigin = "", theme: AtelierTheme = "nord"): string {
+export function page(title: string, content: string, assetOrigin = "", theme: AgentsInTheCloudTheme = "nord"): string {
   return `<!doctype html><html lang="en" data-theme="${theme}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><link rel="stylesheet" href="${escapeHtml(assetOrigin)}/design-system.css"><style>
 body { margin:0; min-height:100dvh; box-sizing:border-box; display:flex; flex-direction:column; padding:24px 16px; font:var(--text-body)/var(--leading-standard) var(--font-sans); background:var(--bg); color:var(--text); }
 main { width:100%; max-width:38rem; margin:auto; }
@@ -52,8 +52,8 @@ function foldout(id: string, label: string, body: string): string {
 }
 
 export function supervisorFragment(view: SupervisorView): string {
-  const title = view.stopping ? "Stopping Atelier" : view.failure ? "Atelier needs attention" : view.connectionAction ? "Setting up remote access" : view.healthy ? "Atelier is ready" : view.operation === "update" ? "Updating Atelier" : "Starting Atelier";
-  const labels = ["Prepare Atelier images", "Stop the previous version", "Start Atelier", "Check health", "Open Atelier"];
+  const title = view.stopping ? "Stopping AgentsInTheCloud" : view.failure ? "AgentsInTheCloud needs attention" : view.connectionAction ? "Setting up remote access" : view.healthy ? "AgentsInTheCloud is ready" : view.operation === "update" ? "Updating AgentsInTheCloud" : "Starting AgentsInTheCloud";
+  const labels = ["Prepare AgentsInTheCloud images", "Stop the previous version", "Start AgentsInTheCloud", "Check health", "Open AgentsInTheCloud"];
   const checklist = labels.map((label, index) => {
     const done = (view.healthy || index < view.phase) && !(index === 4 && view.connectionAction);
     const failed = !done && index === view.phase && !!view.failure;
@@ -62,14 +62,14 @@ export function supervisorFragment(view: SupervisorView): string {
   }).join("");
 
   const failureActions = view.failure && !view.stopping ? `
-    ${view.recoveringHealth ? `<p class="system-detail">System is checking automatically. Rechecking does not restart Atelier.</p>` : ""}
+    ${view.recoveringHealth ? `<p class="system-detail">System is checking automatically. Rechecking does not restart AgentsInTheCloud.</p>` : ""}
     <div class="system-actions">
       ${view.recoveringHealth ? `<form method="post" action="/recheck">${button("Recheck health")}</form>` : ""}
-      <form method="post" action="/retry">${button(view.recoveringHealth ? "Restart Atelier" : "Retry startup")}</form>
+      <form method="post" action="/retry">${button(view.recoveringHealth ? "Restart AgentsInTheCloud" : "Retry startup")}</form>
     </div>` : "";
 
-  return `<section aria-label="Atelier System"><h1>${title}</h1>
-    <section class="system-checklist" aria-label="Atelier preparation">${view.stopping ? "" : `<ol class="status-list">${checklist}</ol>`}${failureActions}</section>
+  return `<section aria-label="AgentsInTheCloud System"><h1>${title}</h1>
+    <section class="system-checklist" aria-label="AgentsInTheCloud preparation">${view.stopping ? "" : `<ol class="status-list">${checklist}</ol>`}${failureActions}</section>
     ${view.authUrl ? `<p>Sign in to finish setting up remote access.</p>${actionLinkHtml({ href: view.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" } })}` : ""}
     ${view.connectionAction ? `<p>${escapeHtml(view.connectionAction.description)}</p>${view.connectionAction.url ? actionLinkHtml({ href: view.connectionAction.url, variant: "primary", content: { kind: "caption", caption: "Open Tailscale DNS settings" }, attributesHtml: 'target="_blank" rel="noreferrer"' }) : ""}` : ""}
     ${view.connectionProblem ? `<p class="system-error">${escapeHtml(view.connectionProblem)}</p>` : ""}

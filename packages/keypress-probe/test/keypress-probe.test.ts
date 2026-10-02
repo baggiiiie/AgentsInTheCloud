@@ -2,14 +2,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { atelierServerModule } from "../src/server/index.ts";
+import { agentsInTheCloudServerModule } from "../src/server/index.ts";
 
 let dataDir: string;
 let previousDataDir: string | undefined;
 
 beforeEach(async () => {
   previousDataDir = process.env.ATELIER_DATA_DIR;
-  dataDir = await mkdtemp(join(tmpdir(), "atelier-keypress-probe-test-"));
+  dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-keypress-probe-test-"));
   process.env.ATELIER_DATA_DIR = dataDir;
 });
 
@@ -21,7 +21,7 @@ afterEach(async () => {
 
 describe("keypress probe settings", () => {
   test("renders and updates explicit Off and On choices", async () => {
-    const settings = atelierServerModule.settingsContributions![0]!;
+    const settings = agentsInTheCloudServerModule.settingsContributions![0]!;
     const initial = await settings.render();
     expect(initial).toContain('role="group" aria-label="Keylogging probe"');
     expect(initial).toMatch(/<button(?=[^>]*value="false")(?=[^>]*aria-pressed="true")[^>]*>Off<\/button>/);

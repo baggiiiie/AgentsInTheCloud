@@ -1,6 +1,6 @@
-import { renderStreamingMarkdownSnapshot } from "@atelier/markdown";
-import type { ModelRef } from "@atelier/llm/server";
-import { escapeHtml } from "@atelier/shared";
+import { renderStreamingMarkdownSnapshot } from "@agents-in-the-cloud/markdown";
+import type { ModelRef } from "@agents-in-the-cloud/llm/server";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, renderMarkdownRow, transcriptActionItemHtml, transcriptRow } from "./render-markup.ts";
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";
@@ -101,11 +101,12 @@ export function renderWorkingSummary(ctx: AgentRenderContext, section: WorkingTr
   const endedAt = section.completedAt ?? section.stoppedAt;
   const active = endedAt === undefined;
   const duration = formatDuration(active ? ctx.readOnly ? Date.now() - section.startedAt : 0 : section.timing?.elapsedMs ?? (endedAt! - section.startedAt));
-  const activityLabel = `${active ? "Working for" : section.completedAt !== undefined ? "Worked for" : "Stopped after"} ${duration}`;
+  const stateLabel = active ? "Working" : section.completedAt !== undefined ? "Completed" : "Stopped";
+  const activityLabel = section.durationUnavailable ? stateLabel : `${stateLabel} · ${duration}`;
   const status = active ? `<i class="status-dot running${ctx.readOnly ? " static" : ""} action-item__status" aria-label="In progress"></i>` : "";
   return transcriptActionItemHtml({ kind: "text", text: activityLabel,
-    attributesHtml: active && !ctx.readOnly ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working for "` : undefined,
-    textAttributesHtml: active && !ctx.readOnly ? 'data-agent-elapsed-target="time"' : undefined,
+    attributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${section.startedAt}" data-agent-elapsed-prefix-value="Working · "` : undefined,
+    textAttributesHtml: active && !ctx.readOnly && !section.durationUnavailable ? 'data-agent-elapsed-target="time"' : undefined,
   }, {
     disclosure: true, leadingHtml: status, trailingHtml: `${steeringCount ? `<span class="agent-working-timing">${steeringCount} steering ${steeringCount === 1 ? "message" : "messages"}</span>` : ""}${active ? "" : renderWorkingTiming(section)}${section.unreadQueueCount ? `<span class="agent-working-timing">${section.unreadQueueCount} unread ${section.unreadQueueCount === 1 ? "message" : "messages"} in queue</span>` : ""}`,
     summaryId: ids.itemSummaryContent(ctx, section.key),

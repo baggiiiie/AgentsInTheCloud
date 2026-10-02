@@ -2,27 +2,27 @@ import {
   maybeNameWorkspaceFromPrompt,
   projectOnboardingInitialPrompt,
   type OnboardingToolDependencies,
-} from "@atelier/agent/server";
+} from "@agents-in-the-cloud/agent/server";
 import {
-  AtelierCoreError,
+  AgentsInTheCloudCoreError,
   createKeyedOperationQueue,
   invalidArguments,
   isJsonObject,
   readJsonObject,
   requestAcceptsJson,
-  type AtelierEventBus,
+  type AgentsInTheCloudEventBus,
   type JsonObject,
   type JsonValue,
-} from "@atelier/core";
-import { actionLinkHtml } from "@atelier/design-system/action-link";
-import { buttonHtml } from "@atelier/design-system/button";
-import { dialogHtml } from "@atelier/design-system/dialog";
-import { panelHtml } from "@atelier/design-system/panel";
-import { Icons } from "@atelier/design-system/icons";
-import { warningBannerHtml } from "@atelier/design-system/warning-banner";
-import { parseModelRef } from "@atelier/llm/server";
-import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, type ProjectConfiguration, type ProjectSummary } from "@atelier/projects";
-import { validDraftId } from "@atelier/prompt/server";
+} from "@agents-in-the-cloud/core";
+import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
+import { parseModelRef } from "@agents-in-the-cloud/llm/server";
+import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, type ProjectConfiguration, type ProjectSummary } from "@agents-in-the-cloud/projects";
+import { validDraftId } from "@agents-in-the-cloud/prompt/server";
 import {
   domId,
   emptyWorkspaceCommandInputSchema,
@@ -42,9 +42,9 @@ import {
   type WorkspaceModuleRouteHandler,
   type WorkspaceModuleWorkViewAdapter,
   type WorkspaceWorkViewPresentation
-} from "@atelier/shared";
-import { createWorkspacePresentationStore, createWorkspaceProvisioning, generateWorkspaceId, listWorkspaces, setWorkspaceParked, setWorkspaceTitle, type WorkspaceCreationContext, type WorkspaceInitInstruction, type WorkspaceProvisioning, type WorkspaceProvisionRun, type WorkspaceWorkViewReference, type WorkspaceWorkViewState } from "@atelier/workspace";
-import { renderWorkspaceLaunchPrompt, renderWorkspaceProvisioning } from "@atelier/workspace/server/provisioning";
+} from "@agents-in-the-cloud/shared";
+import { createWorkspacePresentationStore, createWorkspaceProvisioning, generateWorkspaceId, listWorkspaces, setWorkspaceParked, setWorkspaceTitle, type WorkspaceCreationContext, type WorkspaceInitInstruction, type WorkspaceProvisioning, type WorkspaceProvisionRun, type WorkspaceWorkViewReference, type WorkspaceWorkViewState } from "@agents-in-the-cloud/workspace";
+import { renderWorkspaceLaunchPrompt, renderWorkspaceProvisioning } from "@agents-in-the-cloud/workspace/server/provisioning";
 import { setTimeout as delay } from "node:timers/promises";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -53,11 +53,11 @@ import { agentContentId, selectAgentTurboStream } from "./agent-pane.ts";
 import { agentProvider, defaultAgentProvider, orderedAgentProviders, registeredAgentProviders, rememberAgentProvider } from "./agent-providers.ts";
 import { openWorkspaceFile } from "./file-navigation.ts";
 import { httpErrorStatus, jsonResponse, problemJsonResponse } from "./http-responses.ts";
-import { replace, response, update, wantsStream } from "@atelier/shared/http";
+import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 import { launchComposerContent, renderLaunchComposer, renderLaunchProvider } from "./launch-composer.ts";
 import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
-import { atelierOpenApi } from "./openapi.ts";
+import { agentsInTheCloudOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
 import { createProjectRoutes, type ProjectEditorModalOptions } from "./project-routes.ts";
 import { renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/page.ts";
@@ -66,7 +66,7 @@ import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
-import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAtelierBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workspacePaneOnboardingState, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneProject } from "./workspace-presentation.ts";
+import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workspacePaneOnboardingState, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneProject } from "./workspace-presentation.ts";
 import type { WorkspaceDeletionState, WorkspaceEntry, WorkspaceRegistry } from "./workspace-registry.ts";
 import { workspaceWarnings, type WorkspaceWarning } from "./workspace-warnings.ts";
 
@@ -74,7 +74,7 @@ const jsonStringSchema = Type.String();
 export interface WebAppDeps {
   registry: WorkspaceRegistry;
   /** Event bus passed through to the agent module routes. */
-  events?: AtelierEventBus;
+  events?: AgentsInTheCloudEventBus;
   devReload?: boolean;
   /** Create the container + default agent etc. for an already-registered workspace id. */
   provisionWorkspace(id: string, options: { init?: WorkspaceInitInstruction; context?: WorkspaceCreationContext; run: WorkspaceProvisionRun }): Promise<void>;
@@ -92,8 +92,8 @@ export interface WebAppDeps {
 export interface WebApp {
   fetch(request: Request): Promise<Response>;
   invalidateWorkspace(workspaceId: string): void;
-  subscribeShell(listener: (html: string) => void): Promise<import("@atelier/shared").CableChannelSubscription>;
-  subscribeSurface(identifier: CableIdentifier, listener: (html: string) => void): Promise<import("@atelier/shared").CableChannelSubscription>;
+  subscribeShell(listener: (html: string) => void): Promise<import("@agents-in-the-cloud/shared").CableChannelSubscription>;
+  subscribeSurface(identifier: CableIdentifier, listener: (html: string) => void): Promise<import("@agents-in-the-cloud/shared").CableChannelSubscription>;
   deleteCurrentWorkspaceFromAgent(workspaceId: string, force: boolean): Promise<DeleteCurrentWorkspaceResult>;
   resumeWorkspaceDeletions(): void;
   provisioning: WorkspaceProvisioning;
@@ -343,7 +343,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function workViewKey(reference: WorkspaceWorkViewReference): string {
     const adapter = workViewAdapterByType.get(reference.type);
-    if (!adapter) throw new AtelierCoreError("work_view_reference_invalid", `unknown Work view type: ${reference.type}`);
+    if (!adapter) throw new AgentsInTheCloudCoreError("work_view_reference_invalid", `unknown Work view type: ${reference.type}`);
     return `${reference.type}:${adapter.identity(reference)}`;
   }
 
@@ -531,7 +531,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       : "";
     const recovery = sourceFailure ? {
       stepId: sourceFailure.id,
-      description: missingHost ? `Atelier does not yet trust ${missingHost.host}. Verify its fingerprint before trusting it and retrying.` : changedHost ? "The server's identity changed. Do not retry until your administrator verifies the new key. Update Trusted SSH servers in Project settings only after verification." : needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this project, then retry." : undefined,
+      description: missingHost ? `AgentsInTheCloud does not yet trust ${missingHost.host}. Verify its fingerprint before trusting it and retrying.` : changedHost ? "The server's identity changed. Do not retry until your administrator verifies the new key. Update Trusted SSH servers in Project settings only after verification." : needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this project, then retry." : undefined,
       actionsHtml: recoveryActions,
     } : undefined;
     const inner = `${renderWorkspaceProvisioning(entry.id, snapshot, { failed, error: entry.phase.error, recovery })}${sourceFailure ? "" : recoveryActions}${deleteAction}`;
@@ -545,10 +545,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   function emptyWorkspaceOnboardingHtml(pane: WorkspacePanePresentation): string {
     const state = workspacePaneOnboardingState(pane);
     const copy = state === "first-project"
-      ? '<h1>Welcome to your Atelier!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first project</strong> to get started!</p>'
+      ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first project</strong> to get started!</p>'
       : state === "first-workspace"
-        ? '<h1>Welcome to your Atelier!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first workspace</strong> to get started!</p>'
-        : '<h1>Welcome to your Atelier</h1><p><strong data-empty-workspace-onboarding-target="origin">Select a workspace</strong> to get started.</p>';
+        ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first workspace</strong> to get started!</p>'
+        : '<h1>Welcome to your AgentsInTheCloud</h1><p><strong data-empty-workspace-onboarding-target="origin">Select a workspace</strong> to get started.</p>';
     const welcome = `<section class="workspace-empty-welcome" data-empty-workspace-state="${state}">${copy}</section>`;
     if (state === "workspaces") return `<div id="${emptyWorkspaceOnboardingId}">${welcome}</div>`;
     return `<div id="${emptyWorkspaceOnboardingId}" data-controller="empty-workspace-onboarding" data-empty-workspace-onboarding-destination-value="${state}">
@@ -594,10 +594,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const launchComposer = surface?.kind === "new-workspace"
       ? surface.project ? await renderProjectLaunchComposerFrame(surface.project) : await renderProjectlessLaunchComposerFrame()
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
-    return `<div class="app fixed-shell-app" data-controller="atelier-shortcuts workspace-navigation keyboard-viewport">
+    return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation keyboard-viewport">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""))}
     <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}</main>
-    ${renderAtelierBar()}
+    ${renderAgentsInTheCloudBar()}
   </div>
   ${projectEditor}
   <div id="update_modal_host"></div>
@@ -627,7 +627,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function requireWorkspace(id: string): WorkspaceEntry {
     const entry = registry.get(id);
-    if (!entry) throw new AtelierCoreError("workspace_not_found", `workspace not found: ${id}`);
+    if (!entry) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
     return entry;
   }
 
@@ -756,7 +756,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function createOnboardingWorkspace(project: ProjectSummary, request: Request): Promise<Response> {
     const { settingsRevision } = await readProjectWorkspaceSettings(project.id);
-    const init = await projectWorkspaceInitWithSettings(project.id, settingsRevision, { dockerfile: "FROM atelier-workspace", preloadImages: [], environment: [] });
+    const init = await projectWorkspaceInitWithSettings(project.id, settingsRevision, { dockerfile: "FROM agents-in-the-cloud-workspace", preloadImages: [], environment: [] });
     const { id } = await createWorkspaceFromCommand({
       init,
       projectOnboarding: true,
@@ -856,7 +856,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const keys = records.map(({ line, fingerprint }) => `<p><label><input type="checkbox" name="key" value="${escapeHtml(line)}" checked> <strong>${escapeHtml(line.split(" ")[1] ?? "SSH key")}</strong> <code>${escapeHtml(fingerprint)}</code></label></p>`).join("");
     const warning = changed
       ? `<p>Your workspace is trying to SSH into <strong>${escapeHtml(server)}</strong>.</p><p>We have ssh'd into this address in the past, but the fingerprint the remote machine reports now is different from what it reported previously.</p><p>If you updated the machine, this is expected.</p><p>If you didn't update the machine, it might mean someone may be trying to impersonate it.</p>`
-      : `<p>Atelier received these public keys from <strong>${escapeHtml(server)}</strong>. A network scan does not prove this is the real server. Compare the fingerprints with a trusted source or your administrator before continuing.</p>`;
+      : `<p>AgentsInTheCloud received these public keys from <strong>${escapeHtml(server)}</strong>. A network scan does not prove this is the real server. Compare the fingerprints with a trusted source or your administrator before continuing.</p>`;
     const formId = domId("ssh_trust_form", workspaceId);
     const body = `${warning}<form id="${formId}" method="post" action="${escapeHtml(action)}" data-turbo="true">${keys}${changed ? `<p><label>Type <strong>${escapeHtml(server)}</strong> to confirm: <input class="text-field" name="confirmation" autocomplete="off" required></label></p>` : ""}</form>`;
     const footer = `<form method="post" action="${escapeHtml(action)}/reject" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Don't trust" } })}</form>${buttonHtml({ type: "submit", variant: changed ? "secondary" : "primary", content: { kind: "caption", caption: changed ? "Trust changed identity" : "Trust verified keys" }, attributesHtml: `form="${formId}"` })}`;
@@ -869,7 +869,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const source = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
     const address = source && sshHostTrustFailure(`${source.output ?? ""}\n${source.error ?? ""}`);
     if (!isGitProjectInit(entry.init) || !address || snapshot?.waiting?.stepId !== "workspace.source" || !snapshot.waiting.retryable) {
-      throw new AtelierCoreError("workspace_not_ready", "This workspace is not waiting for SSH server trust");
+      throw new AgentsInTheCloudCoreError("workspace_not_ready", "This workspace is not waiting for SSH server trust");
     }
     if (request.method === "POST") {
       if (!reject) {
@@ -888,7 +888,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function workspaceRuntimeSshTrustEndpoint(id: string, trustId: string, request: Request, reject = false): Promise<Response> {
     requireWorkspace(id);
     const pending = workspaceSshTrustRequests(id).find(item => item.id === trustId);
-    if (!pending) throw new AtelierCoreError("workspace_not_ready", "The SSH trust request has expired");
+    if (!pending) throw new AgentsInTheCloudCoreError("workspace_not_ready", "The SSH trust request has expired");
     const form = reject ? undefined : await request.formData();
     if (pending.changed && !reject && form?.get("confirmation") !== (pending.port === 22 ? pending.host : `${pending.host}:${pending.port}`)) throw invalidArguments("Confirm the changed server identity before trusting it");
     await decideWorkspaceSshTrust(id, trustId, reject ? [] : form!.getAll("key").map(String));
@@ -897,7 +897,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function continueWorkspaceProvisioningEndpoint(id: string, request: Request): Response {
     const entry = requireWorkspace(id);
-    if (entry.phase.kind !== "provisioningPhase") throw new AtelierCoreError("workspace_not_ready", `workspace ${id} is not waiting for provisioning confirmation`);
+    if (entry.phase.kind !== "provisioningPhase") throw new AgentsInTheCloudCoreError("workspace_not_ready", `workspace ${id} is not waiting for provisioning confirmation`);
     const action = new URL(request.url).searchParams.get("action");
     if (action !== null && action !== "retry") throw invalidArguments("Unknown provisioning action");
     const stepId = provisioning.resume(id, action === "retry" ? "retry" : "continue");
@@ -944,7 +944,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   > {
     return await serializePresentationMutation(id, async () => {
       const entry = requireWorkspace(id);
-      if (entry.phase.kind !== "runningPhase") throw new AtelierCoreError("workspace_not_ready", `workspace ${id} is not ready`);
+      if (entry.phase.kind !== "runningPhase") throw new AgentsInTheCloudCoreError("workspace_not_ready", `workspace ${id} is not ready`);
       const affected = parked ? (await workspacePresentationBundle(id)).storedWorkViews.filter(({ reference }) => reference.type === "terminal" || reference.type === "vscode") : [];
       if (affected.length && !force) return { kind: "confirmation", workViews: affected };
       for (const { reference } of affected) await closeWorkView(id, reference);
@@ -1035,7 +1035,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function executeWorkspaceCommand(workspaceId: string, commandId: string, request: Request): Promise<WorkspaceModuleCommandResult> {
     const commands = workspaceModuleCommands();
     const command = commands.find((candidate) => candidate.id === commandId);
-    if (!command) throw new AtelierCoreError("command_not_found", `workspace command not found: ${commandId}`, { availableCommands: commands.map((candidate) => candidate.id) });
+    if (!command) throw new AgentsInTheCloudCoreError("command_not_found", `workspace command not found: ${commandId}`, { availableCommands: commands.map((candidate) => candidate.id) });
     return await command.execute({ workspaceId, events: deps.events, input: await commandInput(request, command) });
   }
 
@@ -1043,7 +1043,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const key = workViewKey(reference);
     const attachments = await attachWorkspaceModules(workspaceId);
     const contribution = attachments.flatMap((attachment) => attachment.workViews ?? []).find((view) => workViewKey(view.reference) === key);
-    if (!contribution) throw new AtelierCoreError("work_view_not_found", `Work view is not available: ${key}`);
+    if (!contribution) throw new AgentsInTheCloudCoreError("work_view_not_found", `Work view is not available: ${key}`);
     await presentationStore.openWorkView(workspaceId, contribution.reference);
     return { reference: contribution.reference, key };
   }
@@ -1084,10 +1084,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     // SAFETY: This value is validated or constructed by the server boundary immediately surrounding this use.
     const reference = JSON.parse(encodedReference) as WorkspaceWorkViewReference;
     const adapter = workViewAdapterByType.get(reference.type);
-    if (!adapter) throw new AtelierCoreError("work_view_reference_invalid", `unknown Work view type: ${reference.type}`);
+    if (!adapter) throw new AgentsInTheCloudCoreError("work_view_reference_invalid", `unknown Work view type: ${reference.type}`);
     const parsed = adapter.parseReference(reference);
     const before = await presentationStore.listWorkViews(workspaceId);
-    if (!before.some(view => workViewKey(view.reference) === workViewKey(parsed))) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${workViewKey(parsed)}`);
+    if (!before.some(view => workViewKey(view.reference) === workViewKey(parsed))) throw new AgentsInTheCloudCoreError("work_view_not_found", `Work view is not open: ${workViewKey(parsed)}`);
     await closeWorkView(workspaceId, parsed);
     if (requestAcceptsJson(request) && !wantsStream(request)) return jsonResponse({ closed: parsed, workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
     return turboStreamResponse("");
@@ -1096,7 +1096,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function reorderWorkViewEndpoint(workspaceId: string, request: Request): Promise<Response> {
     const body = parseReorderWorkViewRequest(await readJsonObject(request));
     const stored = (await presentationStore.listWorkViews(workspaceId)).find((view) => workViewKey(view.reference) === body.key);
-    if (!stored) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${body.key}`);
+    if (!stored) throw new AgentsInTheCloudCoreError("work_view_not_found", `Work view is not open: ${body.key}`);
     await presentationStore.reorderWorkView(workspaceId, stored.reference, body.index);
     if (requestAcceptsJson(request) && !wantsStream(request)) return jsonResponse({ workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
     return turboStreamResponse("");
@@ -1126,7 +1126,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function requestWorkViewAttentionEndpoint(workspaceId: string, key: string, request: Request): Promise<Response> {
     const stored = (await presentationStore.listWorkViews(workspaceId)).find((view) => workViewKey(view.reference) === key);
-    if (!stored) throw new AtelierCoreError("work_view_not_found", `Work view is not open: ${key}`);
+    if (!stored) throw new AgentsInTheCloudCoreError("work_view_not_found", `Work view is not open: ${key}`);
     registry.setParked(workspaceId, false);
     registry.requestSurfaceAttention(workspaceId, key);
     return requestAcceptsJson(request) && !wantsStream(request) ? jsonResponse({ attention: stored.reference }) : turboStreamResponse("");
@@ -1135,7 +1135,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function closeAgentConversationEndpoint(workspaceId: string, conversationId: string, request: Request): Promise<Response> {
     requireWorkspace(workspaceId);
     const before = await agentTabs.list({ workspaceId });
-    if (!before.some(agent => agent.id === conversationId)) throw new AtelierCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+    if (!before.some(agent => agent.id === conversationId)) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
     await agentTabs.close({ workspaceId, conversationId });
     registry.clearSurfaceAttention(workspaceId, `agent:${conversationId}`);
     if (requestAcceptsJson(request) && !wantsStream(request)) {
@@ -1181,7 +1181,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const providers = await orderedAgentProviders();
       return jsonResponse({ defaultProviderId: providers[0]!.id, providers: providers.map(({ id, label }) => ({ id, label })) });
     }
-    if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(atelierOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
+    if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(agentsInTheCloudOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
     if (url.pathname === "/launch-composer" && request.method === "GET") return response(await renderProjectlessLaunchComposerFrame());
     if (url.pathname === "/launch-composer/provider" && request.method === "GET") return response(await renderLaunchProvider(agentProvider(url.searchParams.get("provider") ?? "builtin"), await orderedAgentProviders(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await agentProvider(url.searchParams.get("provider") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
@@ -1237,6 +1237,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     for (const moduleRoute of workspaceModuleRoutes()) {
       const moduleResponse = await moduleRoute.handle(request, url, {
         events: deps.events,
+        renderPage: (body) => response(layout(body)),
         renderModalPage: (dialogHtml) => surfacePage({ kind: "module-modal", dialogHtml }),
         openWorkView: (workspaceId, reference, options) => openWorkspaceModuleWorkView(workspaceId, reference, request, options),
       });
@@ -1341,7 +1342,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
         return result;
       } catch (thrown) {
         const error = thrown instanceof Error ? thrown : new Error(String(thrown));
-        if (error instanceof AtelierCoreError && error.code === "agent_setup_required" && !requestAcceptsJson(request)) {
+        if (error instanceof AgentsInTheCloudCoreError && error.code === "agent_setup_required" && !requestAcceptsJson(request)) {
           const setup = await route(new Request(new URL(String(error.details!.setupUrl), request.url), { headers: { accept: "text/vnd.turbo-stream.html" } }));
           // A rejected launch must keep its prompt and attachment draft intact.
           return new Response(setup.body, { status: 422, headers: setup.headers });

@@ -7,7 +7,7 @@ export async function prepareWorkspaceSystemd(plan: WorkspaceDockerPlan, directo
   await mkdir(directory, { recursive: true });
   const source = join(directory, "init.sh");
   await writeFile(source, init);
-  plan.containerFiles.push({ source, target: "/.atelier/init.sh" });
+  plan.containerFiles.push({ source, target: "/.agents-in-the-cloud/init.sh" });
   if (!plan.extraArgs.includes("--privileged")) plan.extraArgs.push("--privileged");
   plan.extraArgs.push("--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3");
 }

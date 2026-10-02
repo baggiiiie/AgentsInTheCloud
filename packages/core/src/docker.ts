@@ -1,5 +1,5 @@
 import { runCommand, commandSignal, withCommandSignal } from "./command-scope.ts";
-import { AtelierCoreError } from "./errors.ts";
+import { AgentsInTheCloudCoreError } from "./errors.ts";
 
 export interface CommandResult {
   exitCode: number;
@@ -41,7 +41,7 @@ export async function withManagedDockerCommand<T>(args: string[], execute: (args
 export async function requireDocker(args: string[], options: CommandOptions = {}): Promise<CommandResult> {
   const result = await runDocker(args, options);
   if (result.exitCode !== 0) {
-    throw new AtelierCoreError("docker_unavailable", result.stderr.trim() || `docker ${args[0] ?? ""} failed`);
+    throw new AgentsInTheCloudCoreError("docker_unavailable", result.stderr.trim() || `docker ${args[0] ?? ""} failed`);
   }
   return result;
 }
@@ -52,7 +52,7 @@ function cancellableExec(args: string[]) {
   let index = 1;
   while (args[index]?.startsWith("-")) index += valueOptions.has(args[index]!) ? 2 : 1;
   const container = args[index]!;
-  const pidFile = `/tmp/atelier-command-${crypto.randomUUID()}.pid`;
+  const pidFile = `/tmp/agents-in-the-cloud-command-${crypto.randomUUID()}.pid`;
   const script = `echo "$PPID" > ${pidFile}; if test -f ${pidFile}.cancel; then rm -f ${pidFile} ${pidFile}.cancel; exit 125; fi; "$@"; status=$?; rm -f ${pidFile} ${pidFile}.cancel; exit "$status"`;
-  return { container, pidFile, args: [...args.slice(0, index + 1), "timeout", "--signal=KILL", "600", "sh", "-c", script, "atelier-command", ...args.slice(index + 1)] };
+  return { container, pidFile, args: [...args.slice(0, index + 1), "timeout", "--signal=KILL", "600", "sh", "-c", script, "agents-in-the-cloud-command", ...args.slice(index + 1)] };
 }

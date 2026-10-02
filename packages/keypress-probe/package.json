@@ -1,5 +1,5 @@
 {
-  "name": "@atelier/keypress-probe",
+  "name": "@agents-in-the-cloud/keypress-probe",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,8 +8,8 @@
     "./client": "./src/client/index.ts"
   },
   "dependencies": {
-    "@atelier/core": "workspace:*",
-    "@atelier/design-system": "workspace:*",
-    "@atelier/shared": "workspace:*"
+    "@agents-in-the-cloud/core": "workspace:*",
+    "@agents-in-the-cloud/design-system": "workspace:*",
+    "@agents-in-the-cloud/shared": "workspace:*"
   }
 }

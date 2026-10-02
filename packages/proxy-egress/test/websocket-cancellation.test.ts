@@ -37,7 +37,7 @@ async function stalledProxy(protocol: "http" | "https", exercise: (fixture: {
     connection: "Upgrade", upgrade: "websocket", "sec-websocket-version": "13", "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
   } });
   // Attach rejection handling immediately, including on the deliberately broken implementation.
-  const result = bridgeWebSocket(request, client, Buffer.alloc(0), requestWebSocketUpgrade).then(() => undefined, (error: Error) => error);
+  const result = bridgeWebSocket(request, client, Buffer.alloc(0), requestWebSocketUpgrade, value => value).then(() => undefined, (error: Error) => error);
   try {
     await exercise({ client, result, connected, closed, received: () => incoming });
   } finally {

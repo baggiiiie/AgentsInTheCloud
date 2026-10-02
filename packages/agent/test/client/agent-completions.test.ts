@@ -21,7 +21,7 @@ describe("Agent pane residency", () => {
   });
 
   test("keys durable composer text by immutable conversation identity", () => {
-    expect(agentComposerTextStorageKey("workspace-1", "conversation-1")).toBe('atelier.agentComposerText:["workspace-1","conversation-1"]');
+    expect(agentComposerTextStorageKey("workspace-1", "conversation-1")).toBe('agents-in-the-cloud.agentComposerText:["workspace-1","conversation-1"]');
     expect(agentComposerTextStorageKey("workspace-1", "conversation-2")).not.toBe(agentComposerTextStorageKey("workspace-1", "conversation-1"));
     expect(agentComposerTextStorageKey("workspace-2", "conversation-1")).not.toBe(agentComposerTextStorageKey("workspace-1", "conversation-1"));
   });
@@ -107,7 +107,7 @@ describe("agent prompt completion activation", () => {
     expect(agentCompletionRequest(input("/tmp/bla"), true)).toEqual({ kind: "file", query: "/tmp/bla", mode: "direct" });
   });
 
-  test("rejects prompt-template hotkeys already assigned to Atelier commands", () => {
+  test("rejects prompt-template hotkeys already assigned to AgentsInTheCloud commands", () => {
     const commands = [
       { label: "Open VS Code", binding: "Meta+Alt+KeyV" },
       { label: "New Terminal", binding: "Meta+Alt+KeyT" },

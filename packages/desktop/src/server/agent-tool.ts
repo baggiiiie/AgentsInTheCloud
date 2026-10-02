@@ -1,4 +1,4 @@
-import type { WorkspacePresenterDefinition } from "@atelier/agent/server";
+import type { WorkspacePresenterDefinition } from "@agents-in-the-cloud/agent/server";
 import type { RunningDesktop } from "./runtime.ts";
 
 export function createDesktopPresenter(deps: {

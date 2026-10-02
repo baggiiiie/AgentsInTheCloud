@@ -1,10 +1,11 @@
-import { copyButtonHtml } from "@atelier/design-system/copy-button";
-import { buttonHtml } from "@atelier/design-system/button";
+import { renderMarkdownEmbed } from "./embeds.ts";
+import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import MarkdownIt from "markdown-it";
-import { atelierFileHref, renderAtelierEmbed } from "./atelier-markdown.ts";
-import { escapeHtml, isWorkspaceAppPort, workspaceProxyUrl } from "@atelier/shared";
-import { renderMarkdownDiff } from "@atelier/syntax/markdown-diff";
-import { highlightCodeHtml } from "@atelier/syntax";
+import { agentsInTheCloudFileHref } from "./agents-in-the-cloud-markdown.ts";
+import { escapeHtml, isWorkspaceAppPort, isWorkspaceLoopbackHost, workspacePortAppKey, workspaceProxyUrl } from "@agents-in-the-cloud/shared";
+import { renderMarkdownDiff } from "@agents-in-the-cloud/syntax/markdown-diff";
+import { highlightCodeHtml } from "@agents-in-the-cloud/syntax";
 
 export interface MarkdownRenderOptions {
   sourcePath?: string;
@@ -42,7 +43,7 @@ markdown.renderer.rules.fence = (tokens, index, _options, environment: MarkdownE
   const header = filename ? `<div class="${headerClass}" title="${escapeHtml(filename)}">${escapeHtml(filename)}</div>` : "";
   const classes = `agent-code-block copy-region${isDiff ? " markdown-diff" : ""}`;
   const content = `${copyButtonHtml({ label, copyText: isDiff ? token.content : undefined })}${header}${code}`;
-  return `<div class="${classes}" data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="template" data-atelier-fullscreen-title-value="${escapeHtml(title)}">${content}<template data-atelier-fullscreen-target="content"><div class="${classes}">${content}</div></template></div>`;
+  return `<div class="${classes}" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="template" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(title)}">${content}<template data-agents-in-the-cloud-fullscreen-target="content"><div class="${classes}">${content}</div></template></div>`;
 };
 
 function renderHighlightedFence(code: string, language?: string): string {
@@ -60,8 +61,8 @@ function mermaidDiagram(source: string, fullscreen = false): string {
 
 function renderMermaid(source: string, filename?: string): string {
   const title = filename ?? "Mermaid diagram";
-  const header = filename ? `<div class="agent-media-frame-bar"><span>${escapeHtml(filename)}</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="atelier-fullscreen#open"' })}</div>` : "";
-  return `<div class="agent-media-frame agent-mermaid" data-controller="atelier-fullscreen" data-atelier-fullscreen-mode-value="template" data-atelier-fullscreen-title-value="${escapeHtml(title)}">${header}${mermaidDiagram(source)}<template data-atelier-fullscreen-target="content">${mermaidDiagram(source, true)}</template></div>`;
+  const header = filename ? `<div class="agent-media-frame-bar"><span>${escapeHtml(filename)}</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="agents-in-the-cloud-fullscreen#open"' })}</div>` : "";
+  return `<div class="agent-media-frame agent-mermaid" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="template" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(title)}">${header}${mermaidDiagram(source)}<template data-agents-in-the-cloud-fullscreen-target="content">${mermaidDiagram(source, true)}</template></div>`;
 }
 
 function renderPendingMermaid(filename?: string): string {
@@ -73,7 +74,7 @@ const defaultLinkOpen = markdown.renderer.rules.link_open ?? ((tokens, index, op
 markdown.renderer.rules.link_open = (tokens, index, options, environment: MarkdownEnvironment, renderer) => {
   const token = tokens[index]!;
   const href = token.attrGet("href") ?? "";
-  const fileHref = atelierFileHref(environment.workspaceId, href, environment.sourcePath);
+  const fileHref = agentsInTheCloudFileHref(environment.workspaceId, href, environment.sourcePath);
   if (fileHref) {
     token.attrSet("href", fileHref);
     token.attrSet("data-turbo-stream", "true");
@@ -92,20 +93,22 @@ markdown.renderer.rules.link_open = (tokens, index, options, environment: Markdo
 const defaultImage = markdown.renderer.rules.image!;
 markdown.renderer.rules.image = (tokens, index, options, environment: MarkdownEnvironment, renderer) => {
   const source = tokens[index]!.attrGet("src") ?? "";
-  if (source.startsWith("atelier-embed:")) {
-    return renderAtelierEmbed(environment.workspaceId, source.slice("atelier-embed:".length));
-  }
+  const embed = renderMarkdownEmbed(source, {
+    workspaceId: environment.workspaceId,
+    title: tokens[index]!.content,
+    provisional: environment.provisional ?? false,
+  });
+  if (embed !== undefined) return embed;
   return defaultImage(tokens, index, options, environment, renderer);
 };
 
 function workspaceLocalPreviewHref(workspaceId: string, href: string): string | undefined {
   let url: URL;
   try { url = new URL(href); } catch { return undefined; }
-  const hostname = url.hostname.toLowerCase();
-  if (!["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"].includes(hostname)) return undefined;
+  if (!isWorkspaceLoopbackHost(url.hostname)) return undefined;
   const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
   if (!isWorkspaceAppPort(port) || url.protocol !== "http:") return undefined;
-  return workspaceProxyUrl(workspaceId, `port-${port}`, `${url.pathname}${url.search}${url.hash}`);
+  return workspaceProxyUrl(workspaceId, workspacePortAppKey(port, url.hostname), `${url.pathname}${url.search}${url.hash}`);
 }
 
 function withoutFrontmatter(text: string): string {

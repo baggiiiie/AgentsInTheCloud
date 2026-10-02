@@ -1,4 +1,4 @@
-import { escapeHtml } from "@atelier/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { attributesHtml, classNames } from "../html.ts";
 
 export interface ActionItemElement {
@@ -38,7 +38,7 @@ interface CompoundActionItemOptions extends ActionItemContent {
   kind: "compound";
   container?: Omit<ActionItemElement, "tag">;
   primary: ActionItemElement;
-  /** Trusted controls revealed while the item is hovered, focused, active, or selected. */
+  /** Trusted controls revealed on hover, keyboard focus, or touch devices. */
   engagedActionsHtml?: string;
 }
 
@@ -64,7 +64,7 @@ export function actionItemHtml(options: ActionItemOptions): string {
   }
 
   const primary = elementHtml(options.primary, "action-item__primary", content);
-  const actions = options.engagedActionsHtml ? `<div class="action-item__actions action-item__actions--engaged">${options.engagedActionsHtml}</div>` : "";
+  const actions = options.engagedActionsHtml ? `<div class="action-item__actions action-item__actions--engaged" data-controller="action-item-actions">${options.engagedActionsHtml}</div>` : "";
   const container = options.container ?? {};
   return `<div class="${escapeHtml(classNames("action-item", options.tone === "danger" && "is-danger"))}"${attributesHtml(container.attributesHtml)}>${primary}${actions}</div>`;
 }

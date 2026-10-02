@@ -1,9 +1,9 @@
-import { activityButtonHtml } from "@atelier/design-system/activity-button";
-import { buttonHtml } from "@atelier/design-system/button";
-import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@atelier/llm/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@atelier/prompt/server";
-import { transcriptionComposerController } from "@atelier/transcription/server";
-import { domId, escapeHtml } from "@atelier/shared";
+import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@agents-in-the-cloud/llm/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
+import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { configuredModelOptionViews, launchComposerThinkingSettings, selectAvailableConfiguredModel } from "./model-state.ts";
 import { agentConversationKey, agentPath, ids, type AgentRenderContext } from "./render-context.ts";
@@ -13,6 +13,7 @@ import { formatCost, formatTokens } from "./transcript.ts";
 
 export interface AgentStatsView {
   contextPercent: number | null;
+  nativeBranchUsage?: boolean;
   compactAvailable: boolean;
   inputTokens: number;
   outputTokens: number;
@@ -27,6 +28,7 @@ export interface AgentStatsView {
 }
 
 export interface AgentPaneState {
+  readOnly?: boolean;
   transcriptHtml: string;
   busy: boolean;
   stats: AgentStatsView;
@@ -35,25 +37,25 @@ export interface AgentPaneState {
 export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceAgentConversationInfo, state: AgentPaneState, completionCatalogHtml = ""): Promise<string> {
   const key = agentConversationKey(agent.conversationId);
   const draftId = agentAttachmentDraftId(ctx.workspaceId, ctx.conversationId);
-  const attachments = await listStagedAttachments(draftId);
-  const initialPromptDraft = await readInitialPromptDraft(ctx.workspaceId, ctx.conversationId);
+  const attachments = state.readOnly ? [] : await listStagedAttachments(draftId);
+  const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.conversationId);
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
   return `<section id="${domId("agent_pane", ctx.workspaceId, agent.conversationId)}" data-turbo-permanent class="agent-conversation-pane" data-agent-conversation-source="${escapeHtml(key)}">
     <div class="agent-pane agent-composer-pane" id="${ids.pane(ctx)}"
-      data-controller="agent-pane agent-attachments agent-composer composer-focus"
+      ${state.readOnly ? "" : `data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
       data-agent-pane-conversation-id-value="${escapeHtml(ctx.conversationId)}"
-      ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}>
-      <div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>
+      ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}`}>
+      ${state.readOnly ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
       <div class="agent-transcript-region">
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
         </div>
-        ${renderTranscriptEndNavigation()}
+        ${state.readOnly ? "" : renderTranscriptEndNavigation()}
       </div>
-      ${renderOpenComposerButton()}
-      ${renderAgentPaneComposer({
+      ${state.readOnly ? "" : renderOpenComposerButton()}
+      ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({
         ctx,
         action: agentPath(ctx, "/messages"),
         draftId,
@@ -167,7 +169,7 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
   const percent = stats.contextPercent;
   const meter = percent === null
     ? ""
-    : `<span class="agent-stat" title="Context window used"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
+    : `<span class="agent-stat" title="${stats.nativeBranchUsage ? "Estimated context window used" : "Context window used"}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
   const models = stats.models.length > 0 ? stats.models : [{ provider: "", id: "", name: stats.modelName ?? "no model", selected: true, available: false }];
   const formPrefix = `${ids.stats(ctx)}_selection`;
   const modelFormId = `${formPrefix}_model`;
@@ -176,9 +178,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
 ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
-<span class="agent-stat" title="Tokens up (input)">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
-<span class="agent-stat" title="Tokens down (output)">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" title="${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end."><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+<span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
+<span class="agent-stat" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
+<span class="agent-stat" title="${stats.nativeBranchUsage ? "This branch cost, including compaction and recorded attempts. Updated when usage commits." : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

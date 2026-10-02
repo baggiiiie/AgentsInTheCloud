@@ -1,6 +1,6 @@
 import { parseAgentSessionNameCommand } from "./prompt-templates.ts";
 
-/** Atelier owns /name; providers supply only their conversation context and title store. */
+/** AgentsInTheCloud owns /name; providers supply only their conversation context and title store. */
 export async function runAgentSessionNameCommand(text: string, options: {
   suggest: () => Promise<string | undefined>;
   setTitle: (title: string) => Promise<void>;

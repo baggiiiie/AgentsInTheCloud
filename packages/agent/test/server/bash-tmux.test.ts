@@ -5,7 +5,7 @@ import { agentTermCols, agentTermRows, createTmuxBashTool, forcedColorEnvironmen
 const success = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
 
 async function defaultExecWorkspaceShell(_workspaceId: string, command: string) {
-  if (command.includes("cat '/tmp/atelier-agent-") && command.includes(".exit")) return { ...success, stdout: "0\n" };
+  if (command.includes("cat '/tmp/agents-in-the-cloud-agent-") && command.includes(".exit")) return { ...success, stdout: "0\n" };
   return success;
 }
 
@@ -24,7 +24,7 @@ async function executeBash(params: { command: string; timeout?: number }) {
 function mockPaneOutput(stdout: string, exitCode = 0): void {
   execWorkspaceShell.mockImplementation(async (_workspaceId: string, command: string) => {
     if (command.includes("capture-pane")) return { ...success, stdout };
-    if (command.includes("cat '/tmp/atelier-agent-") && command.includes(".exit")) return { ...success, stdout: `${exitCode}\n` };
+    if (command.includes("cat '/tmp/agents-in-the-cloud-agent-") && command.includes(".exit")) return { ...success, stdout: `${exitCode}\n` };
     return success;
   });
 }
@@ -138,7 +138,7 @@ describe("tmux bash tool", () => {
     expect(result.details.fullOutputPath).toBeUndefined();
     expect(execWorkspaceShell.mock.calls.some(([, command]) => command.includes("capture-pane") && command.includes("-S -100000") && !command.includes(" -e"))).toBe(true);
     expect(execWorkspaceShell.mock.calls.some(([, command]) => command.includes("capture-pane") && command.includes("-S -100000") && command.includes(" -e"))).toBe(true);
-    expect(execWorkspaceShell.mock.calls.some(([, command]) => command.includes("new-session") && command.includes("pipe-pane") && command.includes("umask 077") && command.includes("atelier-agent-") && command.includes(".log"))).toBe(true);
+    expect(execWorkspaceShell.mock.calls.some(([, command]) => command.includes("new-session") && command.includes("pipe-pane") && command.includes("umask 077") && command.includes("agents-in-the-cloud-agent-") && command.includes(".log"))).toBe(true);
   });
 
   test("keeps the tail within Pi's 50 KiB and 2000-line model limits", async () => {
@@ -154,7 +154,7 @@ describe("tmux bash tool", () => {
     expect(output).toContain("[Output truncated: showing the last");
     expect(output).toContain(`Full output: ${result.details.fullOutputPath}]`);
     expect(result.details.displayAnsi).toEndWith(output.slice(output.indexOf("[Output truncated:")));
-    expect(result.details.fullOutputPath).toMatch(/^\/tmp\/atelier-agent-[a-f0-9]{8}\.log$/);
+    expect(result.details.fullOutputPath).toMatch(/^\/tmp\/agents-in-the-cloud-agent-[a-f0-9]{8}\.log$/);
   });
 
   test("limits model-facing output to the last 50 KiB", async () => {

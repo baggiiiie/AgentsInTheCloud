@@ -84,9 +84,9 @@ async function tunnel(proxyPort: number, target: string, headers = "") {
 // Real HTTP, CONNECT, TLS termination, placeholder injection and outgoing fetch;
 // no Docker, registry, browser or external network required.
 test("workspace socket controls HTTP and HTTPS identity, policy and reconnection", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-egress-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-egress-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
-  const ca = await ensureMitmCa({ atelierDataDir: directory, dockerHostAtelierDataDir: directory, dockerBridgeHost: "127.0.0.1" });
+  const ca = await ensureMitmCa({ agentsInTheCloudDataDir: directory, dockerHostAgentsInTheCloudDataDir: directory, dockerBridgeHost: "127.0.0.1" });
   const leaf = await ensureLeafCertificate(ca, "127.0.0.1");
   const caPem = await readFile(ca.certPath, "utf8");
   const received: { key?: string | string[]; authorization?: string; proxyAuthorization?: string | string[]; body: string }[] = [];
@@ -271,7 +271,7 @@ test("workspace socket controls HTTP and HTTPS identity, policy and reconnection
 
 
 test("local relay survives an unavailable socket and forwards concurrent large transfers", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "atelier-relay-"));
+  const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-relay-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const socketPath = join(directory, "egress.sock");
   const port = await localRelay(socketPath);

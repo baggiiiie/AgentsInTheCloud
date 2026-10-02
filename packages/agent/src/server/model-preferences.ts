@@ -1,4 +1,4 @@
-import { getConfiguredModels, getAgentModelPreference, setAgentModelPreference } from "@atelier/llm/server";
+import { getConfiguredModels, getAgentModelPreference, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
 
 export async function getConfiguredAgentModels() {
   const [models, active] = await Promise.all([getConfiguredModels(), getAgentModelPreference("builtin")]);

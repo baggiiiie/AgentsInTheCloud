@@ -1,7 +1,7 @@
-import { createNativeTerminalTextInputController, createTerminalKeyBarController, atelierObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@atelier/observable-terminal/client";
-import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@atelier/shared";
+import { createNativeTerminalTextInputController, createTerminalKeyBarController, agentsInTheCloudObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, type ObservableTerminalViewer } from "@agents-in-the-cloud/observable-terminal/client";
+import { composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
-export const atelierClientModule: WorkspaceClientModule = {
+export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller, hooks }) {
     const terminals = new Set<{ element: HTMLElement; hasTranscriptTarget: boolean; toggleMode(): void }>();
@@ -35,7 +35,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       protected get accessoryViewer(): ObservableTerminalViewer | undefined { return this.viewer; }
       private connected = false;
       private sending = false;
-      private get draftKey(): string { return `atelier.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
+      private get draftKey(): string { return `agents-in-the-cloud.cliComposerText:${JSON.stringify([this.workspaceIdValue, this.urlValue])}`; }
       private readonly inputChanged = (): void => { localStorage.setItem(this.draftKey, this.inputTarget.value); };
       private touch?: { id: number; startX: number; startY: number; x: number; y: number; time: number; velocity: number; scrolling: boolean };
       private momentum = 0;
@@ -49,7 +49,7 @@ export const atelierClientModule: WorkspaceClientModule = {
 
       connect(): void {
         terminals.add(this);
-        window.addEventListener("atelier:workspace-pane-visible", this.activate);
+        window.addEventListener("agents-in-the-cloud:workspace-pane-visible", this.activate);
         if (this.hasFormTarget) {
           setTextInputValue(this.inputTarget, localStorage.getItem(this.draftKey) ?? "");
           this.inputTarget.addEventListener("input", this.inputChanged);
@@ -67,7 +67,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         this.refresh();
         this.viewer = createObservableTerminalViewer({
           host: this.terminalTarget, mode: "interactive", websocketUrl: observableWebSocketUrl(`${this.urlValue}/ws`), hideUnfocusedCursor: true,
-          theme: atelierObservableTerminalTheme(),
+          theme: agentsInTheCloudObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
           transformInput: (data) => this.transformAccessoryInput(data),
           nativeTextInput: true,
@@ -85,7 +85,7 @@ export const atelierClientModule: WorkspaceClientModule = {
       }
       disconnect(): void {
         terminals.delete(this);
-        window.removeEventListener("atelier:workspace-pane-visible", this.activate);
+        window.removeEventListener("agents-in-the-cloud:workspace-pane-visible", this.activate);
         this.resize.disconnect();
         this.cursorPosition.disconnect();
         if (this.hasFormTarget) {
@@ -326,7 +326,7 @@ export const atelierClientModule: WorkspaceClientModule = {
         const top = Math.min(0, this.terminalTarget.parentElement!.clientHeight - cursorBottom - 8);
         this.terminalTarget.style.setProperty("--cli-terminal-top", `${top}px`);
       }
-      theme(): void { this.viewer?.setTheme(atelierObservableTerminalTheme()); }
+      theme(): void { this.viewer?.setTheme(agentsInTheCloudObservableTerminalTheme()); }
     });
   },
 };

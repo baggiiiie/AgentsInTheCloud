@@ -27,7 +27,7 @@ const { values } = parseArgs({
     "access-mode": { type: "string", default: "tailscale" },
     "app-image": {
       type: "string",
-      default: "ghcr.io/lucasmeijer/atelier:stable",
+      default: "ghcr.io/lucasmeijer/agents-in-the-cloud:latest",
     },
   },
   strict: true,
@@ -44,8 +44,8 @@ await Promise.all(
     "/run/tailscale",
   ].map((path) => mkdir(path, { recursive: true })),
 );
-await mkdir("/run/atelier-system", { recursive: true });
-await writeFile("/run/atelier-system/access-v1", "");
+await mkdir("/run/agents-in-the-cloud-system", { recursive: true });
+await writeFile("/run/agents-in-the-cloud-system/access-v1", "");
 type State = { accessMode?: "localhost" | "tailscale"; localPort?: number; currentImage?: string; runningContainers?: string[]; uninstall?: UninstallState };
 const persisted: State = (await Bun.file(`${stateDir}/state.json`).exists())
   ? JSON.parse(await readFile(`${stateDir}/state.json`, "utf8"))
@@ -61,7 +61,7 @@ if (persisted.uninstall?.state === "running") {
   await persist();
 }
 let uninstalling = persisted.uninstall !== undefined;
-let activity: Activity = { description: "Starting Atelier services" };
+let activity: Activity = { description: "Starting AgentsInTheCloud services" };
 let failure: string | undefined;
 let operation: "startup" | "update" = "startup";
 let phase = 0;
@@ -125,7 +125,7 @@ function log(text: string) {
 }
 function reportFailure(message: string) {
   failure = message;
-  stage("Atelier needs attention");
+  stage("AgentsInTheCloud needs attention");
   log(failure);
 }
 function stage(text: string, nextPhase = phase) {
@@ -173,7 +173,7 @@ async function appIsHealthy() {
   }
 }
 async function existsContainer() {
-  return (await docker("ps", "-aq", "--filter", "name=^atelier$")).length > 0;
+  return (await docker("ps", "-aq", "--filter", "name=^agents-in-the-cloud$")).length > 0;
 }
 async function pullImage(reference: string, description: string) {
   const progress = new PullProgress();
@@ -191,7 +191,7 @@ async function pullImage(reference: string, description: string) {
 async function prepareImage(reference: string, options: { pullApp: boolean; pullDependencies: boolean }): Promise<string> {
   // Resolve the exact local image ID once. No subsequent tag lookup can change the update.
   if (options.pullApp && !(await docker("image", "ls", "-q", reference)))
-    await pullImage(reference, "Downloading Atelier");
+    await pullImage(reference, "Downloading AgentsInTheCloud");
   const image = JSON.parse(await docker("image", "inspect", reference))[0];
   const preload: unknown = JSON.parse(
     image.Config.Labels?.["eagerly-preload"] ?? "[]",
@@ -243,10 +243,10 @@ async function replace(request: Replacement) {
   phase = 0;
   try {
     await configureRoutes(3001);
-    stage("Preparing Atelier");
+    stage("Preparing AgentsInTheCloud");
     const reference = "channel" in request
       ? await prepareChannelUpdate("/data/app/update.json", {
-          pull: (reference) => pullImage(reference, "Downloading Atelier from the selected channel"),
+          pull: (reference) => pullImage(reference, "Downloading AgentsInTheCloud from the selected channel"),
           inspect: (reference) => docker("image", "inspect", "--format", "{{.Id}}", reference),
         })
       : request.image;
@@ -257,21 +257,21 @@ async function replace(request: Replacement) {
     });
     candidate = exact;
     if (stopping) return;
-    stage("Stopping Atelier", 1);
+    stage("Stopping AgentsInTheCloud", 1);
     logProcess?.kill();
     logProcess = undefined;
     if (await existsContainer()) {
-      await docker("stop", "--time", "30", "atelier");
-      await docker("rm", "atelier");
+      await docker("stop", "--time", "30", "agents-in-the-cloud");
+      await docker("rm", "agents-in-the-cloud");
     }
     if (stopping) return;
-    stage("Starting Atelier", 2);
+    stage("Starting AgentsInTheCloud", 2);
     await docker(
       "run",
       "-d",
       "--init",
       "--name",
-      "atelier",
+      "agents-in-the-cloud",
       "--network",
       "host",
       "--cgroup-parent",
@@ -279,15 +279,15 @@ async function replace(request: Replacement) {
       "--cgroupns",
       "host",
       "--mount",
-      `type=bind,src=${resources.commandsCgroup},dst=/run/atelier-system/workload-processes`,
+      `type=bind,src=${resources.commandsCgroup},dst=/run/agents-in-the-cloud-system/workload-processes`,
       "--mount",
-      "type=bind,src=/run/atelier-system/resources.json,dst=/run/atelier-system/resources.json,readonly",
+      "type=bind,src=/run/agents-in-the-cloud-system/resources.json,dst=/run/agents-in-the-cloud-system/resources.json,readonly",
       "--mount",
-      "type=bind,src=/run/atelier-host,dst=/run/atelier-host,readonly",
+      "type=bind,src=/run/agents-in-the-cloud-host,dst=/run/agents-in-the-cloud-host,readonly",
       "--mount",
-      "type=bind,src=/run/atelier-system/access-v1,dst=/run/atelier-system/access-v1,readonly",
+      "type=bind,src=/run/agents-in-the-cloud-system/access-v1,dst=/run/agents-in-the-cloud-system/access-v1,readonly",
       "--label",
-      "atelier.role=app",
+      "agents-in-the-cloud.role=app",
       "--mount",
       "type=bind,src=/data/app,dst=/data/app",
       "--mount",
@@ -302,16 +302,16 @@ async function replace(request: Replacement) {
     );
     logProcess = spawn(
       "docker",
-      ["logs", "--follow", "--since", "1m", "atelier"],
+      ["logs", "--follow", "--since", "1m", "agents-in-the-cloud"],
       { stdio: ["ignore", "pipe", "pipe"] },
     );
     for (const output of [logProcess.stdout!, logProcess.stderr!])
       output.on("data", (data) => log(data.toString().trimEnd()));
-    stage("Checking Atelier is healthy", 3);
-    await waitFor(appIsHealthy, timeout, "Atelier health");
+    stage("Checking AgentsInTheCloud is healthy", 3);
+    await waitFor(appIsHealthy, timeout, "AgentsInTheCloud health");
     persisted.currentImage = exact;
     await persist();
-    stage("Opening Atelier", 4);
+    stage("Opening AgentsInTheCloud", 4);
     await openApp();
   } catch (error) {
     reportFailure(error instanceof Error ? error.message : String(error));
@@ -326,7 +326,7 @@ async function openApp() {
   healthy = true;
   recoveringHealth = false;
   failure = undefined;
-  stage("Atelier is ready", 4);
+  stage("AgentsInTheCloud is ready", 4);
   emit("ready", "ready");
 }
 
@@ -341,8 +341,8 @@ async function recheckHealth() {
       if (healthy) {
         healthy = false;
         recoveringHealth = true;
-        failure = "Atelier stopped responding to health checks";
-        stage("Atelier needs attention", 3);
+        failure = "AgentsInTheCloud stopped responding to health checks";
+        stage("AgentsInTheCloud needs attention", 3);
       }
       await configureRoutes(3001);
     } else if (recoveringHealth) {
@@ -358,7 +358,7 @@ function allowedOrigin(request: Request) {
   const origin = request.headers.get("origin");
   return (
     !origin ||
-    (persisted.localPort && origin === `http://atelier.localhost:${persisted.localPort}`) ||
+    (persisted.localPort && origin === `http://agents-in-the-cloud.localhost:${persisted.localPort}`) ||
     origin === new URL(request.url).origin ||
     (tailnetHost &&
       (origin === `https://${tailnetHost}` ||
@@ -394,11 +394,11 @@ const server = Bun.serve({
       const appResponding = healthy && await appIsHealthy();
       return Response.json({
         ...installationStatus({
-          activity: healthy && !appResponding ? { description: "Checking Atelier is healthy" } : activity,
+          activity: healthy && !appResponding ? { description: "Checking AgentsInTheCloud is healthy" } : activity,
           failure: failure ?? connectionProblem(),
           stopping, busy, appResponding, hostname: tailnetHost, appliedRoute,
           connectionState, authUrl, connectionAction: httpsAction, logs,
-          localOrigin: persisted.localPort ? `http://atelier.localhost:${persisted.localPort}` : undefined,
+          localOrigin: persisted.localPort ? `http://agents-in-the-cloud.localhost:${persisted.localPort}` : undefined,
           localMode: persisted.accessMode === "localhost" && !remoteRequested,
         }),
         failure,
@@ -520,7 +520,7 @@ const server = Bun.serve({
           return new Response(String(error), { status: 502 });
         }
         operation = "update";
-        stage("Preparing Atelier", 0);
+        stage("Preparing AgentsInTheCloud", 0);
         // Route first, acknowledge, then give the app time to relay that acknowledgement.
         // Replacement remains supervisor-owned if the requesting browser disconnects.
         activeOperation = (async () => {
@@ -542,14 +542,14 @@ const server = Bun.serve({
       return new Response("Not found", { status: 404 });
     if (url.pathname !== "/")
       return new Response(null, { status: 303, headers: { location: "/", "cache-control": "no-store" } });
-    const diagnostic = url.port === "8443" || url.hostname === "system.atelier.localhost";
+    const diagnostic = url.port === "8443" || url.hostname === "system.agents-in-the-cloud.localhost";
     const local = url.hostname.endsWith(".localhost");
-    const events = local ? `${url.protocol}//system.atelier.localhost:${url.port}/events` : tailnetHost
+    const events = local ? `${url.protocol}//system.agents-in-the-cloud.localhost:${url.port}/events` : tailnetHost
       ? `https://${tailnetHost}:8443/events`
       : "/events";
     return new Response(
       page(
-        "Atelier System",
+        "AgentsInTheCloud System",
         `<section data-controller="progress" data-progress-events-value="${escapeHtml(events)}" data-progress-return-value="${!diagnostic && (local || !!tailnetHost)}"><div data-progress-content>${fragment()}</div></section>`,
         local ? "" : tailnetHost ? `https://${tailnetHost}:8443` : "",
         await readAppTheme(),
@@ -588,7 +588,7 @@ const uninstallControl = Bun.serve({
         stage(description);
       };
       try {
-        await progress("Preparing to uninstall Atelier");
+        await progress("Preparing to uninstall AgentsInTheCloud");
         await configureRoutes(3001);
         logProcess?.kill();
         logProcess = undefined;
@@ -616,14 +616,14 @@ async function shutdown(code: number) {
   if (stopping) return;
   stopping = true;
   healthy = false;
-  stage("Stopping Atelier services");
+  stage("Stopping AgentsInTheCloud services");
   stopCommands();
   await startup;
   await activeOperation;
   await routing.catch((error) => log(String(error)));
   try {
     if (!uninstalling) {
-      const running = (await docker("ps", "-q", "--filter", "name=^atelier$"))
+      const running = (await docker("ps", "-q", "--filter", "name=^agents-in-the-cloud$"))
         .split("\n")
         .filter(Boolean);
       const all = (await docker("ps", "-q")).split("\n").filter(Boolean);
@@ -684,7 +684,7 @@ async function initialize() {
     30000,
     "containerd",
   );
-  daemon(["dockerd", "--config-file", "/run/atelier-system/daemon.json"]);
+  daemon(["dockerd", "--config-file", "/run/agents-in-the-cloud-system/daemon.json"]);
   daemon([
     "tailscaled",
     "--state=/data/tailscale/tailscaled.state",
@@ -725,7 +725,7 @@ async function initialize() {
           // not connect an account. System owns this command and its deadline.
           void command(["tailscale", "up", "--timeout=10m"], log, 610_000)
             .catch((error) => {
-              connectionFailure = `Could not connect Atelier: ${String(error)}`;
+              connectionFailure = `Could not connect AgentsInTheCloud: ${String(error)}`;
               log(connectionFailure);
             }).finally(() => { connectionAttempt = "finished"; });
         }

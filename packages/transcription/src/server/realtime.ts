@@ -1,14 +1,15 @@
-import { atelierDataPath, getAtelierRuntimeContext } from "@atelier/core";
-import type { WorkspaceServerSocketHandler, WorkspaceSocketConnection } from "@atelier/shared";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import type { WorkspaceServerSocketHandler, WorkspaceSocketConnection } from "@agents-in-the-cloud/shared";
 import { stat } from "node:fs/promises";
-import { workspaceWorkHostPath } from "@atelier/workspace";
-import { cachedProjectSourcePath } from "@atelier/projects";
+import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
+import { cachedProjectSourcePath } from "@agents-in-the-cloud/projects";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import { readTranscriptionModel, transcriptionModel, type TranscriptionModelId } from "./models.ts";
 import { captureProcessStderr, processExitMessage } from "./process-diagnostics.ts";
 import { addTranscriptionContext, readTranscriptionContext } from "./transcription-context.ts";
 import { ensureTranscriptionRuntime } from "./runtime.ts";
+import { spawnTranscriptionProcess } from "./process.ts";
 
 const transcriptionPort = 8098;
 const transcriptionReadyUrl = `http://127.0.0.1:${transcriptionPort}/ready`;
@@ -25,7 +26,7 @@ async function isTranscriptionServerReady(): Promise<boolean> {
 }
 
 function transcriptionCacheDir(): string {
-  return atelierDataPath(getAtelierRuntimeContext(), "transcription-cache");
+  return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "transcription-cache");
 }
 
 async function artifactProgress(modelId: TranscriptionModelId): Promise<number> {
@@ -46,7 +47,7 @@ async function startTranscriptionServer(model: TranscriptionModelId): Promise<vo
 
   const cacheDir = transcriptionCacheDir();
   const executable = await ensureTranscriptionRuntime(cacheDir);
-  const child = Bun.spawn([
+  const child = spawnTranscriptionProcess([
     executable,
     "serve",
     "--host", "127.0.0.1",
@@ -55,11 +56,7 @@ async function startTranscriptionServer(model: TranscriptionModelId): Promise<vo
     "--asr-model", model,
     "--device", "cpu",
     "--no-ui",
-  ], {
-    env: { ...process.env, XDG_CACHE_HOME: cacheDir },
-    stdout: "inherit",
-    stderr: "pipe",
-  });
+  ], cacheDir);
   transcriptionProcess = child;
   const stderr = captureProcessStderr(child.stderr);
 
@@ -90,7 +87,7 @@ function ensureTranscriptionServer(model: TranscriptionModelId): Promise<void> {
 }
 
 function status(socket: WorkspaceSocketConnection, state: "loading" | "error", message: string, progress?: number): void {
-  socket.send(JSON.stringify({ type: "atelier.transcription.status", status: state, message, progress }));
+  socket.send(JSON.stringify({ type: "agents-in-the-cloud.transcription.status", status: state, message, progress }));
 }
 
 export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (url) => {

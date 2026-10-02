@@ -1,4 +1,3 @@
-@import "/tab-strip.css";
 @import "/warning-banner.css";
 @import "/markdown.css";
 @import "/text-entry.css";
@@ -7,13 +6,16 @@
 @import "/icons.css";
 @import "/floating-surface.css";
 @import "/autocomplete.css";
+@import "/surface-lighting.css";
 @import "/panel.css";
 @import "/popup.css";
 @import "/dialog.css";
 @import "/action-item.css";
+@import "/tab-strip.css";
 @import "/perimeter-button.css";
 @import "/activity-button.css";
 @import "/progress-button.css";
+@import "/comparison-ring.css";
 @import "/button.css";
 @import "/button-group.css";
 @import "/copy-button.css";
@@ -30,7 +32,7 @@
 }
 
 /*
- * Atelier design system
+ * AgentsInTheCloud design system
  *
  * This file is the shared visual interface for the shell and every workspace
  * module. Tokens describe visual roles rather than accumulated measurements.
@@ -85,7 +87,7 @@
   --danger: #d23b3b;
   --decorative: #7c3aed;
 
-  /* Shared source palette. Shiki and Pierre classify; Atelier owns color. */
+  /* Shared source palette. Shiki and Pierre classify; AgentsInTheCloud owns color. */
   --syntax-keyword: #cf222e;
   --syntax-string: #0a3069;
   --syntax-number: #0550ae;
@@ -265,9 +267,9 @@
 .syntax-punctuation { color: var(--syntax-punctuation); }
 
 /* Shared bridge into Pierre's Shadow DOM diff surfaces. */
-.atelier-pierre-host,
-.atelier-pierre-host diffs-container { display: block; min-width: 0; }
-.atelier-pierre-host diffs-container {
+.agents-in-the-cloud-pierre-host,
+.agents-in-the-cloud-pierre-host diffs-container { display: block; min-width: 0; }
+.agents-in-the-cloud-pierre-host diffs-container {
   --diffs-font-family: var(--font-mono);
   --diffs-font-size: var(--text-code);
   --diffs-line-height: calc(var(--text-code) * var(--leading-standard));

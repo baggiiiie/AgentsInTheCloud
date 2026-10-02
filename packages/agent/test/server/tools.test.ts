@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "typebox";
 import {
-  createAtelierControlTools,
-  createWorkspaceAgentTools,
+  createAgentsInTheCloudControlTools,
   executeDeleteCurrentWorkspace,
   normalizeWorkspacePath,
   registerWorkspacePresenter,
@@ -30,8 +29,8 @@ describe("workspace agent tools", () => {
     }));
 
     try {
-      expect(createWorkspaceAgentTools("abc").find((tool) => tool.name === "present")?.description).toContain("atelier-embed:");
-      expect(createAtelierControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("atelier-embed:");
+      expect(createAgentsInTheCloudControlTools("abc", { embeds: true }).find((tool) => tool.name === "present")?.description).toContain("artifact-preview:");
+      expect(createAgentsInTheCloudControlTools("abc").find((tool) => tool.name === "present")?.description).not.toContain("artifact-preview:");
     } finally {
       unregister();
     }
@@ -52,7 +51,7 @@ describe("workspace agent tools", () => {
     }));
 
     try {
-      const present = createWorkspaceAgentTools("abc").find((tool) => tool.name === "present");
+      const present = createAgentsInTheCloudControlTools("abc", { embeds: true }).find((tool) => tool.name === "present");
       expect(present?.parameters.type).toBe("object");
       expect(present?.parameters.anyOf).toBeUndefined();
       expect(present?.parameters.required).toEqual(["kind"]);

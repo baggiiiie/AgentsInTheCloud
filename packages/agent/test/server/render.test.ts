@@ -99,7 +99,7 @@ describe("transcript rendering", () => {
     expect(html).not.toContain("const x");
     const detail = renderTranscriptItemDetailFrame(ctx, item);
     expect(detail.replace(/<[^>]+>/g, "")).toContain("const x = 1;");
-    expect(detail).toContain('data-controller="atelier-fullscreen"');
+    expect(detail).toContain('data-controller="agents-in-the-cloud-fullscreen"');
   });
 
   test("streaming write renders decoded content", () => {
@@ -300,12 +300,12 @@ describe("transcript rendering", () => {
     expect(transcript).toContain("320×200 · image/png");
     const detail = renderTranscriptItemDetailFrame(ctx, item);
     expect(detail).toContain('/session-images/entry/2');
-    expect(detail).toContain('data-atelier-fullscreen-mode-value="media"');
+    expect(detail).toContain('data-agents-in-the-cloud-fullscreen-mode-value="media"');
   });
 
   test("user attachments remain fullscreenable", () => {
     const html = renderTranscript(ctx, [{ type: "user", key: "user", text: "look", images: [{ entryId: "user", contentIndex: 1 }] }], { systemPrompt: "", tools: [] });
     expect(html).toContain('/session-images/user/1');
-    expect(html).toContain('data-atelier-fullscreen-mode-value="media"');
+    expect(html).toContain('data-agents-in-the-cloud-fullscreen-mode-value="media"');
   });
 });
