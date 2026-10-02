@@ -21,7 +21,7 @@ export interface Frame {
   content: number | null;
   /** Screen y of the transcript content's end. */
   contentBottom: number | null;
-  /** Labels of the visible composer buttons. */
+  /** Visible composer button slots (attach, close, transcribe, send); labels change with state, slots don't. */
   buttons: string[];
   viewport: [number, number];
   /** The document's scroll offset: iOS scrolls it to reveal a focused field. */
@@ -69,7 +69,7 @@ export const samplerSource = String.raw`(() => {
       scrollTop: transcript ? round(transcript.scrollTop) : null,
       content: shown(content) ? round(content.getBoundingClientRect().height) : null,
       contentBottom: shown(content) ? round(content.getBoundingClientRect().bottom) : null,
-      buttons: composer ? [...composer.querySelectorAll(".composer-button button")].filter(shown).map(label) : [],
+      buttons: composer ? [...composer.querySelectorAll(".composer-button")].filter((slot) => shown(slot) && [...slot.querySelectorAll("button")].some(shown)).map((slot) => slot.classList[1].replace("composer-", "")) : [],
       viewport: [round(visualViewport.height), round(visualViewport.offsetTop)],
       pageScroll: round(window.scrollY),
       keyboard: document.documentElement.classList.contains("software-keyboard-visible"),

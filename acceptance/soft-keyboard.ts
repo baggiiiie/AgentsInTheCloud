@@ -207,7 +207,7 @@ async function transition(recorder: ScenarioRecorder, label: string, action: () 
 
 function typingModeChecks(frame: Frame, label: string): ReturnType<typeof check>[] {
   return [
-    check(`${label}: D7 only send shows while typing`, frame.buttons.length === 1 && /Send|Steer/.test(frame.buttons[0]!), `visible composer buttons: ${frame.buttons.join(", ") || "none"}`),
+    check(`${label}: D7 only send shows while typing`, frame.buttons.join() === "send", `visible composer buttons: ${frame.buttons.join(", ") || "none"}`),
     check(`${label}: D23 floating buttons hidden`, Object.keys(frame.floating).length === 0, `visible floating buttons: ${Object.keys(frame.floating).join(", ") || "none"}`),
     check(`${label}: D10 composer sits on the keyboard, transcript above it`, frame.composer !== null && close(bottom(frame.composer), keyboardTop(frame), 2) && (frame.transcript === null || close(bottom(frame.transcript), frame.composer[1], 1)), `composer ${JSON.stringify(frame.composer)}, keyboard top ${keyboardTop(frame)}, transcript ${JSON.stringify(frame.transcript)}`),
     check(`${label}: page not scrolled`, frame.pageScroll === 0 && frame.viewport[1] === 0, `scrollY ${frame.pageScroll}, visualViewport.offsetTop ${frame.viewport[1]}`),
@@ -262,7 +262,7 @@ await scenario("ios-D12-D13-done", "D12/D13: dismissing the keyboard with Done r
   const { after } = await transition(recorder, "Done", () => tapDone());
   recorder.add(
     check("Keyboard down, composer stays open", !after.keyboard && after.composer !== null && !after.focus.includes("composer-input"), `arranged: ${after.keyboard}, composer ${JSON.stringify(after.composer)}, focus: ${after.focus || "body"}`),
-    check("D4: all four composer buttons back", after.buttons.length === 4, after.buttons.join(", ")),
+    check("D4: all four composer buttons back", after.buttons.join() === "attach,close,transcribe,send", after.buttons.join(", ")),
   );
 });
 

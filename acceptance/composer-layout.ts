@@ -344,6 +344,37 @@ await scenario("mobile-terminal-tab", "D19: focusing a terminal tab and switchin
 
 await page.navigate(builtinUrl, sel.transcript);
 
+await scenario("mobile-D24-long-press", "D24: holding open-composer for about 500ms opens the composer and starts dictation while the finger is still down; releasing does nothing else.", async (recorder) => {
+  await closeComposer();
+  await page.startTrace();
+  const t = await page.mark("hold open-composer");
+  const release = await page.press(sel.opener);
+  await Bun.sleep(800);
+  const holding = await page.evaluate<{ open: boolean; state: string }>(`(() => {
+    const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
+    return { open: pane.classList.contains("agent-composer-open"), state: pane.querySelector('[data-transcription-composer-target="button"]').dataset.state };
+  })()`);
+  await release();
+  await Bun.sleep(600);
+  const trace = await page.takeTrace();
+  await recorder.trace(trace, "hold open-composer");
+  const opened = trace.frames.find((frame) => frame.composer !== null);
+  const last = trace.frames.at(-1)!;
+  recorder.add(
+    check("D24: composer opened while holding", holding.open && opened !== undefined, `open while held: ${holding.open}, first open frame at +${opened ? Math.round(opened.t - t) : "—"}ms after the press`),
+    check("D24: about 500ms", opened !== undefined && opened.t - t >= 450 && opened.t - t <= 800, `${opened ? Math.round(opened.t - t) : "—"}ms`),
+    check("D24: dictation started while holding", ["loading", "recording", "finishing"].includes(holding.state), `transcribe button state while held: ${holding.state}`),
+    check("D24: releasing changed nothing else", last.composer !== null && !last.focus.includes("composer-input"), `composer ${JSON.stringify(last.composer)}, focus ${last.focus || "body"}`),
+  );
+  recorder.add(...oneStepChecks(analyseTransition(trace, t, Number.POSITIVE_INFINITY, { endAtContentChange: false })).map((result) => ({ ...result, name: `hold open-composer — ${result.name}` })));
+  await recorder.file("holding.png", await page.screenshot());
+  // Stop dictation without sending.
+  await page.tap('.agent-composer-pane [data-transcription-composer-target="button"]');
+  await Bun.sleep(1500);
+  await resetComposerText();
+  await closeComposer();
+});
+
 await scenario("mobile-D21-D22-floating", "D21/D22: floating buttons stack bottom right; scroll-to-bottom only away from the bottom; open-composer hides while the composer is open.", async (recorder) => {
   await closeComposer();
   await scrollPartway();
@@ -372,7 +403,7 @@ await scenario("desktop-D1-selection", "D1: on desktop the composer is open and 
   recorder.add(
     check("D1: composer open", after.composer !== null, JSON.stringify(after.composer)),
     check("D1: text field focused", after.focus.includes("composer-input"), `focus: ${after.focus || "body"}`),
-    check("D4: 2×2 buttons (attach, close, transcribe, send)", after.buttons.length === 4, after.buttons.join(", ")),
+    check("D4: 2×2 buttons (attach, close, transcribe, send)", after.buttons.join() === "attach,close,transcribe,send", after.buttons.join(", ")),
   );
 });
 
