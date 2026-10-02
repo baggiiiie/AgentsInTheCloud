@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { defineTool } from "@earendil-works/pi-coding-agent";
+import { defineWorkspaceTool } from "../../src/server/workspace-tool.ts";
 import { Type } from "typebox";
 import { createAgentMcpCredentials } from "../../src/server/mcp-credentials.ts";
 import { createAgentMcpServer } from "../../src/server/mcp-server.ts";
@@ -22,14 +22,14 @@ async function fixture() {
   const endpoint = createAgentMcpServer({
     authenticate: credentials.authenticate,
     instructions: (agent) => `Instructions for ${agent.workspaceId}`,
-    tools: (agent) => [defineTool({
+    tools: (agent) => [defineWorkspaceTool({
       name: "present", label: "Present", description: "Present work",
       parameters: Type.Object({ kind: Type.Literal("browser") }, { additionalProperties: false }),
       execute: async () => { invocations.push(agent.agentId); return { content: [{ type: "text", text: agent.workspaceId }], details: {} }; },
-    }), ...(agent.workspaceId === "onboarding" ? [defineTool({
-      name: "read_project_settings", label: "Settings", description: "Project settings", parameters: Type.Object({}),
+    }), ...(agent.workspaceId === "workspace-b" ? [defineWorkspaceTool({
+      name: "scoped_probe", label: "Probe", description: "Scoped test capability", parameters: Type.Object({}),
       execute: async () => ({ content: [{ type: "text", text: "settings" }], details: {} }),
-    })] : []), defineTool({
+    })] : []), defineWorkspaceTool({
       name: "wait_for_user", label: "Wait", description: "Wait for human input", parameters: Type.Object({}),
       execute: async (_id, _args, signal, update) => {
         update?.({ content: [{ type: "text", text: "Waiting" }], details: {} });
@@ -39,7 +39,7 @@ async function fixture() {
     })],
   });
   const server = Bun.serve({ port: 0, fetch: (request) => endpoint.fetch(request) });
-  cleanup.push(async () => { await endpoint.revoke({ workspaceId: identity.workspaceId }); await endpoint.revoke({ workspaceId: "onboarding" }); server.stop(true); });
+  cleanup.push(async () => { await endpoint.revoke({ workspaceId: identity.workspaceId }); await endpoint.revoke({ workspaceId: "workspace-b" }); server.stop(true); });
   const url = new URL("/mcp", server.url);
   async function connect(bearer = token) {
     const client = new Client({ name: "test", version: "1.0" });
@@ -75,10 +75,10 @@ test("Streamable HTTP initialization carries guidance; tools are scoped and vali
   expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(["present", "wait_for_user"]);
   expect(await client.callTool({ name: "present", arguments: { kind: "browser" } })).toMatchObject({ content: [{ type: "text", text: "workspace-a" }] });
   expect(f.invocations).toEqual([f.identity.agentId]);
-  await expect(client.callTool({ name: "read_project_settings" })).rejects.toThrow("Unknown tool");
+  await expect(client.callTool({ name: "scoped_probe" })).rejects.toThrow("Unknown tool");
   await expect(client.callTool({ name: "present", arguments: { kind: "browser", workspaceId: "someone-else" } })).rejects.toThrow("Invalid tool arguments");
-  const other = await f.connect(f.credentials.issue({ workspaceId: "onboarding", agentId: crypto.randomUUID() }));
-  expect((await other.client.listTools()).tools.map((tool) => tool.name)).toContain("read_project_settings");
+  const other = await f.connect(f.credentials.issue({ workspaceId: "workspace-b", agentId: crypto.randomUUID() }));
+  expect((await other.client.listTools()).tools.map((tool) => tool.name)).toContain("scoped_probe");
 });
 
 test("bearer authorization applies on every request; a session ID cannot impersonate an agent", async () => {

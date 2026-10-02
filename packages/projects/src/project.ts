@@ -7,7 +7,7 @@ import { Value } from "typebox/value";
 
 export type ProjectSummary = Omit<ProjectRecord, "secrets" | "sshKeys" | "sshKnownHosts" | "environment"> & { configurationFingerprint?: string };
 export type StoredProjectSecret = Static<typeof storedProjectSecretSchema>;
-export type ProjectSecretSummary = Omit<StoredProjectSecret, "encryptedSecret" | "optional" | "annotation"> & { annotation: string; optional: boolean; configured: boolean; valueRevision?: string };
+export type ProjectSecretSummary = Omit<StoredProjectSecret, "encryptedSecret" | "optional" | "annotation"> & { annotation: string; optional: boolean; configured: boolean };
 export type StoredProjectSshKey = Static<typeof storedProjectSshKeySchema>;
 export type ProjectSshKeySummary = Omit<StoredProjectSshKey, "encryptedPrivateKey">;
 export type ProjectEnvironmentVariable = Static<typeof projectEnvironmentVariableSchema>;
@@ -78,13 +78,6 @@ const projectRecordSchema = Type.Object({
   preloadImages: Type.Optional(Type.Array(Type.String())),
 });
 
-/** The writable workspace configuration, derived from the stored project schema. */
-export const projectWorkspaceSettingsSchema = Type.Object({
-  ...Type.Required(Type.Pick(projectRecordSchema, ["dockerfile", "preloadImages"])).properties,
-  environment: Type.Array(Type.Pick(projectEnvironmentVariableSchema, ["name", "value"], { additionalProperties: false })),
-}, { additionalProperties: false });
-export type ProjectWorkspaceSettings = Static<typeof projectWorkspaceSettingsSchema>;
-
 const gitProjectInitSchema = Type.Object({
   type: Type.Literal("project.git"),
   configurationFingerprint: Type.Optional(Type.String()),
@@ -93,8 +86,6 @@ const gitProjectInitSchema = Type.Object({
   gitUrl: Type.String(),
   branch: Type.Union([Type.String(), Type.Null()]),
   sessionShareKey: Type.String(),
-  settings: Type.Optional(projectWorkspaceSettingsSchema),
-  createdBy: Type.Optional(Type.Object({ workspaceId: Type.String(), conversationId: Type.String() })),
 });
 
 export type GitProjectInitInstruction = Static<typeof gitProjectInitSchema>;
@@ -225,7 +216,7 @@ export type ProjectConfiguration = ProjectSummary & {
 
 export function projectSecretSummary(secret: StoredProjectSecret): ProjectSecretSummary {
   const { encryptedSecret, ...metadata } = secret;
-  return { ...metadata, annotation: secret.annotation ?? "", optional: secret.optional ?? false, configured: !!encryptedSecret, valueRevision: encryptedSecret ? createHash("sha256").update(encryptedSecret).digest("hex") : undefined };
+  return { ...metadata, annotation: secret.annotation ?? "", optional: secret.optional ?? false, configured: !!encryptedSecret };
 }
 
 export function projectSecretSummaries(project: ProjectRecord): ProjectSecretSummary[] {

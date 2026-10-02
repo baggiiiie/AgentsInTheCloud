@@ -1,16 +1,9 @@
-import { shellQuote } from "@agents-in-the-cloud/core";
 import type { WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
-import { execWorkspaceShell, workspaceContainerName, workspaceRoot } from "@agents-in-the-cloud/workspace";
+import { workspaceContainerName } from "@agents-in-the-cloud/workspace";
 import {
   createObservableTerminalSocket,
-  buildCapturePaneCommand,
-  buildKillSessionCommand,
-  buildObservableSessionCommand,
-  buildSendInterruptCommand,
-  buildSetRemainOnExitCommand,
   normalizeCarriageReturns,
   observableTerminalCols,
-  observableTerminalHistoryLimit,
   observableTerminalRows,
   stripObservablePaneFraming,
   stripTerminalControls,
@@ -18,31 +11,14 @@ import {
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
-  defineTool,
   formatSize,
   truncateLine,
   truncateTail,
-  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 
-/**
- * Bash tool that runs commands inside the workspace container under a PTY,
- * via a marked tmux session. Display is decoupled from execution: the browser
- * can attach an inline terminal to the tmux session while the command runs; the
- * tool result is captured from tmux's rendered scrollback and active screen.
- */
-
-export const agentTmuxPrefix = "agents-in-the-cloud-agent-";
-
-/** Fixed terminal size for agent bash commands (a normal desktop terminal). */
-export const agentTermCols = observableTerminalCols;
-export const agentTermRows = observableTerminalRows;
-
 const maxModelLineChars = 500;
 const maxDisplayAnsiBytes = 200_000;
-const tmuxHistoryLimit = observableTerminalHistoryLimit;
-const pollIntervalMs = 350;
 
 /**
  * Color conventions understood by the most common build-tool ecosystems.
@@ -67,8 +43,6 @@ export const forcedColorEnvironment = {
   DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION: 1,
 } as const;
 
-type ExecWorkspaceShell = typeof execWorkspaceShell;
-
 interface LimitedModelLines {
   text: string;
   linesTruncated: number;
@@ -86,10 +60,6 @@ function limitModelLines(text: string): LimitedModelLines {
     return limited.text;
   });
   return { text: lines.join("\n"), linesTruncated };
-}
-
-function shellExport(assignments: Record<string, string | number>): string {
-  return `export ${Object.entries(assignments).map(([key, value]) => `${key}=${shellQuote(String(value))}`).join(" ")}`;
 }
 
 export function stripTmuxPaneFraming(text: string): string {
@@ -128,111 +98,6 @@ export const bashToolDefinition = {
   }),
 };
 
-export function createTmuxBashTool(
-  workspaceId: string,
-  runWorkspaceShell: ExecWorkspaceShell = execWorkspaceShell,
-): ToolDefinition<any, any> {
-  return defineTool({
-    ...bashToolDefinition,
-    execute: async (_toolCallId: string, params: { command: string; timeout?: number }, signal?: AbortSignal, onUpdate?: (partial: any) => void) => {
-      const sessionName = `${agentTmuxPrefix}${crypto.randomUUID().slice(0, 8)}`;
-      const exitFile = `/tmp/${sessionName}.exit`;
-      const fullOutputPath = `/tmp/${sessionName}.log`;
-      const timeoutMs = Math.max(1, params.timeout ?? 600) * 1000;
-
-      // Interactive editors/pagers/prompts are neutralized (GIT_EDITOR=true,
-      // PAGER=cat, GIT_TERMINAL_PROMPT=0) so commands like a bare `git commit`
-      // fail fast instead of opening vim. stdin stays on the PTY — full-screen
-      // programs (ncurses, progress UIs) need a tty on stdin to render.
-      //
-      // The command runs directly in tmux's PTY. After it exits, the model and
-      // UI outputs are both captured from tmux's rendered scrollback and active
-      // screen: plain capture for the model, ANSI-preserving capture for UI.
-      const guards = shellExport({ EDITOR: "true", GIT_EDITOR: "true", VISUAL: "true", GIT_PAGER: "cat", PAGER: "cat", GIT_TERMINAL_PROMPT: 0 });
-      // Encourage color even when a tool second-guesses the PTY. NO_COLOR must
-      // be removed because it is the standard opt-out and may be inherited from
-      // the AgentsInTheCloud process. NINJA_STATUS has no boolean color switch, so give
-      // direct Ninja invocations an explicitly colored progress prefix.
-      const colorEnv = `unset NO_COLOR; ${shellExport({ ...forcedColorEnvironment, COLUMNS: agentTermCols, LINES: agentTermRows })}`;
-      const ninjaStatus = "export NINJA_STATUS=$(printf '\\033[36m[%%f/%%t %%p]\\033[0m ')";
-      // Force the tmux pane's tty size immediately before the command starts. If
-      // the size is briefly reported as very narrow, carriage-return progress UIs
-      // (for example `git clone`) wrap and then each `\r` returns only to the
-      // start of the wrapped physical row, producing concatenated progress text
-      // in the live browser terminal.
-      const forceTtySize = `stty cols ${agentTermCols} rows ${agentTermRows} 2>/dev/null || true`;
-      // Capture the complete PTY stream before the command starts. The retained
-      // file is only advertised when the model-facing result is truncated.
-      const captureFullOutput = `tmux pipe-pane -o -t "$TMUX_PANE" ${shellQuote(`umask 077; cat > ${shellQuote(fullOutputPath)}`)}`;
-      const runCommand = `(
-${forceTtySize}
-${params.command}
-)
-status=$?
-printf '%s\\n' "$status" > ${shellQuote(exitFile)}`;
-      const inner = `${buildSetRemainOnExitCommand()}; ${captureFullOutput}; ${forceTtySize}; ${ninjaStatus}; ${colorEnv}; ${guards}; ${runCommand}`;
-      const create = await runWorkspaceShell(
-        workspaceId,
-        buildObservableSessionCommand({ requireExistingServer: true, session: sessionName, cwd: workspaceRoot, command: shellQuote(inner), cols: agentTermCols, rows: agentTermRows, fixedSize: true, remainOnExit: true, historyLimit: tmuxHistoryLimit }),
-      );
-      if (create.exitCode !== 0) throw new Error(create.stderr.trim() || `could not start command session`);
-
-      onUpdate?.({ content: [], details: { workspaceId, tmuxSession: sessionName, command: params.command } });
-
-      const startedAt = Date.now();
-      let exitCode: number | undefined;
-      for (;;) {
-        if (signal?.aborted) {
-          await runWorkspaceShell(workspaceId, buildSendInterruptCommand(sessionName));
-          break;
-        }
-        const probe = await runWorkspaceShell(workspaceId, `if test -f ${shellQuote(exitFile)}; then cat ${shellQuote(exitFile)}; elif ! tmux -N has-session -t ${shellQuote(sessionName)} 2>/dev/null; then printf 'session-lost\\n'; fi`);
-        const text = probe.stdout.trim();
-        if (text === "session-lost") {
-          throw new Error(`Command session disappeared before reporting an exit status (the workspace tmux server may have restarted). Full output: ${fullOutputPath}`);
-        }
-        if (text !== "") {
-          exitCode = Number(text);
-          break;
-        }
-        if (Date.now() - startedAt > timeoutMs) {
-          await runWorkspaceShell(workspaceId, buildSendInterruptCommand(sessionName));
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-      }
-
-      // Capture tmux's rendered scrollback and active screen. Plain capture feeds
-      // the model; ANSI-preserving capture feeds the UI terminal view.
-      const modelPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit, ansi: false }));
-      const displayPane = await runWorkspaceShell(workspaceId, buildCapturePaneCommand({ session: sessionName, historyLimit: tmuxHistoryLimit }));
-
-      const { output, displayAnsi, modelTruncated } = formatBashOutput(modelPane.stdout, displayPane.stdout, fullOutputPath);
-
-      const removeFullOutput = modelTruncated ? "" : `rm -f ${shellQuote(fullOutputPath)}; `;
-      await runWorkspaceShell(workspaceId, `${buildKillSessionCommand(sessionName)}; rm -f ${shellQuote(exitFile)}; ${removeFullOutput}true`);
-      const aborted = signal?.aborted ?? false;
-      const timedOut = exitCode === undefined && !aborted;
-      let body = output || "(no output)";
-      if (aborted) body = `${body}\n\nCommand aborted`;
-      else if (timedOut) body = `${body}\n\nCommand timed out after ${Math.round(timeoutMs / 1000)} seconds`;
-      else if (exitCode !== 0) body = `${body}\n\nCommand exited with code ${exitCode}`;
-
-      return {
-        content: [{ type: "text" as const, text: body }],
-        details: {
-          workspaceId,
-          exitCode,
-          displayAnsi,
-          aborted,
-          timedOut,
-          fullOutputPath: modelTruncated ? fullOutputPath : undefined,
-        },
-      };
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Inline terminal websocket: read-only attach to an agent tmux session.
 // ---------------------------------------------------------------------------
@@ -246,12 +111,12 @@ export function createAgentTermSocketSession(url: URL): WorkspaceServerSocketSes
   return createObservableTerminalSocket({
     containerName: workspaceContainerName(workspaceId),
     session,
-    // Receipt supervisor and legacy bash both use the default workspace server.
+    // The receipt supervisor uses the default workspace server.
     requireExistingServer: true,
     // Inline terminals must never resize the agent's fixed-size command pane.
-    cols: agentTermCols,
-    rows: agentTermRows,
-    user: "agents-in-the-cloud",
+    cols: observableTerminalCols,
+    rows: observableTerminalRows,
+    user: "atelier",
     readonly: true,
     fixedSize: true,
   });

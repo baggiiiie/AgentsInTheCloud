@@ -1,4 +1,4 @@
-import { configureAgentMcp, configureOnboardingTools, handleAgentMcpRequest, markProjectOnboardingWorkspace } from "@agents-in-the-cloud/agent/server";
+import { configureAgentMcp, handleAgentMcpRequest } from "@agents-in-the-cloud/agent/server";
 import { createAgentsInTheCloudEventBus, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { designSystemCatalogueHtml } from "@agents-in-the-cloud/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@agents-in-the-cloud/observable-terminal/server";
@@ -26,7 +26,6 @@ import { agentProvider, rememberAgentProvider } from "./agent-providers.ts";
 import { createWebApp, type WebApp } from "./app.ts";
 import { parseAssetManifest } from "./asset-manifest.ts";
 import { createCableServer, type CableSocketData } from "./cable.ts";
-import { createProjectSecretRequester } from "./project-secret-request.ts";
 import { legacyStaticFiles } from "./static-files.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
 import { prepareWorkspaceForUse, recoverWorkspaces } from "./workspace-recovery.ts";
@@ -253,7 +252,6 @@ app = createWebApp({
   },
 });
 
-configureOnboardingTools({ deleteWorkspace: app.deleteCurrentWorkspaceFromAgent, createWorkspace: app.createWorkspaceFromAgent, requestSecretValue: createProjectSecretRequester() });
 
 agentsInTheCloudEvents.on("workspace_user_activity", ({ workspaceId }) => registry.touch(workspaceId));
 agentsInTheCloudEvents.on("workspace_title_changed", ({ workspaceId, title }) => registry.setTitle(workspaceId, title || null));
@@ -279,7 +277,6 @@ for (const module of workspaceModules) {
 }
 
 provisioningHooks.push({ id: "workspace.agent", label: "Prepare agent", async run({ workspaceId, creationContext }) {
-  if (creationContext?.projectOnboarding) markProjectOnboardingWorkspace(workspaceId);
   const parameters = creationContext?.agent;
   const provider = agentProvider(parameters?.provider ?? "builtin");
   if (parameters) {

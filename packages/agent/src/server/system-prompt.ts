@@ -1,6 +1,4 @@
 import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import { projectOnboardingInstructions } from "./project-onboarding.ts";
-import { isProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
 
 /** AgentsInTheCloud guidance for every agent, whether AgentsInTheCloud runs its loop or it connects through MCP. */
 export const sharedAgentsInTheCloudInstructions = `You are running inside of an online coding tool called AgentsInTheCloud.
@@ -31,7 +29,7 @@ That can be showing proof through screenshots. It can be by spinning up a dev se
 preview browser to it. It can be by recording a video. You will optimize for your users evaluation convenience.`;
 
 /** Only AgentsInTheCloud's own transcript renders embed and file URLs. */
-export const atelierSystemPrompt = `${sharedAgentsInTheCloudInstructions}
+export const agentsInTheCloudSystemPrompt = `${sharedAgentsInTheCloudInstructions}
 
 The AgentsInTheCloud web application makes it easy for the user to inspect files you have created. If you want the user
 to see an image, svg, video, or any other file on your disk inline in the conversation, emit a Markdown image with an AgentsInTheCloud embed URL like this:
@@ -47,7 +45,7 @@ Keep layouts responsive. To preview a separate app, use a Browser Work view.
 
 /** Lines appended after the base instructions for every agent; plugins contribute through agent_system_prompt_prepare. */
 export async function prepareAppendedAgentsInTheCloudInstructions(events: AgentsInTheCloudEventBus | undefined, workspaceId: string, conversationId: string, lines: string[] = []): Promise<string[]> {
-  const appended = [...lines, ...(isProjectOnboardingWorkspace(workspaceId) ? [projectOnboardingInstructions] : [])];
+  const appended = [...lines];
   await events?.emit("agent_system_prompt_prepare", { workspaceId, conversationId, lines: appended });
   return appended;
 }

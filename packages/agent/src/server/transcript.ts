@@ -62,7 +62,6 @@ const toolViewDetailsSchema = Type.Object({
   displayAnsi: Type.Optional(Type.String()),
   tmuxSession: Type.Optional(Type.String()),
   workspaceId: Type.Optional(Type.String()),
-  secretRequestUrl: Type.Optional(Type.String()),
 });
 
 export type ToolViewDetails = Static<typeof toolViewDetailsSchema> & { [key: string]: JsonValue | undefined };
@@ -326,5 +325,5 @@ export function formatCost(cost: number): string {
 }
 
 export function isBashTool(name: string): boolean {
-  return name === "bash" || name === "bash_in_other_workspace";
+  return name === "bash";
 }

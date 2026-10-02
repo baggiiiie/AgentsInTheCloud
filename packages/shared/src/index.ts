@@ -315,8 +315,6 @@ export interface AgentWorkspaceParameters {
 }
 
 export interface WorkspaceCreationContext extends Record<string, unknown> {
-  /** Host-owned launch intent; never parsed from ordinary workspace/agent request fields. */
-  projectOnboarding?: true;
   agent?: AgentWorkspaceParameters;
 }
 

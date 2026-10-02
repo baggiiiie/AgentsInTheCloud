@@ -3,7 +3,6 @@ import { execWorkspaceShell } from "@agents-in-the-cloud/workspace";
 import { authenticateAgentRequest, createAgentMcpCredentials } from "./mcp-credentials.ts";
 import { createAgentMcpServer } from "./mcp-server.ts";
 import { createAgentsInTheCloudControlTools } from "./tools.ts";
-import { createRegisteredOnboardingTools } from "./onboarding-tools.ts";
 import { agentConversationKey } from "./render-context.ts";
 import { publishWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 import { prepareAppendedAgentsInTheCloudInstructions, sharedAgentsInTheCloudInstructions } from "./system-prompt.ts";
@@ -17,7 +16,7 @@ function credentialStore() { return credentials ??= createAgentMcpCredentials();
 let events: AgentsInTheCloudEventBus | undefined;
 const mcp = createAgentMcpServer({
   authenticate: (token) => credentialStore().authenticate(token),
-  tools: ({ workspaceId, agentId }) => [...createAgentsInTheCloudControlTools(workspaceId, { events }), ...createRegisteredOnboardingTools(workspaceId, agentId)],
+  tools: ({ workspaceId }) => createAgentsInTheCloudControlTools(workspaceId, { events }),
   instructions: ({ workspaceId, agentId }) => agentMcpInstructions(workspaceId, agentId),
 });
 export function configureAgentMcp(eventBus: AgentsInTheCloudEventBus): void {

@@ -48,16 +48,12 @@ export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, type T
 export { type AgentRouteHandler, requireAgentPresentation } from "./route-support.ts";
 export { type AgentTranscriptSnapshot, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
 
-export { configureOnboardingTools, type OnboardingToolDependencies, type SecretValueRequest } from "./onboarding-tools.ts";
-
-export { projectOnboardingInitialPrompt } from "./project-onboarding.ts";
 
 export { maybeNameWorkspaceFromPrompt } from "./agent-title-suggestion.ts";
 export { nativeAgentLaunch } from "./launch.ts";
 export { hasAvailableBuiltinAgentModel } from "./model-state.ts";
 
 export { prepareAgentMcp, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest } from "./mcp.ts";
-export { markProjectOnboardingWorkspace } from "./workspace-capabilities.ts";
 
 export { WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
 export { WorkspaceAdmission, WorkspaceStops, DurableTaskAdmissions, commitDurableStop, markGatedDurableWork, settleStoppedDurableWork } from "./durable-lifecycle.ts";

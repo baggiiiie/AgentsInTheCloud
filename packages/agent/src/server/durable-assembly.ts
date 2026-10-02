@@ -2,14 +2,13 @@ import { agentDelegation } from "./delegation.ts";
 import { durableTiming, type WriteDurableTiming } from "./durable-timing.ts";
 import { durableSubscriptionActivity } from "./durable-accounting.ts";
 import type { Models } from "@earendil-works/pi-ai";
-import { createRegistry, defineExtension, type AgentChange, type Extension, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
+import { createRegistry, defineExtension, type AgentChange, type Harness, type HarnessOptions } from "@earendil-works/pi-durable";
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
 import { createPiModelRuntime } from "@agents-in-the-cloud/llm/server";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { createDurableWorkspaceTools } from "./durable-tools.ts";
 import { createDurableBashExtension } from "./durable-bash.ts";
 import { durableJournalInstructions } from "./durable-storage.ts";
-import { createRegisteredDurableOnboardingExtensions } from "./durable-onboarding.ts";
 import { loadWorkspaceAgentsFiles } from "./workspace-agents-files.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
 import { agentsInTheCloudSystemPrompt, prepareAppendedAgentsInTheCloudInstructions } from "./system-prompt.ts";
@@ -17,11 +16,10 @@ import { launchComposerThinkingSettings, resolveNewWorkspaceAgentModel } from ".
 import type { WorkspaceAgentToolOptions } from "./tools.ts";
 
 /** Workspace-scoped code, including the task definitions needed to recover bash. */
-export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick<Models, "getModel">, options: WorkspaceAgentToolOptions = {}, onboarding: readonly Extension[] = createRegisteredDurableOnboardingExtensions(workspaceId)) {
+export function createDurableWorkspaceRegistry(workspaceId: string, models: Pick<Models, "getModel">, options: WorkspaceAgentToolOptions = {}) {
   const registry = createRegistry();
   registry.install(defineExtension({ name: "agents-in-the-cloud.workspace-tools", tools: createDurableWorkspaceTools(workspaceId, models, options) }));
   registry.install(createDurableBashExtension(workspaceId));
-  for (const extension of onboarding) registry.install(extension);
   return registry;
 }
 

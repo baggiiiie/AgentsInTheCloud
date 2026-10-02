@@ -1,4 +1,3 @@
-import { isProjectOnboardingWorkspace, markProjectOnboardingWorkspace } from "../../src/server/workspace-capabilities.ts";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -93,41 +92,6 @@ describe("Workspace Agent conversation store", () => {
   test("slugs are filesystem friendly", () => {
     expect(sessionShareKeySlug("Product Suite")).toBe("product-suite");
     expect(sessionShareDir("Product Suite", "/tmp/data")).toBe("/tmp/data/session-shares/product-suite");
-  });
-});
-
-describe("host-owned project onboarding permission", () => {
-  test("persists for the lifetime of the workspace, including sibling and replacement agents", async () => {
-    const root = await dataDir();
-    await writeProjectInit("ws1", "repo-1234", "suite");
-    markProjectOnboardingWorkspace("ws1");
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
-    expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(true);
-    expect(await Bun.file(join(root, "workspaces", "ws1", "metadata", "agent-capabilities.json")).json()).toEqual({ projectOnboarding: ["workspace"] });
-    const [resumed] = await listWorkspaceAgentConversations("ws1");
-    expect(isProjectOnboardingWorkspace(resumed!.workspaceId)).toBe(true);
-    expect(isProjectOnboardingWorkspace((await createNextWorkspaceAgentConversation("ws1")).workspaceId)).toBe(true);
-    expect(isProjectOnboardingWorkspace("ws2")).toBe(false);
-    await archiveWorkspaceAgentConversation(agent);
-    const replacement = await ensureDefaultWorkspaceAgentConversation("ws1");
-    expect(replacement.label).toBe("Agent 1");
-    expect(isProjectOnboardingWorkspace(replacement.workspaceId)).toBe(true);
-  });
-
-  test("a transcript cannot opt a normal conversation in", async () => {
-    await dataDir();
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
-    await writeFile(join(process.env.ATELIER_DATA_DIR!, "workspaces", "ws1", "metadata", "untrusted-capabilities.json"), JSON.stringify({ projectOnboarding: [agent.conversationId] }));
-    expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(false);
-  });
-
-  test("host initialization grants onboarding without changing the existing conversation", async () => {
-    await dataDir();
-    const agent = await ensureDefaultWorkspaceAgentConversation("ws1");
-    expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(false);
-    markProjectOnboardingWorkspace("ws1");
-    expect(await ensureDefaultWorkspaceAgentConversation("ws1")).toEqual(agent);
-    expect(isProjectOnboardingWorkspace(agent.workspaceId)).toBe(true);
   });
 });
 
