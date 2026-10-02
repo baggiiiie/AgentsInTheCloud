@@ -24,6 +24,8 @@ export interface Frame {
   /** Labels of the visible composer buttons. */
   buttons: string[];
   viewport: [number, number];
+  /** The document's scroll offset: iOS scrolls it to reveal a focused field. */
+  pageScroll: number;
   keyboard: boolean;
   focus: string;
 }
@@ -69,6 +71,7 @@ export const samplerSource = String.raw`(() => {
       contentBottom: shown(content) ? round(content.getBoundingClientRect().bottom) : null,
       buttons: composer ? [...composer.querySelectorAll(".composer-button button")].filter(shown).map(label) : [],
       viewport: [round(visualViewport.height), round(visualViewport.offsetTop)],
+      pageScroll: round(window.scrollY),
       keyboard: document.documentElement.classList.contains("software-keyboard-visible"),
       focus: active && active !== document.body ? (active.className && typeof active.className === "string" ? active.tagName.toLowerCase() + "." + active.className.split(" ")[0] : active.tagName.toLowerCase()) : "",
     };
@@ -110,6 +113,7 @@ function channels(frames: Frame[]): Channel[] {
     for (const label of labels) putBox(`floating[${label}]`, index, frame.floating[label] ?? null);
     if (frame.scrollTop !== null) put("scrollTop", index, frame.scrollTop);
     put("keyboard", index, frame.keyboard ? 1 : 0);
+    put("pageScroll", index, frame.pageScroll);
     put("buttons", index, hash(frame.buttons.join("|")));
   });
   return [...result].map(([key, values]) => ({ key, values }));
