@@ -5,9 +5,16 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--radius-overlay);
-  background: var(--panel);
+  /* A localized reflection wraps the upper corners; the quiet outline stays visible below.
+   * Fixed vertical reach keeps the reflection consistent on short and tall panels. */
+  background:
+    var(--panel-inner-glow) padding-box,
+    var(--panel-background-image) padding-box,
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    var(--panel-rim-reflection) border-box,
+    var(--panel-outline) border-box;
 }
 
 .panel__header {

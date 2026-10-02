@@ -24,3 +24,14 @@ html.software-keyboard-visible :is(.terminal-pane, .cli-agent-body:not(.cli-tran
   display: grid; flex: 0 0 auto; grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px; padding: 6px 2px 2px; border-top: 1px solid var(--line-strong); background: var(--bg);
 }
+
+/* Light sits above background canvases (z=0), below glyphs (z=1) and input (z=2).
+ * Explicit ANSI backgrounds remain renderer-owned; no foreground tint or input overlay. */
+.gespenst::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--terminal-background-image);
+}

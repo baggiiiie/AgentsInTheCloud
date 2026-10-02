@@ -10,7 +10,7 @@
 }
 /* This grid item must shrink to the pane, not the transcript's intrinsic width.
    Wide code and tables scroll inside the transcript instead of widening the column. */
-.agent-transcript-region { position: relative; display: flex; min-width: 0; min-height: 0; }
+.agent-transcript-region { background-image: var(--transcript-background-image); position: relative; display: flex; min-width: 0; min-height: 0; }
 .agent-transcript-region > .agent-transcript { flex: 1; min-width: 0; }
 .agent-transcript {
   min-height: 0; overflow-y: auto; scroll-behavior: auto;

@@ -71,6 +71,10 @@ export const designSystemStaticFiles = {
     url: new URL("./icons/icons.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/surface-lighting.css": {
+    url: new URL("./surface-lighting.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
   "/panel.css": {
     url: new URL("./panel/panel.css", import.meta.url),
     contentType: "text/css; charset=utf-8",

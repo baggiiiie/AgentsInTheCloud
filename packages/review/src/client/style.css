@@ -4,6 +4,8 @@
   min-height: 0;
   overflow: auto;
   background: var(--bg);
+  background-image: var(--review-background-image);
+  background-attachment: local;
   color: var(--text);
   container-type: inline-size;
 }
@@ -27,7 +29,7 @@
 
 .review-toolbar-actions { display: flex; width: 100%; }
 .review-toolbar-actions > .button-group { width: 100%; }
-.review-toolbar-actions .copy-button { position: static; }
+.review-toolbar-actions .copy-button { position: relative; }
 .review-display-toggles {
   display: inline-flex;
   align-items: center;
@@ -72,6 +74,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--panel);
+  background-image: var(--review-background-image);
 }
 
 .review-file-loading,

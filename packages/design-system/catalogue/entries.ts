@@ -318,8 +318,8 @@ export const entries: CatalogueEntry[] = [
     title: "Foundations & composition",
     when: "Role tokens and shared layout primitives, not a second set of component sizes.",
     contract:
-      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
-    sources: ["design-system.css"],
+      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Action items, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
+    sources: ["design-system.css", "surface-lighting.css"],
     examples: [
       {
         title: "Semantic colors · title · form spacing",
@@ -347,7 +347,7 @@ export const entries: CatalogueEntry[] = [
     id: "button",
     compareButtonSizes: true,
     title: "Button",
-    when: "An action, not navigation. Primary for the main action, secondary for supporting actions, danger for destructive actions.",
+    when: "An action with a quiet directional rim and background light, not navigation. Primary for the main action, secondary for supporting actions, danger for destructive actions. Progress and usage rings retain their own perimeter treatment.",
     contract:
       "Choose caption OR icon-only with a mandatory accessible label. On narrow screens (≤700px) or coarse pointers, regular icon-only controls are 42.5px with 17.85px icons. Add data-popular-button to a button (via attributesHtml) or containing group for 62.5px controls and 26.25px icons. Popular caption buttons also have a 62.5px minimum height; ordinary caption buttons are unchanged. Desktop popular sizes are fixed: 38.24px icon controls with 20.59px icons, and 36.93px minimum-height caption controls with 18.38px icons. Native type and disabled are explicit. Do not add classes or override component anatomy via attributesHtml.",
     imports: { button: "buttonHtml", icons: "Icons" },
@@ -493,7 +493,7 @@ export const entries: CatalogueEntry[] = [
     id: "action-item",
     compareButtonSizes: true,
     title: "Action item",
-    when: "Rows in menus, navigation, trees and action lists. Use compound when a row has separately actionable trailing controls.",
+    when: "Rows in menus, navigation, trees and action lists. Selected, hovered and keyboard-focused rows have a subtle directional rim reflection; idle rows stay plain. Use compound when a row has separately actionable trailing controls.",
     contract:
       "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
     imports: {
@@ -909,7 +909,7 @@ export const entries: CatalogueEntry[] = [
   {
     id: "panel",
     title: "Panel",
-    when: "A bounded surface with fixed chrome and flexible body. Dialog composes this; workspace panes use it directly.",
+    when: "A bounded surface with a continuous outline, soft upper-left rim reflection and faint localized background light, fixed chrome and flexible body. Dialog composes this; workspace panes use it directly.",
     contract:
       "Supply semantic element tag, trusted header/body and optional footer. Use an outer layout container for dimensions. bodyLayout: padded/full-bleed and bodyOverflow: scroll/contained are the supported body behaviors. No root or body classes. panel__title uses normal body text and accepts a leading icon; strong.panel__title adds emphasis for the Atelier identity.",
     imports: { panel: "panelHtml", icons: "Icons" },
