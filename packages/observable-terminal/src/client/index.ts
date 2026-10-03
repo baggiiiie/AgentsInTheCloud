@@ -275,8 +275,9 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     const sendInput = (data: string): void => {
       if (ws?.readyState === WebSocket.OPEN) ws.send(data);
     };
-    // A hidden host measures 0×0, so Gespenst falls back to 80×24. Keep that
-    // size local: resizing the PTY makes TUIs like Pi redraw their whole history.
+    // Gespenst is patched to preserve its grid when a hidden host measures 0×0.
+    // Only measurable panes can change the PTY size: workspace selection itself
+    // must not resize tmux or make TUIs like Pi redraw their whole history.
     let ptySize = { cols: term.geometry.cols, rows: term.geometry.rows };
     // The size the server already has: the attach URL's, or the last one sent.
     let sentSize = ptySize;
