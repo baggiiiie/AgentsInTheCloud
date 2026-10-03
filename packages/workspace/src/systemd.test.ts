@@ -11,8 +11,8 @@ test("provisioning supplies setup and PID 1 requirements without replacing image
     const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
     await prepareWorkspaceSystemd(plan, directory, "echo setup");
     expect(plan.extraArgs).toEqual(["--security-opt", "writable-cgroups=true", "--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3"]);
-    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.agents-in-the-cloud/init.sh" }, { source: join(directory, "docker-support"), target: "/etc/agents-in-the-cloud/docker-support" }]);
-    expect(await readFile(join(directory, "docker-support"), "utf8")).toBe("disabled\n\n");
+    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.agents-in-the-cloud/init.sh" }, { source: join(directory, "agents-in-the-cloud"), target: "/etc" }]);
+    expect(await readFile(join(directory, "agents-in-the-cloud", "docker-support"), "utf8")).toBe("disabled\n\n");
     expect(await readFile(join(directory, "init.sh"), "utf8")).toBe("echo setup");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
@@ -24,6 +24,6 @@ test("Docker opt-in keeps the ordinary privileged runtime and snapshots the sett
     await prepareWorkspaceSystemd(plan, directory, "echo setup");
     expect(plan.extraArgs).not.toContain("writable-cgroups=true");
     expect(plan.extraArgs).toContain("--privileged");
-    expect(await readFile(join(directory, "docker-support"), "utf8")).toBe("enabled\nhttps://agents-in-the-cloud.example/projects/app/settings?section=privileged\n");
+    expect(await readFile(join(directory, "agents-in-the-cloud", "docker-support"), "utf8")).toBe("enabled\nhttps://agents-in-the-cloud.example/projects/app/settings?section=privileged\n");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

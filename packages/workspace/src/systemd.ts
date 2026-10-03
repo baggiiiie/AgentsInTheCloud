@@ -8,9 +8,12 @@ export async function prepareWorkspaceSystemd(plan: WorkspaceDockerPlan, directo
   const source = join(directory, "init.sh");
   await writeFile(source, init);
   plan.containerFiles.push({ source, target: "/.agents-in-the-cloud/init.sh" });
-  const dockerSupport = join(directory, "docker-support");
-  await writeFile(dockerSupport, `${plan.privileged ? "enabled" : "disabled"}\n${plan.dockerSupportSettingsUrl ?? ""}\n`);
-  plan.containerFiles.push({ source: dockerSupport, target: "/etc/agents-in-the-cloud/docker-support" });
+  const configuration = join(directory, "agents-in-the-cloud");
+  await mkdir(configuration, { recursive: true });
+  await writeFile(join(configuration, "docker-support"), `${plan.privileged ? "enabled" : "disabled"}\n${plan.dockerSupportSettingsUrl ?? ""}\n`);
+  // docker cp cannot create a file's missing parent directory in a stopped container.
+  // Copy the directory into /etc so provisioning owns its creation, too.
+  plan.containerFiles.push({ source: configuration, target: "/etc" });
   // systemd needs a writable cgroup mount; Docker can grant one without privileged mode.
   plan.extraArgs.push(...(plan.privileged ? ["--privileged"] : ["--security-opt", "writable-cgroups=true"]));
   plan.extraArgs.push("--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3");
