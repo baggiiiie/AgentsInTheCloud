@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import * as agent from "@agents-in-the-cloud/agent/server";
+import * as agent from "@agents-in-the-cloud/builtin-agent/server";
 import { agentsInTheCloudServerModule as codexModule } from "@agents-in-the-cloud/codex-agent/server";
 import { createTestApp, deferred, postJson, temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
 

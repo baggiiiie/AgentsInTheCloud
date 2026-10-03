@@ -1,4 +1,4 @@
-import { agentDelegation } from "./delegation.ts";
+import { agentToolPresentations } from "./tool-presentations.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -282,7 +282,7 @@ function renderGenericDetail(ctx: AgentRenderContext, tool: ToolView): string {
 }
 
 export function renderToolDetail(ctx: AgentRenderContext, key: string, tool: ToolView, count: number): string {
-  const custom = agentDelegation?.toolPresentations?.get(tool.name)?.detail(ctx, tool);
+  const custom = agentToolPresentations?.get(tool.name)?.detail(ctx, tool);
   if (custom !== undefined) return custom;
   if (isBashTool(tool.name)) return renderBashDetail(ctx, key, tool, count);
   if (tool.name === "read") return renderReadDetail(ctx, key, tool, count);
@@ -522,7 +522,7 @@ function getEditOperations(args: JsonObject | undefined): DiffOperation[] {
 function genericToolSummary(tool: ToolView): string {
   const args = toolArgs(tool);
   if (!args) return "";
-  const custom = agentDelegation?.toolPresentations?.get(tool.name)?.summary(tool);
+  const custom = agentToolPresentations?.get(tool.name)?.summary(tool);
   if (custom !== undefined) return custom;
   const direct = stringArg(args, "command", "path", "file_path");
   if (direct) return truncateOneLine(direct, 120);

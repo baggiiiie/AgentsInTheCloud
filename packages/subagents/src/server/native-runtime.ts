@@ -5,7 +5,7 @@ import { Value } from "typebox/value";
 import { awaitWithContext } from "@earendil-works/chord/context";
 import { copyJson, type Context, type JsonValue } from "@earendil-works/chord";
 import { AgentDoc, configure, defineExtension, defineTask, defineTool, section, LiveDoc, InboxDoc, type Harness, type Tx, type ConversationId, type ToolExecutionApi, type TaskId } from "@earendil-works/pi-durable";
-import { WorkspaceConversations, WorkspaceAdmission, WorkspaceStops, DurableTaskAdmissions, commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, type DurableConversationRecord } from "@agents-in-the-cloud/agent/server";
+import { WorkspaceConversations, WorkspaceAdmission, WorkspaceStops, DurableTaskAdmissions, commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, type DurableConversationRecord } from "@agents-in-the-cloud/builtin-agent/server";
 import { Delegation, Mailbox, inheritedBoundaryEntry, communicationEntry, updateReceipt, anchorTaskName, maxConcurrentSubagents, attributedContent, attribution, attributedMessagesSchema, selectNativeForkHistory, finalText, type Receipt } from "./native-state.ts";
 import { codexSubagentDescriptions } from "./codex-subagent-descriptions.ts";
 import { parseForkTurns } from "./subagent-protocol.ts";

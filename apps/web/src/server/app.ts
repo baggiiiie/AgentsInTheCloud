@@ -1,4 +1,4 @@
-import { maybeNameWorkspaceFromPrompt } from "@agents-in-the-cloud/agent/server";
+import { maybeNameWorkspaceFromPrompt } from "@agents-in-the-cloud/builtin-agent/server";
 import {
   AgentsInTheCloudCoreError,
   createKeyedOperationQueue,

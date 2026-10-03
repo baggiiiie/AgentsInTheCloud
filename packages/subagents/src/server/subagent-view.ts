@@ -1,5 +1,6 @@
-import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/agent/server";
-import { ids, listWorkspaceAgentConversations } from "@agents-in-the-cloud/agent/server";
+import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/builtin-agent/server";
+import { ids } from "@agents-in-the-cloud/agent/server";
+import { listWorkspaceAgentConversations } from "@agents-in-the-cloud/builtin-agent/server";
 import { requestAcceptsJson, type JsonValue } from "@agents-in-the-cloud/core";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -9,7 +10,7 @@ import { response } from "@agents-in-the-cloud/shared/http";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { nativeSnapshot, viewPath, type NativeAgentView as SubagentRecord } from "./native-view-state.ts";
-import { durableWorkspaceOwner, WorkspaceConversations } from "@agents-in-the-cloud/agent/server";
+import { durableWorkspaceOwner, WorkspaceConversations } from "@agents-in-the-cloud/builtin-agent/server";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { Delegation } from "./native-state.ts";
 

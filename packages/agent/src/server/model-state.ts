@@ -24,10 +24,6 @@ export async function resolveNewWorkspaceAgentModel(selectedModel?: string): Pro
   return selectAvailableConfiguredModel(await configuredModelOptionViews(), requested);
 }
 
-export async function hasAvailableBuiltinAgentModel(): Promise<boolean> {
-  return (await configuredModelOptionViews()).some((model) => model.available);
-}
-
 /** Omit current to select the saved default; null represents a session without a model. */
 export async function configuredModelOptionViews(current?: ModelRef | null, runtime?: Pick<Awaited<ReturnType<typeof createPiModelRuntime>>, "getAvailable" | "checkAuth" | "getModel" | "listCredentials">): Promise<AgentModelOptionView[]> {
   runtime ??= await createPiModelRuntime();

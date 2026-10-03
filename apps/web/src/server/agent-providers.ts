@@ -1,4 +1,4 @@
-import { hasAvailableBuiltinAgentModel } from "@agents-in-the-cloud/agent/server";
+import { hasAvailableBuiltinAgentModel } from "@agents-in-the-cloud/builtin-agent/server";
 import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, invalidArguments, readTextIfExists, writeJsonAtomic, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { createPiModelRuntime, usesProviderSubscription } from "@agents-in-the-cloud/llm/server";
 import type { WorkspaceAgentProvider } from "@agents-in-the-cloud/shared";

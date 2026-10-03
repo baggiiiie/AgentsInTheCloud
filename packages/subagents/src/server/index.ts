@@ -2,7 +2,7 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
-import { listWorkspaceAgentConversations, configureAgentDelegation, durableWorkspaceOwner } from "@agents-in-the-cloud/agent/server";
+import { listWorkspaceAgentConversations, configureAgentDelegation, durableWorkspaceOwner } from "@agents-in-the-cloud/builtin-agent/server";
 import { createNativeDelegationExtension } from "./native-runtime.ts";
 import { delegationModels } from "./native-models.ts";
 import { nativeDelegationTranscript } from "./native-transcript.ts";

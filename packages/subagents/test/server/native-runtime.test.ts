@@ -6,7 +6,7 @@ import { awaitWithContext, BACKGROUND_CONTEXT as context } from "@earendil-works
 import { createModels, fauxAssistantMessage, fauxProvider, fauxToolCall, type FauxResponseFactory } from "@earendil-works/pi-ai";
 import type { Context } from "@earendil-works/chord";
 import { createRegistry, defineExtension, LiveDoc, type Harness, type Extension } from "@earendil-works/pi-durable";
-import { openDurableAgentRuntime, type DurableAgentRuntime } from "../../../agent/src/server/durable-runtime.ts";
+import { openDurableAgentRuntime, type DurableAgentRuntime } from "@agents-in-the-cloud/builtin-agent/server/durable-runtime";
 import { createNativeDelegationExtension } from "../../src/server/native-runtime.ts";
 import { Delegation, Mailbox } from "../../src/server/native-state.ts";
 
@@ -291,8 +291,8 @@ test("interrupt_agent retains the child for a later follow-up and returns its pr
 test("Stop also fences a native input admitted by an already-stopped dispatcher", async () => {
   const { owner, root, faux } = await setup();
   const { defineTask } = await import("@earendil-works/pi-durable");
-  const { DurableTaskAdmissions, WorkspaceStops, commitDurableStop } = await import("@agents-in-the-cloud/agent/server");
-  const { markGatedDurableWork, settleStoppedDurableWork } = await import("../../../agent/src/server/durable-lifecycle.ts");
+  const { DurableTaskAdmissions, WorkspaceStops, commitDurableStop } = await import("@agents-in-the-cloud/builtin-agent/server");
+  const { markGatedDurableWork, settleStoppedDurableWork } = await import("@agents-in-the-cloud/builtin-agent/server/durable-lifecycle");
   // A not-yet-installed dispatcher models the persisted outbox before execution.
   const dispatcher = defineTask<Record<string, never>, { phase: "send" }, null>({
     name: "test.late-dispatcher", version: 1, initial: () => ({ phase: "send" }),

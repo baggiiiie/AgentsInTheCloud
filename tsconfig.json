@@ -13,6 +13,8 @@
       "@agents-in-the-cloud/browser": ["./packages/browser/src/server/index.ts"],
       "@agents-in-the-cloud/subagents/server": ["./packages/subagents/src/server/index.ts"],
       "@agents-in-the-cloud/subagents/client": ["./packages/subagents/src/client/index.ts"],
+      "@agents-in-the-cloud/builtin-agent/server": ["./packages/builtin-agent/src/server/index.ts"],
+      "@agents-in-the-cloud/builtin-agent": ["./packages/builtin-agent/src/server/index.ts"],
       "@agents-in-the-cloud/agent/server": ["./packages/agent/src/server/index.ts"],
       "@agents-in-the-cloud/agent/client": ["./packages/agent/src/client/index.ts"],
       "@agents-in-the-cloud/agent": ["./packages/agent/src/server/index.ts"],

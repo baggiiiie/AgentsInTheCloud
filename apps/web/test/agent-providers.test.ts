@@ -60,11 +60,11 @@ test("default-change events observe the already-persisted preference", async () 
 test("defaults to Claude Code when an Anthropic subscription is the only way to run an agent", async () => {
   const child = Bun.spawn([process.execPath, "-e", `
     import { expect, mock } from "bun:test";
-    const agent = await import("@agents-in-the-cloud/agent/server");
+    const agent = await import("@agents-in-the-cloud/builtin-agent/server");
     const llm = await import("@agents-in-the-cloud/llm/server");
     let builtinHasModel = false;
     let credentials = [{ providerId: "anthropic", type: "oauth" }];
-    mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agent, hasAvailableBuiltinAgentModel: async () => builtinHasModel }));
+    mock.module("@agents-in-the-cloud/builtin-agent/server", () => ({ ...agent, hasAvailableBuiltinAgentModel: async () => builtinHasModel }));
     mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm, createPiModelRuntime: async () => ({ listCredentials: async () => credentials }) }));
     const { defaultAgentProvider, orderedAgentProviders, rememberAgentProvider } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agent-providers.ts"))});
     expect((await orderedAgentProviders())[0].id).toBe("claude");

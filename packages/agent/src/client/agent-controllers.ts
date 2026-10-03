@@ -1,33 +1,24 @@
-import { createAgentNotificationsController } from "./notifications-controller.ts";
 import { createUsageControllers } from "./usage-controllers.ts";
 import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
-import { createAgentPaneController, registerAgentPaneVisibilityHooks } from "./agent-pane.ts";
 import { createAgentCompletionsController, registerPromptTemplateCommands } from "./completions-controller.ts";
 import { createAgentEditDiffController } from "./edit-diff-controller.ts";
-import { createAgentTurnController } from "./turn-controller.ts";
 import { createAgentElapsedController } from "./elapsed-controller.ts";
 import { createAgentNoticeController } from "./notice-controller.ts";
 import { registerLaunchComposerCommand } from "./launch-composer-command.ts";
 import { createAgentMermaidController } from "./mermaid-controller.ts";
-import { createAgentTermController } from "./terminal-controller.ts";
 import { createAgentThinkingController } from "./thinking-controller.ts";
 import { createAgentStreamingTextController } from "./streaming-text-controller.ts";
 import { createAgentLazyDetailController, createAgentTailFrameController } from "./transcript-detail-controllers.ts";
 
-export { agentConnectionShouldRun } from "./agent-pane.ts";
 export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator, type PromptHistoryState } from "./composer-state.ts";
 export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
 export { promptTemplateHotkeyConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
-export { forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "./terminal-controller.ts";
 
 export const agentClientModule: WorkspaceClientModule = {
   id: "agent",
   install({ application, Controller, hooks }) {
-    application.register("agent-notifications", createAgentNotificationsController(Controller));
     for (const [name, controller] of Object.entries(createUsageControllers(Controller))) application.register(name, controller);
-    application.register("agent-pane", createAgentPaneController(Controller));
-    application.register("agent-turn", createAgentTurnController(Controller));
     application.register("agent-elapsed", createAgentElapsedController(Controller));
     application.register("agent-edit-diff", createAgentEditDiffController(Controller));
     application.register("agent-thinking", createAgentThinkingController(Controller));
@@ -37,9 +28,7 @@ export const agentClientModule: WorkspaceClientModule = {
     application.register("agent-mermaid", createAgentMermaidController(Controller));
     application.register("agent-notice", createAgentNoticeController(Controller));
     application.register("agent-completions", createAgentCompletionsController(Controller, hooks));
-    application.register("agent-term", createAgentTermController(Controller));
 
-    registerAgentPaneVisibilityHooks(application, hooks);
     registerLaunchComposerCommand(hooks);
     registerPromptTemplateCommands(hooks);
   },

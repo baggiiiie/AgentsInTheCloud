@@ -48,7 +48,7 @@ test("publishes package-owned workspace helpers as executable tools", async () =
   try {
     await prepareWorkspaceToolsMount({ agentsInTheCloudDataDir: root, dockerHostAgentsInTheCloudDataDir: root, dockerBridgeHost: "unused" });
     for (const [packageName, name] of [
-      ["agent", "agents-in-the-cloud-agent-bash"],
+      ["builtin-agent", "agents-in-the-cloud-agent-bash"],
       ["desktop", "agents-in-the-cloud-desktop"],
       ["vscode", "agents-in-the-cloud-start-vscode"],
       ["workspace-terminal", "pbcopy"],
