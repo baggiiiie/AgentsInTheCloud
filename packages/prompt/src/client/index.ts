@@ -20,8 +20,8 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         scope: "agent-conversation",
         binding: "Meta+Alt+KeyO",
         run() {
-          const action = composer.classList.contains("agent-composer-open") ? "close" : "open";
-          composer.querySelector<HTMLButtonElement>(`[data-action="agent-composer#${action}"]`)!.click();
+          const control = composer.classList.contains("agent-composer-open") ? '[data-action="agent-composer#close"]' : '[data-agent-composer-target="opener"]';
+          composer.querySelector<HTMLButtonElement>(control)!.click();
         },
       }];
     });

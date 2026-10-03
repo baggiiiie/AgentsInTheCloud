@@ -1,5 +1,5 @@
 import { setActivityButtonState } from "@agents-in-the-cloud/design-system/activity-button/client";
-import { CableTopics, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
+import { CableTopics, changeLayout, isWorkspacePaneVisible, type AgentComposerSendPromptDetail, composerSubmitKey, setTextInputValue, type CableSubscription, type WorkspaceClientApplication as StimulusApplication, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentComposerPrimaryAction, agentComposerTextStorageKey, PromptHistoryNavigator } from "./composer-state.ts";
@@ -51,8 +51,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     private hasBeenReady = false;
     private composerMutationObserver?: MutationObserver;
     private connected = false;
-    private composerRevision = 0;
-    private submittedComposer?: { revision: number; attachmentIds: string[]; requestId: string };
+    private submittedComposer?: { text: string; attachmentIds: string[]; requestId: string };
     private readonly identifySubmission = (event: FormDataEvent): void => {
       const body = event.formData;
       // Mode may change from send to steer while an uncertain request retries.
@@ -93,20 +92,15 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.element.dataset.agentPresentationReady = "false";
       if (this.cableSubscription) this.setReconnecting(true);
     };
-    private readonly submitting = (): void => {
+    private readonly submitting = (event: SubmitEvent): void => {
+      if (event.defaultPrevented) return;
       const submittedText = this.inputTarget.value;
-      const submittedRevision = this.composerRevision;
       const body = new FormData(this.formTarget);
       this.submittedComposer = {
-        revision: submittedRevision,
+        text: submittedText,
         attachmentIds: body.getAll("attachment").map(String),
         requestId: String(body.get("requestId")),
       };
-      if (/^\/compact(?:\s|$)/.test(submittedText.trim())) {
-        queueMicrotask(() => {
-          if (this.composerRevision === submittedRevision) this.setInputValue("");
-        });
-      }
       this.scrollToTranscriptEnd();
     };
     connect(): void {
@@ -141,13 +135,10 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
 
     inputTargetConnected(input: HTMLTextAreaElement): void {
       if (this.connected) {
-        this.composerRevision += 1;
         this.promptHistory.inputChanged();
         localStorage.setItem(this.composerTextStorageKey, input.value);
       }
-      requestAnimationFrame(() => {
-        if (input.isConnected && this.inputTarget === input) this.autosize();
-      });
+      input.dispatchEvent(new Event("agent-composer:resize", { bubbles: true }));
     }
 
     becomeVisible(): void {
@@ -172,7 +163,6 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
     }
 
     private reconcileConnection(): void {
-      requestAnimationFrame(() => this.autosize());
       if (!this.connectionShouldRun()) {
         this.stopConnection();
         return;
@@ -256,11 +246,8 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       const completionMenuOpen = Boolean(this.element.querySelector<HTMLElement>(".agent-completion-menu-host:not([hidden])")?.checkVisibility());
       if (!completionMenuOpen && this.promptHistory.keydown(event, this.inputTarget, () => this.userPrompts())) return;
 
-      // Enter inserts a newline when typing with a hardware keyboard. A software
-      // keyboard's Send key and ⌘/Ctrl+Enter both submit.
-      const submitKey = composerSubmitKey(event);
-      const softwareKeyboardSubmit = !completionMenuOpen && submitKey === "software-keyboard";
-      if (submitKey === "shortcut" || softwareKeyboardSubmit) {
+      // Enter inserts a newline on every keyboard; only ⌘/Ctrl+Enter sends.
+      if (composerSubmitKey(event)) {
         event.preventDefault();
         if (this.inputTarget.value.trim() || this.formTarget.querySelector(".agent-chip")) {
           const submitter = this.formTarget.querySelector<HTMLButtonElement>('button[value="send"], button[value="steer"]');
@@ -269,47 +256,18 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       }
     }
 
-    focusInput(event: Event): void {
-      // SVG icons inside controls must not turn their clicks into composer focus.
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("button, select, input, a, textarea, .agent-chip")) return;
-      const input = this.inputTarget;
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-    }
-
     private setInputValue(value: string): void {
       setTextInputValue(this.inputTarget, value);
     }
 
     promptChanged(): void {
-      this.composerRevision += 1;
       this.promptHistory.inputChanged();
       localStorage.setItem(this.composerTextStorageKey, this.inputTarget.value);
-      this.autosize();
+      this.updateSendStopButton();
     }
 
     private get composerTextStorageKey(): string {
       return agentComposerTextStorageKey(this.workspaceIdValue, this.conversationIdValue);
-    }
-
-    autosize(): void {
-      const input = this.inputTarget;
-      const maxHeight = Number.parseFloat(getComputedStyle(input).getPropertyValue("--composer-input-max-height")) || 260;
-      // Measuring at auto height must not temporarily expand the transcript:
-      // that layout can clamp its scrollTop before the final height is restored.
-      const inputArea = input.parentElement!;
-      const previousAreaHeight = inputArea.style.height;
-      inputArea.style.height = getComputedStyle(inputArea).height;
-      input.style.height = "auto";
-      // Add a small buffer for fractional line-height/browser rounding so a
-      // one-pixel overflow doesn't flash a scrollbar before the real limit.
-      const nextHeight = Math.ceil(input.scrollHeight) + 2;
-      input.style.height = `${Math.min(nextHeight, maxHeight)}px`;
-      input.style.overflowY = nextHeight > maxHeight ? "auto" : "hidden";
-      inputArea.style.height = previousAreaHeight;
-      this.navigation.layoutChanged();
-      this.updateSendStopButton();
     }
 
     sendStopTargetConnected(): void {
@@ -347,16 +305,29 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.scrollToTranscriptEnd();
     }
 
+    /**
+     * Turbo accepted the submission (guards and dictation have had their say) and
+     * holds its form data: the composer empties, or closes on mobile, right away.
+     */
+    submitStarted(): void {
+      changeLayout(() => {
+        this.setInputValue("");
+        this.element.dispatchEvent(new Event("agent-composer:sending"));
+      });
+    }
+
     submitted(event: TurboSubmitEndEvent): void {
       const submission = this.submittedComposer;
       this.submittedComposer = undefined;
-      if (!event.detail.success) return;
+      if (!event.detail.success) {
+        // Sending never discards the draft.
+        if (submission && !this.inputTarget.value) this.setInputValue(submission.text);
+        this.element.dispatchEvent(new Event("agent-composer:failed"));
+        return;
+      }
       const key = `${this.composerTextStorageKey}:admission`;
       if (submission && this.pendingAdmission()?.requestId === submission.requestId) sessionStorage.removeItem(key);
-      if (submission && this.composerRevision === submission.revision) {
-        this.setInputValue("");
-        localStorage.removeItem(this.composerTextStorageKey);
-      }
+      if (!this.inputTarget.value) localStorage.removeItem(this.composerTextStorageKey);
       if (event.detail.fetchResponse?.response.headers.get("x-agents-in-the-cloud-attachment-draft-consumed") === "true") {
         const consumed = new Set(submission?.attachmentIds ?? []);
         this.formTarget.querySelectorAll<HTMLInputElement>('input[name="attachment"]').forEach((input) => {

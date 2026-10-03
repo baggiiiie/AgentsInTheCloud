@@ -1,7 +1,6 @@
 import type { AgentsInTheCloudEventBus, JsonObject, JsonValue } from "@agents-in-the-cloud/core";
 import type { TSchema } from "typebox";
 import { escapeHtml } from "./html.ts";
-import { focusLikelyOpensSoftwareKeyboard } from "./software-keyboard.ts";
 import type { WorkspaceGateway } from "./workspace-gateway.ts";
 export * from "./workspace-gateway.ts";
 
@@ -378,25 +377,16 @@ export interface WorkspaceClientSurfaceVisibilityContext {
 }
 
 export const phoneLayoutMediaQuery = "(max-width: 700px), (hover: none) and (pointer: coarse)";
-
-type ComposerSubmitKey = "shortcut" | "software-keyboard";
+/** The composer rules are about available space, not touch: mobile is a viewport of 700px or less. */
+export const mobileComposerMediaQuery = "(max-width: 700px)";
 
 /** Asks an Agent conversation's composer to send a prompt without touching its draft. */
 export const agentComposerSendPromptEvent = "agent-composer:send-prompt";
 export interface AgentComposerSendPromptDetail { text: string }
 
-export function composerSubmitKey(
-  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "isComposing">,
-  focusOpensSoftwareKeyboard?: boolean,
-): ComposerSubmitKey | undefined {
-  if (event.key !== "Enter") return undefined;
-  if (event.metaKey || event.ctrlKey) return "shortcut";
-  // iOS auto-capitalization can report Shift on the software keyboard's Send
-  // key. Only disregard Shift while that keyboard is actually visible, so a
-  // hardware Shift+Enter still inserts a newline on touch devices.
-  const shiftedSoftwareSend = event.shiftKey && document.documentElement.classList.contains("software-keyboard-visible");
-  if ((focusOpensSoftwareKeyboard ?? focusLikelyOpensSoftwareKeyboard()) && !event.altKey && (!event.shiftKey || shiftedSoftwareSend) && !event.isComposing) return "software-keyboard";
-  return undefined;
+/** Enter inserts a newline everywhere; only ⌘↩ (Ctrl+↩ on Windows and Linux) sends. */
+export function composerSubmitKey(event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey">): boolean {
+  return event.key === "Enter" && (event.metaKey || event.ctrlKey);
 }
 
 export function isWorkspacePaneVisible(element: Element): boolean {
@@ -494,7 +484,8 @@ export {
   setTextInputValue
 } from "./text-input.ts";
 
-export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking, isTextEntry } from "./software-keyboard.ts";
+export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking, isTextEntry, softwareKeyboardArranged, softwareKeyboardEvent, softwareKeyboardStorageKey } from "./software-keyboard.ts";
+export { anchorScrollBottom, changeLayout, layoutAfterEvent, layoutBeforeEvent } from "./layout-transaction.ts";
 export { isApplePlatform } from "./platform.ts";
 
 export type { CableChannelAdapter, CableChannelSubscription } from "./cable.ts";

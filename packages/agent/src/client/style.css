@@ -121,21 +121,11 @@
 
 .agent-tool-ansi, .agent-tool-code, .agent-tool-term { background: color-mix(in srgb, var(--bg) 45%, #000 14%); color: var(--text-bright); }
 
-.agent-transcript-navigation {
-  position: absolute; z-index: 20; right: 10px; bottom: 4px; display: flex;
-}
-/* Keep transcript navigation above the composer opener in reading mode. */
-.agent-pane:not(.agent-composer-open) .agent-transcript-navigation { bottom: var(--agent-composer-opener-clearance); }
+.agent-transcript-navigation { display: flex; }
 .agent-transcript-navigation[hidden] { display: none; }
 .agent-pane-composer .composer-footer { padding-right: var(--composer-control-inset); }
 @media (max-width: 700px) {
-  .agent-transcript-navigation { right: 4px; }
   .agent-pane-composer .composer-footer { padding-right: 4px; }
-}
-
-@media (max-width: 700px), (hover: none) and (pointer: coarse) {
-  html.software-keyboard-visible .agent-transcript-region { flex: 1 1 0px; }
-  html.software-keyboard-visible .agent-pane .agent-transcript { padding-block: 0; }
 }
 
 @media (max-width: 700px) {
@@ -147,14 +137,6 @@
   right: var(--agent-inline-gutter); bottom: calc(100% + 4px); left: var(--agent-inline-gutter);
   pointer-events: auto;
 }
-/* The quick-launch band spans the composer's full width but only its buttons
- * are visible; keep the transparent remainder click-through so it does not
- * cover the send/stop button sharing the same row. */
-.composer-surface > .agent-completion-menu-host:has(> .agent-quick-launches) {
-  right: var(--composer-control-inset); bottom: calc(var(--composer-footer-height) + var(--composer-control-inset)); left: var(--composer-control-inset);
-  pointer-events: none;
-}
-.composer-surface > .agent-completion-menu-host:has(> .agent-quick-launches) [data-agent-quick-launch] { pointer-events: auto; }
 .agent-completion-menu-host[hidden] { display: none; }
 .agent-quick-launches { display: flex; flex-wrap: wrap; gap: 6px; }
 [data-agent-quick-launch] { gap: 7px; }

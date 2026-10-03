@@ -2,12 +2,12 @@ import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 const terminalAccessoryButtons = [
-  { key: "control", label: "Ctrl", ariaLabel: "Control for next keystroke" },
-  { key: "escape", label: "Esc", ariaLabel: "Escape" },
-  { key: "left", label: "←", ariaLabel: "Left arrow" },
   { key: "up", label: "↑", ariaLabel: "Up arrow" },
   { key: "down", label: "↓", ariaLabel: "Down arrow" },
+  { key: "left", label: "←", ariaLabel: "Left arrow" },
   { key: "right", label: "→", ariaLabel: "Right arrow" },
+  { key: "control", label: "Ctrl", ariaLabel: "Control for next keystroke" },
+  { key: "escape", label: "Esc", ariaLabel: "Escape" },
 ] as const;
 
 export function renderTerminalKeyBar(controller: string): string {

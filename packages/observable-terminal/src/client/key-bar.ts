@@ -26,25 +26,39 @@ export function controlModifiedTerminalInput(data: string): string {
   return data;
 }
 
+/** A second Ctrl tap within this window locks Ctrl on. */
+const controlDoubleTapMs = 400;
+
 /** Shared Stimulus behavior for interactive terminal surfaces and their key bars. */
 export function createTerminalKeyBarController(Controller: WorkspaceClientControllerConstructor) {
   abstract class TerminalKeyBarController extends Controller {
     static targets = ["control"];
     declare readonly controlTarget: HTMLButtonElement;
     protected abstract readonly accessoryViewer: ObservableTerminalViewer | undefined;
-    private controlPending = false;
+    /** One tap applies Ctrl to the next key only; a double tap keeps it on until tapped again. */
+    private control: "off" | "next" | "locked" = "off";
+    private controlTappedAt = 0;
 
     protected transformAccessoryInput(data: string): string {
-      if (!this.controlPending) return data;
-      this.resetAccessoryKeys();
+      if (this.control === "off") return data;
+      if (this.control === "next") this.setControl("off");
       return controlModifiedTerminalInput(data);
     }
 
-    protected resetAccessoryKeys(): void { this.setControlPending(false); }
+    protected resetAccessoryKeys(): void { this.setControl("off"); }
 
-    private setControlPending(pending: boolean): void {
-      this.controlPending = pending;
-      this.controlTarget.setAttribute("aria-pressed", String(pending));
+    private setControl(control: "off" | "next" | "locked"): void {
+      this.control = control;
+      this.controlTarget.setAttribute("aria-pressed", String(control !== "off"));
+      this.controlTarget.setAttribute("aria-label", control === "locked" ? "Control, locked on" : "Control for next keystroke");
+    }
+
+    private tapControl(now: number): void {
+      const doubleTap = now - this.controlTappedAt <= controlDoubleTapMs;
+      this.controlTappedAt = now;
+      if (this.control === "off") this.setControl("next");
+      else if (this.control === "next" && doubleTap) this.setControl("locked");
+      else this.setControl("off");
     }
 
     preserveTerminalFocus(event: MouseEvent): void {
@@ -58,7 +72,7 @@ export function createTerminalKeyBarController(Controller: WorkspaceClientContro
       if (!key) throw new Error("terminal key button is missing its key");
       this.element.querySelector(".gespenst__input")?.dispatchEvent(new Event("terminal-text-input:reset"));
       const viewer = this.accessoryViewer;
-      if (key === "control") this.setControlPending(!this.controlPending);
+      if (key === "control") this.tapControl(event.timeStamp);
       else viewer?.sendInput(this.transformAccessoryInput(terminalInputForAccessoryKey(key)));
       viewer?.setHistoryCursorHidden(false);
       viewer?.focus();

@@ -1,7 +1,7 @@
 import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@agents-in-the-cloud/llm/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingButtons, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
@@ -53,9 +53,8 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
         </div>
-        ${state.readOnly ? "" : renderTranscriptEndNavigation()}
+        ${state.readOnly ? "" : renderFloatingButtons(`${renderTranscriptEndNavigation()}${renderOpenComposerButton()}`)}
       </div>
-      ${state.readOnly ? "" : renderOpenComposerButton()}
       ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({
         ctx,
         action: agentPath(ctx, "/messages"),
@@ -73,7 +72,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
 
 export function renderAgentPanePromptInput(ctx: AgentRenderContext, initialText = ""): string {
   const placeholder = "Write your prompt here";
-  return `<textarea id="${ids.input(ctx)}" class="composer-input" name="text" rows="2" enterkeyhint="send" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(placeholder)}" data-controller="composer-send-hint" data-agent-pane-target="input" data-agent-completions-target="input" data-action="paste->agent-attachments#paste input->agent-completions#input input->agent-pane#promptChanged">${escapeHtml(initialText)}</textarea>`;
+  return `<textarea id="${ids.input(ctx)}" class="composer-input" name="text" rows="2" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(placeholder)}" data-controller="composer-send-hint" data-agent-pane-target="input" data-agent-completions-target="input" data-action="paste->agent-attachments#paste input->agent-completions#input input->agent-pane#promptChanged">${escapeHtml(initialText)}</textarea>`;
 }
 
 interface AgentComposerRenderOptions {
@@ -98,10 +97,11 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
   const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy, options.hasStoppableWork)}</span>`;
   return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
     <div class="composer-surface">
-      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-end->agent-pane#submitted click->agent-pane#focusInput">
+      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-start->agent-pane#submitStarted turbo:submit-end->agent-pane#submitted">
         ${renderComposerBody({
           draft: { id: draftId, rowId: ids.attachRow(ctx), attachments: options.attachments },
           collapsible: true,
+          quickLaunches: true,
           inputHtml: renderAgentPanePromptInput(ctx, options.initialText ?? ""),
           sendHtml: renderComposerActions(actions),
         })}

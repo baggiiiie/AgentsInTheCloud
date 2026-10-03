@@ -40,7 +40,7 @@ function rawFileCompletionQuery(prefix: string): string {
 }
 
 export interface AgentCompletionRequest {
-  kind: "quick-launch" | "slash-command" | "file";
+  kind: "slash-command" | "file";
   query: string;
   mode?: "direct" | "fuzzy";
 }
@@ -50,8 +50,6 @@ export function agentCompletionRequest(input: AgentCompletionInput, force = fals
     const prefix = fileCompletionPrefix(input);
     return { kind: "file", query: rawFileCompletionQuery(prefix), mode: prefix.startsWith("@") ? "fuzzy" : "direct" };
   }
-  if (input.value === "") return { kind: "quick-launch", query: "" };
-
   const before = input.value.slice(0, input.selectionStart ?? 0);
   const after = input.value.slice(input.selectionEnd ?? 0);
   if (!after || /^\s/.test(after)) {

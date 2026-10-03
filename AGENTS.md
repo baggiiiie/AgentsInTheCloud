@@ -22,6 +22,12 @@ Do not write UI tests. Follow the [UI testing policy](docs/ui-testing-policy.md)
 - When controlling or staging an AgentsInTheCloud instance programmatically, follow [docs/automation.md](docs/automation.md).
 - Whenever modifying the user interface, use elements from the [AgentsInTheCloud design system catalogue](packages/design-system/README.md) whenever possible.
 
+### Composer and soft-keyboard acceptance scripts
+
+- Changes touching the composer, transcript scroll, floating buttons or terminal sizing must run `acceptance/composer-layout.ts`.
+- Changes touching soft-keyboard handling must also run `acceptance/soft-keyboard.ts`.
+- In both cases, link the report in the summary.
+
 Run the development server with `bun run web`. It watches TypeScript, CSS, assets, and server code, automatically reloading open pages after successful changes. Successful asset reloads log `[assets] ready`.
 
 ## User-facing copy and dialogs

@@ -1,3 +1,5 @@
+import { layoutAfterEvent, layoutBeforeEvent } from "@agents-in-the-cloud/shared";
+
 interface TranscriptGeometry {
   viewport: number;
   contentStart: number;
@@ -31,6 +33,7 @@ export class TranscriptNavigation {
   private touch?: { x: number; y: number };
   private readonly resizeObserver: ResizeObserver;
   private readonly composerOpener: HTMLElement | null;
+  private layoutBottom?: number;
 
   constructor(private readonly transcript: HTMLElement, private readonly content: HTMLElement, private readonly latestButton: HTMLElement) {
     this.composerOpener = transcript.closest(".agent-composer-pane")!.querySelector<HTMLElement>(".agent-composer-opener > button");
@@ -47,8 +50,28 @@ export class TranscriptNavigation {
     transcript.addEventListener("keydown", this.keydown);
     transcript.addEventListener("pointerdown", this.pointerDown);
     window.visualViewport?.addEventListener("resize", this.layoutChanged);
+    document.addEventListener(layoutBeforeEvent, this.layoutBefore);
+    document.addEventListener(layoutAfterEvent, this.layoutAfter);
     this.renderMode();
   }
+
+  // Composer and keyboard changes push the transcript up in the same frame:
+  // the content at its bottom edge stays put, so the scroll offset changes once.
+  private readonly layoutBefore = (): void => {
+    this.layoutBottom = this.visible && this.transcript.checkVisibility() ? this.transcript.scrollTop + this.transcript.clientHeight : undefined;
+  };
+
+  private readonly layoutAfter = (): void => {
+    const bottom = this.layoutBottom;
+    this.layoutBottom = undefined;
+    if (bottom === undefined || this.transcript.clientHeight === this.height) return;
+    cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    this.stopMotion();
+    if (!this.following) this.transcript.scrollTop = bottom - this.transcript.clientHeight;
+    else this.pendingPosition = "instant";
+    this.reconcile();
+  };
 
   setVisible(visible: boolean): void {
     this.visible = visible;
@@ -173,54 +196,58 @@ export class TranscriptNavigation {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
-      if (!this.visible) return;
-      const width = this.transcript.clientWidth;
-      const geometry = this.geometry();
-      const widthChanged = this.width !== 0 && width !== this.width;
-      const resized = widthChanged || (this.height !== 0 && geometry.viewport !== this.height);
-      this.width = width;
-      this.height = geometry.viewport;
-      if (resized && this.following) {
-        // Composer/keyboard changes resize the viewport immediately. Match that
-        // layout change with a snap, even if a follow glide is already running.
-        this.stopMotion();
-        this.pendingPosition = "instant";
-      } else if (widthChanged && !this.pendingPosition && this.readingAnchor && this.content.contains(this.readingAnchor.element)) {
-        const { element, offset, height } = this.readingAnchor;
-        const bounds = element.getBoundingClientRect();
-        // Scale an offset inside a reflowed block; preserve gaps above it.
-        const nextOffset = offset < 0 ? offset * bounds.height / height : offset;
-        this.moveTo(this.transcript.scrollTop + bounds.top - this.transcript.getBoundingClientRect().top - nextOffset, true);
-      }
-      this.reconcileMotion(geometry);
-      this.reserve(geometry);
-
-      if (this.pendingPosition === "prompt") {
-        this.pendingPosition = undefined;
-        const users = this.content.querySelectorAll<HTMLElement>(".agent-user");
-        const target = users.item(users.length - 1)?.closest<HTMLElement>(".agent-item");
-        this.transcript.scrollTop = target
-          ? this.transcript.scrollTop + target.getBoundingClientRect().top - this.transcript.getBoundingClientRect().top
-          : 0;
-      } else if (!this.following && geometry.contentEnd < this.transcript.scrollTop + geometry.threshold) {
-        // A wider pane (for example fullscreen) can reflow the entire transcript
-        // above a paused viewport. Do not protect an empty viewport with reserve.
-        this.transcript.scrollTop = geometry.latestTop;
-      } else if (this.following) {
-        // Follow visible content, not scrollHeight (which includes our reserve).
-        // Keep the opener's 8px clearance as new content arrives; elsewhere
-        // retain the larger streaming hysteresis before another scroll.
-        const plannedTop = this.motionFrame ? Math.max(this.transcript.scrollTop, this.motionTarget) : this.transcript.scrollTop;
-        const contentAboveViewport = geometry.contentEnd < this.transcript.scrollTop + geometry.threshold;
-        if (this.pendingPosition || contentAboveViewport || geometry.contentEnd > plannedTop + geometry.viewport - geometry.followThreshold) {
-          this.moveTo(geometry.latestTop, this.pendingPosition === "instant");
-          this.pendingPosition = undefined;
-        }
-      }
-      this.reserve(geometry);
-      this.rememberReadingPosition();
+      this.reconcile();
     });
   };
+
+  private reconcile(): void {
+    if (!this.visible) return;
+    const width = this.transcript.clientWidth;
+    const geometry = this.geometry();
+    const widthChanged = this.width !== 0 && width !== this.width;
+    const resized = widthChanged || (this.height !== 0 && geometry.viewport !== this.height);
+    this.width = width;
+    this.height = geometry.viewport;
+    if (resized && this.following) {
+      // Composer/keyboard changes resize the viewport immediately. Match that
+      // layout change with a snap, even if a follow glide is already running.
+      this.stopMotion();
+      this.pendingPosition = "instant";
+    } else if (widthChanged && !this.pendingPosition && this.readingAnchor && this.content.contains(this.readingAnchor.element)) {
+      const { element, offset, height } = this.readingAnchor;
+      const bounds = element.getBoundingClientRect();
+      // Scale an offset inside a reflowed block; preserve gaps above it.
+      const nextOffset = offset < 0 ? offset * bounds.height / height : offset;
+      this.moveTo(this.transcript.scrollTop + bounds.top - this.transcript.getBoundingClientRect().top - nextOffset, true);
+    }
+    this.reconcileMotion(geometry);
+    this.reserve(geometry);
+
+    if (this.pendingPosition === "prompt") {
+      this.pendingPosition = undefined;
+      const users = this.content.querySelectorAll<HTMLElement>(".agent-user");
+      const target = users.item(users.length - 1)?.closest<HTMLElement>(".agent-item");
+      this.transcript.scrollTop = target
+        ? this.transcript.scrollTop + target.getBoundingClientRect().top - this.transcript.getBoundingClientRect().top
+        : 0;
+    } else if (!this.following && geometry.contentEnd < this.transcript.scrollTop + geometry.threshold) {
+      // A wider pane (for example fullscreen) can reflow the entire transcript
+      // above a paused viewport. Do not protect an empty viewport with reserve.
+      this.transcript.scrollTop = geometry.latestTop;
+    } else if (this.following) {
+      // Follow visible content, not scrollHeight (which includes our reserve).
+      // Keep the opener's 8px clearance as new content arrives; elsewhere
+      // retain the larger streaming hysteresis before another scroll.
+      const plannedTop = this.motionFrame ? Math.max(this.transcript.scrollTop, this.motionTarget) : this.transcript.scrollTop;
+      const contentAboveViewport = geometry.contentEnd < this.transcript.scrollTop + geometry.threshold;
+      if (this.pendingPosition || contentAboveViewport || geometry.contentEnd > plannedTop + geometry.viewport - geometry.followThreshold) {
+        this.moveTo(geometry.latestTop, this.pendingPosition === "instant");
+        this.pendingPosition = undefined;
+      }
+    }
+    this.reserve(geometry);
+    this.rememberReadingPosition();
+  }
 
   private moveTo(top: number, instant: boolean): void {
     if (instant || this.reducedMotion.matches) {
@@ -278,6 +305,11 @@ export class TranscriptNavigation {
     // Only user input reveals the thumb. Keep it visible through native momentum
     // and dragging, but never let automatic follow movement reveal or prolong it.
     if (!this.following && this.transcript.classList.contains("is-scrolling")) this.showScrollbar();
+    // Reaching the end by hand resumes following; scroll-to-bottom shows only away from it.
+    if (!this.following && !this.motionFrame && this.transcript.scrollTop >= this.geometry().latestTop - 2) {
+      this.following = true;
+      this.renderMode();
+    }
     // Geometry does not toggle intent, and being above the padded end is normal.
     // Paused/idle scrolling must also reclaim reserve behind the viewport.
     if (!this.motionFrame) this.layoutChanged();
@@ -347,5 +379,7 @@ export class TranscriptNavigation {
     this.transcript.removeEventListener("keydown", this.keydown);
     this.transcript.removeEventListener("pointerdown", this.pointerDown);
     window.visualViewport?.removeEventListener("resize", this.layoutChanged);
+    document.removeEventListener(layoutBeforeEvent, this.layoutBefore);
+    document.removeEventListener(layoutAfterEvent, this.layoutAfter);
   }
 }

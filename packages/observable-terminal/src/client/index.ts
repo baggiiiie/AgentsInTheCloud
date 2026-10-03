@@ -278,13 +278,19 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     // A hidden host measures 0×0, so Gespenst falls back to 80×24. Keep that
     // size local: resizing the PTY makes TUIs like Pi redraw their whole history.
     let ptySize = { cols: term.geometry.cols, rows: term.geometry.rows };
+    // The size the server already has: the attach URL's, or the last one sent.
+    let sentSize = ptySize;
     const measurePtySize = (): boolean => {
       const { width, height } = term.element.getBoundingClientRect();
       if (width && height) ptySize = { cols: term.geometry.cols, rows: term.geometry.rows };
       return width > 0 && height > 0;
     };
+    // Resizing makes tmux and its TUI redraw everything; only send real changes.
     const sendSize = (): void => {
-      if (measurePtySize() && ws?.readyState === WebSocket.OPEN) ws.send(encodeObservableTerminalMessage({ type: "resize", ...ptySize }));
+      if (!measurePtySize() || ws?.readyState !== WebSocket.OPEN) return;
+      if (ptySize.cols === sentSize.cols && ptySize.rows === sentSize.rows) return;
+      sentSize = ptySize;
+      ws.send(encodeObservableTerminalMessage({ type: "resize", ...ptySize }));
     };
     let awaitingFirstOutput = true;
     let disposed = false;
@@ -381,6 +387,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       if (interactive) {
         status(hasConnected || retryAttempts > 0 ? "reconnecting" : "connecting");
         measurePtySize();
+        sentSize = ptySize;
         websocketUrl.searchParams.set("cols", String(ptySize.cols));
         websocketUrl.searchParams.set("rows", String(ptySize.rows));
       }
@@ -613,5 +620,6 @@ function lastCursorVisibility(data: string | Uint8Array): boolean | undefined {
 }
 
 export { createTerminalKeyBarController } from "./key-bar.ts";
+export { TerminalFrame, type TerminalFrameOptions } from "./terminal-frame.ts";
 
 export { createNativeTerminalTextInputController } from "./native-text-input.ts";

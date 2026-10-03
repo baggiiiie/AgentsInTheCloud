@@ -14,7 +14,6 @@ import { createProvisionTerminalController } from "@agents-in-the-cloud/workspac
 import * as Turbo from "@hotwired/turbo";
 import { AccessSettingsController } from "./access-settings.ts";
 import { AgentsInTheCloudEasterEggController } from "./agents-in-the-cloud-easter-egg.ts";
-import { KeyboardViewportController } from "./keyboard-viewport.ts";
 import { PwaReminderController } from "./pwa-reminder.ts";
 import { registerWorkspaceAppFrameController } from "./workspace-app-frame.ts";
 import { installWorkspaceCable } from "./workspace-cable.ts";
@@ -55,7 +54,6 @@ Turbo.StreamActions["select-workspace"] = function selectWorkspace(this: HTMLEle
 
 for (const module of workspaceClientModules) await module.install({ application, Controller, hooks: clientHooks });
 registerWorkspaceControllers({
-  "keyboard-viewport": KeyboardViewportController,
   "access-settings": AccessSettingsController,
   "pwa-reminder": PwaReminderController,
   "agents-in-the-cloud-easter-egg": AgentsInTheCloudEasterEggController,

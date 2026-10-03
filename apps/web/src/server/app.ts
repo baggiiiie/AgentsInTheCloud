@@ -587,7 +587,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const launchComposer = surface?.kind === "new-workspace"
       ? surface.project ? await renderProjectLaunchComposerFrame(surface.project) : await renderProjectlessLaunchComposerFrame()
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
-    return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation keyboard-viewport">
+    return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""))}
     <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}</main>
     ${renderAgentsInTheCloudBar()}

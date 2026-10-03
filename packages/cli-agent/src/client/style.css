@@ -2,24 +2,19 @@
 
 .cli-agent-body { --agent-inline-gutter:clamp(.75rem, 4cqi, 2.5rem); container-type:inline-size; position:relative; display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; background:var(--bg); color:var(--text-bright); }
 .cli-agent-stage { position:relative; flex:1; min-height:0; overflow:hidden; }
-.cli-agent-body .observable-terminal-host { position:absolute; inset-inline:0; bottom:0; height:var(--cli-terminal-height); min-height:0; overflow:hidden; touch-action:none; }
+/* The terminal frame fixes the host's size; the stage clips it from the top. */
+.cli-agent-body .observable-terminal-host { position:absolute; left:0; bottom:0; min-height:0; overflow:hidden; touch-action:none; }
 /* Overlay the banner: taking rows from the terminal would resize the PTY on every (re)connect. */
 .cli-agent-stage > .observable-terminal-connection { position:absolute; top:0; left:0; right:0; z-index:2; }
 .cli-agent-body .cli-transcript-view { display:none; position:absolute; inset:0; overflow-y:auto; padding-bottom:128px; }
 .cli-agent-body.cli-transcript-mode .observable-terminal-host { visibility:hidden; pointer-events:none; }
 .cli-agent-body.cli-transcript-mode .cli-transcript-view { display:block; }
-.cli-transcript-switch { position:absolute; z-index:3; right:10px; bottom:12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
-.cli-agent-body:not(.agent-composer-open) .cli-transcript-switch { bottom:var(--agent-composer-opener-clearance); }
 @media (max-width:700px), (pointer:coarse) {
   .cli-agent-body .cli-transcript-view { padding-bottom:172px; }
-  .cli-transcript-switch { right:4px; }
 }
-.cli-transcript-switch > :is(button, a) { --button-background:var(--panel); }
-.cli-transcript-switch > button[hidden] { display:none; }
-.cli-agent-body:not(.cli-transcript-mode) .cli-transcript-switch > button[data-cli-terminal-target="transcriptEnd"] { display:none; }
-.cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:none; }
-.cli-agent-body.cli-transcript-mode .cli-transcript-switch > a[data-action~="cli-terminal#showTranscript"] { display:none; }
-.cli-agent-body.cli-transcript-mode .cli-transcript-switch > button[data-action="cli-terminal#showTerminal"] { display:inline-flex; }
+.cli-agent-body:not(.cli-transcript-mode) [data-cli-terminal-target="transcriptEnd"] { display:none; }
+.cli-agent-body:not(.cli-transcript-mode) [data-action="cli-terminal#showTerminal"] { display:none; }
+.cli-agent-body.cli-transcript-mode [data-action~="cli-terminal#showTranscript"] { display:none; }
 .cli-transcript-empty { padding:24px 0; color:var(--text-muted); }
 .cli-agent-body .cli-agent-composer {
   --agent-inline-gutter: 12px;
@@ -27,10 +22,3 @@
 }
 .cli-terminal-status[hidden], .cli-terminal-status:empty { display:none; }
 .cli-terminal-status { padding:12px 20px; display:flex; align-items:center; gap:12px; color:var(--text); }
-
-/* The composer opener must not cover the right-arrow key during terminal input. */
-html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) > .agent-composer-opener { display:none; }
-/* The stage already ends above the key bar; no composer-opener clearance is needed. */
-html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) .cli-transcript-switch { bottom:12px; }
-
-html.software-keyboard-visible .cli-agent-body:has(.gespenst__input:focus) .observable-terminal-host { top:var(--cli-terminal-top, 0px); bottom:auto; }

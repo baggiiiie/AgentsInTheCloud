@@ -67,7 +67,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
     }
 
     private readonly keydown = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || composerSubmitKey(event) !== "shortcut") return;
+      if (event.defaultPrevented || !composerSubmitKey(event)) return;
       if (this.state === "idle" || this.state === "error") return;
       const target = event.target instanceof Element ? event.target : null;
       const otherEditor = target?.closest("input, textarea, select, [contenteditable='true']");
@@ -332,6 +332,8 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       const transcriptionStateChanged = this.element.hasAttribute("data-transcribing") !== transcribing;
       this.element.toggleAttribute("data-transcribing", transcribing);
       this.input.readOnly = transcribing;
+      // Recognised words stream into the field; it can't take focus until dictation stops.
+      this.input.inert = transcribing;
       if (transcriptionStateChanged) notifyInputListeners(this.input);
       if (state === "finishing") this.setProgress(100);
       else if (!working) this.setProgress(0);

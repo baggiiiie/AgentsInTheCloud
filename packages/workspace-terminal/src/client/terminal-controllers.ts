@@ -4,11 +4,12 @@ import {
   agentsInTheCloudObservableTerminalTheme,
   createObservableTerminalViewer,
   observableWebSocketUrl,
+  TerminalFrame,
   TerminalTouchFocus,
   createTerminalKeyBarController,
   type ObservableTerminalViewer,
 } from "@agents-in-the-cloud/observable-terminal/client";
-import { isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
+import { focusLikelyOpensSoftwareKeyboard, isTextEntry, isWorkspacePaneVisible, type WorkspaceClientControllerConstructor, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { terminalViewKey } from "../shared.ts";
 
 function createTerminalSessionPickerController(Controller: WorkspaceClientControllerConstructor) {
@@ -30,19 +31,32 @@ function createTerminalSessionPickerController(Controller: WorkspaceClientContro
 function createTerminalPaneController(Controller: WorkspaceClientControllerConstructor) {
   return class TerminalPaneController extends createTerminalKeyBarController(Controller) {
     static values = { workspaceId: String, id: String };
-    static targets = ["connectionStatus", "host"];
+    static targets = ["connectionStatus", "host", "stage"];
     declare readonly hostTarget: HTMLElement;
+    declare readonly stageTarget: HTMLElement;
     declare readonly connectionStatusTarget: HTMLElement;
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;
     declare readonly idValue: string;
     private readonly touchFocus = new TerminalTouchFocus(() => this.viewer?.focus());
     private pointerDrag?: { id: number; select: boolean };
+    private frame?: TerminalFrame;
+    private readonly resize = new ResizeObserver(() => this.frame?.update());
 
     private viewer?: ObservableTerminalViewer;
     protected get accessoryViewer(): ObservableTerminalViewer | undefined { return this.viewer; }
 
     start(): void {
+      if (!this.frame) {
+        const stage = this.stageTarget;
+        this.frame = new TerminalFrame({
+          stage, host: this.hostTarget,
+          measure: () => ({ width: stage.clientWidth, height: stage.clientHeight }),
+          resized: () => this.viewer?.refresh(),
+        });
+        this.resize.observe(stage);
+      }
+      this.frame.update();
       if (!this.viewer) {
         const style = getComputedStyle(this.hostTarget);
         this.viewer = createObservableTerminalViewer({
@@ -59,10 +73,14 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
         this.viewer.reconnect();
         this.viewer.refresh();
       }
-      if (document.hasFocus()) this.viewer.focus();
+      // Never take focus from a text field, such as an Agent composer shown beside it.
+      if (document.hasFocus() && !focusLikelyOpensSoftwareKeyboard() && !isTextEntry(document.activeElement)) this.viewer.focus();
     }
 
     stop(): void {
+      this.resize.disconnect();
+      this.frame?.dispose();
+      this.frame = undefined;
       this.viewer?.dispose();
       this.viewer = undefined;
       this.resetAccessoryKeys();
