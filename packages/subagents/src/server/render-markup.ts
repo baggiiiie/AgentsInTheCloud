@@ -10,7 +10,3 @@ export function communicationTraceHtml(ctx: AgentRenderContext, agentId: string,
   const query = new URLSearchParams({ child: agentId, message: messageId });
   return `<a href="/workspaces/${encodeURIComponent(ctx.workspaceId)}/subagents/reveal?${escapeHtml(query.toString())}" data-turbo="false" class="agent-trace-link">${escapeHtml(label)}</a>`;
 }
-
-export function communicationEnvelopeHtml(envelope: string): string {
-  return `<div class="agent-communication-body" title="Included in a prepared model request; not a read receipt">${escapeHtml(envelope)}</div>`;
-}

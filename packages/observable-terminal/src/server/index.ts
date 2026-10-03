@@ -16,7 +16,6 @@ export {
   buildKillSessionCommand,
   buildListSessionsCommand,
   buildObservableSessionCommand,
-  buildSendInterruptCommand,
   buildSetRemainOnExitCommand,
   type ObservableTerminalSessionOptions,
 } from "./tmux.ts";

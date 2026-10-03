@@ -5,7 +5,6 @@ import type { JsonObject } from "@agents-in-the-cloud/core";
 
 const previewNamespace = "agents-in-the-cloud-redesign-preview";
 const previewTitle = "AgentsInTheCloud redesign preview";
-const retiredPreviewFile = "/work/preview/agents-in-the-cloud-redesign.md";
 const previewTerminalTitle = "Terminal";
 const baseUrl = "http://127.0.0.1:3000";
 const repoRoot = resolve(new URL("..", import.meta.url).pathname);
@@ -66,13 +65,6 @@ async function state(workspaceId: string): Promise<WorkspaceState> {
 async function preparePreview(): Promise<string> {
   const previewWorkspace = await workspace();
   let current = await state(previewWorkspace.id);
-  const retiredFixtureOpen = current.workViews?.some((view) => view.reference.type === "file" && view.reference.path === retiredPreviewFile) ?? false;
-  if (retiredFixtureOpen) {
-    for (const view of current.workViews?.filter((candidate) => candidate.reference.type === "file" || candidate.reference.type === "terminal") ?? []) {
-      await post(`/workspaces/${current.id}/work-views/close`, { reference: view.reference });
-    }
-    current = await state(current.id);
-  }
   const has = (type: string) => current.workViews?.some((view) => view.reference.type === type) ?? false;
 
   if (!has("browser")) await post(`/workspaces/${current.id}/commands/browser.create`, { url: "https://github.com/lucasmeijer/atelier" });

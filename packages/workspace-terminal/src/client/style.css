@@ -13,9 +13,5 @@ html.software-keyboard-visible .terminal-pane:has(.gespenst__input:focus:not([re
 .terminal-loading { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: var(--text-muted); pointer-events: none; }
 .observable-terminal-host:has(.observable-terminal-painted) > .terminal-loading { display: none; }
 .terminal-session-list { max-height: min(480px, 60vh); padding: 8px; overflow: auto; }
-.terminal-session-name, .terminal-session-process { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.terminal-session-name { flex: 0 1 auto; color: var(--text-bright); font-weight: var(--weight-medium); }
-.terminal-session-separator { flex: 0 0 auto; color: var(--text-muted); }
-.terminal-session-process { flex: 1 1 auto; color: var(--text); }
 .terminal-session-activity { flex: 0 0 auto; color: var(--text); white-space: nowrap; }
 .terminal-session-empty { min-height: 120px; }

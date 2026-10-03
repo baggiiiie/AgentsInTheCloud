@@ -9,7 +9,7 @@
 .subagents-empty { padding: 24px; color: var(--text-muted); }
 .agent-communication > summary { font: inherit; }
 .agent-trace-link { text-decoration: none; appearance: none; background: none; border: 0; padding: 4px 0; color: var(--text-muted); font: inherit; cursor: pointer; text-align: left; }
-.agent-communication:not(.agent-model-delivery) .agent-trace-link { color: var(--text); }
+.agent-communication .agent-trace-link { color: var(--text); }
 .agent-trace-link:hover { color: var(--text); text-decoration: underline; }
 /* Standard tool-card shell; cells remain ordinary, wrapping body text. */
 .agent-communication-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--text-body); }

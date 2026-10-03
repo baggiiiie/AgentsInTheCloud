@@ -13,7 +13,6 @@ import { createProvisionTerminalController } from "@agents-in-the-cloud/workspac
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import * as Turbo from "@hotwired/turbo";
 import { AccessSettingsController } from "./access-settings.ts";
-import { AgentsInTheCloudEasterEggController } from "./agents-in-the-cloud-easter-egg.ts";
 import { PwaReminderController } from "./pwa-reminder.ts";
 import { registerWorkspaceAppFrameController } from "./workspace-app-frame.ts";
 import { installWorkspaceCable } from "./workspace-cable.ts";
@@ -56,7 +55,6 @@ for (const module of workspaceClientModules) await module.install({ application,
 registerWorkspaceControllers({
   "access-settings": AccessSettingsController,
   "pwa-reminder": PwaReminderController,
-  "agents-in-the-cloud-easter-egg": AgentsInTheCloudEasterEggController,
   "workspace-presentation": createWorkspacePresentationController(Controller, application, clientHooks),
 });
 registerWorkspaceNavigationControllers();

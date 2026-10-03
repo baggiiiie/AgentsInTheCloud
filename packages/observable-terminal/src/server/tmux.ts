@@ -73,7 +73,3 @@ export function buildListSessionsCommand(format = "#S"): string {
 export function buildKillSessionCommand(session: string): string {
   return `tmux kill-session -t ${shellQuote(session)} 2>/dev/null || true`;
 }
-
-export function buildSendInterruptCommand(session: string): string {
-  return `tmux send-keys -t ${shellQuote(session)} C-c 2>/dev/null; true`;
-}
