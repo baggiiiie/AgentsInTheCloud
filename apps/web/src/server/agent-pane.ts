@@ -104,7 +104,7 @@ export function renderAgentNavigation(presentation: WorkspacePresentation): stri
 function agentEmptyId(workspaceId: string): string { return domId("agent_empty", workspaceId); }
 
 function renderAgentEmpty(presentation: WorkspacePresentation): string {
-  return `<div id="${agentEmptyId(presentation.workspace.id)}" class="agent-empty-canvas"><div class="agent-empty-choices"><h2>Choose your first agent</h2><p>Start a conversation with an agent provider.</p><div class="action-list">${providerOptions(presentation, false)}</div></div></div>`;
+  return `<div id="${agentEmptyId(presentation.workspace.id)}" class="agent-empty-canvas"><div class="agent-empty-choices"><div class="action-list">${providerOptions(presentation, false)}</div></div></div>`;
 }
 
 function renderAgentPaneSlot(workspaceId: string, agent: AgentPaneContribution, active: boolean): string {
