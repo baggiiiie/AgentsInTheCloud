@@ -13,7 +13,7 @@ const leafCertificateLifetimeDays = 7;
 
 export async function ensureMitmCa(context?: AgentsInTheCloudRuntimeContext): Promise<MitmCa> {
   const runtime = context ?? getAgentsInTheCloudRuntimeContext();
-  const dir = process.env.ATELIER_MITM_CA_DIR || agentsInTheCloudDataPath(runtime, "proxy-ca");
+  const dir = agentsInTheCloudDataPath(runtime, "proxy-ca");
   const certPath = join(dir, "agents-in-the-cloud-mitm-ca.pem");
   const keyPath = join(dir, "agents-in-the-cloud-mitm-ca-key.pem");
   const leafDir = join(dir, "leaf");

@@ -9,7 +9,7 @@ import {
   createWorkspaceIngress,
   createWorkspaceIngressSockets,
   detectParentOriginPublisher,
-  publicOriginPortRangeFromEnv,
+  defaultPublicOriginPortRange,
   publicWorkspaceAppOrigin,
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
@@ -33,7 +33,6 @@ import { createFileWorkspaceActivityStore, createFileWorkspaceAttentionStore, cr
 
 const requestedPort = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? "0.0.0.0";
-const allowPortFallback = process.env.ATELIER_PORT_FALLBACK === "1";
 const devReloadFile = process.argv.find((argument) => argument.startsWith("--agents-in-the-cloud-dev-reload-file="))?.slice("--agents-in-the-cloud-dev-reload-file=".length);
 
 const authPassword = process.env.ATELIER_PASSWORD ?? "";
@@ -50,10 +49,6 @@ const authSessionPayloadSchema = Type.Object({
   nonce: Type.String(),
 });
 
-function authSecret(): string {
-  return process.env.ATELIER_AUTH_SECRET || authPassword;
-}
-
 function authEnabled(): boolean {
   return authPassword.length > 0;
 }
@@ -64,7 +59,7 @@ function base64Url(bytes: ArrayBuffer | Uint8Array): string {
 }
 
 async function hmac(input: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(authSecret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(authPassword), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return base64Url(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input)));
 }
 
@@ -204,9 +199,8 @@ const workspaceRemovedHandlers: Array<(workspaceId: string) => void | Promise<vo
 
 const runtimeContext = getAgentsInTheCloudRuntimeContext();
 
-const publicOriginPortRange = publicOriginPortRangeFromEnv();
 
-const parentOriginPublisher = await detectParentOriginPublisher(publicOriginPortRange);
+const parentOriginPublisher = await detectParentOriginPublisher(defaultPublicOriginPortRange);
 
 const registry = createWorkspaceRegistry({
   activityStore: createFileWorkspaceActivityStore(join(runtimeContext.agentsInTheCloudDataDir, "view-state", "workspace-activity.json")),
@@ -383,7 +377,7 @@ const workspaceIngress = createWorkspaceIngress({
     if (!await isWorkspaceRunning(workspaceId)) throw new StoppedWorkspaceError(workspaceId);
   },
   resolveApp: resolveWorkspaceApp,
-  originPortRange: publicOriginPortRange,
+  originPortRange: defaultPublicOriginPortRange,
   parentOriginPublisher,
   resolvePort: (id, port, protocol, url) => workspacePortBackend(id, port, url.pathname + url.search, `${protocol}:`),
   originIdentityStore: createFileOriginIdentityStore(),
@@ -481,76 +475,61 @@ const defaultWorkspaceImage = await ensureDefaultWorkspaceImage({ buildOutput: "
 await ensureHostInotifyLimit(defaultWorkspaceImage);
 for (const workspace of persistedWorkspaces) await ingressSockets.ensure(workspace.id);
 await workspaceIngress.initialize();
-const maxPortAttempts = allowPortFallback ? 100 : 1;
-let serverPort = 0;
+const server = Bun.serve<SocketData>({
+  hostname,
+  port: requestedPort,
+  // Keep long-lived upgraded sockets and slow workspace app proxy requests
+  // alive well beyond Bun's short default idle timeout.
+  idleTimeout: 255,
+  async fetch(request, server) {
+    const url = new URL(request.url);
+    const canonical = await handleCanonicalProxyRequest(url);
+    if (canonical) return canonical;
 
-for (let attempt = 0; attempt < maxPortAttempts; attempt++) {
-  const port = requestedPort === 0 ? 0 : requestedPort + attempt;
+    const mcpResponse = await handleAgentMcpRequest(request);
+    if (mcpResponse) return mcpResponse;
 
-  try {
-    const server = Bun.serve<SocketData>({
-      hostname,
-      port,
-      // Keep long-lived upgraded sockets and slow workspace app proxy requests
-      // alive well beyond Bun's short default idle timeout.
-      idleTimeout: 255,
-      async fetch(request, server) {
-        const url = new URL(request.url);
-        const canonical = await handleCanonicalProxyRequest(url);
-        if (canonical) return canonical;
+    const auth = await authResponse(request);
+    if (auth) return auth;
 
-        const mcpResponse = await handleAgentMcpRequest(request);
-        if (mcpResponse) return mcpResponse;
+    if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
+      const socketData = await validateSocket(request, url);
+      if (!socketData) return new Response("not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+      if (server.upgrade(request, { data: socketData })) return undefined;
+      return new Response("websocket upgrade failed", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+    }
 
-        const auth = await authResponse(request);
-        if (auth) return auth;
+    if (url.pathname === "/debug/connections" && request.method === "GET") {
+      return new Response(JSON.stringify({ cable: cableServer.stats(), ingress: workspaceIngress.inspect() }, null, 2), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
 
-        if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
-          const socketData = await validateSocket(request, url);
-          if (!socketData) return new Response("not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
-          if (server.upgrade(request, { data: socketData })) return undefined;
-          return new Response("websocket upgrade failed", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
-        }
+    if (devReloadFile && url.pathname === "/__agents-in-the-cloud_dev_reload" && request.method === "GET") {
+      return new Response(Bun.file(devReloadFile), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    }
 
-        if (url.pathname === "/debug/connections" && request.method === "GET") {
-          return new Response(JSON.stringify({ cable: cableServer.stats(), ingress: workspaceIngress.inspect() }, null, 2), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
-        }
+    const staticResponse = await serveStatic(url.pathname, request);
+    if (staticResponse) return staticResponse;
 
-        if (devReloadFile && url.pathname === "/__agents-in-the-cloud_dev_reload" && request.method === "GET") {
-          return new Response(Bun.file(devReloadFile), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
-        }
-
-        const staticResponse = await serveStatic(url.pathname, request);
-        if (staticResponse) return staticResponse;
-
-        return await compressDynamicResponse(request, await app.fetch(request));
-      },
-      websocket: {
-        open(ws) {
-          if (ws.data.kind === "cable") cableServer.open(ws, ws.data);
-          else if (ws.data.kind === "provision-term") openProvisionTermSocket(ws, ws.data);
-          else ws.data.open?.(ws);
-        },
-        message(ws, message) {
-          if (ws.data.kind === "cable") cableServer.message(ws, message);
-          else if (ws.data.kind === "workspace-module") ws.data.message?.(ws, message);
-        },
-        close(ws) {
-          if (ws.data.kind === "cable") cableServer.close(ws);
-          else if (ws.data.kind === "provision-term") closeProvisionTermSocket(ws.data);
-          else ws.data.close?.(ws);
-        },
-      },
-    });
-    serverPort = server.port ?? port;
-    break;
-  } catch (error) {
-    const addressInUse = error instanceof Error && "code" in error && error.code === "EADDRINUSE";
-    if (!addressInUse || requestedPort === 0 || !allowPortFallback) throw error;
-  }
-}
-
-if (serverPort === 0) throw new Error(`No available port found from ${requestedPort} through ${requestedPort + maxPortAttempts - 1}`);
+    return await compressDynamicResponse(request, await app.fetch(request));
+  },
+  websocket: {
+    open(ws) {
+      if (ws.data.kind === "cable") cableServer.open(ws, ws.data);
+      else if (ws.data.kind === "provision-term") openProvisionTermSocket(ws, ws.data);
+      else ws.data.open?.(ws);
+    },
+    message(ws, message) {
+      if (ws.data.kind === "cable") cableServer.message(ws, message);
+      else if (ws.data.kind === "workspace-module") ws.data.message?.(ws, message);
+    },
+    close(ws) {
+      if (ws.data.kind === "cable") cableServer.close(ws);
+      else if (ws.data.kind === "provision-term") closeProvisionTermSocket(ws.data);
+      else ws.data.close?.(ws);
+    },
+  },
+});
+const serverPort = server.port ?? requestedPort;
 
 void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_started", {
   workspaces: persistedWorkspaces.map(({ id, parked }) => ({ id, parked: Boolean(parked) })),

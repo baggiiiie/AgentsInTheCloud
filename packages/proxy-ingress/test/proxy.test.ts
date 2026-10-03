@@ -5,7 +5,6 @@ import {
   createWorkspaceIngress,
   ensureTailscaleServePortConfig,
   normalizeDecodedFetchResponse,
-  publicOriginPortRangeFromEnv,
   StoppedWorkspaceError,
   pruneTailscaleServePortConfig,
   type ParentOriginPublisher,
@@ -373,11 +372,6 @@ describe("decoded upstream response normalization", () => {
 });
 
 describe("origin publication policy", () => {
-  test("parses configured origin port ranges", () => {
-    expect(publicOriginPortRangeFromEnv("43100-43110")).toEqual({ start: 43100, end: 43110 });
-    expect(() => publicOriginPortRangeFromEnv("bad")).toThrow();
-  });
-
   test("publishes active HTTPS origins without disturbing unrelated routes", () => {
     const config: TailscaleServeConfig = {
       TCP: { "443": { HTTPS: true } },

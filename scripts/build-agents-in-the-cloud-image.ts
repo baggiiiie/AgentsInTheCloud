@@ -203,10 +203,6 @@ function gitCommitId(): string {
   return commit ? `${commit}${dirty}` : "unknown";
 }
 
-function gitCommitDescription(): string {
-  return maybeRun(["git", "log", "-1", "--pretty=%s"]) || "local build";
-}
-
 function workspaceImageRepository(appImage: string): string {
   if (appImage === "ghcr.io/lucasmeijer/agents-in-the-cloud") return "ghcr.io/lucasmeijer/agents-in-the-cloud-workspace";
   return `${appImage}-workspace`;
@@ -300,7 +296,6 @@ if (options.push) {
 
 const defaultBuildArgs = [
   `ATELIER_COMMIT_ID=${gitCommitId()}`,
-  `ATELIER_COMMIT_DESCRIPTION=${gitCommitDescription()}`,
   `ATELIER_DEFAULT_WORKSPACE_IMAGE=${publishedWorkspaceRef}`,
   `ATELIER_EAGERLY_PRELOAD=${JSON.stringify([publishedWorkspaceRef])}`,
 ];

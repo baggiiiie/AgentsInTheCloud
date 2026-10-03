@@ -8,7 +8,7 @@ import { workspaceGatewayErrorHeader, isWorkspaceAppPort, parseWorkspacePortAppK
 import { createMemoryOriginIdentityStore, type OriginIdentityStore } from "./origin-identity.ts";
 import { closeWebSocket, maxSocketBufferedBytes, forwardToUpstream } from "./websocket.ts";
 import {
-  publicOriginPortRangeFromEnv,
+  defaultPublicOriginPortRange,
   type PortRange,
 } from "./tailscale-serve.ts";
 
@@ -99,7 +99,7 @@ export { isSameLocalApp } from "./local-app.ts";
 export { createFileOriginIdentityStore, createMemoryOriginIdentityStore, type OriginIdentityStore } from "./origin-identity.ts";
 
 export function createWorkspaceIngress(options: WorkspaceIngressOptions): WorkspaceIngress {
-  const publicRange = options.originPortRange ?? publicOriginPortRangeFromEnv();
+  const publicRange = options.originPortRange ?? defaultPublicOriginPortRange;
   const publisher = options.parentOriginPublisher ?? createLocalOriginPublisher();
   const identityStore = options.originIdentityStore ?? createMemoryOriginIdentityStore();
   let stopping = false;

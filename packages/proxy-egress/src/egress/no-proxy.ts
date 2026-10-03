@@ -3,7 +3,6 @@ export function defaultNoProxyEntries(): string[] {
     "localhost",
     "127.0.0.1",
     "::1",
-    ...(process.env.ATELIER_WORKSPACE_PROXY_NO_PROXY?.split(",") ?? []),
     // Legacy/public AgentsInTheCloud domains should be reached directly. The egress
     // proxy can downgrade/MITM TLS to HTTP/1.1 for secret injection, which
     // breaks strict HTTP/2 clients such as Subito's gRPC uploader.

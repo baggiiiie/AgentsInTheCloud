@@ -9,16 +9,6 @@ export interface PortRange {
 
 export const defaultPublicOriginPortRange: PortRange = { start: 41000, end: 41999 };
 
-export function publicOriginPortRangeFromEnv(value = process.env.ATELIER_PROXY_PORT_RANGE): PortRange {
-  if (!value?.trim()) return defaultPublicOriginPortRange;
-  const match = value.trim().match(/^(\d+)\s*-\s*(\d+)$/);
-  if (!match) throw new Error(`invalid ATELIER_PROXY_PORT_RANGE: ${value}`);
-  const start = Number(match[1]);
-  const end = Number(match[2]);
-  if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end > 65535 || start > end) throw new Error(`invalid ATELIER_PROXY_PORT_RANGE: ${value}`);
-  return { start, end };
-}
-
 export const defaultTailscaleLocalApiSocketPath = "/var/run/tailscale/tailscaled.sock";
 export const defaultTailscaleServeHelperPath = "/usr/local/bin/agents-in-the-cloud-tailscale-serve-helper";
 

@@ -6,7 +6,7 @@ Build the AgentsInTheCloud app and its matching default workspace image:
 bun run image:build
 ```
 
-By default the script builds `ghcr.io/lucasmeijer/agents-in-the-cloud:<git-description>` and `ghcr.io/lucasmeijer/agents-in-the-cloud:latest` from `apps/web/Dockerfile` and embeds the current git commit metadata in `ATELIER_COMMIT_ID` and `ATELIER_COMMIT_DESCRIPTION`. The default workspace image uses a deterministic content tag, so the build reuses it when that tag already exists locally (or in the registry during `image:publish`). Pass `--workspace` to force rebuilding that image.
+By default the script builds `ghcr.io/lucasmeijer/agents-in-the-cloud:<git-description>` and `ghcr.io/lucasmeijer/agents-in-the-cloud:latest` from `apps/web/Dockerfile` and embeds the current git commit in `ATELIER_COMMIT_ID`. The default workspace image uses a deterministic content tag, so the build reuses it when that tag already exists locally (or in the registry during `image:publish`). Pass `--workspace` to force rebuilding that image.
 
 Useful options:
 

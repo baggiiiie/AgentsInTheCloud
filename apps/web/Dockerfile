@@ -63,11 +63,9 @@ RUN printf '%s\n' '#!/usr/bin/env sh' 'exec /usr/local/bin/bun /app/packages/pro
  && chmod 755 /usr/local/bin/agents-in-the-cloud-tailscale-serve-helper /app/apps/web/docker-entrypoint.sh
 
 ARG ATELIER_COMMIT_ID
-ARG ATELIER_COMMIT_DESCRIPTION
 ARG ATELIER_DEFAULT_WORKSPACE_IMAGE
 ARG ATELIER_EAGERLY_PRELOAD="[]"
 ENV ATELIER_COMMIT_ID=${ATELIER_COMMIT_ID}
-ENV ATELIER_COMMIT_DESCRIPTION=${ATELIER_COMMIT_DESCRIPTION}
 LABEL org.opencontainers.image.source="https://github.com/lucasmeijer/atelier" \
       org.opencontainers.image.revision="${ATELIER_COMMIT_ID}" \
       eagerly-preload="${ATELIER_EAGERLY_PRELOAD}"
