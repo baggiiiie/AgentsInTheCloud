@@ -74,6 +74,7 @@ const projectRecordSchema = Type.Object({
   sshKeys: Type.Optional(Type.Array(storedProjectSshKeySchema)),
   sshKnownHosts: Type.Optional(Type.String()),
   environment: Type.Optional(Type.Array(projectEnvironmentVariableSchema)),
+  privileged: Type.Optional(Type.Boolean()),
   dockerfile: Type.Optional(Type.String()),
   preloadImages: Type.Optional(Type.Array(Type.String())),
 });
@@ -179,11 +180,12 @@ export function findProjectRecord(store: ProjectStore, projectId: string): Proje
   return project;
 }
 
-export function projectConfigurationFingerprint(project: Pick<ProjectRecord, "gitUrl" | "branch" | "dockerfile" | "secrets" | "sshKnownHosts"> & { environment?: Pick<ProjectEnvironmentVariable, "name" | "value">[] }): string {
+export function projectConfigurationFingerprint(project: Pick<ProjectRecord, "gitUrl" | "branch" | "dockerfile" | "privileged" | "secrets" | "sshKnownHosts"> & { environment?: Pick<ProjectEnvironmentVariable, "name" | "value">[] }): string {
   // Only workspace setup snapshots belong here; SSH keys are authorized live. Renaming a project
   // also changes its session share key, which is not worth warning existing workspaces about.
   const configuration = {
     gitUrl: project.gitUrl, branch: project.branch,
+    privileged: project.privileged ?? false,
     dockerfile: project.dockerfile ?? "",
     environment: (project.environment ?? []).map(({ name, value }) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name)),
     secrets: (project.secrets ?? []).filter((secret) => secret.encryptedSecret).map(({ envName, hostPattern, placeholder, allowInPath, encryptedSecret }) => ({ envName, hostPattern, placeholder, allowInPath, encryptedSecret })).sort((a, b) => a.envName.localeCompare(b.envName)),
@@ -200,6 +202,7 @@ function projectSummary(project: ProjectRecord): ProjectSummary {
     branch: project.branch,
     sessionShareKey: project.sessionShareKey,
     lastWorkspaceCreatedAt: project.lastWorkspaceCreatedAt,
+    privileged: project.privileged ?? false,
     dockerfile: project.dockerfile,
     preloadImages: [...(project.preloadImages ?? [])],
     configurationFingerprint: projectConfigurationFingerprint(project),
@@ -331,6 +334,15 @@ export async function setProjectPreloadImages(id: string, images: string[], file
   return await updateProjectStore(file, (store) => {
     const project = findProjectRecord(store, id);
     project.preloadImages = preloadImages;
+    return { project: projectSummary(project) };
+  });
+}
+
+/** Host-authorized opt-in; agent-editable workspace settings cannot grant privilege. */
+export async function setProjectPrivileged(id: string, privileged: boolean, file = projectsFile()): Promise<UpdateProjectResult> {
+  return updateProjectStore(file, (store) => {
+    const project = findProjectRecord(store, id);
+    project.privileged = privileged;
     return { project: projectSummary(project) };
   });
 }

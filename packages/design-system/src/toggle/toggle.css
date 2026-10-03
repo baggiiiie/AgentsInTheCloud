@@ -1,9 +1,16 @@
+/* Intrinsic sizing also applies in grid and column-flex parents, which otherwise
+   stretch auto-sized children even when they use inline-flex. */
+.button-toggle,
+.text-toggle {
+  position: relative;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-width: 100%;
+}
+
 /* A button toggle keeps the current choice and its alternatives visible at once. */
 .button-toggle {
-  position: relative;
   isolation: isolate;
-  display: inline-flex;
-  max-width: 100%;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--line-strong);
@@ -46,9 +53,6 @@
 .text-toggle {
   --toggle-indicator-offset: 0px;
   --toggle-indicator-width: 0px;
-  position: relative;
-  display: inline-flex;
-  max-width: 100%;
   align-items: center;
   gap: 8px;
   font: 400 var(--text-body)/var(--leading-standard) var(--font-sans);

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ensureDefaultWorkspaceImage } from "../src/index.ts";
 
-if (process.argv.length !== 2) throw new Error("usage: bun packages/workspace-image/scripts/integration.ts");
+if (process.argv.length > 3) throw new Error("usage: bun packages/workspace-image/scripts/integration.ts [local-workspace-image]");
 const id = `agents-in-the-cloud-workspace-test-${process.pid}-${Date.now()}`;
 const producer = `${id}-producer`;
 const workspace = `${id}-workspace`;
@@ -48,6 +48,7 @@ async function start(image: string, name: string, writableCache: boolean) {
     "--mount", `type=volume,src=${cache},dst=/data/erofs-cache${writableCache ? "" : ",readonly"}`,
     "--mount", `type=volume,src=${parents},dst=/run/agents-in-the-cloud-parent,readonly`, image]);
   containers.push(name);
+  await command(["docker", "cp", join(directory, "docker-support"), `${name}:/etc/agents-in-the-cloud/docker-support`]);
   await command(["docker", "cp", join(directory, "token"), `${name}:/etc/agents-in-the-cloud-workspace-gateway-token`]);
   await command(["docker", "start", name]);
   await waitReady(name);
@@ -60,12 +61,13 @@ async function hashes() { return exec(producer, "sh", "-c", "find /data/erofs-ca
 
 try {
   console.log("Ensure the real module-contributed workspace image (first run may build)");
-  const image = await ensureDefaultWorkspaceImage({ buildOutput: "inherit" });
+  const image = process.argv[2] ?? await ensureDefaultWorkspaceImage({ buildOutput: "inherit" });
   const before = (await command(["docker", "image", "inspect", "--format", "{{.Id}} {{.Created}}", image])).stdout.toString();
-  assert.equal(await ensureDefaultWorkspaceImage({ buildOutput: "inherit" }), image);
+  if (!process.argv[2]) assert.equal(await ensureDefaultWorkspaceImage({ buildOutput: "inherit" }), image);
   assert.equal((await command(["docker", "image", "inspect", "--format", "{{.Id}} {{.Created}}", image])).stdout.toString(), before);
   console.log(`Reused ${image}`);
   await writeFile(join(directory, "token"), token);
+  await writeFile(join(directory, "docker-support"), "enabled\n\n");
   for (const volume of [cache, parents]) { await command(["docker", "volume", "create", volume]); volumes.push(volume); }
   await command(["docker", "network", "create", network]); createdNetwork = true;
   await start(image, producer, true);

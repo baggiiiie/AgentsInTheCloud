@@ -61,6 +61,7 @@ const projectDetailResponseSchema = Type.Object({
     sessionShareKey: Type.String(),
     configurationFingerprint: Type.String(),
     preloadImages: Type.Array(Type.String()),
+    privileged: Type.Boolean(),
     environment: Type.Array(environmentVariableSchema),
     secrets: Type.Array(projectSecretSummarySchema),
   }, { additionalProperties: false }),

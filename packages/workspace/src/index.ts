@@ -56,7 +56,6 @@ const withWorkspaceIdentityLock = createProcessFileLock({
   lockDir: () => agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", "identity-tombstones.lock"),
 });
 const dockerLabelsSchema = Type.Record(Type.String(), Type.String());
-const booleanSchema = Type.Boolean();
 const nonBlankStringSchema = Type.String({ pattern: "\\S" });
 const stringArraySchema = Type.Array(Type.String());
 export const workspaceRoot = "/work";
@@ -205,7 +204,6 @@ async function readWorkspaceInit(context: Awaited<ReturnType<typeof getAgentsInT
 
 export interface RepoWorkspaceManifest {
   version: 1;
-  docker?: { privileged?: boolean };
   initScripts?: string[];
   seedPiConfig?: {
     authJson?: string;
@@ -221,13 +219,6 @@ function optionalString(record: JsonObject, key: string, path: string, label = k
   const value = record[key];
   if (value === undefined) return undefined;
   if (!Value.Check(nonBlankStringSchema, value)) throw invalidArguments(`invalid ${path}: ${label} must be a non-empty string`);
-  return value;
-}
-
-function optionalBoolean(record: JsonObject, key: string, path: string, label = key): boolean | undefined {
-  const value = record[key];
-  if (value === undefined) return undefined;
-  if (!Value.Check(booleanSchema, value)) throw invalidArguments(`invalid ${path}: ${label} must be a boolean`);
   return value;
 }
 
@@ -248,12 +239,9 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   if (!isJsonObject(parsed)) throw invalidArguments(`invalid ${path}: expected object`);
   const record = parsed;
   if (record.version !== 1) throw invalidArguments(`invalid ${path}: unsupported version`);
-  if (record.privileged !== undefined) throw invalidArguments(`invalid ${path}: privileged is no longer supported; use docker.privileged`);
+  if (record.privileged !== undefined) throw invalidArguments(`invalid ${path}: privileged is no longer supported; use Project settings`);
   if (record.isAgentsInTheCloud !== undefined) throw invalidArguments(`invalid ${path}: isAgentsInTheCloud is no longer supported`);
-  const dockerRecord = optionalRecord(record, "docker", path);
-  const privileged = dockerRecord ? optionalBoolean(dockerRecord, "privileged", path, "docker.privileged") : undefined;
-  const docker: RepoWorkspaceManifest["docker"] | undefined = dockerRecord ? {} : undefined;
-  if (docker && privileged !== undefined) docker.privileged = privileged;
+  if (record.docker !== undefined) throw invalidArguments(`invalid ${path}: docker settings are no longer supported; use Project settings`);
   const initScripts = record.initScripts;
   if (initScripts !== undefined && !Value.Check(stringArraySchema, initScripts)) throw invalidArguments(`invalid ${path}: initScripts must be an array of strings`);
   const seedPiConfigRecord = optionalRecord(record, "seedPiConfig", path);
@@ -263,7 +251,6 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   const seedAgentsInTheCloudConfigRecord = optionalRecord(record, "seedAgentsInTheCloudConfig", path);
   const projectsJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
   const manifest: RepoWorkspaceManifest = { version: 1 };
-  if (docker) manifest.docker = docker;
   if (initScripts) manifest.initScripts = initScripts;
   if (seedPiConfigRecord) {
     manifest.seedPiConfig = {};
@@ -301,7 +288,6 @@ async function readRepoWorkspaceManifest(sourcePath: string): Promise<RepoWorksp
 async function applyRepoWorkspaceManifest(sourcePath: string, plan: WorkspaceDockerPlan): Promise<void> {
   const manifest = await readRepoWorkspaceManifest(sourcePath);
   if (!manifest) return;
-  if (manifest.docker?.privileged && !plan.extraArgs.includes("--privileged")) plan.extraArgs.push("--privileged");
   applySeedConfigManifest(manifest, plan);
   plan.initScripts.push(...(manifest.initScripts ?? []));
 }
@@ -484,6 +470,8 @@ export async function createWorkspace(options: { id: string; events: AgentsInThe
       activePlan.mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), target: "/run/agents-in-the-cloud-parent", readonly: true });
       await applyRepoWorkspaceManifest(source.worktreePath, activePlan);
       await events.emit("workspace_plan_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot, plan: activePlan });
+      // Gate once, after all modules have contributed their image requests.
+      if (!activePlan.privileged) activePlan.preloadImages = [];
       return activePlan;
     });
     if (!activePlan.image) {

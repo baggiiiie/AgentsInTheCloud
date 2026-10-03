@@ -18,7 +18,7 @@ import {
   listProjectEnvironmentVariables, listProjectSecrets,
   listProjectSshKeys, listProjects, parseProjectSpec, renameProjectSshKey,
   secretNeedsValue, projectSecretAllowsPath, projectSecretPathPermissionSchema,
-  setProjectDockerfile, setProjectPreloadImages,
+  setProjectDockerfile, setProjectPreloadImages, setProjectPrivileged,
   setProjectSshKnownHosts,
   updateProject,
   updateProjectEnvironmentVariable, updateProjectSecret,
@@ -103,6 +103,13 @@ export function createProjectRoutes(deps: {
     </section>`;
   }
 
+  function projectPrivilegeEditor(project: ProjectSummary, section?: ProjectSettingsSection): string {
+    return `<section class="project-configuration-list" id="${domId("project_privileged", project.id)}"${revealSection(section, "privileged")}>
+      <div class="project-configuration-head"><h3>Docker support &amp; isolation</h3><p>Privileged mode enables Docker inside workspaces, at the cost of isolation from the host. Workspace agents can access host devices and may read or modify host data. Leave it off unless you need Docker and trust the project and its agents.</p><p>Off by default. Changes apply to new workspaces only; recreate existing workspaces to change their privileges.</p></div>
+      ${toggleHtml({ variant: "button", label: "Privileged mode", name: "privileged", value: String(project.privileged ?? false), options: [{ value: "false", label: "Off — stronger isolation" }, { value: "true", label: "On — Docker support" }], form: { action: `/projects/${encodeURIComponent(project.id)}/privileged`, method: "post", turbo: true } })}
+    </section>`;
+  }
+
   function projectDockerfileEditor(project: ProjectSummary, section?: ProjectSettingsSection): string {
     const example = [
       "FROM agents-in-the-cloud-workspace",
@@ -133,7 +140,7 @@ export function createProjectRoutes(deps: {
       <label><span>Image references, one per line</span><textarea class="textarea" name="preloadImages" rows="4" spellcheck="false" autocomplete="off" placeholder="docker.io/library/postgres:17">${escapeHtml((project.preloadImages ?? []).join("\n"))}</textarea></label>
     </form>`;
     return `<section class="project-configuration-list" id="${domId("project_preload_images", project.id)}"${revealSection(section, "preload-images")}>
-      <div class="project-configuration-head"><h3>Preloaded Docker images</h3></div>
+      <div class="project-configuration-head"><h3>Preloaded Docker images</h3><p>Images are preloaded into new workspaces only when Docker support is on.</p></div>
       ${projectConfigurationDisclosure("Configure preloaded images", fields, section === "preload-images")}
     </section>`;
   }
@@ -264,12 +271,12 @@ export function createProjectRoutes(deps: {
     });
   }
 
-  type ProjectSettingsSection = "repository" | "secrets" | "ssh-keys" | "environment" | "dockerfile" | "preload-images" | "danger";
+  type ProjectSettingsSection = "repository" | "secrets" | "ssh-keys" | "environment" | "dockerfile" | "preload-images" | "privileged" | "danger";
 
   function parseProjectSettingsSection(value: string | undefined): ProjectSettingsSection | undefined {
     if (value === undefined) return undefined;
-    if (value === "repository" || value === "secrets" || value === "ssh-keys" || value === "environment" || value === "dockerfile" || value === "preload-images" || value === "danger") return value;
-    throw invalidArguments("section must be one of: repository, secrets, ssh-keys, environment, dockerfile, preload-images, danger");
+    if (value === "repository" || value === "secrets" || value === "ssh-keys" || value === "environment" || value === "dockerfile" || value === "preload-images" || value === "privileged" || value === "danger") return value;
+    throw invalidArguments("section must be one of: repository, secrets, ssh-keys, environment, dockerfile, preload-images, privileged, danger");
   }
 
   async function projectEditorBody(project: ProjectSummary, instanceUrl: string, section?: ProjectSettingsSection): Promise<string> {
@@ -279,7 +286,7 @@ export function createProjectRoutes(deps: {
       <div class="project-editor-page project-editor-detail-page">
         <div class="project-editor-detail-body">
           <section class="project-edit-section"${revealSection(section, "repository")}><form class="project-edit-form" aria-label="Repository" method="post" action="/projects/${encodeURIComponent(project.id)}" data-controller="settings-autosave" data-action="change->settings-autosave#save"><label class="project-edit-field"><span>Display name</span><input class="text-field" name="name" value="${escapeHtml(project.name)}" required></label><label class="project-edit-field"><span>Repository</span><input class="text-field" name="gitUrl" value="${escapeHtml(formatProjectSpec(project))}" required></label></form></section>
-          <div class="project-edit-config">${projectSecretEditor(project, secrets, section)}${projectSshKeyEditor(project, sshKeys, knownHosts, section)}${projectEnvironmentEditor(project, environment, section)}${projectDockerfileEditor(project, section)}${projectPreloadImagesEditor(project, section)}</div>
+          <div class="project-edit-config">${projectSecretEditor(project, secrets, section)}${projectSshKeyEditor(project, sshKeys, knownHosts, section)}${projectEnvironmentEditor(project, environment, section)}${projectDockerfileEditor(project, section)}${projectPreloadImagesEditor(project, section)}${projectPrivilegeEditor(project, section)}</div>
           <section class="project-edit-danger-zone"${revealSection(section, "danger")}>${projectConfigurationDisclosure("Danger zone", `<div class="project-edit-danger">${projectDeleteControl(project.id)}</div>`, section === "danger")}</section>
           <section class="project-configuration-list">
             <div class="project-configuration-head"><h3>AgentsInTheCloud instance URL</h3><p>The external URL for this AgentsInTheCloud instance.</p></div>
@@ -389,6 +396,21 @@ export function createProjectRoutes(deps: {
   async function projectSettingsResponse(request: Request, result: ProjectSettingsResult, renderFields: () => Promise<string> = async () => ""): Promise<Response> {
     deps.invalidatePresentation();
     return requestAcceptsJson(request) ? jsonResponse(result) : turboStreamResponse(`${await renderFields()}`);
+  }
+
+  async function updateProjectPrivilegeEndpoint(projectId: string, request: Request): Promise<Response> {
+    let privileged: boolean;
+    if (requestAcceptsJson(request)) {
+      const body = await readJsonObject(request);
+      if (!Value.Check(jsonBooleanSchema, body.privileged)) throw invalidArguments("privileged must be a boolean");
+      privileged = body.privileged;
+    } else {
+      const value = (await request.formData()).get("privileged");
+      if (value !== "true" && value !== "false") throw invalidArguments("privileged must be true or false");
+      privileged = value === "true";
+    }
+    const result = await setProjectPrivileged(projectId, privileged);
+    return projectSettingsResponse(request, result, async () => replace(domId("project_privileged", projectId), projectPrivilegeEditor(result.project)));
   }
 
   async function updateProjectDockerfileEndpoint(projectId: string, request: Request): Promise<Response> {
@@ -575,6 +597,7 @@ export function createProjectRoutes(deps: {
     if (url.pathname === "/projects/github-search" && request.method === "GET") return await githubRepositorySearchEndpoint(url);
 
     let params: string[] | undefined;
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/privileged$/)) && request.method === "POST") return await updateProjectPrivilegeEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/projects\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateProjectDockerfileEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/projects\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateProjectPreloadImagesEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/projects\/([^/]+)\/launch-composer$/)) && request.method === "GET") return response(await deps.renderLaunchComposer(await projectById(params[0]!)));

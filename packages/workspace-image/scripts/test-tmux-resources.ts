@@ -16,9 +16,9 @@ async function docker(args: string[], input?: string, check = true) {
 }
 async function exec(...args: string[]) { return (await docker(["exec", name, ...args])).stdout.trim(); }
 try {
-  await docker(["create", "--name", name, "--privileged", "--cgroupns=private", "--memory=512m", "--memory-swap=512m", "--tmpfs", "/run",
+  await docker(["create", "--name", name, "--security-opt", "writable-cgroups=true", "--cgroupns=private", "--memory=512m", "--memory-swap=512m", "--tmpfs", "/run",
     "--env", "HOME=/root", "--env", "USER=root", "--env", "LOGNAME=root", "--env", "SHELL=/bin/sh", "--env", "LANG=C.UTF-8",
-    "--entrypoint", "/bin/bash", image, "-ec", "rm -f /etc/systemd/system/agents-in-the-cloud-gateway.service; exec /usr/local/bin/agents-in-the-cloud-workspace-init"]);
+    "--entrypoint", "/bin/bash", image, "-ec", "rm -f /etc/systemd/system/agents-in-the-cloud-gateway.service /usr/lib/systemd/system/agents-in-the-cloud-gateway.service; exec /usr/local/bin/agents-in-the-cloud-workspace-init"]);
   const bootstrap = fileURLToPath(new URL("../rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", import.meta.url));
   await docker(["cp", bootstrap, `${name}:/usr/local/bin/agents-in-the-cloud-workspace-init`]);
   await docker(["start", name]);

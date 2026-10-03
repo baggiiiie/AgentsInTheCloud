@@ -1,0 +1,35 @@
+#!/bin/bash
+# This is guidance, not a security boundary: the container runtime denies host access.
+set -euo pipefail
+mapfile -t configuration < /etc/agents-in-the-cloud/docker-support
+case "${configuration[0]}" in
+    enabled) exec /usr/local/libexec/agents-in-the-cloud/docker "$@" ;;
+    disabled)
+        cat >&2 <<'MESSAGE'
+Docker support is off for this workspace.
+
+AgentsInTheCloud can run Docker inside workspaces, but it requires privileged mode,
+which reduces isolation: agents may read or modify host data.
+
+MESSAGE
+        if [[ -n "${configuration[1]}" ]]; then
+            cat >&2 <<'MESSAGE'
+To enable it:
+  1. Open Project settings → Docker support & isolation.
+  2. Select “On — Docker support”.
+  3. Create a new workspace for this project.
+
+MESSAGE
+            printf 'Project settings: %s\n\n' "${configuration[1]}" >&2
+        else
+            cat >&2 <<'MESSAGE'
+To use Docker, create a workspace for a project with Docker support enabled
+in Project settings → Docker support & isolation.
+
+MESSAGE
+        fi
+        echo 'Changing the project setting does not enable Docker in this existing workspace.' >&2
+        exit 1
+        ;;
+    *) echo "Invalid Docker support configuration: ${configuration[0]}" >&2; exit 1 ;;
+esac

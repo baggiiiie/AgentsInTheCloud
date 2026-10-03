@@ -5,7 +5,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { clearWorkspaceGitHubToken, createAgentsInTheCloudEventBus, setWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
-import { addProject, cachedProjectSourcePath, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
+import { addProject, cachedProjectSourcePath, createProjectSshKey, deleteProjectSshKey, prepareWorkspaceSource, registerProjectWorkspaceInitEvents, setProjectPrivileged, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -294,6 +294,25 @@ describe("workspace source preparation", () => {
     expect(other.mounts[0]!.source).not.toBe(projectAPath);
     expect((await stat(projectAPath)).isDirectory()).toBe(true);
     expect(first.initScripts).toEqual([]);
+  });
+
+  test("privileged mode follows the project at provisioning and links to its settings", async () => {
+    const events = createAgentsInTheCloudEventBus();
+    registerProjectWorkspaceInitEvents(events);
+    const { project } = await addProject("https://example.test/privileged.git");
+    const provision = async () => {
+      const init: GitProjectInitInstruction = { type: "project.git", projectId: project.id, name: project.name, gitUrl: project.gitUrl, branch: null, sessionShareKey: project.sessionShareKey };
+      const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+      await events.emit("workspace_plan_prepare", { workspaceId: "privilege", init, workHostPath: join(dataDir, "workspaces", "privilege", "work"), workContainerPath: "/work", plan });
+      return plan;
+    };
+    const initial = await provision();
+    expect(initial.privileged).toBe(false);
+    expect(initial.dockerSupportSettingsUrl).toEndWith(`/projects/${encodeURIComponent(project.id)}/settings?section=privileged`);
+    await setProjectPrivileged(project.id, true);
+    expect((await provision()).privileged).toBe(true);
+    await setProjectPrivileged(project.id, false);
+    expect((await provision()).privileged).toBe(false);
   });
 
   test("rejects malformed persisted workspace source metadata", async () => {

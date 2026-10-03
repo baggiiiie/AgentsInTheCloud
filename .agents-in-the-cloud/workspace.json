@@ -1,8 +1,5 @@
 {
   "version": 1,
-  "docker": {
-    "privileged": true
-  },
   "seedPiConfig": {
     "authJson": "/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-host/pi-config/auth.json",
     "modelsJson": "/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-host/pi-config/models.json",

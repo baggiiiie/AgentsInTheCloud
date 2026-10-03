@@ -119,8 +119,9 @@ await mkdir(join(outDir, "runtime-units"));
 for (const [name, content] of Object.entries(workspaceRuntimeUnits())) {
   await writeFile(join(outDir, "runtime-units", name), content);
 }
-dockerfile += `COPY runtime-units/ /etc/systemd/system/\n`;
+dockerfile += `COPY runtime-units/ /usr/lib/systemd/system/\n`;
 dockerfile += `RUN python3 -c 'import json; p="/etc/docker/daemon.json"; c=json.load(open(p)); c["hosts"]=["fd://"]; json.dump(c,open(p,"w"))'\n`;
+dockerfile += `RUN mkdir -p /etc/agents-in-the-cloud && printf "disabled\\n\\n" > /etc/agents-in-the-cloud/docker-support\n`;
 dockerfile += `RUN mkdir -p /.agents-in-the-cloud && printf "systemctl start agents-in-the-cloud-tmux.service\\n" > /.agents-in-the-cloud/init.sh\n`;
 // binfmt registrations belong to the host kernel; workspace shutdown must not unregister them.
 dockerfile += `RUN systemctl mask systemd-binfmt.service\n`;

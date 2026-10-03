@@ -35,6 +35,7 @@ describe("workspace image content identity", () => {
 
   test.each([
     ["systemd bootstrap script", "packages/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "files/base/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "#"],
+    ["Docker capability guard", "packages/workspace-image/rootfs/usr/local/bin/docker", "files/base/rootfs/usr/local/bin/docker", "#"],
   ])("%s is packaged and changes the default image identity", async (_name, sourcePath, packagedPath, comment) => {
     const before = await generateInCheckout();
     const source = join(before.fixture, sourcePath);

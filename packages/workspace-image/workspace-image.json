@@ -80,6 +80,12 @@
       "to": "/usr/local/bin/agents-in-the-cloud-workspace-init",
       "mode": "0755",
       "afterRun": true
+    },
+    {
+      "from": "rootfs/usr/local/bin/docker",
+      "to": "/usr/local/bin/docker",
+      "mode": "0755",
+      "afterRun": true
     }
   ],
   "run": [
@@ -89,7 +95,8 @@
     "set -eux; npm install -g playwright@1.61.0 @playwright/test@1.61.0; PLAYWRIGHT_BROWSERS_PATH=/ms-playwright playwright install --with-deps chromium; chmod -R a+rX /ms-playwright /usr/local/lib/node_modules; for sandbox in /ms-playwright/chromium-*/chrome-linux*/chrome_sandbox; do chown root:root \"$sandbox\"; chmod 4755 \"$sandbox\"; ln -s chrome_sandbox \"${sandbox%/*}/chrome-sandbox\"; done; playwright --version",
     "set -eux; npm install -g hunkdiff@0.22.0; hunk --version",
     "getent group docker || groupadd docker; id -u agents-in-the-cloud >/dev/null 2>&1 || useradd --create-home --shell /bin/bash agents-in-the-cloud; echo 'agents-in-the-cloud ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/agents-in-the-cloud; chmod 0440 /etc/sudoers.d/agents-in-the-cloud; install -d -o agents-in-the-cloud -g agents-in-the-cloud /.agents-in-the-cloud /work; usermod -aG docker agents-in-the-cloud",
-    "systemctl mask tmp.mount getty@tty1.service console-getty.service; ln -sf /lib/systemd/system/multi-user.target /etc/systemd/system/default.target"
+    "systemctl mask tmp.mount getty@tty1.service console-getty.service; ln -sf /lib/systemd/system/multi-user.target /etc/systemd/system/default.target",
+    "install -d /usr/local/libexec/agents-in-the-cloud; mv /usr/local/bin/docker /usr/local/libexec/agents-in-the-cloud/docker"
   ],
   "env": {
     "TERM": "xterm-256color",
