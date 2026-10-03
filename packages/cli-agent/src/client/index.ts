@@ -80,9 +80,13 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           transformInput: (data) => this.transformAccessoryInput(data),
           nativeTextInput: true,
           onConnectionStateChange: (state) => { this.connected = state === "connected"; },
-          onFileLink: ({ path, line, column }) => {
+          onLink: (link) => {
+            if ("url" in link) {
+              window.open(link.url, "_blank", "noopener,noreferrer");
+              return;
+            }
             const anchor = document.createElement("a");
-            anchor.href = `${workspaceFileOpenUrl(this.workspaceIdValue, path, { line, column })}&existing=1`;
+            anchor.href = `${workspaceFileOpenUrl(this.workspaceIdValue, link.path, { line: link.line, column: link.column })}&existing=1`;
             anchor.dataset.turboStream = "true";
             anchor.hidden = true;
             this.element.append(anchor);
@@ -156,7 +160,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         // the completed tap directly against the painted cells instead. Start the
         // link lookup at the original location, before the terminal shifts.
         const bounds = this.terminalTarget.getBoundingClientRect();
-        const link = viewer.activateFileLinkAt(clientX, clientY);
+        const link = viewer.activateLinkAt(clientX, clientY);
         // Focusing after the asynchronous lookup loses the touch gesture on
         // mobile Safari, so it cannot open the software keyboard.
         viewer.focus();

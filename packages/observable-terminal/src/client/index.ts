@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
 
-import type { TerminalTheme } from "@gespenst/core";
+import type { TerminalBufferRow, TerminalTheme } from "@gespenst/core";
 import { copyTextToClipboard, errorMessage } from "@agents-in-the-cloud/shared";
 import { encodeObservableTerminalMessage } from "../shared/index.ts";
-import { terminalFileAt, type TerminalFileLink } from "./file-links.ts";
+import { terminalLinkAt, type TerminalLink } from "./links.ts";
 
 declare const ATELIER_GHOSTTY_WASM_URL: string;
 declare const ATELIER_GHOSTTY_CALLBACKS_WASM_URL: string;
@@ -110,7 +110,7 @@ export interface ObservableTerminalViewer {
   /** Send a touch scroll through the terminal's wheel path, including TUI mouse reporting. */
   scrollTouch(deltaY: number, clientX: number, clientY: number): void;
   /** Resolve a completed touch tap against the painted terminal, before sending TUI input. */
-  activateFileLinkAt(clientX: number, clientY: number): Promise<boolean>;
+  activateLinkAt(clientX: number, clientY: number): Promise<boolean>;
   /** Hide the input cursor while reading CLI history without changing the PTY. */
   setHistoryCursorHidden(hidden: boolean): void;
   paste(text: string): void;
@@ -144,8 +144,8 @@ export interface ObservableTerminalViewerOptions {
   /** Preserve native editing context for CLI prose; shell terminals remain literal. */
   nativeTextInput?: boolean;
   onOutput?: (text: string) => void;
-  /** Opt-in file navigation for agent terminals, not arbitrary shell terminals. */
-  onFileLink?: (link: TerminalFileLink) => void;
+  /** Opt-in file and web link navigation for agent terminals, not arbitrary shell terminals. */
+  onLink?: (link: TerminalLink) => void;
   /** Server-rendered status for an interactive terminal. */
   connectionStatus?: HTMLElement;
   /** Hide the cursor while keyboard focus is elsewhere, without changing the PTY. */
@@ -219,7 +219,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
     getSelection: () => viewer?.getSelection() ?? Promise.resolve(""),
     dragPointer: (event, action, select) => viewer?.dragPointer(event, action, select),
     scrollTouch: (deltaY, clientX, clientY) => viewer?.scrollTouch(deltaY, clientX, clientY),
-    activateFileLinkAt: (clientX, clientY) => viewer?.activateFileLinkAt(clientX, clientY) ?? Promise.resolve(false),
+    activateLinkAt: (clientX, clientY) => viewer?.activateLinkAt(clientX, clientY) ?? Promise.resolve(false),
     setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; viewer?.setHistoryCursorHidden(hidden); },
     paste: (text) => viewer?.paste(text),
     pressEnter: () => viewer?.pressEnter(),
@@ -470,20 +470,21 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     }, { capture: true });
 
     // Gespenst renders into a canvas, so there are no anchors to click. Read
-    // its authoritative painted cells (including OSC 8 destinations) instead
-    // of trying to parse the incoming PTY byte stream or its escape sequences.
-    const fileLinkAt = (rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"], clientX: number, clientY: number, bounds = term.element.getBoundingClientRect()) => {
+    // its authoritative cells instead of parsing the PTY byte stream. Only buffer
+    // rows carry OSC 8 destinations; viewport snapshots omit them. Without a
+    // range, readBuffer returns the visible viewport.
+    const linkAtPoint = (rows: readonly TerminalBufferRow[], clientX: number, clientY: number, bounds = term.element.getBoundingClientRect()) => {
       const scale = Math.max(1, globalThis.devicePixelRatio || 1);
       const column = Math.floor((clientX - bounds.left) * scale / term.geometry.cellWidthPx);
       const row = Math.floor((clientY - bounds.top) * scale / term.geometry.cellHeightPx);
-      return rows[row] && column >= 0 && column < term.geometry.cols ? terminalFileAt(rows[row], column) : undefined;
+      return rows[row] && column >= 0 && column < term.geometry.cols ? terminalLinkAt(rows[row], column) : undefined;
     };
-    if (options.onFileLink) {
-      let rows: Awaited<ReturnType<typeof term.readViewport>>["viewportRows"] = [];
+    if (options.onLink) {
+      let rows: readonly TerminalBufferRow[] = [];
       let pointerInside = false;
       let hoverEvent: PointerEvent | undefined;
       let pointerStart: { id: number; x: number; y: number } | undefined;
-      const linkAt = (event: PointerEvent) => fileLinkAt(rows, event.clientX, event.clientY);
+      const linkAt = (event: PointerEvent) => linkAtPoint(rows, event.clientX, event.clientY);
       let reading = false;
       let dirty = false;
       const updateRows = async () => {
@@ -493,7 +494,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         try {
           while (dirty && !disposed) {
             dirty = false;
-            rows = (await term.readViewport()).viewportRows;
+            rows = (await term.readBuffer()).rows;
             term.element.style.cursor = hoverEvent && linkAt(hoverEvent) ? "pointer" : "";
           }
         } finally { reading = false; }
@@ -519,10 +520,10 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         if (link) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          options.onFileLink!(link);
+          options.onLink!(link);
         } else {
           // A first touch can arrive before the viewport read completes.
-          void updateRows().then(() => { if (!disposed) { const target = linkAt(event); if (target) options.onFileLink!(target); } });
+          void updateRows().then(() => { if (!disposed) { const target = linkAt(event); if (target) options.onLink!(target); } });
         }
       }, { capture: true });
       term.element.addEventListener("pointerleave", () => { pointerInside = false; hoverEvent = undefined; term.element.style.cursor = ""; pointerStart = undefined; });
@@ -575,15 +576,15 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       scrollTouch: (deltaY, clientX, clientY) => {
         term.element.dispatchEvent(new WheelEvent("wheel", { deltaY, clientX, clientY, cancelable: true }));
       },
-      activateFileLinkAt: async (clientX, clientY) => {
-        if (!options.onFileLink || disposed) return false;
+      activateLinkAt: async (clientX, clientY) => {
+        if (!options.onLink || disposed) return false;
         // A tap can focus the terminal and shift it above the software keyboard
         // while the viewport read is pending. Resolve the tapped cell against
         // its position at the time of the tap, not its new position.
         const bounds = term.element.getBoundingClientRect();
-        const link = fileLinkAt((await term.readViewport()).viewportRows, clientX, clientY, bounds);
+        const link = linkAtPoint((await term.readBuffer()).rows, clientX, clientY, bounds);
         if (!link || disposed) return false;
-        options.onFileLink(link);
+        options.onLink(link);
         return true;
       },
       setHistoryCursorHidden: (hidden) => { historyCursorHidden = hidden; updateCursorVisibility(); },

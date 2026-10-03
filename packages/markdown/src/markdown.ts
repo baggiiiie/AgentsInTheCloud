@@ -19,9 +19,12 @@ interface MarkdownEnvironment extends MarkdownRenderOptions {
 
 const markdown = new MarkdownIt({
   html: false,
-  linkify: false,
+  linkify: true,
   typographer: false,
 });
+// Only explicit http(s) URLs: fuzzy matching would link file names like README.md.
+markdown.linkify.set({ fuzzyLink: false, fuzzyEmail: false, fuzzyIP: false });
+markdown.linkify.add("ftp:", null).add("//", null).add("mailto:", null);
 
 markdown.renderer.rules.table_open = () => '<div class="agent-table-scroll"><table>';
 markdown.renderer.rules.table_close = () => "</table></div>";
