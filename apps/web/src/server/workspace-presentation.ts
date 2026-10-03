@@ -290,6 +290,14 @@ function renderWorkLauncherCommand(command: NonNullable<WorkspacePresentation["c
   return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}"${actionAttribute}>${item}</form>`;
 }
 
+function renderEmptyWorkPane(workspaceId: string, workCommands: NonNullable<WorkspacePresentation["commands"]>): string {
+  const launchers = workCommands.map((command) => {
+    const item = actionItemHtml({ kind: "single", label: { kind: "text", text: command.label }, leadingHtml: command.iconHtml ?? Icons.Plus, element: { tag: "button", attributesHtml: 'type="submit"' } });
+    return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}">${item}</form>`;
+  }).join("");
+  return `<div id="${workViewDomId(workspaceId, "empty")}" class="fixed-shell-empty-work empty-state"><div class="fixed-shell-empty-work-content"><p>You can add any of these:</p><div class="fixed-shell-empty-work-launchers action-list">${launchers}</div></div></div>`;
+}
+
 function renderWorkPane(presentation: WorkspacePresentation): string {
   const selectors = renderWorkViewSelectors(presentation.workspace.id, presentation.workViews);
   const panes = presentation.workViews.map((view) => renderWorkViewPane(presentation.workspace.id, view, view.key === presentation.initialSelection?.workView)).join("");
@@ -303,8 +311,8 @@ function renderWorkPane(presentation: WorkspacePresentation): string {
   }) : "";
   return `<div class="fixed-shell-work-pane">${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="work" data-workspace-presentation-target="workPane" aria-label="Work"' },
-    headerHtml: `${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
-    bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || `<div id="${workViewDomId(presentation.workspace.id, "empty")}" class="fixed-shell-empty-work empty-state">Open Files, a file, terminal, or browser to work alongside the Agent.</div>`}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
+    headerHtml: `${presentation.workViews.length ? "" : '<span class="panel__title">Views</span>'}${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
+    bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || renderEmptyWorkPane(presentation.workspace.id, workCommands)}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
   })}</div>`;
 }
 

@@ -389,6 +389,9 @@ turbo-frame { display: contents; }
 .fixed-shell-work-resizer:hover::after, .fixed-shell-work-resizer:focus-visible::after { background: var(--text); }
 .fixed-shell-work-actions { position: absolute; z-index: 2; top: 8px; right: 10px; display: flex; gap: 6px; }
 .fixed-shell-empty-work { height: 100%; }
+.fixed-shell-empty-work-content { display: grid; gap: 12px; width: max-content; max-width: 100%; }
+.fixed-shell-empty-work-content > p { margin: 0; color: var(--text-muted); }
+.fixed-shell-empty-work-launchers { text-align: start; }
 .fixed-shell-availability { position: absolute; z-index: 4; inset: 0; justify-items: center; background: var(--fixed-shell-raised); }
 .fixed-shell-availability-mark { width: 18px; height: 18px; margin-bottom: 12px; border: 2px solid var(--line-strong); border-top-color: var(--text); border-radius: 50%; animation: fixed-shell-spin .9s linear infinite; }
 .fixed-shell-availability p { max-width: 440px; color: var(--text); line-height: var(--leading-standard); }

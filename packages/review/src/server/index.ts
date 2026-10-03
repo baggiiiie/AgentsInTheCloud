@@ -208,7 +208,7 @@ export const reviewWorkspaceModule: WorkspaceModule = {
     const workView = { ...reviewWorkViewPresentation, label: index.phase === "ready" ? renderReviewTitle(files) : reviewWorkViewPresentation.label };
     return {
       workViews: [workView],
-      commands: [{ id: "review.open", label: "Review", description: "Show Review. New workspaces include it by default; use this command to reopen it after closing.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Review, label: "Review" } } }],
+      commands: [{ id: "review.open", label: "Review", description: "Open Review to see and comment on the workspace's changes.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Review, label: "Review" }, shortcut: { defaultBinding: "Meta+Alt+KeyR" } } }],
     };
   },
 };

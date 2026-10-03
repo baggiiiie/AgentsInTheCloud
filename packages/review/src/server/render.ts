@@ -313,4 +313,5 @@ export const reviewWorkViewPresentation: WorkspaceWorkViewPresentation = {
   label: "Review",
   kind: "contextual", iconHtml: Icons.Review,
   availability: { phase: "live" },
+  initiallyOpen: false,
 };
