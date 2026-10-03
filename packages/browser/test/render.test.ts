@@ -15,3 +15,16 @@ test("workspace previews delegate browser capabilities to their dynamically assi
   setWorkspaceBrowserTarget(workspaceId, view.key, "https://example.com/");
   expect(renderBrowserFrame(workspaceId, view, view.targetUrl)).not.toContain(" allow=");
 });
+
+test("re-navigating to the same URL gives the preview iframe a new identity so it reloads", () => {
+  const workspaceId = `render_${crypto.randomUUID()}`;
+  const view = createWorkspaceBrowserView(workspaceId);
+  const iframeId = () => renderBrowserFrame(workspaceId, view, view.targetUrl).match(/<iframe id="([^"]+)"/)![1];
+
+  setWorkspaceBrowserTarget(workspaceId, view.key, "http://localhost:3000/");
+  const first = iframeId();
+  expect(iframeId()).toBe(first);
+
+  setWorkspaceBrowserTarget(workspaceId, view.key, "http://localhost:3000/");
+  expect(iframeId()).not.toBe(first);
+});

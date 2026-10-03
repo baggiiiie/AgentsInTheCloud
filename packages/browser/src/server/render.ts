@@ -3,7 +3,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { qrCodeButtonHtml, qrCodeDialogHtml } from "@agents-in-the-cloud/design-system/qr-code";
 import { domId, escapeHtml, isWorkspaceLoopbackHost, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
-import { browserFrameId, type WorkspaceBrowserView } from "./state.ts";
+import { browserFrameId, browserNavigationCount, type WorkspaceBrowserView } from "./state.ts";
 
 export function browserWorkViewPresentation(view: WorkspaceBrowserView): WorkspaceWorkViewPresentation {
   return {
@@ -43,7 +43,7 @@ const workspacePreviewPermissions = [
 ].map((feature) => `${feature} *`).join("; ");
 
 export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserView, previewUrl: string): string {
-  const navigationKey = domId("browser_navigation", workspaceId, view.key, Bun.hash(previewUrl).toString(16));
+  const navigationKey = domId("browser_navigation", workspaceId, view.key, Bun.hash(`${previewUrl}#${browserNavigationCount(workspaceId, view.key)}`).toString(16));
   const target = view.targetUrl ? new URL(view.targetUrl) : undefined;
   const appKey = view.key;
   const frameControllerAttributes = previewUrl

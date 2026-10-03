@@ -19,6 +19,16 @@ function parseBrowserViews(value: JsonValue): WorkspaceBrowserView[] {
 }
 
 const browserViews = createWorkspaceMetadataState("browser-work-views.json", parseBrowserViews, () => []);
+// Bumped on every navigation so re-navigating to the same URL still reloads the preview iframe.
+const browserNavigationCounts = new Map<string, number>();
+
+function navigationCountKey(workspaceId: string, appKey: string): string {
+  return `${workspaceId}/${appKey}`;
+}
+
+export function browserNavigationCount(workspaceId: string, appKey: string): number {
+  return browserNavigationCounts.get(navigationCountKey(workspaceId, appKey)) ?? 0;
+}
 
 export function browserFrameId(workspaceId: string, appKey: string): string {
   return domId("browser_frame", workspaceId, appKey);
@@ -43,6 +53,7 @@ export function createWorkspaceBrowserView(workspaceId: string): WorkspaceBrowse
 
 export function deleteWorkspaceBrowserView(workspaceId: string, appKey: string): void {
   browserViews.write(workspaceId, browserViews.read(workspaceId).filter((view) => view.key !== appKey));
+  browserNavigationCounts.delete(navigationCountKey(workspaceId, appKey));
 }
 
 export function setWorkspaceBrowserTarget(workspaceId: string, appKey: string, input: string): WorkspaceBrowserView | undefined {
@@ -50,10 +61,12 @@ export function setWorkspaceBrowserTarget(workspaceId: string, appKey: string, i
   if (!view) return undefined;
   view.targetUrl = normalizeBrowserUrl(input);
   browserViews.write(workspaceId, browserViews.read(workspaceId));
+  browserNavigationCounts.set(navigationCountKey(workspaceId, appKey), browserNavigationCount(workspaceId, appKey) + 1);
   return view;
 }
 
 export function deleteWorkspaceBrowserState(workspaceId: string): void {
+  for (const view of browserViews.read(workspaceId)) browserNavigationCounts.delete(navigationCountKey(workspaceId, view.key));
   browserViews.delete(workspaceId);
 }
 
