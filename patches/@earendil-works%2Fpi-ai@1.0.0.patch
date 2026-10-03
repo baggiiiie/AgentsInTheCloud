@@ -1,0 +1,26 @@
+diff --git a/dist/api/openai-codex-responses.js b/dist/api/openai-codex-responses.js
+index 40014b3b7eacb3a8e5e43daac2cec6446e8810c2..6ee63ec3201e788c1843bb077ae263f91fc671ca 100644
+--- a/dist/api/openai-codex-responses.js
++++ b/dist/api/openai-codex-responses.js
+@@ -1279,7 +1279,11 @@ function extractAccountId(token) {
+     }
+ }
+ function buildBaseCodexHeaders(initHeaders, additionalHeaders, accountId, token) {
+-    const headers = new Headers(initHeaders);
++    // Defaults first so model and caller headers can override them, matching the other providers.
++    const headers = new Headers({ originator: "pi", "User-Agent": getPiUserAgent() });
++    for (const [key, value] of Object.entries(initHeaders || {})) {
++        headers.set(key, value);
++    }
+     for (const [key, value] of Object.entries(additionalHeaders || {})) {
+         if (value === null) {
+             headers.delete(key);
+@@ -1290,8 +1294,6 @@ function buildBaseCodexHeaders(initHeaders, additionalHeaders, accountId, token)
+     }
+     headers.set("Authorization", `Bearer ${token}`);
+     headers.set("chatgpt-account-id", accountId);
+-    headers.set("originator", "pi");
+-    headers.set("User-Agent", getPiUserAgent());
+     return headers;
+ }
+ function buildSSEHeaders(initHeaders, additionalHeaders, accountId, token, sessionId) {

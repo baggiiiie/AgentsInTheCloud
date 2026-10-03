@@ -2,7 +2,7 @@ import { createKeyedOperationQueue, type AgentsInTheCloudEventBus } from "@agent
 import { errorMessage } from "@agents-in-the-cloud/shared";
 import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@agents-in-the-cloud/workspace";
 import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
-import { cheapestAvailableProviderModel, createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/server";
+import { cheapestAvailableProviderModel, claudeCodeHeaders, createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/server";
 import { listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
 
 /**
@@ -139,7 +139,7 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
       }
       const response = await runtime.completeSimple(model, {
         messages: [{ role: "user", content: promptFor(promptText), timestamp: Date.now() }],
-      }, agentTitleRequestOptions);
+      }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model) });
       if (response.stopReason === "error") {
         logAgentTitleSuggestionError(agent, titleModelRef, response.errorMessage ?? "model returned an error", {
           stopReason: response.stopReason,
@@ -194,7 +194,7 @@ export async function suggestSessionSlug(userPrompt: string, selectedModel?: Mod
   if (!model || !(await runtime.checkAuth(model.provider))) return undefined;
   const response = await runtime.completeSimple(model, {
     messages: [{ role: "user", content: promptFor(userPrompt), timestamp: Date.now() }],
-  }, agentTitleRequestOptions);
+  }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model) });
   if (response.stopReason === "error") return undefined;
   return normalizeSlug(textFromResponse(response));
 }

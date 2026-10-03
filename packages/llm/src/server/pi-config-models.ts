@@ -7,10 +7,11 @@ import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { forgetSubscriptionInference } from "./recent-subscription-activity.ts";
 import { defaultProviderModels, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { arch, platform, release } from "node:os";
 import { dirname, join } from "node:path";
 import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, readTextIfExists, writeJsonAtomic, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 import { errorMessage } from "@agents-in-the-cloud/shared";
-import type { AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
+import type { Api, AuthInteraction, AuthPrompt, Model, ProviderHeaders } from "@earendil-works/pi-ai";
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -183,10 +184,33 @@ export function cheapestProviderModel(runtime: Pick<ModelRuntime, "getModels">, 
   return runtime.getModels(provider).toSorted((a, b) => a.cost.input - b.cost.input)[0];
 }
 
+const agentsInTheCloudUserAgent = `AgentsInTheCloud (${platform()} ${release()}; ${arch()})`;
+
+/** Introduces AgentsInTheCloud to providers instead of pi. Caller headers still win. */
+function identifyAsAgentsInTheCloud(runtime: ModelRuntime): ModelRuntime {
+  const withIdentity = (model: Model<Api>, headers: ProviderHeaders | undefined): ProviderHeaders | undefined => {
+    // Anthropic subscriptions only accept requests that identify as Claude Code.
+    if (model.provider === "anthropic" && runtime.isUsingOAuth(model.provider)) return headers;
+    const identity: ProviderHeaders = model.api === "openai-codex-responses" ? { "User-Agent": agentsInTheCloudUserAgent, originator: "AgentsInTheCloud" } : { "User-Agent": agentsInTheCloudUserAgent };
+    return { ...identity, ...headers };
+  };
+  // Instance overrides also catch completeSimple, fetchDeferred, and the runtime's own re-entry when it routes virtual models.
+  const streamSimple = runtime.streamSimple.bind(runtime);
+  const streamDeferred = runtime.streamDeferred.bind(runtime);
+  runtime.streamSimple = (model, context, options) => streamSimple(model, context, { ...options, headers: withIdentity(model, options?.headers) });
+  runtime.streamDeferred = (model, handle, options) => streamDeferred(model, handle, { ...options, headers: withIdentity(model, options?.headers) });
+  return runtime;
+}
+
+/** Housekeeping requests to Anthropic pose as Claude Code, the version pi already claims for Claude subscriptions. */
+export function claudeCodeHeaders(model: Model<Api>): ProviderHeaders | undefined {
+  return model.provider === "anthropic" ? { "User-Agent": "claude-cli/2.1.280", "x-app": "cli" } : undefined;
+}
+
 export function createPiModelRuntime(): Promise<ModelRuntime> {
   return modelRuntime ??= (async () => {
     await preparePiModelsJson();
-    return await ModelRuntime.create({ authPath: piAuthJsonPath(), modelsPath: piModelsJsonPath() });
+    return identifyAsAgentsInTheCloud(await ModelRuntime.create({ authPath: piAuthJsonPath(), modelsPath: piModelsJsonPath() }));
   })();
 }
 
@@ -229,11 +253,11 @@ async function validateModelProviderApiKey(provider: string, key: string): Promi
   if (!trimmed) throw new Error("API key is required");
   const credentials = new InMemoryCredentialStore();
   await credentials.modify(provider, async () => ({ type: "api_key", key: trimmed }));
-  const runtime = await ModelRuntime.create({ credentials, modelsPath: piModelsJsonPath(), allowModelNetwork: false });
+  const runtime = identifyAsAgentsInTheCloud(await ModelRuntime.create({ credentials, modelsPath: piModelsJsonPath(), allowModelNetwork: false }));
   const models = runtime.getModels(provider);
   const model = models[Math.floor(Math.random() * models.length)];
   if (!model) throw new Error(`No models found for provider "${provider}"`);
-  const response = await runtime.completeSimple(model, { messages: [{ role: "user", content: "Reply with exactly: ok", timestamp: Date.now() }] }, { maxTokens: 1 });
+  const response = await runtime.completeSimple(model, { messages: [{ role: "user", content: "Reply with exactly: ok", timestamp: Date.now() }] }, { maxTokens: 1, headers: claudeCodeHeaders(model) });
   if (response.stopReason === "error") throw new Error(response.errorMessage ?? "Provider rejected the API key");
 }
 
