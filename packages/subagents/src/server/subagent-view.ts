@@ -63,6 +63,9 @@ function childrenHtml(workspaceId: string, parentId: string, agents: SubagentRec
 function emptyHtml(workspaceId: string, empty: boolean): string {
   return `<div id="subagents-empty-${h(workspaceId)}" class="subagents-empty"${empty ? "" : " hidden"}>No delegated tasks for this agent yet.</div>`;
 }
+function unsupportedHtml(workspaceId: string): string {
+  return `<div id="subagents-unsupported-${h(workspaceId)}" class="subagents-empty">This Subagents view only works with the Builtin agent.</div>`;
+}
 function renderSubagentTree(workspaceId: string, rootId: string, agents: SubagentRecord[], open = new Set<string>()): string {
   return childrenHtml(workspaceId, rootId, agents, open) + emptyHtml(workspaceId, agents.length === 0);
 }
@@ -70,7 +73,14 @@ function renderSubagentTree(workspaceId: string, rootId: string, agents: Subagen
 /** Publish the tree while preserving independently subscribed child transcripts. */
 export async function subscribeSubagentTree(workspaceId: string, rootId: string, listener: (html: string) => void): Promise<AgentLivePresentationSubscription> {
   const roots = await listWorkspaceAgentConversations(workspaceId);
-  if (!roots.some((root) => root.conversationId === rootId)) throw new Error("Subagent root not found");
+  if (!roots.some((root) => root.conversationId === rootId)) {
+    const presentation = createLivePresentation(() => [{
+      target: `subagents-content-${workspaceId}`,
+      html: unsupportedHtml(workspaceId),
+    }]);
+    const subscription = presentation.subscribe(listener);
+    return { unsubscribe() { subscription.unsubscribe(); presentation.dispose(); } };
+  }
   const owner = await durableWorkspaceOwner(workspaceId);
   let snapshot = await nativeSnapshot(workspaceId);
   const presentation = createLivePresentation(() => [{
