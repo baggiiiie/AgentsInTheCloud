@@ -242,7 +242,7 @@ function forgetSubscriptionState(provider: string): void {
 export async function loginPiOAuthProvider(providerId: string, interaction: AuthInteraction): Promise<void> {
   const runtime = await createPiModelRuntime();
   const deviceId = await piDeviceId();
-  await runtime.login(providerId, "oauth", interaction, { getDeviceId: () => deviceId });
+  await runtime.login(providerId, "oauth", interaction, { getDeviceId: () => deviceId, agentName: "AgentsInTheCloud" });
   forgetSubscriptionState(providerId);
   if (providerId === "openai" || providerId === "anthropic") await syncSubscriptionClis(runtime);
   await refreshConnectedProviderCatalogue(runtime, providerId, interaction.signal);
