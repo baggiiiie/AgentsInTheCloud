@@ -1,7 +1,6 @@
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
-import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
 import { qrCodeButtonHtml, qrCodeDialogHtml } from "@agents-in-the-cloud/design-system/qr-code";
 import { domId, escapeHtml, isWorkspaceLoopbackHost, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { browserFrameId, type WorkspaceBrowserView } from "./state.ts";
@@ -66,35 +65,16 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
   const qrDialogId = `${navigationKey}_qr`;
   const qrButton = qrCodeButtonHtml(qrDialogId, "Open preview on your phone", !target);
   const qrDialog = target ? qrCodeDialogHtml(qrDialogId, previewUrl) : "";
-  const backButton = buttonHtml({
-    type: "button",
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>', label: "Back" },
-    disabled: true,
-  });
-  const forwardButton = buttonHtml({
-    type: "button",
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>', label: "Forward" },
-    disabled: true,
-  });
   const reloadButton = buttonHtml({
     type: "button",
     variant: "secondary",
     content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.5-2.6L20 9M4 15l2.4 2.6A7 7 0 0 0 17.9 15"/></svg>', label: "Reload" },
     attributesHtml: 'data-action="browser-address#reload"',
   });
-  const navigation = buttonGroupHtml({
-    orientation: "horizontal",
-    semantics: "group",
-    label: "Browser navigation",
-    itemsHtml: `${backButton}${forwardButton}${reloadButton}`,
-  });
   return `<turbo-frame id="${browserFrameId(workspaceId, appKey)}" class="browser-frame">
     <div class="browser-shell">
       <form class="browser-toolbar work-view-toolbar" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/browser/${encodeURIComponent(appKey)}/navigate" data-turbo-frame="${browserFrameId(workspaceId, appKey)}" data-controller="browser-address" data-action="submit->browser-address#submit">
-        <div class="browser-window-controls" aria-hidden="true"><span class="red"></span><span class="amber"></span><span class="green"></span></div>
-        <div class="browser-navigation">${navigation}</div>
+        ${reloadButton}
         <input id="${navigationKey}_address" data-turbo-permanent class="browser-address-input text-field" name="url" value="${escapeHtml(view.targetUrl)}" placeholder="http://localhost:3000" spellcheck="false" autocomplete="off" aria-label="Browser URL" data-action="click->browser-address#initializeAddress">
         ${externalLink}
         ${qrButton}
