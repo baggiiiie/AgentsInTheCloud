@@ -70,12 +70,6 @@
       "afterRun": true
     },
     {
-      "from": "rootfs/usr/local/bin/chromium",
-      "to": "/usr/local/bin/chromium",
-      "mode": "0755",
-      "afterRun": true
-    },
-    {
       "from": "rootfs/usr/local/bin/agents-in-the-cloud-workspace-init",
       "to": "/usr/local/bin/agents-in-the-cloud-workspace-init",
       "mode": "0755",
@@ -85,6 +79,11 @@
       "from": "rootfs/usr/local/bin/docker",
       "to": "/usr/local/bin/docker",
       "mode": "0755",
+      "afterRun": true
+    },
+    {
+      "from": "rootfs/etc/profile.d/agents-in-the-cloud-tools.sh",
+      "to": "/etc/profile.d/agents-in-the-cloud-tools.sh",
       "afterRun": true
     }
   ],
@@ -105,6 +104,7 @@
     "LC_ALL": "C.UTF-8",
     "XDG_CONFIG_HOME": "/home/agents-in-the-cloud/.config",
     "NODE_PATH": "/usr/local/lib/node_modules",
-    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright"
+    "PLAYWRIGHT_BROWSERS_PATH": "/ms-playwright",
+    "PATH": "/opt/agents-in-the-cloud/bin:${PATH}"
   }
 }

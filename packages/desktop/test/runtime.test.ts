@@ -10,7 +10,7 @@ test("desktop operations use the workspace-owned runtime, returning live connect
   const runtime = createDesktopRuntime(async (workspace, command) => { calls.push([workspace, command]); return result(running); });
   expect(await runtime.start("workspace")).toEqual(running);
   expect(await runtime.status("workspace")).toEqual(running);
-  expect(calls).toEqual([ ["workspace", ["agents-in-the-cloud-desktop", "start"]], ["workspace", ["agents-in-the-cloud-desktop", "status"]] ]);
+  expect(calls).toEqual([ ["workspace", ["/opt/agents-in-the-cloud/bin/agents-in-the-cloud-desktop", "start"]], ["workspace", ["/opt/agents-in-the-cloud/bin/agents-in-the-cloud-desktop", "status"]] ]);
 });
 
 test("failed startup never returns CDP details as if ready", async () => {

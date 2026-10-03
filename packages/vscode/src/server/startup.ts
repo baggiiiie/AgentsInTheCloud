@@ -40,7 +40,7 @@ export function vscodeStartupScript(workspaceFile: string): string {
     # An owned listener may still be booting. Start only when the port is free.
     if ! listener_is_owned; then
       printf '%s\n' '${JSON.stringify({ folders: [{ path: workspaceRoot }] })}' > ${shellQuote(workspaceFile)}
-      ATELIER_VSCODE_HOST=0.0.0.0 ATELIER_VSCODE_PORT=${workspaceVSCodePort} ATELIER_VSCODE_DEFAULT_WORKSPACE=${shellQuote(workspaceFile)} nohup agents-in-the-cloud-start-vscode > /.agents-in-the-cloud/vscode/server.log 2>&1 9>&- &
+      ATELIER_VSCODE_HOST=0.0.0.0 ATELIER_VSCODE_PORT=${workspaceVSCodePort} ATELIER_VSCODE_DEFAULT_WORKSPACE=${shellQuote(workspaceFile)} nohup /opt/agents-in-the-cloud/bin/agents-in-the-cloud-start-vscode > /.agents-in-the-cloud/vscode/server.log 2>&1 9>&- &
       started_pid=$!
     fi
 

@@ -13,7 +13,7 @@ export type RunningDesktop = Extract<DesktopStatus, { phase: "running" }>;
 
 export function createDesktopRuntime(exec: (workspaceId: string, command: string[]) => Promise<WorkspaceExecResult>) {
   async function invoke(workspaceId: string, command: "start" | "status"): Promise<DesktopStatus> {
-    const result = await exec(workspaceId, ["agents-in-the-cloud-desktop", command]);
+    const result = await exec(workspaceId, ["/opt/agents-in-the-cloud/bin/agents-in-the-cloud-desktop", command]);
     if (result.exitCode === 127) {
       throw new Error(`Desktop runtime unavailable. Recreate this workspace with the current workspace image. ${result.stderr.trim() || result.stdout.trim()}`.trim());
     }

@@ -10,7 +10,7 @@ export const DEFAULT_VIEWPORT = { width: 1440, height: 900 } as const;
 export const DEFAULT_FRAME_RATE = 25;
 export const CHROMIUM_PATH = process.platform === "darwin"
 	? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-	: "/usr/local/bin/chromium";
+	: "/opt/agents-in-the-cloud/bin/chromium";
 export const FFMPEG_PATH = "/usr/bin/ffmpeg";
 export const FFPROBE_PATH = "/usr/bin/ffprobe";
 export const DEFAULT_ARTIFACT_ROOT = "/work/artifacts";

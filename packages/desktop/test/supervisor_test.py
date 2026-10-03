@@ -1,13 +1,18 @@
 import importlib.util
+from importlib.machinery import SourceFileLoader
 from pathlib import Path
 import signal
+import sys
 import socket
 import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-spec = importlib.util.spec_from_file_location("desktop", Path(__file__).parent.parent / "workspace-image/agents-in-the-cloud-desktop.py")
+# The deployed tools directory contains only executable files.
+sys.dont_write_bytecode = True
+loader = SourceFileLoader("desktop", str(Path(__file__).parent.parent / "workspace_tools/agents-in-the-cloud-desktop"))
+spec = importlib.util.spec_from_loader(loader.name, loader)
 desktop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(desktop)
 

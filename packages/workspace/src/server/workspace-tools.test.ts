@@ -43,12 +43,25 @@ test("combines package tools into one read-only executable directory and synchro
   }
 });
 
-test("includes the agent bash helper in the shared tools directory", async () => {
+test("publishes package-owned workspace helpers as executable tools", async () => {
   const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-tools-mount-"));
   try {
     await prepareWorkspaceToolsMount({ agentsInTheCloudDataDir: root, dockerHostAgentsInTheCloudDataDir: root, dockerBridgeHost: "unused" });
-    expect(await readFile(join(root, "workspace-tools/agents-in-the-cloud-agent-bash"), "utf8"))
-      .toBe(await readFile(new URL("../../../agent/workspace_tools/agents-in-the-cloud-agent-bash", import.meta.url), "utf8"));
+    for (const [packageName, name] of [
+      ["agent", "agents-in-the-cloud-agent-bash"],
+      ["desktop", "agents-in-the-cloud-desktop"],
+      ["vscode", "agents-in-the-cloud-start-vscode"],
+      ["workspace-terminal", "pbcopy"],
+      ["workspace-image", "chromium"],
+    ]) {
+      const published = join(root, "workspace-tools", name!);
+      expect(await readFile(published, "utf8"))
+        .toBe(await readFile(new URL(`../../../${packageName}/workspace_tools/${name}`, import.meta.url), "utf8"));
+      expect((await stat(published)).mode & 0o777).toBe(0o755);
+    }
+    const clipboard = Bun.spawnSync([join(root, "workspace-tools/pbcopy")], { stdin: Buffer.from("clipboard text") });
+    expect(clipboard.exitCode).toBe(0);
+    expect(clipboard.stdout.toString()).toBe("\x1b]52;c;Y2xpcGJvYXJkIHRleHQ=\x07");
   } finally {
     await rm(root, { recursive: true, force: true });
   }

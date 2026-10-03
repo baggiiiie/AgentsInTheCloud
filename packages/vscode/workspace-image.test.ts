@@ -55,7 +55,7 @@ test("VS Code startup keeps server state outside home and preserves existing set
   await chmod(server, 0o755);
   await writeFile(join(imageRoot, "vscode-defaults/Machine/settings.json"), '{"default":true}');
   await writeFile(join(imageRoot, "vscode-defaults/Machine/mcp.json"), '{"servers":{}}');
-  const startup = (await readFile(new URL("./workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-start-vscode", import.meta.url), "utf8"))
+  const startup = (await readFile(new URL("./workspace_tools/agents-in-the-cloud-start-vscode", import.meta.url), "utf8"))
     .replaceAll("/opt/agents-in-the-cloud", imageRoot)
     .replaceAll("/.agents-in-the-cloud", stateRoot);
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("ATELIER_VSCODE_")));

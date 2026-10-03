@@ -51,9 +51,36 @@ describe("workspace image content identity", () => {
     await writeFile(generator, (await readFile(generator, "utf8")).replace("WORKDIR /work", "WORKDIR /changed-work"));
     const instructionChange = await generateContext(before.fixture);
     expect(instructionChange.metadata).not.toBe(before.metadata);
-    await chmod(join(before.fixture, "packages/workspace-image/rootfs/usr/local/bin/chromium"), 0o700);
+    await chmod(join(before.fixture, "packages/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init"), 0o700);
     const permissionChange = await generateContext(before.fixture);
     expect(permissionChange.metadata).not.toBe(instructionChange.metadata);
+  });
+
+  test("adds mounted tools to the inherited PATH and restores them for login shells", async () => {
+    const { dockerfile, output } = await generateInCheckout();
+    expect(dockerfile).toContain('PATH="/opt/agents-in-the-cloud/bin:${PATH}"');
+    const profile = await readFile(join(output, "files/base/rootfs/etc/profile.d/agents-in-the-cloud-tools.sh"), "utf8");
+    const result = Bun.spawnSync(["/bin/sh", "-ec", `${profile}\nprintf '%s' "$PATH"`], {
+      env: { PATH: "/custom/bin:/usr/bin:/bin" },
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString()).toBe("/opt/agents-in-the-cloud/bin:/custom/bin:/usr/bin:/bin");
+  });
+
+  test("mounted helper changes do not change the image or its identity", async () => {
+    const before = await generateInCheckout();
+    for (const [packageName, name] of [
+      ["desktop", "agents-in-the-cloud-desktop"],
+      ["vscode", "agents-in-the-cloud-start-vscode"],
+      ["workspace-terminal", "pbcopy"],
+      ["workspace-image", "chromium"],
+    ]) {
+      expect(before.dockerfile).not.toContain(`/usr/local/bin/${name}`);
+      await appendFile(join(before.fixture, "packages", packageName!, "workspace_tools", name!), "\n# mounted helper update\n");
+    }
+    const after = await generateContext(before.fixture);
+    expect(after.metadata).toBe(before.metadata);
+    expect(after.dockerfile).toBe(before.dockerfile);
   });
 
   test("equivalent checkouts at different absolute paths produce identical output", async () => {
@@ -95,7 +122,6 @@ describe("workspace image layer ordering", () => {
 
   test.each([
     ["packages/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init", "files/base/rootfs/usr/local/bin/agents-in-the-cloud-workspace-init"],
-    ["packages/vscode/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-start-vscode", "files/vscode/workspace-image/rootfs/usr/local/bin/agents-in-the-cloud-start-vscode"],
   ])("copies runtime script %s only after module setup", async (sourcePath, packagedPath) => {
     const before = await generateInCheckout();
     const copy = `COPY ${JSON.stringify(packagedPath)}`;
