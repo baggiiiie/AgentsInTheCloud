@@ -22,15 +22,6 @@ const packagesDir = new URL("packages/", root);
 const clientOutputUrl = new URL("../src/client/workspace-client-modules.generated.ts", import.meta.url);
 const serverOutputUrl = new URL("../src/server/workspace-modules.generated.ts", import.meta.url);
 
-function disabledPackageNames(): Set<string> {
-  const disabled = new Set<string>();
-  for (const name of (process.env.ATELIER_DISABLED_WORKSPACE_MODULES ?? "").split(",")) {
-    const trimmed = name.trim();
-    if (trimmed) disabled.add(trimmed);
-  }
-  return disabled;
-}
-
 async function readPackageJson(url: URL): Promise<PackageJson> {
   return Value.Parse(packageJsonSchema, JSON.parse(await readFile(url, "utf8")));
 }
@@ -54,14 +45,13 @@ function exportsName(source: string, exportName: string): boolean {
 
 async function discoverModules(subpath: "client" | "server", exportName: DiscoveredModule["exportName"]): Promise<DiscoveredModule[]> {
   const packages = await readdir(packagesDir, { withFileTypes: true });
-  const disabled = disabledPackageNames();
   const modules: DiscoveredModule[] = [];
 
   for (const entry of packages) {
     if (!entry.isDirectory()) continue;
     const packageJsonUrl = new URL(`${entry.name}/package.json`, packagesDir);
     const manifest = await readPackageJson(packageJsonUrl);
-    if (!manifest.name || disabled.has(manifest.name) || !hasExport(manifest, `./${subpath}`)) continue;
+    if (!manifest.name || !hasExport(manifest, `./${subpath}`)) continue;
 
     const index = await fileText(new URL(`${entry.name}/src/${subpath}/index.ts`, packagesDir));
     if (!index || !exportsName(index, exportName)) continue;

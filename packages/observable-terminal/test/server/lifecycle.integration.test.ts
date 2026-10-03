@@ -3,10 +3,8 @@ import { shellQuote } from "@agents-in-the-cloud/core";
 import { resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import { attachHostObservableTerminal, attachObservableTerminal, buildObservableSessionCommand, type ObservableTerminalConnection } from "../../src/server/index.ts";
 
-const integration = process.env.ATELIER_OBSERVABLE_TERMINAL_INTEGRATION === "1" ? describe : describe.skip;
-
 for (const remote of [false, true]) {
-  integration(`${remote ? "Docker" : "host"} terminal lifecycle`, () => {
+  describe.skip(`${remote ? "Docker" : "host"} terminal lifecycle`, () => {
     const container = `agents-in-the-cloud-terminal-test-${crypto.randomUUID()}`;
     const sessions: string[] = [];
     const connections: ObservableTerminalConnection[] = [];

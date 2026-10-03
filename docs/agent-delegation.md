@@ -83,19 +83,7 @@ survive root archival and workspace deletion, just like root history. Replacemen
 sessions reuse the root identity/tree; timestamps and tool-call IDs distinguish runs.
 A child interrupted before its session was created may have only a ledger record.
 
-## Disabling and validation
-
-The existing generator option remains supported:
-
-```sh
-ATELIER_DISABLED_WORKSPACE_MODULES=@agents-in-the-cloud/subagents bun run generate:workspace-modules
-```
-
-Without that workspace module, startup does not install delegation, and there are
-no delegation tools, instructions, routes, views, controllers, CSS or tree channel.
-Saved files remain; saved disabled Work views use the existing unavailable state.
-Regenerate normally to restore the module. This is optional installation, not a
-package-deletion guarantee: application startup explicitly imports Subagents.
+## Validation
 
 Run `bun run check` and `bun run test`. Non-UI checks exercise close/unload/removal,
 custom history handling, request-scoped adaptation and failure propagation, Cable

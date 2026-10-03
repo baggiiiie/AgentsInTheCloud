@@ -389,7 +389,7 @@ export function registerProjectWorkspaceInitEvents(events: AgentsInTheCloudEvent
     if (isGitProjectInit(init)) {
       const settings = await getProjectConfiguration(init.projectId);
       plan.privileged = settings.privileged;
-      plan.dockerSupportSettingsUrl = `${process.env.ATELIER_PUBLIC_URL ?? ""}/projects/${encodeURIComponent(init.projectId)}/settings?section=privileged`;
+      plan.dockerSupportSettingsUrl = `/projects/${encodeURIComponent(init.projectId)}/settings?section=privileged`;
       plan.preloadImages = [...settings.preloadImages ?? []];
       plan.mounts.push({ type: "bind", ...(await projectPersistentMount(init.projectId)) });
       Object.assign(plan.env, Object.fromEntries(settings.environment.map(({ name, value }) => [name, value])));

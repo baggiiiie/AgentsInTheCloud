@@ -112,7 +112,7 @@ Run `bun run test:gateway` with Go 1.26+ installed for the real Bun-ingress/Go-g
 
 ## Remote HTTPS
 
-When AgentsInTheCloud is reached over HTTPS, every active browser-origin port must also be reachable with a trusted HTTPS certificate. The supported automatic configuration uses `ATELIER_TAILSCALE_SERVE=1` with an HTTPS `ATELIER_PUBLIC_URL`; AgentsInTheCloud publishes and retracts active origins through Tailscale Serve. An operator using another trusted-network reverse proxy must equivalently terminate HTTPS and forward the managed origin range (41000–41999 by default) to the same local ports. Publishing only AgentsInTheCloud's main port is insufficient because each app origin intentionally has a separate browser origin.
+When AgentsInTheCloud is reached over HTTPS, every active browser-origin port must also be reachable with a trusted HTTPS certificate. With Tailscale remote access, AgentsInTheCloud publishes and retracts active origins through Tailscale Serve. An operator using another trusted-network reverse proxy must equivalently terminate HTTPS and forward the managed origin range (41000–41999 by default) to the same local ports. Publishing only AgentsInTheCloud's main port is insufficient because each app origin intentionally has a separate browser origin.
 
 ## Why not container IPs?
 

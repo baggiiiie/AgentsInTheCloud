@@ -10,15 +10,13 @@ import {
   createWorkspaceIngressSockets,
   detectParentOriginPublisher,
   defaultPublicOriginPortRange,
-  publicWorkspaceAppOrigin,
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
-import { agentsInTheCloudName, errorMessage, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { agentsInTheCloudName, errorMessage, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
 import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { ServerWebSocket } from "bun";
-import { timingSafeEqual as timingSafeEqualBytes } from "node:crypto";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Type } from "typebox";
@@ -36,161 +34,11 @@ const requestedPort = Number(process.env.PORT ?? 3000);
 const hostname = process.env.HOST ?? "0.0.0.0";
 const devReloadFile = process.argv.find((argument) => argument.startsWith("--agents-in-the-cloud-dev-reload-file="))?.slice("--agents-in-the-cloud-dev-reload-file=".length);
 
-const authPassword = process.env.ATELIER_PASSWORD ?? "";
-
 function displayUrl(host: string, port: number): string {
   const displayHost = host === "0.0.0.0" ? "127.0.0.1" : host;
   const formattedHost = displayHost.includes(":") && !displayHost.startsWith("[") ? `[${displayHost}]` : displayHost;
   return `http://${formattedHost}${port === 80 ? "" : `:${port}`}`;
 }
-const authCookieName = "agents-in-the-cloud_session";
-const authCookieMaxAgeSeconds = 60 * 60 * 24 * 30;
-const authSessionPayloadSchema = Type.Object({
-  expires: Type.Integer(),
-  nonce: Type.String(),
-});
-
-function authEnabled(): boolean {
-  return authPassword.length > 0;
-}
-
-function base64Url(bytes: ArrayBuffer | Uint8Array): string {
-  const array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return Buffer.from(array).toString("base64url");
-}
-
-async function hmac(input: string): Promise<string> {
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(authPassword), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  return base64Url(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(input)));
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  const left = new TextEncoder().encode(a);
-  const right = new TextEncoder().encode(b);
-  return left.length === right.length && timingSafeEqualBytes(left, right);
-}
-
-function cookieValue(request: Request, name: string): string | undefined {
-  const cookie = request.headers.get("cookie") ?? "";
-  for (const part of cookie.split(";")) {
-    const [rawName, ...rawValue] = part.trim().split("=");
-    if (rawName === name) return rawValue.join("=");
-  }
-  return undefined;
-}
-
-async function createAuthSessionCookie(): Promise<string> {
-  const expires = Math.floor(Date.now() / 1000) + authCookieMaxAgeSeconds;
-  const nonce = crypto.randomUUID();
-  const payload = base64Url(new TextEncoder().encode(JSON.stringify({ expires, nonce })));
-  return `${payload}.${await hmac(payload)}`;
-}
-
-async function isAuthenticated(request: Request): Promise<boolean> {
-  if (!authEnabled()) return true;
-  const value = cookieValue(request, authCookieName);
-  if (!value) return false;
-  const [payload, signature] = value.split(".");
-  if (!payload || !signature || !timingSafeEqual(signature, await hmac(payload))) return false;
-  try {
-    const normalized = payload.replaceAll("-", "+").replaceAll("_", "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const data = Value.Parse(
-      authSessionPayloadSchema,
-      JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(padded), (char) => char.charCodeAt(0)))),
-    );
-    return data.expires > Math.floor(Date.now() / 1000);
-  } catch {
-    return false;
-  }
-}
-
-function isHttpsRequest(request: Request): boolean {
-  return new URL(publicWorkspaceAppOrigin(request)).protocol === "https:";
-}
-
-function sharedCookieDomain(request: Request): string | undefined {
-  const hostname = new URL(publicWorkspaceAppOrigin(request)).hostname.toLowerCase();
-  if (hostname === "localhost" || hostname.endsWith(".localhost") || /^[\d.]+$/.test(hostname) || hostname.includes(":")) return undefined;
-  const labels = hostname.split(".").filter(Boolean);
-  if (labels.length < 2) return undefined;
-  return `.${labels.slice(-2).join(".")}`;
-}
-
-function authCookieAttributes(request: Request, maxAge = authCookieMaxAgeSeconds): string {
-  const secure = isHttpsRequest(request) ? "; Secure" : "";
-  const cookieDomain = sharedCookieDomain(request);
-  const domain = cookieDomain ? `; Domain=${cookieDomain}` : "";
-  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}${domain}`;
-}
-
-function loginPage(next: string, error = ""): Response {
-  return response(`<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${escapeHtml(agentsInTheCloudName)}</title>
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-<link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#eadcc6">
-<style>
-  html { touch-action: manipulation; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f6f8fc; color: #172033; }
-  form { width: min(360px, calc(100vw - 32px)); display: grid; gap: 14px; padding: 24px; border: 1px solid #d8e0ec; border-radius: 16px; background: white; box-shadow: 0 18px 50px rgba(15, 23, 42, .08); }
-  h1 { margin: 0; font-size: 18px; }
-  input, button { font: inherit; border-radius: 10px; padding: 10px 12px; }
-  input { border: 1px solid #cbd5e1; }
-  button { border: 0; background: #2563eb; color: white; font-weight: 650; cursor: pointer; }
-  .error { color: #b42318; min-height: 20px; }
-</style>
-</head>
-<body>
-<form method="post" action="/login">
-  <h1>Sign in to ${escapeHtml(agentsInTheCloudName)}</h1>
-  ${error ? `<div class="error">${escapeHtml(error)}</div>` : `<div class="error"></div>`}
-  <input type="hidden" name="next" value="${escapeHtml(next)}">
-  <input name="password" type="password" placeholder="Password" autocomplete="current-password" autofocus required>
-  <button type="submit">Sign in</button>
-</form>
-</body>
-</html>`);
-}
-
-function redirectToLogin(request: Request): Response {
-  const url = new URL(request.url);
-  const next = `${url.pathname}${url.search}`;
-  return Response.redirect(new URL(`/login?next=${encodeURIComponent(next)}`, url).toString(), 303);
-}
-
-async function authResponse(request: Request): Promise<Response | undefined> {
-  if (!authEnabled()) return undefined;
-  const url = new URL(request.url);
-  if (url.pathname === "/up") return undefined;
-  if (url.pathname === "/login" && request.method === "GET") return loginPage(url.searchParams.get("next") || "/");
-  if (url.pathname === "/login" && request.method === "POST") {
-    const form = await request.formData();
-    const next = String(form.get("next") || "/");
-    const password = String(form.get("password") || "");
-    if (!timingSafeEqual(password, authPassword)) return loginPage(next, "Invalid password");
-    const response = Response.redirect(new URL(next.startsWith("/") ? next : "/", url).toString(), 303);
-    response.headers.append("set-cookie", `${authCookieName}=${await createAuthSessionCookie()}; ${authCookieAttributes(request)}`);
-    return response;
-  }
-  if (url.pathname === "/logout") {
-    const response = Response.redirect(new URL("/login", url).toString(), 303);
-    response.headers.append("set-cookie", `${authCookieName}=; ${authCookieAttributes(request, 0)}`);
-    return response;
-  }
-  if (await isAuthenticated(request)) return undefined;
-  const accepts = request.headers.get("accept") ?? "";
-  if (request.method === "GET" && accepts.includes("text/html")) return redirectToLogin(request);
-  return textResponse("unauthorized\n", { status: 401 });
-}
-
 const agentsInTheCloudEvents = createAgentsInTheCloudEventBus();
 configureAgentMcp(agentsInTheCloudEvents);
 const socketHandlers: WorkspaceServerSocketHandler[] = [];
@@ -490,9 +338,6 @@ const server = Bun.serve<SocketData>({
     const mcpResponse = await handleAgentMcpRequest(request);
     if (mcpResponse) return mcpResponse;
 
-    const auth = await authResponse(request);
-    if (auth) return auth;
-
     if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
       const socketData = await validateSocket(request, url);
       if (!socketData) return textResponse("not found", { status: 404 });
@@ -536,7 +381,7 @@ void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_started", {
   workspaces: persistedWorkspaces.map(({ id, parked }) => ({ id, parked: Boolean(parked) })),
 }).catch((error) => console.error("AgentsInTheCloud startup handlers failed", error));
 
-console.log(`${agentsInTheCloudName} is available at ${process.env.ATELIER_PUBLIC_URL || displayUrl(hostname, serverPort)}`);
+console.log(`${agentsInTheCloudName} is available at ${displayUrl(hostname, serverPort)}`);
 
 void recoverWorkspaces(registry, workspaceStartupOperations).catch((error) => console.error("Workspace recovery failed", error));
 
