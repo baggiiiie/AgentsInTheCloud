@@ -12,6 +12,7 @@ export {
   projectWorkspaceInit,
   updateProject,
   setProjectDockerfile,
+  setProjectPrivileged,
   setProjectPreloadImages,
   type AddProjectResult,
   type DeleteProjectResult,

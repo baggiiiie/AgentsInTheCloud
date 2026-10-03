@@ -129,6 +129,7 @@ export async function initializeResources() {
   await mkdir("/run/atelier-system", { recursive: true });
   await writeFile("/run/atelier-system/resources.json", JSON.stringify(result));
   const config = JSON.parse(await readFile("/etc/docker/daemon.json", "utf8"));
+  config.runtimes = { ...config.runtimes, "atelier-cgroup": { path: "/usr/local/bin/atelier-cgroup-runc" } };
   config["cgroup-parent"] = result.workloadsCgroupParent;
   config["exec-opts"] = ["native.cgroupdriver=cgroupfs"];
   await writeFile("/run/atelier-system/daemon.json", JSON.stringify(config));

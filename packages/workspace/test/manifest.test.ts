@@ -47,16 +47,12 @@ describe("workspace manifest init scripts", () => {
 });
 
 describe("workspace manifest Docker configuration", () => {
-  test("accepts optional Docker privilege", () => {
+  test("rejects removed repository-controlled Docker settings", () => {
     expect(parse({ version: 1 })).toEqual({ version: 1 });
-    expect(parse({ version: 1, docker: {} }).docker).toEqual({});
-    for (const privileged of [true, false]) {
-      expect(parse({ version: 1, docker: { privileged } }).docker).toEqual({ privileged });
+    const removedSettings: JsonObject[] = [{}, { privileged: true }, { privileged: false }, { privileged: "true" }];
+    for (const docker of removedSettings) {
+      expectInvalid({ version: 1, docker }, "docker settings are no longer supported; use Project settings");
     }
-  });
-
-  test("rejects a non-boolean Docker privilege", () => {
-    expectInvalid({ version: 1, docker: { privileged: "true" } }, "docker.privileged must be a boolean");
   });
 
   test("rejects removed special-purpose fields", () => {

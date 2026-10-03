@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAtelierEventBus } from "@atelier/core";
 import type { WorkspaceDockerPlan } from "@atelier/workspace";
-import { addProject, createProjectSecret, getProjectConfiguration, isGitProjectInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, registerProjectWorkspaceInitEvents, setProjectPreloadImages, updateProjectSecret, validateProjectWorkspaceSettings, writeProjectWorkspaceSettings, type ProjectWorkspaceSettings } from "../src/index.ts";
+import { addProject, createProjectSecret, getProjectConfiguration, isGitProjectInit, projectWorkspaceInitWithSettings, readProjectWorkspaceSettings, registerProjectWorkspaceInitEvents, setProjectPreloadImages, setProjectPrivileged, updateProjectSecret, validateProjectWorkspaceSettings, writeProjectWorkspaceSettings, type ProjectWorkspaceSettings } from "../src/index.ts";
 
 const defaults: ProjectWorkspaceSettings = { dockerfile: "", preloadImages: [], environment: [] };
 
@@ -89,7 +89,35 @@ describe("complete project workspace settings", () => {
     expect((await readProjectWorkspaceSettings(projectId)).settingsRevision).toBe(settingsRevision);
   });
 
+  test("privilege defaults off, requires host authorization, and follows the project at provisioning", async () => {
+    const initial = await getProjectConfiguration(projectId);
+    expect(initial.privileged).toBe(false);
+    const revision = await readProjectWorkspaceSettings(projectId);
+    const init = await projectWorkspaceInitWithSettings(projectId, revision.settingsRevision, defaults);
+    const events = createAtelierEventBus();
+    registerProjectWorkspaceInitEvents(events);
+    async function provision() {
+      const plan: WorkspaceDockerPlan = { preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+      await events.emit("workspace_plan_prepare", { workspaceId: "privilege", init, workHostPath: "/unused", workContainerPath: "/work", plan });
+      return plan;
+    }
+    expect((await provision()).privileged).toBe(false);
+    expect((await provision()).preloadImages).toEqual([]);
+    const unauthorized = { ...defaults, privileged: true };
+    expect(() => validateProjectWorkspaceSettings(unauthorized)).toThrow();
+    const enabled = await setProjectPrivileged(projectId, true);
+    expect(enabled.project.privileged).toBe(true);
+    expect(enabled.project.configurationFingerprint).not.toBe(initial.configurationFingerprint);
+    expect((await provision()).privileged).toBe(true);
+    const current = await readProjectWorkspaceSettings(projectId);
+    await writeProjectWorkspaceSettings(projectId, current.settingsRevision, defaults);
+    expect((await getProjectConfiguration(projectId)).privileged).toBe(true);
+    await setProjectPrivileged(projectId, false);
+    expect((await provision()).privileged).toBe(false);
+  });
+
   test("workspace configuration is an independent persisted snapshot with fixed repository and creator", async () => {
+    await setProjectPrivileged(projectId, true);
     const initial = await readProjectWorkspaceSettings(projectId);
     const settings = { ...defaults, preloadImages: ["postgres:17"], environment: [{ name: "PORT", value: "4000" }] };
     const init = await projectWorkspaceInitWithSettings(projectId, initial.settingsRevision, settings, { workspaceId: "parent", conversationId: "agent-1" });

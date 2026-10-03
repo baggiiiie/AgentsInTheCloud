@@ -1,8 +1,5 @@
 {
   "version": 1,
-  "docker": {
-    "privileged": true
-  },
   "seedPiConfig": {
     "authJson": "/home/atelier/.local/share/atelier-host/pi-config/auth.json",
     "modelsJson": "/home/atelier/.local/share/atelier-host/pi-config/models.json",

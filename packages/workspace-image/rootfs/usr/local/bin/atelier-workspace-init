@@ -17,6 +17,15 @@ with open('/.atelier/environment', 'w', opener=lambda path, flags: os.open(path,
             escaped = value.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`').replace('$', '\\$')
             file.write(f'{key}="{escaped}"\n')
 PY
-systemctl enable docker.socket
-if [ -f /etc/systemd/system/atelier-gateway.service ]; then systemctl enable atelier-gateway.service; fi
+read -r docker_support < /etc/atelier/docker-support
+case "$docker_support" in
+    enabled)
+        systemctl enable docker.socket
+        ;;
+    disabled)
+        systemctl mask docker.socket docker.service containerd.service
+        ;;
+    *) echo "Invalid Docker support configuration: $docker_support" >&2; exit 1 ;;
+esac
+if [ -f /usr/lib/systemd/system/atelier-gateway.service ]; then systemctl enable atelier-gateway.service; fi
 exec /sbin/init

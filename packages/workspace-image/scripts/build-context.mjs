@@ -90,7 +90,10 @@ for (const name of (await readdir(gatewaySource)).sort()) {
   hash.update(await readFile(join(gatewaySource, name)));
 }
 
-let dockerfile = `FROM golang:1.26.0 AS gateway-build\nWORKDIR /src\nCOPY gateway/ ./\nRUN go test ./... && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /atelier-workspace-gateway .\n\nFROM oven/bun:1.4.0 AS bun-dist\n\nFROM ${runtimeImage}\n\nARG DEBIAN_FRONTEND=noninteractive\nLABEL com.atelier.workspace-image.modules=${quote(moduleNames.join(","))}\n\nRUN mkdir -p /opt/atelier/home-defaults && cp -a /etc/skel/. /opt/atelier/home-defaults/\n\n`;
+// Both System and nested Atelier installations provide the same scoped runtime.
+await cp(join(packagesDir, "workspace-image/workspace-image/cgroup-runtime"), join(outDir, "cgroup-runtime"), { recursive: true });
+
+let dockerfile = `FROM golang:1.26.0 AS gateway-build\nWORKDIR /src\nCOPY gateway/ ./\nCOPY cgroup-runtime/ /cgroup-runtime/\nRUN cd /cgroup-runtime && go test ./... && CGO_ENABLED=0 go build -trimpath -o /atelier-cgroup-runc .\nRUN go test ./... && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /atelier-workspace-gateway .\n\nFROM oven/bun:1.4.0 AS bun-dist\n\nFROM ${runtimeImage}\n\nARG DEBIAN_FRONTEND=noninteractive\nLABEL com.atelier.workspace-image.modules=${quote(moduleNames.join(","))}\n\nRUN mkdir -p /opt/atelier/home-defaults && cp -a /etc/skel/. /opt/atelier/home-defaults/\n\n`;
 dockerfile += `COPY --from=bun-dist /usr/local/bin/bun /usr/local/bin/bun\nCOPY --from=bun-dist /usr/local/bin/bunx /usr/local/bin/bunx\nRUN bun --version\n\n`;
 function appendCopies(copies) {
   for (const copy of copies) {
@@ -114,13 +117,14 @@ dockerfile += `RUN diff -r --no-dereference /opt/atelier/home-defaults /home/ate
 if (finalCopies.length) dockerfile += "# Files independent of module setup\n";
 appendCopies(finalCopies);
 if (Object.keys(env).length) dockerfile += `ENV ${Object.entries(env).map(([key, value]) => `${key}=${quote(value)}`).join(" \\\n    ")}\n\n`;
-dockerfile += `COPY --from=gateway-build /atelier-workspace-gateway /usr/local/bin/atelier-workspace-gateway\n\n`;
+dockerfile += `COPY --from=gateway-build /atelier-cgroup-runc /usr/local/bin/atelier-cgroup-runc\nCOPY --from=gateway-build /atelier-workspace-gateway /usr/local/bin/atelier-workspace-gateway\n\n`;
 await mkdir(join(outDir, "runtime-units"));
 for (const [name, content] of Object.entries(workspaceRuntimeUnits())) {
   await writeFile(join(outDir, "runtime-units", name), content);
 }
-dockerfile += `COPY runtime-units/ /etc/systemd/system/\n`;
-dockerfile += `RUN python3 -c 'import json; p="/etc/docker/daemon.json"; c=json.load(open(p)); c["hosts"]=["fd://"]; json.dump(c,open(p,"w"))'\n`;
+dockerfile += `COPY runtime-units/ /usr/lib/systemd/system/\n`;
+dockerfile += `RUN python3 -c 'import json; p="/etc/docker/daemon.json"; c=json.load(open(p)); c["hosts"]=["fd://"]; c["runtimes"]={"atelier-cgroup":{"path":"/usr/local/bin/atelier-cgroup-runc"}}; json.dump(c,open(p,"w"))'\n`;
+dockerfile += `RUN mkdir -p /etc/atelier && printf "disabled\\n\\n" > /etc/atelier/docker-support\n`;
 dockerfile += `RUN mkdir -p /.atelier && printf "systemctl start atelier-tmux.service\\n" > /.atelier/init.sh\n`;
 // binfmt registrations belong to the host kernel; workspace shutdown must not unregister them.
 dockerfile += `RUN systemctl mask systemd-binfmt.service\n`;

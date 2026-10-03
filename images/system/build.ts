@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { cp, mkdir } from "node:fs/promises";
 import { inlineDesignSystemCss } from "../../packages/design-system/src/inline-styles.ts";
 const out = new URL("./.build/", import.meta.url).pathname;
 await mkdir(out, { recursive: true });
@@ -20,3 +20,5 @@ const client = await Bun.build({
 });
 if (!client.success) throw new AggregateError(client.logs);
 await Bun.write(`${out}/design-system.css`, await inlineDesignSystemCss());
+
+await cp(new URL("../../packages/workspace-image/workspace-image/cgroup-runtime/", import.meta.url), `${out}/cgroup-runtime`, { recursive: true });

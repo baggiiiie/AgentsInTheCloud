@@ -16,6 +16,8 @@ export interface WorkspaceDockerContainerFile {
 
 export interface WorkspaceDockerPlan {
   image?: string;
+  privileged?: boolean;
+  dockerSupportSettingsUrl?: string;
   preloadImages: string[];
   labels: Record<string, string>;
   env: Record<string, string>;

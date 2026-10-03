@@ -10,8 +10,20 @@ test("provisioning supplies setup and PID 1 requirements without replacing image
   try {
     const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
     await prepareWorkspaceSystemd(plan, directory, "echo setup");
-    expect(plan.extraArgs).toEqual(["--privileged", "--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3"]);
-    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.atelier/init.sh" }]);
+    expect(plan.extraArgs).toEqual(["--runtime", "atelier-cgroup", "--cgroupns=private", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3"]);
+    expect(plan.containerFiles).toEqual([{ source: join(directory, "init.sh"), target: "/.atelier/init.sh" }, { source: join(directory, "docker-support"), target: "/etc/atelier/docker-support" }]);
+    expect(await readFile(join(directory, "docker-support"), "utf8")).toBe("disabled\n\n");
     expect(await readFile(join(directory, "init.sh"), "utf8")).toBe("echo setup");
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("Docker opt-in keeps the ordinary privileged runtime and snapshots the settings link", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "workspace-systemd-"));
+  try {
+    const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], privileged: true, initScripts: [], containerFiles: [], cleanup: [], dockerSupportSettingsUrl: "https://atelier.example/projects/app/settings?section=privileged" };
+    await prepareWorkspaceSystemd(plan, directory, "echo setup");
+    expect(plan.extraArgs).not.toContain("--runtime");
+    expect(plan.extraArgs).toContain("--privileged");
+    expect(await readFile(join(directory, "docker-support"), "utf8")).toBe("enabled\nhttps://atelier.example/projects/app/settings?section=privileged\n");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

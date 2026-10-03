@@ -377,7 +377,10 @@ export function registerProjectWorkspaceInitEvents(events: AtelierEventBus): voi
 
   events.on("workspace_plan_prepare", async ({ workspaceId, init, plan }) => {
     if (isGitProjectInit(init)) {
-      const settings = init.settings ?? await getProjectConfiguration(init.projectId);
+      const project = await getProjectConfiguration(init.projectId);
+      plan.privileged = project.privileged;
+      const settings = init.settings ?? project;
+      plan.dockerSupportSettingsUrl = `${process.env.ATELIER_PUBLIC_URL ?? ""}/projects/${encodeURIComponent(init.projectId)}/settings?section=privileged`;
       plan.preloadImages = [...settings.preloadImages ?? []];
       plan.mounts.push({ type: "bind", ...(await projectPersistentMount(init.projectId)) });
       Object.assign(plan.env, Object.fromEntries(settings.environment.map(({ name, value }) => [name, value])));

@@ -35,6 +35,8 @@ describe("workspace image content identity", () => {
 
   test.each([
     ["systemd bootstrap script", "packages/workspace-image/rootfs/usr/local/bin/atelier-workspace-init", "files/base/rootfs/usr/local/bin/atelier-workspace-init", "#"],
+    ["Docker capability guard", "packages/workspace-image/rootfs/usr/local/bin/docker", "files/base/rootfs/usr/local/bin/docker", "#"],
+    ["cgroup runtime", "packages/workspace-image/workspace-image/cgroup-runtime/main.go", "cgroup-runtime/main.go", "//"],
   ])("%s is packaged and changes the default image identity", async (_name, sourcePath, packagedPath, comment) => {
     const before = await generateInCheckout();
     const source = join(before.fixture, sourcePath);
@@ -78,6 +80,11 @@ describe("workspace image layer ordering", () => {
     expect(desktop.indexOf("apt-get install")).toBeLessThan(desktop.indexOf("RUN glib-compile-schemas"));
     expect(dockerfile.indexOf("# Module: base")).toBeLessThan(dockerfile.indexOf("# Module: vscode"));
     expect(dockerfile.indexOf("# Module: vscode")).toBeLessThan(dockerfile.indexOf("# Module: desktop"));
+  });
+
+  test("the scoped runtime is installed after heavyweight module setup", async () => {
+    const { dockerfile } = await generateInCheckout();
+    expect(dockerfile.indexOf("COPY --from=gateway-build /atelier-cgroup-runc")).toBeGreaterThan(dockerfile.indexOf("# Files independent of module setup"));
   });
 
   test("changing feature dependencies preserves preceding build instructions", async () => {
