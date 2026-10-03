@@ -55,7 +55,7 @@ export const samplerSource = String.raw`(() => {
     const pane = first(".agent-composer-pane");
     const composer = pane ? pane.querySelector(":scope > .composer") : null;
     const floating = {};
-    const stack = first(".composer-floating-buttons");
+    const stack = first(".floating-stack");
     if (stack) for (const button of stack.querySelectorAll("button, a")) if (shown(button)) floating[label(button)] = layoutBox(button);
     const content = transcript ? transcript.querySelector(".agent-transcript-content") : null;
     const active = document.activeElement;

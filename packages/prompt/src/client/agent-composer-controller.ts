@@ -2,8 +2,6 @@ import { changeLayout, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible,
 
 /** The composer may grow to this share of the space above the keyboard (or of the window). */
 const composerMaxShare = 0.4;
-/** A stacked composer may exceed that max (short screens) up to this share. */
-const stackMaxShare = 0.5;
 const longPressMs = 500;
 
 /**
@@ -154,8 +152,7 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
 
     /**
      * Sizes the text field: line by line up to the max, never below the buttons'
-     * height. The buttons stack 1×4 whenever the text, at the stacked width,
-     * fills that taller stack; the choice depends only on the content, so it can't oscillate.
+     * height. On a short screen the button column may push the composer past the max.
      */
     autosize(): void {
       const input = this.input;
@@ -165,15 +162,13 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       const style = getComputedStyle(root);
       const keyboard = Number.parseFloat(style.getPropertyValue("--software-keyboard-inset") || "0")
         + Number.parseFloat(style.getPropertyValue("--software-keyboard-top") || "0");
-      const available = root.clientHeight - keyboard;
-      const maxComposer = Math.floor(available * composerMaxShare);
+      const maxComposer = Math.floor((root.clientHeight - keyboard) * composerMaxShare);
       const area = input.parentElement!;
       const buttons = area.querySelector<HTMLElement>(":scope > .composer-buttons")!;
       const launches = area.querySelector<HTMLElement>(":scope > .composer-quick-launches");
       const height = (element: HTMLElement | null): number => element?.checkVisibility() ? element.getBoundingClientRect().height : 0;
       // Everything but the input area: thumbnails, status, footer.
       const chrome = composer.getBoundingClientRect().height - area.getBoundingClientRect().height;
-      const stacked = composer.classList.contains("composer-stacked");
       // Quick launches make way as soon as there is something written.
       const hadText = composer.classList.contains("composer-has-text");
       const hasText = /\S/.test(input.value);
@@ -182,35 +177,23 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       const areaHeight = area.style.height;
       area.style.height = `${area.getBoundingClientRect().height}px`;
       const inline = input.style.height;
-      const measure = (stack: boolean) => {
-        composer.classList.toggle("composer-has-text", hasText);
-        composer.classList.toggle("composer-stacked", stack);
-        input.style.height = "0px";
-        const content = Math.ceil(input.scrollHeight);
-        const below = height(launches);
-        // Buttons beside the text set its minimum; buttons floating above it (while typing) don't.
-        const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
-        const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);
-        const room = maxComposer - chrome - below;
-        // Stack once the text fills the stack's height, or overflows the max. On a short
-        // screen the stack may then exceed the max, but never half the space.
-        const wanted = content >= room || content + below >= height(buttons) - 1;
-        return { content, minimum, limit: Math.max(minimum, room), fits: wanted && chrome + height(buttons) <= available * stackMaxShare };
-      };
-      // While typing with a soft keyboard only send shows; there is nothing to stack.
-      const stack = !root.classList.contains("software-keyboard-visible") && measure(true).fits;
-      const layout = measure(stack);
-      composer.classList.toggle("composer-stacked", stacked);
+      composer.classList.toggle("composer-has-text", hasText);
+      input.style.height = "0px";
+      const content = Math.ceil(input.scrollHeight);
+      const below = height(launches);
+      // Buttons beside the text set its minimum; send floating over it (while typing) doesn't.
+      const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
+      const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);
+      const limit = Math.max(minimum, maxComposer - chrome - below);
       composer.classList.toggle("composer-has-text", hadText);
       input.style.height = inline;
       area.style.height = areaHeight;
-      const next = Math.max(layout.minimum, Math.min(layout.content, layout.limit));
-      const overflow = layout.content > layout.limit ? "auto" : "hidden";
+      const next = Math.max(minimum, Math.min(content, limit));
+      const overflow = content > limit ? "auto" : "hidden";
       const current = input.getBoundingClientRect().height;
-      if (stack !== stacked || hasText !== hadText || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
+      if (hasText !== hadText || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
         changeLayout(() => {
           composer.classList.toggle("composer-has-text", hasText);
-          composer.classList.toggle("composer-stacked", stack);
           input.style.height = `${next}px`;
           input.style.overflowY = overflow;
         });

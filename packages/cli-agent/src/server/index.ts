@@ -1,5 +1,5 @@
 import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingButtons, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@agents-in-the-cloud/shared";
@@ -59,7 +59,6 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const draftId = agentAttachmentDraftId(workspaceId, `${adapter.id}:${conversationId}`);
           const rowId = domId("cli_attach", workspaceId, conversationId);
           const composerUrl = `${url}/composer`;
-          // Bottom up: the terminal/transcript toggle, scroll-to-bottom, then open-composer.
           const transcriptControls = renderCliTranscriptControls(adapter, workspaceId, conversationId);
           const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-transcription-composer-workspace-id-value="${escapeHtml(workspaceId)}">
             <div class="composer-surface">
@@ -81,7 +80,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
               ${terminal.exists ? '<div class="observable-terminal-host" data-cli-terminal-target="terminal" tabindex="0" data-action="pointerdown->cli-terminal#terminalPointer:capture pointermove->cli-terminal#terminalPointer:capture pointerup->cli-terminal#terminalPointer:capture terminal-text-input:input->cli-terminal#sendNativeInput keydown->cli-terminal#resumeInput:capture beforeinput->cli-terminal#resumeInput:capture touchstart->cli-terminal#startTerminalTouch:passive touchmove->cli-terminal#moveTerminalTouch:!passive touchcancel->cli-terminal#cancelTerminalTouch touchend->cli-terminal#finishTerminalTouch:!passive"></div>' : ""}
               ${renderCliTranscriptView(adapter, workspaceId, conversationId)}
-              ${renderFloatingButtons(`${composer ? renderOpenComposerButton() : ""}${transcriptControls.scrollToBottom}${transcriptControls.toggle}`)}
+              ${renderFloatingStack({ openComposer: composer ? renderOpenComposerButton() : undefined, ...transcriptControls })}
             </div>
             ${terminal.exists ? renderTerminalKeyBar("cli-terminal") : ""}
             ${composer}

@@ -43,25 +43,16 @@
 .composer-input::placeholder { color: var(--text-muted); font: inherit; }
 .composer-buttons {
   grid-area: 1 / 2 / 3 / 3; align-self: end;
-  display: grid; gap: var(--composer-button-gap); padding: var(--composer-control-inset);
-  grid-template: "attach close" var(--composer-control-size) "transcribe send" var(--composer-control-size) / var(--composer-control-size) var(--composer-control-size);
+  display: flex; flex-direction: column; gap: var(--composer-button-gap); padding: var(--composer-control-inset);
 }
-.composer-button { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; }
-.composer-attach { grid-area: attach; }
-.composer-close { grid-area: close; }
-.composer-transcribe { grid-area: transcribe; }
-.composer-send { grid-area: send; justify-content: flex-end; }
+.composer-button { position: relative; display: flex; align-items: center; justify-content: center; width: var(--composer-control-size); height: var(--composer-control-size); }
+/* A captioned action (such as Connect to send) is wider than the column and extends to the left. */
+.composer-send { justify-content: flex-end; }
 .composer-quick-launches { grid-area: 2 / 1; padding: 0 0 var(--composer-control-inset) var(--composer-control-inset); }
 /* Text may come right down to the quick launches. */
 html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer-input-area:has(> .composer-quick-launches:not(:empty)) > .composer-input { padding-bottom: 2px; }
 /* Quick launches make way as soon as anything is written. */
 .composer.composer-has-text .composer-quick-launches { display: none; }
-/* A tall composer stacks the buttons, giving the text the second column's width. */
-.composer.composer-stacked .composer-buttons {
-  /* Tight enough to fit under the 40% max on a phone (4 × 62.5px + 10px). */
-  gap: 2px; padding-block: 2px;
-  grid-template: "close" var(--composer-control-size) "attach" var(--composer-control-size) "transcribe" var(--composer-control-size) "send" var(--composer-control-size) / var(--composer-control-size);
-}
 .composer-quick-launches:empty { display: none; }
 .composer-selection { max-width: 170px; padding: 1px 2px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
 .composer-selection:hover { border-color: var(--line-strong); background: var(--panel); color: var(--text-bright); }
@@ -76,24 +67,28 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 }
 @media (max-width: 700px) {
   .composer-input { font-size: 16px; }
-  .composer-buttons { --composer-control-inset: 4px; }
+  /* Tight enough for the column to fit under the 40% max on a phone (4 × 62.5px + 10px). */
+  .composer-buttons { --composer-control-inset: 4px; gap: 2px; padding-block: 2px; }
 }
 
-/* Floating buttons stack at the bottom right of the transcript or terminal:
-   open-composer at the bottom, scroll-to-bottom above it. */
-.composer-floating-buttons {
+/* The floating stack sits at the bottom right of the transcript or terminal.
+   Bottom to top: open composer, view switch, follow latest (in reverse DOM order). */
+.floating-stack {
   position: absolute; z-index: 3; right: 10px; bottom: 12px;
   display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
 }
-.composer-floating-buttons > * { pointer-events: auto; }
-.composer-floating-buttons [hidden] { display: none; }
-.composer-floating-buttons :is(button, a) { --button-background: var(--panel); }
-@media (max-width: 700px) { .composer-floating-buttons { right: 4px; } }
+.floating-stack > * { pointer-events: auto; }
+.floating-stack [hidden] { display: none; }
+.floating-stack :is(button, a) { --button-background: var(--panel); }
+@media (max-width: 700px) { .floating-stack { right: 4px; } }
 .agent-composer-opener { position: relative; display: flex; }
 .agent-composer-opener > button { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
 .agent-composer-draft-dot { position: absolute; top: 3px; right: 3px; pointer-events: none; }
 .agent-composer-opener:not([data-draft]) > .agent-composer-draft-dot { display: none; }
 .agent-composer-open .agent-composer-opener { display: none; }
+/* The pane listens for clicks (a tap beside the controls focuses the text), which makes iOS
+   flash its tap highlight over the whole pane; buttons show their own pressed state. */
+.agent-composer-pane { -webkit-tap-highlight-color: transparent; }
 .agent-composer-pane:not(.agent-composer-open) > .composer { display: none; }
 /* Agent composers form the pane's bottom edge rather than a nested card. */
 .agent-composer-pane > .composer > .composer-surface {
@@ -104,18 +99,18 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 
 /* Typing mode: while the soft keyboard is up, only typing-related UI shows.
    The composer collapses to the text field with send beside it. */
-html.software-keyboard-visible :is(.composer-floating-buttons, .agent-composer-pane .composer-attach, .agent-composer-pane .composer-close,
+html.software-keyboard-visible :is(.floating-stack, .agent-composer-pane .composer-attach, .agent-composer-pane .composer-close,
   .agent-composer-pane .composer-transcribe, .agent-composer-pane .composer-quick-launches, .agent-composer-pane .composer-footer) { display: none; }
 html.software-keyboard-visible .agent-composer-pane .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
 /* The text takes the full width and runs underneath send, which sits in the bottom-right corner. */
 html.software-keyboard-visible .agent-composer-pane .composer-input-area { position: relative; }
 html.software-keyboard-visible .agent-composer-pane .composer-buttons {
   position: absolute; z-index: 1; bottom: var(--composer-control-inset); right: var(--composer-control-inset); padding: 0;
-  grid-template: "send" var(--composer-control-size) / var(--composer-control-size);
 }
 html.software-keyboard-visible .agent-composer-pane .composer-input-area > .composer-input {
   grid-column: 1 / -1; padding: 12px 16px;
-  min-height: max(calc(1lh + 24px), calc(var(--composer-control-size) + 2 * var(--composer-control-inset)));
+  /* Two controls tall: room for a few lines of text above the keyboard. */
+  min-height: max(calc(1lh + 24px), calc(2 * (var(--composer-control-size) + 2 * var(--composer-control-inset))));
 }
 html.software-keyboard-visible .agent-composer-pane .composer-surface > form > [role="status"] { margin: 0; max-height: 2lh; overflow-y: auto; }
 /* Host launch settings can wrap without hiding provider-specific controls. */

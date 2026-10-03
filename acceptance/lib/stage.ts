@@ -1,7 +1,8 @@
 /**
  * Stages the shared acceptance setup through Atelier's automation API
  * (docs/automation.md): a built-in agent with a long transcript, a Pi CLI
- * agent, and a terminal tab. An existing workspace can be reused.
+ * agent, a terminal tab and a quick-launch prompt template. An existing
+ * workspace can be reused.
  */
 
 export interface Stage {
@@ -91,16 +92,29 @@ export async function stage(options: { atelier: string; workspaceId?: string; mo
     await json(atelier, `/workspaces/${id}/commands/terminal.create`, { method: "POST", body: { title: "Shell", cwd: "/work" } });
     terminal = (await workspace(atelier, id)).workViews.find((view) => view.reference.type === "terminal")!;
   }
+  await stageQuickLaunch(id);
   return { atelier, workspaceId: id, builtinId: builtin.id, piId: pi.id, terminalKey: terminal.key };
+}
+
+/** A prompt template marked for quick launch, so composers show their quick-launch row. */
+async function stageQuickLaunch(workspaceId: string): Promise<void> {
+  const template = "---\ndescription: Reply with OK\nquick-launch: true\n---\nReply with just the word OK.\n";
+  await workspaceExec(workspaceId, ["sh", "-c", "mkdir -p /work/.agents-in-the-cloud/prompts && cat > /work/.agents-in-the-cloud/prompts/ok.md"], template);
 }
 
 /** tmux window sizes inside the workspace container, by session name. Read-only: no hooks are installed. */
 export async function tmuxSizes(workspaceId: string): Promise<Record<string, string>> {
-  const process = Bun.spawn(["docker", "exec", "-u", "agents-in-the-cloud", `agents-in-the-cloud-${workspaceId}`, "tmux", "list-windows", "-a", "-F", "#{session_name} #{window_width}x#{window_height}"], { stdout: "pipe", stderr: "pipe" });
-  const output = await new Response(process.stdout).text();
-  if (await process.exited !== 0) throw new Error(`tmux list-windows failed: ${await new Response(process.stderr).text()}`);
+  const output = await workspaceExec(workspaceId, ["tmux", "list-windows", "-a", "-F", "#{session_name} #{window_width}x#{window_height}"]);
   return Object.fromEntries(output.trim().split("\n").filter(Boolean).map((line) => {
     const space = line.lastIndexOf(" ");
     return [line.slice(0, space), line.slice(space + 1)];
   }));
+}
+
+/** Runs a command in the workspace container as its user and returns its output. */
+async function workspaceExec(workspaceId: string, command: string[], stdin?: string): Promise<string> {
+  const process = Bun.spawn(["docker", "exec", "-i", "-u", "agents-in-the-cloud", `agents-in-the-cloud-${workspaceId}`, ...command], { stdin: stdin === undefined ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
+  const output = await new Response(process.stdout).text();
+  if (await process.exited !== 0) throw new Error(`${command.join(" ")} failed: ${await new Response(process.stderr).text()}`);
+  return output;
 }

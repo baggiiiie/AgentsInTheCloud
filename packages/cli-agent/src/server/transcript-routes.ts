@@ -2,6 +2,7 @@ import { ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, type Age
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { renderFollowLatestButton } from "@agents-in-the-cloud/prompt/server";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 import type { CliAgentAdapter } from "./adapter.ts";
@@ -18,15 +19,15 @@ export function renderCliTranscriptView(adapter: CliAgentAdapter, workspaceId: s
   return `<turbo-frame id="${ids.transcript(ctx)}" class="agent-transcript cli-transcript-view" data-cli-terminal-target="transcript" data-action="turbo:frame-load->cli-terminal#transcriptLoaded scroll->cli-terminal#transcriptScrolled"></turbo-frame>`;
 }
 
-/** The terminal/transcript toggle and the transcript's scroll-to-bottom, for the floating button stack. */
-interface CliTranscriptControls { toggle: string; scrollToBottom: string }
+/** The view switch (terminal ↔ transcript) and the transcript's follow latest, for the floating stack. */
+interface CliTranscriptControls { viewSwitch?: string; followLatest?: string }
 
 export function renderCliTranscriptControls(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): CliTranscriptControls {
-  if (!adapter.loadTranscript) return { toggle: "", scrollToBottom: "" };
+  if (!adapter.loadTranscript) return {};
   const ctx = context(workspaceId, conversationId, adapter.id);
   return {
-    toggle: `${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}`,
-    scrollToBottom: buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>', label: "Follow latest" }, attributesHtml: 'data-popular-button data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd" hidden' }),
+    viewSwitch: `${actionLinkHtml({ href: ctx.transcriptBasePath, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: `data-popular-button data-turbo-frame="${ids.transcript(ctx)}" data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"` })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}`,
+    followLatest: renderFollowLatestButton('data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd"'),
   };
 }
 

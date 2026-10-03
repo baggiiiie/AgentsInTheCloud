@@ -1,7 +1,7 @@
 import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-button";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@agents-in-the-cloud/llm/server";
-import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingButtons, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
+import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderFollowLatestButton, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
@@ -53,7 +53,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
         </div>
-        ${state.readOnly ? "" : renderFloatingButtons(`${renderTranscriptEndNavigation()}${renderOpenComposerButton()}`)}
+        ${state.readOnly ? "" : renderFloatingStack({ openComposer: renderOpenComposerButton(), followLatest: renderFollowLatestButton('data-agent-pane-target="transcriptEnd" data-action="agent-pane#scrollToTranscriptEnd"') })}
       </div>
       ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({
         ctx,
@@ -126,20 +126,6 @@ export async function renderLaunchComposerSettings(options: { frameId: string; f
     selectedThinkingLevel: options.selectedThinkingLevel && thinkingLevels.includes(options.selectedThinkingLevel) ? options.selectedThinkingLevel : selectedThinkingLevel ?? "",
     connectedProvider: hasConnectedModelProvider(await createPiModelRuntime()),
   });
-}
-
-function renderTranscriptEndNavigation(): string {
-  const button = buttonHtml({
-    type: "button",
-    variant: "secondary",
-    content: {
-      kind: "icon-only",
-      iconHtml: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 16h12M10 4v9m-4-4 4 4 4-4"/></svg>',
-      label: "Follow latest",
-    },
-    attributesHtml: 'data-popular-button data-action="agent-pane#scrollToTranscriptEnd"',
-  });
-  return `<div class="agent-transcript-navigation" data-agent-pane-target="transcriptEnd" hidden>${button}</div>`;
 }
 
 export function renderPromptActions(ctx: AgentRenderContext | undefined, busy: boolean, hasStoppableWork = busy): string {

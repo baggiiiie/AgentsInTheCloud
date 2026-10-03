@@ -118,8 +118,6 @@
 
 .agent-tool-ansi, .agent-tool-code, .agent-tool-term { background: color-mix(in srgb, var(--bg) 45%, #000 14%); color: var(--text-bright); }
 
-.agent-transcript-navigation { display: flex; }
-.agent-transcript-navigation[hidden] { display: none; }
 .agent-pane-composer .composer-footer { padding-right: var(--composer-control-inset); }
 @media (max-width: 700px) {
   .agent-pane-composer .composer-footer { padding-right: 4px; }

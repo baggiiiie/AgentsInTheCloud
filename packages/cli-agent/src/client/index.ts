@@ -223,6 +223,8 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         this.transcriptTarget.scrollTo({ top: this.transcriptEndTop(), behavior: "smooth" });
       }
       showTerminal(): void {
+        // A full redraw is slow; the terminal only needs one after being hidden.
+        if (!this.element.classList.contains("cli-transcript-mode")) return;
         this.element.classList.remove("cli-transcript-mode");
         this.viewer?.refresh();
       }

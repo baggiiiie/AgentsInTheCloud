@@ -59,15 +59,15 @@ const sel = {
   close: '.agent-composer-pane .composer-close button',
   input: ".agent-composer-pane .composer-input",
   send: ".agent-composer-pane .composer-send button:not([data-action])",
-  scrollToBottom: '.composer-floating-buttons :is(.agent-transcript-navigation > button, [data-cli-terminal-target="transcriptEnd"])',
+  followLatest: '.floating-stack :is([data-agent-pane-target="transcriptEnd"], [data-cli-terminal-target="transcriptEnd"])',
   terminal: ".observable-terminal-host",
-  viewTranscript: '.composer-floating-buttons [data-action~="cli-terminal#showTranscript"]',
+  viewTranscript: '.floating-stack [data-action~="cli-terminal#showTranscript"]',
 };
 
 const bottom = (box: Box): number => box ? box[1] + box[3] : Number.NaN;
 /** Floating buttons keep the workspace bar's outer inset: 4px on mobile, 10px on desktop. */
 let floatingInset = 4;
-const floatingLabel = { opener: "Open composer", scrollToBottom: "Follow latest" };
+const floatingLabel = { opener: "Open composer", followLatest: "Follow latest" };
 
 async function scenario(name: string, description: string, body: (recorder: ScenarioRecorder) => Promise<void>): Promise<void> {
   if (args.only && !new RegExp(args.only).test(name)) return;
@@ -106,8 +106,8 @@ async function resetComposerText(): Promise<void> {
 }
 
 async function pinToBottom(): Promise<void> {
-  if (await page.visible(sel.scrollToBottom)) {
-    await page.tap(sel.scrollToBottom);
+  if (await page.visible(sel.followLatest)) {
+    await page.tap(sel.followLatest);
     await Bun.sleep(1500);
   }
 }
@@ -131,16 +131,23 @@ async function closeComposer(): Promise<void> {
   }
 }
 
-function floatingStackChecks(frame: Frame, composerOpen: boolean): ReturnType<typeof check>[] {
+/** Floating stack slots, bottom to top. */
+const floatingOrder = [[floatingLabel.opener], ["View transcript", "Back to terminal"], [floatingLabel.followLatest]];
+
+function floatingStackChecks(frame: Frame, composerOpen: boolean, surface: Box = frame.transcript): ReturnType<typeof check>[] {
   const opener = frame.floating[floatingLabel.opener] ?? null;
-  const toBottom = frame.floating[floatingLabel.scrollToBottom] ?? null;
-  const results = [];
+  const shown = Object.entries(frame.floating).filter((entry): entry is [string, NonNullable<Box>] => entry[1] !== null);
+  const rank = (label: string): number => floatingOrder.findIndex((labels) => labels.includes(label));
+  const lowestFirst = [...shown].sort((a, b) => bottom(b[1]) - bottom(a[1]));
+  const lowest = lowestFirst[0]?.[1] ?? null;
+  const results = [
+    check("D21: floating stack bottom to top: open composer, view switch, follow latest", lowestFirst.every(([label], index) => index === 0 || rank(label) > rank(lowestFirst[index - 1]![0])) && lowestFirst.every(([, box]) => close(box[0] + box[2] / 2, lowest![0] + lowest![2] / 2, 2)), lowestFirst.map(([label, box]) => `${label} ${JSON.stringify(box)}`).join(" ↑ ") || "no floating buttons"),
+  ];
   if (composerOpen) {
     results.push(check("D22: open-composer hidden while the composer is open", !opener, opener ? `visible at ${JSON.stringify(opener)}` : "hidden"));
-    if (toBottom) results.push(check("D22: scroll-to-bottom sits just above the composer, bottom right", close(bottom(toBottom), frame.composer![1] - 12, 2) && close(toBottom[0] + toBottom[2], frame.transcript![0] + frame.transcript![2] - floatingInset, 3), `button bottom ${bottom(toBottom)}, composer top ${frame.composer![1]}; button right ${toBottom[0] + toBottom[2]}, transcript right ${frame.transcript![0] + frame.transcript![2]}`));
+    if (lowest && surface) results.push(check("D22: the stack sits just above the composer, bottom right", close(bottom(lowest), frame.composer![1] - 12, 2) && close(lowest[0] + lowest[2], surface[0] + surface[2] - floatingInset, 3), `lowest button bottom ${bottom(lowest)}, composer top ${frame.composer![1]}; button right ${lowest[0] + lowest[2]}, surface right ${surface[0] + surface[2]}`));
   } else {
-    results.push(check("D21: open-composer at the bottom right of the transcript", Boolean(opener) && close(bottom(opener), bottom(frame.transcript) - 12, 2), opener ? `button bottom ${bottom(opener)}, transcript bottom ${bottom(frame.transcript)}` : "open-composer not visible"));
-    if (toBottom && opener) results.push(check("D21: scroll-to-bottom stacked above open-composer", bottom(toBottom) <= opener[1] && close(toBottom[0] + toBottom[2] / 2, opener[0] + opener[2] / 2, 2), `scroll-to-bottom ${JSON.stringify(toBottom)}, open-composer ${JSON.stringify(opener)}`));
+    results.push(check("D21: open-composer at the bottom right of the surface", Boolean(opener) && opener === lowest && close(bottom(opener), bottom(surface) - 12, 2), opener ? `button bottom ${bottom(opener)}, surface bottom ${bottom(surface)}` : "open-composer not visible"));
   }
   return results;
 }
@@ -273,7 +280,7 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
   recorder.add(
     check("H7: thumbnails sit in one row", row.rowHeight <= row.chipHeight + 12, `row ${row.rowHeight}px for chips of ${row.chipHeight}px (${row.chips} chips)`),
     check("H7: the row scrolls sideways", row.scrollWidth > row.clientWidth, `scrollWidth ${row.scrollWidth} > clientWidth ${row.clientWidth}`),
-    // The text field gets what is left under the max, never less than its own min height (H2: the 2×2 buttons).
+    // The text field gets what is left under the max, never less than its own min height (H2: the button column).
     check("H7: thumbnails count toward the max height; the text field gets what's left", close(row.input, Math.max(row.inputMin, max - (row.composer - row.input)), 1) && (close(row.composer, max, 2) || close(row.input, row.inputMin, 1)), `composer ${row.composer} (max ${max}); text field ${row.input}, its min ${row.inputMin}, thumbnails/quick launches/footer ${Math.round(row.composer - row.input)}${row.composer > max + 2 ? " — the fixed rows plus the text field's min exceed the max, so the min wins (H2)" : ""}`),
   );
   await page.key("a", { ctrl: true });
@@ -319,6 +326,25 @@ await scenario("mobile-D14-terminal-focus", "D14: focusing the Pi terminal colla
     check("D3: draft kept", await page.evaluate<string>(`[...document.querySelectorAll(".cli-agent-body .composer-input")].find((e) => e.closest(".cli-agent-body").checkVisibility()).value`) === "Draft that must survive", "composer text unchanged"),
     check("D1: draft dot on open-composer", await page.visible(sel.draftDot), "status dot inside open-composer"),
   );
+});
+
+await scenario("mobile-D21-pi-floating", "D21: on a CLI agent the view switch sits above open-composer, and follow latest above both while reading the transcript.", async (recorder) => {
+  await page.evaluate<boolean>("(document.activeElement.blur(), true)");
+  const terminal = await transition(recorder, "terminal", async () => {}, { waitMs: 200, expectChange: false });
+  recorder.add(
+    check("D21: open composer and view switch shown on the terminal", Boolean(terminal.after.floating["Open composer"] && terminal.after.floating["View transcript"]), JSON.stringify(terminal.after.floating)),
+    ...floatingStackChecks(terminal.after, false, terminal.after.terminal),
+  );
+  await page.tap(sel.viewTranscript);
+  await page.waitFor(".cli-agent-body.cli-transcript-mode .cli-transcript-view .agent-transcript-content", 15_000);
+  await Bun.sleep(800);
+  await page.wheel(".cli-transcript-view", -900);
+  await Bun.sleep(900);
+  const reading = await transition(recorder, "CLI transcript, scrolled up", async () => {}, { waitMs: 200, expectChange: false });
+  recorder.add(...floatingStackChecks(reading.after, false));
+  await recorder.file("pi-transcript.png", await page.screenshot());
+  await page.tap('.floating-stack [data-action~="cli-terminal#showTerminal"]');
+  await Bun.sleep(800);
 });
 
 await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcript shows switches to the terminal instantly, in the same frame as the composer closing.", async (recorder) => {
@@ -388,15 +414,15 @@ await scenario("mobile-D24-long-press", "D24: holding open-composer for about 50
   await closeComposer();
 });
 
-await scenario("mobile-D21-D22-floating", "D21/D22: floating buttons stack bottom right; scroll-to-bottom only away from the bottom; open-composer hides while the composer is open.", async (recorder) => {
+await scenario("mobile-D21-D22-floating", "D21/D22: floating buttons stack bottom right; follow latest only away from the bottom; open-composer hides while the composer is open.", async (recorder) => {
   await closeComposer();
   await scrollPartway();
   const reading = await transition(recorder, "reading, scrolled up", async () => {}, { waitMs: 200, expectChange: false });
   recorder.add(...floatingStackChecks(reading.after, false));
-  await page.tap(sel.scrollToBottom);
+  await page.tap(sel.followLatest);
   await Bun.sleep(1800);
   const atBottom = await transition(recorder, "at the bottom", async () => {}, { waitMs: 200, expectChange: false });
-  recorder.add(check("D21: scroll-to-bottom hidden at the bottom", !atBottom.after.floating[floatingLabel.scrollToBottom], JSON.stringify(atBottom.after.floating)));
+  recorder.add(check("D21: follow latest hidden at the bottom", !atBottom.after.floating[floatingLabel.followLatest], JSON.stringify(atBottom.after.floating)));
   await transition(recorder, "open composer", () => page.tap(sel.opener));
   await scrollPartway();
   const open = await transition(recorder, "composer open, scrolled up", async () => {}, { waitMs: 200, expectChange: false });
@@ -418,7 +444,7 @@ await scenario("desktop-D1-selection", "D1: on desktop the composer is open and 
   recorder.add(
     check("D1: composer open", after.composer !== null, JSON.stringify(after.composer)),
     check("D1: text field focused", after.focus.includes("composer-input"), `focus: ${after.focus || "body"}`),
-    check("D4: 2×2 buttons (attach, close, transcribe, send)", after.buttons.join() === "attach,close,transcribe,send", after.buttons.join(", ")),
+    check("D4: one button column (close, attach, transcribe, send)", after.buttons.join() === "close,attach,transcribe,send", after.buttons.join(", ")),
   );
 });
 
@@ -426,12 +452,14 @@ await scenario("desktop-D8-D2-send", "D8/D2/H4: Enter inserts a newline; Cmd+Ent
   await resetComposerText();
   await page.tap(sel.input);
   const minimum = (await transition(recorder, "empty", async () => {}, { waitMs: 150, expectChange: false })).after.composer![3];
-  await page.insertText("Reply with just the word OK.\nSecond line\nThird line\nFourth line");
+  // Enough lines to fill the button column, so the next one grows the composer.
+  const lines = ["Reply with just the word OK and ignore the numbered lines below.", ...Array.from({ length: 9 }, (_, index) => `${index + 1}.`)];
+  await page.insertText(lines.join("\n"));
   await Bun.sleep(200);
   const entered = await transition(recorder, "Enter", () => page.key("Enter"));
   const value = await page.evaluate<string>("document.activeElement.value");
   recorder.add(
-    check("D8: Enter inserted a newline", value.endsWith("\n") && value.split("\n").length === 5, JSON.stringify(value)),
+    check("D8: Enter inserted a newline", value.endsWith("\n") && value.split("\n").length === lines.length + 1, JSON.stringify(value)),
     check("D8: Enter did not send", entered.after.content === entered.before.content && value.length > 0, "text still in the composer, transcript unchanged"),
     check("H1: one line taller", entered.after.composer![3] - entered.before.composer![3] > 15, `${entered.before.composer![3]} → ${entered.after.composer![3]}`),
   );

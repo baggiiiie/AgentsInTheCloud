@@ -109,10 +109,11 @@ export async function analyseKeyboardVideo(file: string, options: { statusBarPoi
     const margin = Math.round(12 * (width / 393));
     const pageRows = (current: Uint8Array, reference: number): number => Math.max(statusRows, Math.min(keyboardTop(current, width, height), reference) - margin);
     // The first frame where the page (not the keyboard itself, e.g. a pressed key) differs from the start.
+    // Masked regions count here: a masked terminal can cover everything the transition moves.
     const firstTop = keyboardTop(first, width, height);
     let firstChanged: number | null = null;
     for (let index = 1; index < count; index++) {
-      if (differing(frame(index), first, width, statusRows, pageRows(frame(index), firstTop), tolerance, options.masks).count > 1500) { firstChanged = index; break; }
+      if (differing(frame(index), first, width, statusRows, pageRows(frame(index), firstTop), tolerance).count > 1500) { firstChanged = index; break; }
     }
     // Noise floor: still frames before anything changed.
     let noise = 0;
