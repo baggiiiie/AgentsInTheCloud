@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Help the user understand the current topic visually with concise diagrams, code-shape sketches, and focused artifacts presented through AgentsInTheCloud.
+description: Help the user understand the current topic visually with concise diagrams, code-shape sketches.
 ---
 
 # Show Me
@@ -118,23 +118,7 @@ function expandSkill(command: string): string {
 }
 ```
 
-## Use AgentsInTheCloud's visual surfaces
-
-Escalate to one focused HTML artifact when spatial layout, grouping, color, comparison, or interaction communicates the point better than a text diagram. A show-me artifact is an explanation, not a production UI or a broad design exploration.
-
-1. Write the artifact to `/work/artifacts/show-me-{short-description}.html`. The directory is intentionally ignored by this repository.
-2. Make it self-contained and responsive for AgentsInTheCloud's roughly 860px-wide preview and narrow screens. Prefer HTML and CSS, with inline SVG only when lines or geometry matter. Do not depend on CDN scripts or fonts.
-3. Use real labels and data. Match the product's colors, typography, spacing, and components when explaining an existing UI. When the topic is AgentsInTheCloud itself, inspect and reuse its design-system tokens and patterns.
-4. Include only the states, boundaries, and annotations needed for the current point. For a static explanation, avoid controls that do not improve understanding.
-5. Present the file inline in the response with exactly this Markdown shape:
-
-```markdown
-![](artifact-preview:/work/artifacts/show-me-{short-description}.html)
-```
-
-AgentsInTheCloud automatically renders referenced HTML in an inline iframe, so do not use `open`, start a server, or call the presentation tool for a static artifact. If the explanation genuinely requires live interaction or a running application, use the available AgentsInTheCloud browser presentation instead: run the server in tmux on any available TCP port except `2999` (reserved for the workspace gateway), bind to `127.0.0.1` or `0.0.0.0`, allow any preview hostname, and present its localhost URL.
-
-Use screenshots or video only when the point is actual rendered behavior that an explanatory HTML diagram would misrepresent. Reference those files with `artifact-preview:` too. Link editable source with an `agents-in-the-cloud://file/...` URL when the user will benefit from inspecting it.
+Use screenshots or video only when the point is actual rendered behavior that an explanatory HTML diagram would misrepresent. Link editable source with an `agents-in-the-cloud://file/...` URL when the user will benefit from inspecting it.
 
 If the task is to compare several UI directions or validate a state model rather than explain the current topic, use the `prototype` skill instead of turning this artifact into a miniature prototype.
 
