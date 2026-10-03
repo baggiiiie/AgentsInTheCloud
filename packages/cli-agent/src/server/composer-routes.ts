@@ -1,5 +1,6 @@
 import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentSessionNameCommand } from "@agents-in-the-cloud/agent/server";
 import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
+import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import type { CliSessions } from "./sessions.ts";
 
 export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
@@ -12,11 +13,11 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     const session = await sessions.ready(workspaceId, conversationId);
     if (request.method === "GET" && operation === "completions") {
       const html = renderFileCompletionMenu(await listFileCompletions(workspaceId, url.searchParams.get("q") ?? "", url.searchParams.get("mode") === "fuzzy" ? "fuzzy" : "direct"));
-      return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+      return response(html);
     }
     if (request.method === "POST" && operation === "completions/prompt-template-expand") {
       const form = await request.formData();
-      return new Response(await expandPromptTemplate(workspaceId, String(form.get("text") ?? "")), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+      return textResponse(await expandPromptTemplate(workspaceId, String(form.get("text") ?? "")));
     }
     const draftId = agentAttachmentDraftId(workspaceId, `${providerId}:${conversationId}`);
     if (request.method === "POST" && operation === "consumed") {
@@ -53,6 +54,6 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     }
     text = [text, ...notes].filter(Boolean).join("\n\n");
     await sessions.recordNamingPrompt(workspaceId, conversationId, text);
-    return new Response(text, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+    return textResponse(text);
   };
 }

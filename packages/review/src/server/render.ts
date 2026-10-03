@@ -8,7 +8,7 @@ import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { preloadDiffHTML } from "@pierre/diffs/ssr";
-import { domId, escapeHtml, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
+import { domId, escapeHtml, formatBytes, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import type { ReviewFile, ReviewFileStats, ReviewFileSummary, ReviewIndex } from "./diff.ts";
 import { defaultReviewSettings, reviewCommentsPrompt, type ReviewCommentModel, type ReviewSettings } from "../model.ts";
 import { reviewDiffOptions } from "@agents-in-the-cloud/syntax/pierre";
@@ -101,24 +101,12 @@ function reviewFileStatsId(workspaceId: string, path: string): string {
   return domId("review", workspaceId, "stats", path);
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ["KiB", "MiB", "GiB", "TiB"];
-  let size = bytes / 1024;
-  let unit = 0;
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024;
-    unit += 1;
-  }
-  return `${Number(size.toFixed(1))} ${units[unit]}`;
-}
-
 export function renderFileStats(counts: ReviewFileStats): string {
   if (!counts.binarySizes) return `<span class="review-additions">+${counts.additions}</span><span class="review-deletions">−${counts.deletions}</span>`;
   const { before, after } = counts.binarySizes;
   const sizes = [before, after].filter((size): size is number => size !== undefined);
   const title = `Binary file: ${sizes.map((size) => `${size} bytes`).join(" → ")}`;
-  return `<span class="review-file-size" title="${title}">${sizes.map(formatFileSize).join(" → ")}</span>`;
+  return `<span class="review-file-size" title="${title}">${sizes.map(formatBytes).join(" → ")}</span>`;
 }
 
 function renderGitStats(workspaceId: string, file: ReviewFileSummary, counts?: ReviewFileStats): string {

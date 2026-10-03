@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, rm, stat } from "node:fs/promises";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import { dirname, join } from "node:path";
-import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, isNotFoundError } from "@agents-in-the-cloud/core";
 
 const failure = Buffer.from([5]);
 const maxPacketLength = 256 * 1024; // OpenSSH's SSH_AGENT_MAX_LEN.
@@ -121,7 +121,7 @@ export class SharedSshAgent {
       try {
         if ((await stat(this.backendPath)).isSocket()) return child;
       } catch (error) {
-        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+        if (!isNotFoundError(error)) throw error;
       }
       await Bun.sleep(20);
     }

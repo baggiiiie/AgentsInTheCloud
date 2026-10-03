@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { response } from "@agents-in-the-cloud/shared/http";
+import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
 import { sessionShareDir, workspaceSessionShareKey } from "./session-store.ts";
 import { durableJournalDirectory } from "./durable-storage.ts";
 import { retainedDurableWorkspaceOwner } from "./runtime.ts";
@@ -21,14 +22,14 @@ export async function retainedDurableHistories(workspaceId: string) {
   // arbitrary/missing viewer must not turn into access to the projectless share.
   // Check retained host metadata only: history must work without Docker/readiness.
   const metadata = await stat(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata")).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
+    if (isNotFoundError(error)) return undefined;
     throw error;
   });
   if (!metadata?.isDirectory()) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${workspaceId}`);
   const share = await workspaceSessionShareKey(workspaceId);
   const directory = join(sessionShareDir(share), "builtin-durable");
   const entries = await readdir(directory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return [];
+    if (isNotFoundError(error)) return [];
     throw error;
   });
   const histories: { workspaceId: string; owner: DurableAgentRuntime }[] = [];
@@ -41,17 +42,15 @@ export async function retainedDurableHistories(workspaceId: string) {
   return histories;
 }
 
-function html(content: string, status = 200) { return new Response(content, { status, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }); }
-
 /** Read-only HTTP surface: never mounts a live runtime, probes readiness, or resumes a scheduler. */
 export const handleDurableHistoryRequest: AgentRouteHandler = async (request, url, options) => {
   const match = url.pathname.match(/^\/workspaces\/([^/]+)\/agent-history(?:\/([^/]+)\/([^/]+)(?:\/(session-images|transcript-items)\/([^/]+)(?:\/(\d+))?)?)?$/);
   if (!match || request.method !== "GET") return undefined;
   function page(title: string, content: string) {
     if (!options.renderPage) throw new Error("Native history requires the host page renderer");
-    const response = options.renderPage(`<div class="app no-sidebar"><div class="main"><header class="header"><h1>${escapeHtml(title)}</h1></header><main class="body">${content}</main></div></div>`);
-    response.headers.set("Cache-Control", "no-store");
-    return response;
+    const rendered = options.renderPage(`<div class="app no-sidebar"><div class="main"><header class="header"><h1>${escapeHtml(title)}</h1></header><main class="body">${content}</main></div></div>`);
+    rendered.headers.set("Cache-Control", "no-store");
+    return rendered;
   }
   const viewer = decodeURIComponent(match[1]!);
   const [source = "", conversationId = "", operation = "", item = "", index = ""] = match.slice(2).map(value => value === undefined ? "" : decodeURIComponent(value));
@@ -70,18 +69,18 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
   }
   const history = histories.find(history => history.workspaceId === source);
   const record = history && (await history.owner.catalog()).find(record => record.conversationId === conversationId);
-  if (!history || !record) return html("Not found", 404);
+  if (!history || !record) return response("Not found", { status: 404 });
   const controller = await history.owner.conversation(record);
   if (operation === "session-images") return controller.image(item, Number(index));
   const branch = url.searchParams.get("branch") ?? String(record.durableId);
-  if (!(record.branches ?? [record.durableId]).some(id => String(id) === branch)) return html("Not found", 404);
+  if (!(record.branches ?? [record.durableId]).some(id => String(id) === branch)) return response("Not found", { status: 404 });
   const ctx = { workspaceId: source, conversationId, readOnly: true, transcriptQuery: `branch=${encodeURIComponent(branch)}`, transcriptBasePath: `${base}/${encodeURIComponent(source)}/${encodeURIComponent(conversationId)}` };
   const view = await controller.historyView(branch);
   const items = projectDurableTranscript(view);
   if (operation === "transcript-items") {
     const selected = findTranscriptItem(items, item);
     const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
-    return selected ? html(renderTranscriptItemDetailFrame(ctx, selected, { count })) : html("Not found", 404);
+    return selected ? response(renderTranscriptItemDetailFrame(ctx, selected, { count })) : response("Not found", { status: 404 });
   }
   const branches = (record.branches ?? [record.durableId]).map(id => actionLinkHtml({ href: `${ctx.transcriptBasePath}?branch=${id}`, variant: "secondary", content: { kind: "caption", caption: `Branch ${id}${id === record.durableId ? " (current)" : ""}` } })).join(" ");
   return page(record.title, `${actionLinkHtml({ href: base, variant: "secondary", content: { kind: "caption", caption: "All history" } })}<nav>${branches}</nav><p>Full branch history, including earlier sessions. This view is read-only.</p><div class="agent-transcript"><div class="agent-transcript-content">${items.map(item => renderTranscriptItem(ctx, item)).join("")}</div></div>`);

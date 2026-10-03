@@ -1,6 +1,7 @@
 import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
 import { invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { textResponse } from "@agents-in-the-cloud/shared/http";
 import { isWorkspaceLoopbackHost, turboStreamResponse, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceModuleCommandHandler } from "@agents-in-the-cloud/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -118,7 +119,7 @@ async function browserNavigateEndpoint(workspaceId: string, appKey: string, requ
   const view = setWorkspaceBrowserTarget(workspaceId, appKey, url);
   if (!view) return wantsJson
     ? Response.json({ error: { code: "view_not_found", message: `browser view not found: ${appKey}` } }, { status: 404 })
-    : new Response("browser view not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+    : textResponse("browser view not found", { status: 404 });
   return wantsJson
     ? Response.json({ view: { key: view.key, label: view.label, url: view.targetUrl } })
     : turboStreamResponse("");

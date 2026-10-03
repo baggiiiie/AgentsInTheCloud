@@ -1,6 +1,7 @@
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { turboStreamResponse, type WorkspaceModule } from "@agents-in-the-cloud/shared";
+import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -21,14 +22,6 @@ type ReviewReference = Static<typeof reviewReferenceSchema>;
 let invalidateWorkspace: (workspaceId: string) => void;
 const indexes = new Map<string, ReviewIndex>();
 const stats = new WeakMap<ReviewIndex, Promise<ReviewFileStats[]>>();
-
-function textResponse(message: string, status: number): Response {
-  return new Response(message, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
-}
-
-function htmlResponse(html: string): Response {
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-}
 
 async function refresh(workspaceId: string): Promise<{ index: ReviewIndex; comments: ReviewComment[] }> {
   const index = await collectReviewIndex(workspaceWorkHostPath(workspaceId));
@@ -69,22 +62,22 @@ async function createComment(workspaceId: string, request: Request): Promise<Res
   const startLine = positiveLine(form.get("startLine"));
   const endLine = positiveLine(form.get("endLine"));
   const body = String(form.get("body") ?? "").trim();
-  if (!path || !side || !startLine || !endLine || endLine < startLine || !body || body.length > 20_000) return textResponse("Invalid review comment", 422);
+  if (!path || !side || !startLine || !endLine || endLine < startLine || !body || body.length > 20_000) return textResponse("Invalid review comment", { status: 422 });
   const file = await collectReviewFile(workspaceWorkHostPath(workspaceId), path);
-  if (!file || file.kind !== "text") return textResponse("Review file is no longer available", 409);
+  if (!file || file.kind !== "text") return textResponse("Review file is no longer available", { status: 409 });
   const snippet = reviewSnippet(file, side, startLine, endLine);
-  if (!snippet && startLine !== 1) return textResponse("Review line is no longer available", 409);
+  if (!snippet && startLine !== 1) return textResponse("Review line is no longer available", { status: 409 });
   addReviewComment(workspaceId, { path, side, startLine, endLine, body, snippet });
   return turboStreamResponse("");
 }
 
 async function updateComment(workspaceId: string, id: string, request: Request): Promise<Response> {
   const body = String((await request.formData()).get("body") ?? "").trim();
-  if (!body || body.length > 20_000) return textResponse("Invalid review comment", 422);
+  if (!body || body.length > 20_000) return textResponse("Invalid review comment", { status: 422 });
   const comment = listReviewComments(workspaceId).find((candidate) => candidate.id === id);
-  if (!comment) return textResponse("Review comment not found", 404);
+  if (!comment) return textResponse("Review comment not found", { status: 404 });
   const file = await collectReviewFile(workspaceWorkHostPath(workspaceId), comment.path);
-  if (!file || file.kind !== "text") return textResponse("Review file is no longer available", 409);
+  if (!file || file.kind !== "text") return textResponse("Review file is no longer available", { status: 409 });
   updateReviewComment(workspaceId, id, body);
   return turboStreamResponse("");
 }
@@ -123,61 +116,61 @@ export const reviewWorkspaceModule: WorkspaceModule = {
   routes: [{
     async handle(request, url) {
       if (url.pathname.startsWith("/review/settings/")) {
-        if (request.method !== "POST") return textResponse("Method not allowed", 405);
+        if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
         const form = await request.formData();
         if (url.pathname === "/review/settings/diff-layout") {
           const viewport = url.searchParams.get("viewport") ?? "";
           const value = String(form.get("review-diff-layout") ?? "");
-          if (!isReviewViewport(viewport) || !isReviewDiffLayout(value)) return textResponse("Invalid review diff layout", 422);
+          if (!isReviewViewport(viewport) || !isReviewDiffLayout(value)) return textResponse("Invalid review diff layout", { status: 422 });
           await updateReviewSettings({ [viewport]: value });
         } else if (url.pathname === "/review/settings/diff-highlighting") {
           const value = String(form.get("review-diff-highlighting") ?? "");
-          if (!isReviewDiffHighlighting(value)) return textResponse("Invalid review diff highlighting", 422);
+          if (!isReviewDiffHighlighting(value)) return textResponse("Invalid review diff highlighting", { status: 422 });
           await updateReviewSettings({ highlighting: value });
         } else if (url.pathname === "/review/settings/diff-overflow") {
           const value = String(form.get("review-diff-overflow") ?? "");
-          if (!isReviewDiffOverflow(value)) return textResponse("Invalid review diff overflow", 422);
+          if (!isReviewDiffOverflow(value)) return textResponse("Invalid review diff overflow", { status: 422 });
           await updateReviewSettings({ overflow: value });
         } else {
-          return textResponse("Not found", 404);
+          return textResponse("Not found", { status: 404 });
         }
         return turboStreamResponse("");
       }
-      let match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/deletion\/file$/);
-      if (match) return request.method === "GET" ? await deletionReviewFileResponse(decodeURIComponent(match[1]!), url) : textResponse("Method not allowed", 405);
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/deletion\/commit$/);
-      if (match) return request.method === "GET" ? await deletionReviewCommitResponse(decodeURIComponent(match[1]!), url) : textResponse("Method not allowed", 405);
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/refresh$/);
-      if (match) return request.method === "POST" ? await refreshedResponse(decodeURIComponent(match[1]!)) : textResponse("Method not allowed", 405);
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/more-files$/);
+      let match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/deletion\/file$/);
+      if (match) return request.method === "GET" ? await deletionReviewFileResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/deletion\/commit$/);
+      if (match) return request.method === "GET" ? await deletionReviewCommitResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/refresh$/);
+      if (match) return request.method === "POST" ? await refreshedResponse(match[0]!) : textResponse("Method not allowed", { status: 405 });
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/more-files$/);
       if (match) {
-        if (request.method !== "GET") return textResponse("Method not allowed", 405);
-        const workspaceId = decodeURIComponent(match[1]!);
+        if (request.method !== "GET") return textResponse("Method not allowed", { status: 405 });
+        const workspaceId = match[0]!;
         const offset = Number(url.searchParams.get("offset"));
-        if (!Number.isSafeInteger(offset) || offset < reviewFilePageSize || offset % reviewFilePageSize !== 0) return textResponse("Invalid review file offset", 422);
+        if (!Number.isSafeInteger(offset) || offset < reviewFilePageSize || offset % reviewFilePageSize !== 0) return textResponse("Invalid review file offset", { status: 422 });
         const { index, comments } = await current(workspaceId);
         const files = await currentStats(workspaceId, index);
-        return htmlResponse(renderReviewMoreFiles(workspaceId, index, comments, offset, files));
+        return response(renderReviewMoreFiles(workspaceId, index, comments, offset, files));
       }
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/comments$/);
-      if (match) return request.method === "POST" ? await createComment(decodeURIComponent(match[1]!), request) : textResponse("Method not allowed", 405);
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/comments\/delete$/);
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/comments$/);
+      if (match) return request.method === "POST" ? await createComment(match[0]!, request) : textResponse("Method not allowed", { status: 405 });
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/comments\/delete$/);
       if (match) {
-        if (request.method !== "POST") return textResponse("Method not allowed", 405);
-        const workspaceId = decodeURIComponent(match[1]!);
+        if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
+        const workspaceId = match[0]!;
         const { comments } = await current(workspaceId);
         deleteReviewComments(workspaceId, comments.map((comment) => comment.id));
         return turboStreamResponse("");
       }
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/comments\/([^/]+)\/update$/);
-      if (match) return request.method === "POST" ? await updateComment(decodeURIComponent(match[1]!), decodeURIComponent(match[2]!), request) : textResponse("Method not allowed", 405);
-      match = url.pathname.match(/^\/workspaces\/([^/]+)\/review\/comments\/([^/]+)\/delete$/);
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/comments\/([^/]+)\/update$/);
+      if (match) return request.method === "POST" ? await updateComment(match[0]!, match[1]!, request) : textResponse("Method not allowed", { status: 405 });
+      match = matchRoute(url, /^\/workspaces\/([^/]+)\/review\/comments\/([^/]+)\/delete$/);
       if (!match) return undefined;
-      if (request.method !== "POST") return textResponse("Method not allowed", 405);
-      const workspaceId = decodeURIComponent(match[1]!);
-      const id = decodeURIComponent(match[2]!);
+      if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
+      const workspaceId = match[0]!;
+      const id = match[1]!;
       const comment = listReviewComments(workspaceId).find((candidate) => candidate.id === id);
-      if (!comment) return textResponse("Review comment not found", 404);
+      if (!comment) return textResponse("Review comment not found", { status: 404 });
       deleteReviewComments(workspaceId, [id]);
       return turboStreamResponse("");
     },

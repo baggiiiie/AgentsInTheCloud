@@ -12,3 +12,19 @@ export function response(body: string, init: ResponseInit = {}): Response {
   if (!headers.has("cache-control")) headers.set("cache-control", "no-store");
   return new Response(body, { ...init, headers });
 }
+
+export function textResponse(body: string, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  headers.set("content-type", "text/plain; charset=utf-8");
+  return response(body, { ...init, headers });
+}
+
+export function jsonResponse<Body extends object>(body: Body, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  headers.set("content-type", "application/json; charset=utf-8");
+  return response(JSON.stringify(body), { ...init, headers });
+}
+
+export function matchRoute(url: URL, pattern: RegExp): string[] | undefined {
+  return url.pathname.match(pattern)?.slice(1).map(decodeURIComponent);
+}

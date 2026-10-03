@@ -1,15 +1,11 @@
-import { readFile } from "node:fs/promises";
+import { readTextIfExists } from "./fs.ts";
 const descriptor = "/run/agents-in-the-cloud-system/resources.json";
 async function resources(): Promise<
   { workloadsCgroupParent: string } | undefined
 > {
-  try {
-    return JSON.parse(await readFile(descriptor, "utf8"));
-  } catch (error) {
-    // A developer's local Docker context has no System-owned workload group.
-    if ((error instanceof Error && "code" in error && error.code === "ENOENT")) return undefined;
-    throw error;
-  }
+  const text = await readTextIfExists(descriptor);
+  // A developer's local Docker context has no System-owned workload group.
+  return text === undefined ? undefined : JSON.parse(text);
 }
 export async function workloadBuildArgs(): Promise<string[]> {
   const config = await resources();

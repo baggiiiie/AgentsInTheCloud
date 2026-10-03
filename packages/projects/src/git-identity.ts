@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { getAgentsInTheCloudRuntimeContext, invalidArguments, shellQuote, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { getAgentsInTheCloudRuntimeContext, invalidArguments, isNotFoundError, shellQuote, writeJsonAtomic, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -31,17 +30,13 @@ async function readStore(file: string): Promise<GitIdentityStore> {
     const email = parsed.gitIdentity.email.trim();
     return name && email ? { gitIdentity: { name, email } } : {};
   } catch (error) {
-    const code = error instanceof Error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return {};
+    if (isNotFoundError(error)) return {};
     throw error;
   }
 }
 
 async function writeStore(file: string, store: GitIdentityStore): Promise<void> {
-  await mkdir(dirname(file), { recursive: true });
-  const tempFile = `${file}.${randomUUID()}.tmp`;
-  await writeFile(tempFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
-  await rename(tempFile, file);
+  await writeJsonAtomic(file, store);
 }
 
 function validateGitIdentity(identity: GitIdentitySettings): GitIdentitySettings {

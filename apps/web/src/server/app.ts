@@ -22,6 +22,7 @@ import { validDraftId } from "@agents-in-the-cloud/prompt/server";
 import {
   domId,
   emptyWorkspaceCommandInputSchema,
+  errorMessage,
   escapeHtml,
   parseWorkspaceFileTarget,
   turboStreamResponse,
@@ -47,8 +48,8 @@ import { createAgentPaneHost } from "./agent-pane-host.ts";
 import { agentContentId, selectAgentTurboStream } from "./agent-pane.ts";
 import { agentProvider, defaultAgentProvider, orderedAgentProviders, registeredAgentProviders, rememberAgentProvider } from "./agent-providers.ts";
 import { openWorkspaceFile } from "./file-navigation.ts";
-import { httpErrorStatus, jsonResponse, problemJsonResponse } from "./http-responses.ts";
-import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
+import { httpErrorStatus, problemJsonResponse } from "./http-responses.ts";
+import { jsonResponse, matchRoute, replace, response, textResponse, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 import { launchComposerContent, renderLaunchComposer, renderLaunchProvider } from "./launch-composer.ts";
 import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
@@ -130,7 +131,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     | { kind: "regions"; regions: readonly LiveRegion[] };
   const surfaces = new Map<string, { workspaceId: string; kind: string; resource: ReturnType<typeof createLiveResource<SurfaceState>> }>();
   const reportPresentationError = (error: Error) => logError(
-    `Could not refresh live state: ${error instanceof Error ? error.message : String(error)}`,
+    `Could not refresh live state: ${errorMessage(error)}`,
   );
   const shell = createLiveResource(async () => {
     const pane = await workspacePaneCollections("");
@@ -264,7 +265,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     },
     parkedChanged(entry) {
       if (suppressParkedStateCallbacks) return;
-      void persistWorkspaceParked(entry.id, entry.parked).catch((error) => logError(`could not persist parked state for workspace ${entry.id}: ${error instanceof Error ? error.message : String(error)}`));
+      void persistWorkspaceParked(entry.id, entry.parked).catch((error) => logError(`could not persist parked state for workspace ${entry.id}: ${errorMessage(error)}`));
     },
     removed(id) {
       workPresentationIntents.delete(id);
@@ -704,7 +705,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       } catch (error) {
         const entry = registry.get(id);
         if (!entry || entry.phase.deletion) return;
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         logError(`could not provision workspace ${id}: ${message}`);
         registry.setProvisioningState(id, "failed", message);
       }
@@ -1148,7 +1149,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const url = new URL(request.url);
 
     if (url.pathname === "/up" && (request.method === "GET" || request.method === "HEAD")) {
-      return new Response(request.method === "HEAD" ? null : "ok\n", { headers: { "content-type": "text/plain; charset=utf-8" } });
+      return textResponse(request.method === "HEAD" ? "" : "ok\n");
     }
     if (url.pathname === "/" && (request.method === "GET" || request.method === "HEAD")) {
       const page = await homePage();
@@ -1162,14 +1163,14 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/launch-composer" && request.method === "GET") return response(await renderProjectlessLaunchComposerFrame());
     if (url.pathname === "/launch-composer/provider" && request.method === "GET") return response(await renderLaunchProvider(agentProvider(url.searchParams.get("provider") ?? "builtin"), await orderedAgentProviders(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await agentProvider(url.searchParams.get("provider") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
-    const projectSettingsMatch = url.pathname.match(/^\/projects\/([^/]+)\/settings$/);
+    const projectSettingsMatch = matchRoute(url, /^\/projects\/([^/]+)\/settings$/);
     if (projectSettingsMatch && request.method === "GET") {
-      const projectId = decodeURIComponent(projectSettingsMatch[1]!);
+      const projectId = projectSettingsMatch[0]!;
       const section = url.searchParams.get("section") ?? undefined;
       return projectEditorResponse(request, { kind: "settings", projectId, section });
     }
-    const projectWorkspaceMatch = url.pathname.match(/^\/projects\/([^/]+)\/workspaces\/new$/);
-    if (projectWorkspaceMatch && request.method === "GET") return await surfacePage({ kind: "new-workspace", project: await projectRoutes.byReference(decodeURIComponent(projectWorkspaceMatch[1]!)) });
+    const projectWorkspaceMatch = matchRoute(url, /^\/projects\/([^/]+)\/workspaces\/new$/);
+    if (projectWorkspaceMatch && request.method === "GET") return await surfacePage({ kind: "new-workspace", project: await projectRoutes.byReference(projectWorkspaceMatch[0]!) });
     if (url.pathname === "/workspaces/new" && request.method === "GET") return await surfacePage({ kind: "new-workspace" });
     if (url.pathname === "/projects/new" && request.method === "GET") {
       return projectEditorResponse(request, { kind: "new" });
@@ -1183,10 +1184,6 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const projectResponse = await projectRoutes.handle(request, url);
     if (projectResponse) return projectResponse;
 
-    const match = (pattern: RegExp): string[] | undefined => {
-      const result = url.pathname.match(pattern);
-      return result ? result.slice(1).map(decodeURIComponent) : undefined;
-    };
     const routeParam = (values: string[], index: number): string => {
       const value = values[index];
       if (value === undefined) throw new Error(`Route parameter ${index} is missing`);
@@ -1211,7 +1208,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
     let params: string[] | undefined;
 
-    if ((params = match(/^\/workspaces\/([^/]+)\/file\/open$/))) {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/file\/open$/))) {
       if (request.method !== "GET") return response("Method not allowed", { status: 405, headers: { allow: "GET" } });
       return await openWorkspaceFile(routeParam(params, 0), parseWorkspaceFileTarget(url.searchParams),
         (workspaceId, reference) => openWorkspaceModuleWorkView(workspaceId, reference, request), url.searchParams.get("existing") === "1");
@@ -1219,52 +1216,52 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
     if (url.pathname === "/agent-workspaces" && request.method === "POST") return await createEmptyAgentWorkspaceEndpoint(request);
 
-    if ((params = match(/^\/workspaces\/([^/]+)\/sidebar-title$/)) && request.method === "POST") return await updateWorkspaceSidebarTitle(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/commands\/([^/]+)$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/sidebar-title$/)) && request.method === "POST") return await updateWorkspaceSidebarTitle(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/commands\/([^/]+)$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       const commandId = routeParam(params, 1);
       return await serializePresentationMutation(workspaceId, async () => await workspaceCommandEndpoint(workspaceId, commandId, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/agents\/([^/]+)\/close$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/close$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       const conversationId = routeParam(params, 1);
       return await serializePresentationMutation(workspaceId, async () => await closeAgentConversationEndpoint(workspaceId, conversationId, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/work-views\/close$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/work-views\/close$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       return await serializePresentationMutation(workspaceId, async () => await closeWorkViewJsonEndpoint(workspaceId, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/work-views\/(.+)\/attention\/request$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/work-views\/(.+)\/attention\/request$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       const key = routeParam(params, 1);
       return await serializePresentationMutation(workspaceId, async () => await requestWorkViewAttentionEndpoint(workspaceId, key, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/work-views\/(.+)\/close$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/work-views\/(.+)\/close$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       const reference = routeParam(params, 1);
       return await serializePresentationMutation(workspaceId, async () => await closeWorkViewEndpoint(workspaceId, reference, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/work-views\/reorder$/)) && request.method === "POST") {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/work-views\/reorder$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
       return await serializePresentationMutation(workspaceId, async () => await reorderWorkViewEndpoint(workspaceId, request));
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/park$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], true, request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/unpark$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], false, request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/warnings\/([^/]+)\/dismiss$/)) && request.method === "POST") return dismissWorkspaceWarning(params[0], params[1], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)\/reject$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request, true);
-    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust\/reject$/)) && request.method === "POST") return workspaceSshTrustEndpoint(params[0]!, request, true);
-    if ((params = match(/^\/workspaces\/([^/]+)\/ssh-trust$/))) {
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/park$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], true, request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/unpark$/)) && request.method === "POST") return parkWorkspaceEndpoint(params[0], false, request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/warnings\/([^/]+)\/dismiss$/)) && request.method === "POST") return dismissWorkspaceWarning(params[0], params[1], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)\/reject$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request, true);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/ssh-trust\/([^/]+)$/)) && request.method === "POST") return workspaceRuntimeSshTrustEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/ssh-trust\/reject$/)) && request.method === "POST") return workspaceSshTrustEndpoint(params[0]!, request, true);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/ssh-trust$/))) {
       if (request.method === "GET" || request.method === "POST") return await workspaceSshTrustEndpoint(params[0]!, request);
     }
-    if ((params = match(/^\/workspaces\/([^/]+)\/provisioning\/continue$/)) && request.method === "POST") return continueWorkspaceProvisioningEndpoint(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/delete\/cancel$/)) && request.method === "POST") return await cancelWorkspaceDeletionEndpoint(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/delete\/confirm$/)) && request.method === "POST") return await confirmWorkspaceDeletionEndpoint(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/delete\/retry$/)) && request.method === "POST") return await retryWorkspaceDeletionEndpoint(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteWorkspaceEndpoint(params[0], request);
-    if ((params = match(/^\/workspaces\/([^/]+)$/)) && request.method === "GET") return await workspacePage(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/provisioning\/continue$/)) && request.method === "POST") return continueWorkspaceProvisioningEndpoint(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/delete\/cancel$/)) && request.method === "POST") return await cancelWorkspaceDeletionEndpoint(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/delete\/confirm$/)) && request.method === "POST") return await confirmWorkspaceDeletionEndpoint(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/delete\/retry$/)) && request.method === "POST") return await retryWorkspaceDeletionEndpoint(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteWorkspaceEndpoint(params[0], request);
+    if ((params = matchRoute(url, /^\/workspaces\/([^/]+)$/)) && request.method === "GET") return await workspacePage(params[0], request);
 
-    return response("not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+    return textResponse("not found", { status: 404 });
   }
 
   return {

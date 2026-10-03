@@ -6,9 +6,10 @@ import { syncSubscriptionClis } from "./subscription-cli.ts";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { forgetSubscriptionInference } from "./recent-subscription-activity.ts";
 import { defaultProviderModels, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, readTextIfExists, writeJsonAtomic, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import type { AuthInteraction, AuthPrompt } from "@earendil-works/pi-ai";
 import { InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
@@ -39,13 +40,6 @@ async function piDeviceId(): Promise<string> {
     if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
   }
   return (await readFile(path, "utf8")).trim();
-}
-
-async function writeJsonFile(path: string, value: JsonObject): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tmp = `${path}.tmp-${crypto.randomUUID()}`;
-  await writeFile(tmp, `${JSON.stringify(value, null, 2)}\n`);
-  await rename(tmp, path);
 }
 
 function jsonString(value: JsonValue | undefined): string | undefined {
@@ -93,7 +87,7 @@ function parseCustomModelsJson(source: string): JsonObject {
   try {
     parsed = JSON.parse(source);
   } catch (error) {
-    throw new Error(`Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Invalid JSON: ${errorMessage(error)}`);
   }
   if (!isJsonObject(parsed)) throw new Error("Custom model configuration must be a JSON object.");
   const unexpected = Object.keys(parsed).filter((key) => key !== "providers");
@@ -104,7 +98,7 @@ function parseCustomModelsJson(source: string): JsonObject {
 
 async function validateCustomModelProviders(providers: JsonObject): Promise<void> {
   const path = join(piConfigDir(), `.custom-models-validation-${crypto.randomUUID()}.json`);
-  await writeJsonFile(path, { providers });
+  await writeJsonAtomic(path, { providers });
   try {
     const validationRuntime = await ModelRuntime.create({ modelsPath: path, allowModelNetwork: false, refreshOnCreate: false });
     const error = validationRuntime.getError();
@@ -115,14 +109,11 @@ async function validateCustomModelProviders(providers: JsonObject): Promise<void
 }
 
 async function readStoredCustomModelProviders(): Promise<JsonObject | undefined> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(piCustomModelsJsonPath(), "utf8"));
-    if (!isJsonObject(parsed) || !isJsonObject(parsed.providers)) throw new Error(`${piCustomModelsJsonPath()} must contain a providers object`);
-    return parsed.providers;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
-  }
+  const source = await readTextIfExists(piCustomModelsJsonPath());
+  if (source === undefined) return undefined;
+  const parsed: unknown = JSON.parse(source);
+  if (!isJsonObject(parsed) || !isJsonObject(parsed.providers)) throw new Error(`${piCustomModelsJsonPath()} must contain a providers object`);
+  return parsed.providers;
 }
 
 function withoutOfficialModelDuplicates(providers: JsonObject, officialRuntime: ModelRuntime): CustomModelsSaveResult & { providers: JsonObject } {
@@ -152,7 +143,7 @@ async function preparePiModelsJson(): Promise<void> {
   const settings = await getModelSettings();
   const stored = await readStoredCustomModelProviders();
   const providers = stored ?? settings.providers ?? {};
-  if (!stored && Object.keys(providers).length) await writeJsonFile(piCustomModelsJsonPath(), { providers });
+  if (!stored && Object.keys(providers).length) await writeJsonAtomic(piCustomModelsJsonPath(), { providers });
   await materializeCustomModelProviders(providers);
 }
 
@@ -164,7 +155,7 @@ export async function getCustomModelsJson(): Promise<string> {
 export async function setCustomModelsJson(source: string): Promise<CustomModelsSaveResult> {
   const providers = source.trim() ? parseCustomModelsJson(source) : {};
   await validateCustomModelProviders(providers);
-  await writeJsonFile(piCustomModelsJsonPath(), { providers });
+  await writeJsonAtomic(piCustomModelsJsonPath(), { providers });
   const result = await materializeCustomModelProviders(providers);
   if (modelRuntime) await (await modelRuntime).refresh();
   return result;
@@ -203,7 +194,7 @@ export type PiAuthPrompt = AuthPrompt;
 
 export class ProviderCatalogueRefreshError extends Error {
   constructor(cause: unknown) {
-    super(`Provider connected, but the online model catalogue refresh failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    super(`Provider connected, but the online model catalogue refresh failed: ${errorMessage(cause)}`, { cause });
     this.name = "ProviderCatalogueRefreshError";
   }
 }

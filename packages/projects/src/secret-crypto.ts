@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
 
 const keyBytes = 32;
 const ivBytes = 12;
@@ -16,7 +16,7 @@ async function readOrCreateMasterKey(file: string): Promise<Buffer> {
     if (key.byteLength !== keyBytes) throw new AgentsInTheCloudCoreError("invalid_project_secret_key", `project secrets key must be ${keyBytes} bytes`);
     return key;
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!isNotFoundError(error)) throw error;
     const key = randomBytes(keyBytes);
     await mkdir(dirname(file), { recursive: true });
     await writeFile(file, `${key.toString("base64url")}\n`, { encoding: "utf8", mode: 0o600 });

@@ -2,6 +2,7 @@ import { lstat, readFile, readlink, stat } from "node:fs/promises";
 import { isUtf8 } from "node:buffer";
 import { join, relative, sep } from "node:path";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
+import { isNotFoundError } from "@agents-in-the-cloud/core";
 import type { ReviewSide } from "../model.ts";
 
 const maxRenderedBytes = 1_000_000;
@@ -93,7 +94,7 @@ async function workingFile(root: string, path: string): Promise<Buffer | undefin
     if (!info.isFile()) return undefined;
     return await readFile(absolute);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    if (isNotFoundError(error)) return undefined;
     throw error;
   }
 }
@@ -171,7 +172,7 @@ async function statusEntries(root: string): Promise<StatusEntry[] | undefined> {
   try {
     await stat(root);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    if (isNotFoundError(error)) return undefined;
     throw error;
   }
   const inside = await git(root, ["rev-parse", "--is-inside-work-tree"], true);

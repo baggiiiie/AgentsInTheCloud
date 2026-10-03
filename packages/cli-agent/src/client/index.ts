@@ -1,5 +1,5 @@
 import { createNativeTerminalTextInputController, createTerminalKeyBarController, agentsInTheCloudObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalFrame, type ObservableTerminalViewer } from "@agents-in-the-cloud/observable-terminal/client";
-import { anchorScrollBottom, changeLayout, composerSubmitKey, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
+import { anchorScrollBottom, changeLayout, composerSubmitKey, errorMessage, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "cli-agent",
@@ -266,7 +266,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           // Sending never discards the draft.
           if (!this.inputTarget.value) setTextInputValue(this.inputTarget, draftText);
           this.failed();
-          showError(error instanceof Error ? error.message : String(error));
+          showError(errorMessage(error));
         }
         finally { this.sending = false; }
       }
@@ -283,7 +283,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           await this.deliver(data);
           this.sent();
         }
-        catch (error) { this.failed(); status.textContent = error instanceof Error ? error.message : String(error); status.hidden = false; }
+        catch (error) { this.failed(); status.textContent = errorMessage(error); status.hidden = false; }
         finally { this.sending = false; }
       }
       /** The terminal replaces the frozen transcript before anything else moves; the composer empties at once. */

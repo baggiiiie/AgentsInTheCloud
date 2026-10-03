@@ -1,6 +1,7 @@
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 
 export const treeFilterOptions = [
   ["default", "Default"],
@@ -39,7 +40,7 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
   if (suffix === "/summary" && request.method === "GET") {
     const entry = url.searchParams.get("entry") ?? "";
     if (!entry) throw new AgentsInTheCloudCoreError("invalid_arguments", "tree entry is required");
-    return new Response(renderAgentTreeContinuationMenu(entry), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return response(renderAgentTreeContinuationMenu(entry));
   }
   if (suffix === "/label" && request.method === "POST") {
     const form = await request.formData();
@@ -52,7 +53,7 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
   }
   if (suffix === "" && request.method === "GET") {
     const html = await (await presentation()).treeHtml({ filter: parseTreeFilterMode(url.searchParams.get("filter")), query: url.searchParams.get("q") ?? "" });
-    return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+    return response(html);
   }
   if (suffix === "" && request.method === "POST") {
     const form = await request.formData();
@@ -62,7 +63,7 @@ export async function handleAgentTreeRequest(request: Request, url: URL, suffix:
     if (summaryMode !== "none" && summaryMode !== "summary" && summaryMode !== "custom") throw new AgentsInTheCloudCoreError("invalid_arguments", "valid summary mode is required");
     if (summaryMode !== "none") throw new AgentsInTheCloudCoreError("invalid_arguments", "Continue without a summary for this history.");
     await (await controller()).navigate(entry);
-    return new Response("", { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return textResponse("");
   }
   return undefined;
 }

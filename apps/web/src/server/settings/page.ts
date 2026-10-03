@@ -5,7 +5,7 @@ import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
 import { invalidArguments } from "@agents-in-the-cloud/core";
-import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
 import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
@@ -164,7 +164,7 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
     try {
       await setGitIdentity({ name: String(form.get("commitAuthorName") ?? ""), email: String(form.get("commitAuthorEmail") ?? "") });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       return stream(replace("settings_git_identity", await renderGitIdentityForm(message)));
     }
     return stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);

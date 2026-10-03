@@ -1,7 +1,7 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { shellQuote, commandSignal, runCommand, killCommandGroup, withCommandSignal } from "@agents-in-the-cloud/core";
+import { shellQuote, commandSignal, runCommand, killCommandGroup, withCommandSignal, readTextIfExists } from "@agents-in-the-cloud/core";
 import { observableTerminalCols, observableTerminalEnvironment, observableTerminalHistoryLimit, observableTerminalRows } from "./constants.ts";
 import { buildKillSessionCommand, buildObservableSessionCommand, buildSetRemainOnExitCommand } from "./tmux.ts";
 
@@ -52,10 +52,7 @@ export async function runHostObservableCommand(options: HostObservableCommandOpt
     let exitCode: number | undefined;
     while (exitCode === undefined) {
       signal?.throwIfAborted();
-      const text = await readFile(exitFile, "utf8").catch((error) => {
-        if (error.code === "ENOENT") return "";
-        throw error;
-      });
+      const text = await readTextIfExists(exitFile) ?? "";
       if (text.trim()) exitCode = Number(text.trim());
       else await new Promise((resolve) => setTimeout(resolve, 250));
     }
@@ -70,10 +67,7 @@ export async function runHostObservableCommand(options: HostObservableCommandOpt
     if (!completed) {
       await withCommandSignal(AbortSignal.timeout(10_000), async () => {
         await writeFile(`${pidFile}.cancel`, "");
-        const pid = await readFile(pidFile, "utf8").catch((error) => {
-          if (error.code === "ENOENT") return "";
-          throw error;
-        });
+        const pid = await readTextIfExists(pidFile) ?? "";
         if (pid.trim()) killCommandGroup(Number(pid.trim()));
         const stopped = await runCommand(["sh", "-lc", buildKillSessionCommand(options.session)]);
         if (stopped.exitCode !== 0) throw new Error(stopped.stderr);

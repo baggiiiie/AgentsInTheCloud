@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
+import { isNotFoundError } from "@agents-in-the-cloud/core";
 import { isWorkspaceAppPort } from "@agents-in-the-cloud/shared";
 import { mkdir, chmod, unlink } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,7 +23,7 @@ export function createWorkspaceIngressSockets(ingress: WorkspaceIngress, directo
       const creating = (async () => {
         const path = join(directory, workspaceId, "ingress.sock");
         await mkdir(join(directory, workspaceId), { recursive: true });
-        try { await unlink(path); } catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+        try { await unlink(path); } catch (error) { if (!isNotFoundError(error)) throw error; }
         const server = Bun.serve({ unix: path, maxRequestBodySize: 4 * 1024 * 1024, async fetch(request, server) {
           // Host-owned protocols such as MCP can stream for longer than Bun's idle timeout.
           server.timeout(request, 0);

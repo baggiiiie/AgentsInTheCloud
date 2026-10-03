@@ -1,4 +1,5 @@
 import type { WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 
 let rendererPromise: Promise<typeof import("beautiful-mermaid")["renderMermaidSVG"]> | undefined;
 
@@ -78,7 +79,7 @@ export function createAgentMermaidController(Controller: StimulusControllerConst
         if (!this.connected || source !== this.sourceValue) return;
         const message = document.createElement("pre");
         message.className = "agent-mermaid-error";
-        message.textContent = error instanceof Error ? error.message : String(error);
+        message.textContent = errorMessage(error);
         this.diagramTarget.replaceChildren(message);
         this.diagramTarget.setAttribute("aria-busy", "false");
       }

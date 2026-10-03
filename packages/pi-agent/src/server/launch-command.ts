@@ -1,12 +1,12 @@
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
-import { cliLaunchScript, writeFileScript, type CliAgentSession, type CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
+import { cliLaunchScript, cliPromptText, writeFileScript, type CliAgentSession, type CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
 import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { piAgentsInTheCloudExtensionPath } from "./mcp.ts";
 import { piAgentsInTheCloudTheme, piThemeName } from "./theme.ts";
 
 /** Install and launch latest Pi, independent of the Pi libraries AgentsInTheCloud embeds. */
 export function piLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resumePath?: string): string {
-  const prompt = [input.text, ...input.attachmentNotes].filter(Boolean).join("\n\n");
+  const prompt = cliPromptText(input);
   const model = settings.model ? parseModelRef(settings.model)! : undefined;
   // Pi treats @-prefixed positionals as file attachments even after --.
   const message = prompt.startsWith("@") ? `\n${prompt}` : prompt;

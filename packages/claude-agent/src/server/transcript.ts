@@ -1,6 +1,6 @@
-import { nativeJsonlRows, nativeJsonlText, nativeImageTypes, nativeImageResponse } from "@agents-in-the-cloud/cli-agent/server";
+import { nativeJsonlRows, nativeImageTypes, nativeImageResponse, nativeTimestamp } from "@agents-in-the-cloud/cli-agent/server";
 import { join } from "node:path";
-import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { getAgentsInTheCloudRuntimeContext, readTextIfExists } from "@agents-in-the-cloud/core";
 import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
@@ -27,10 +27,6 @@ const rowSchema = Type.Object({
 });
 type ClaudeBlock = Static<typeof blockSchema>;
 
-function timestamp(value?: string): number {
-  const parsed = Date.parse(value ?? "");
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
 type ProjectedToolCall = { name: string; args: unknown };
 function toolCall(block: ClaudeBlock): ProjectedToolCall {
   if (block.name === "Bash") return { name: "bash", args: block.input };
@@ -72,7 +68,7 @@ export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
     const id = row.uuid;
     if (!id || !lineage.has(id)) continue;
     const message = row.message;
-    const time = timestamp(row.timestamp);
+    const time = nativeTimestamp(row.timestamp);
     if (row.type === "user" && message) {
       const blocks = Array.isArray(message.content) ? message.content : [];
       const images: Extract<TranscriptRecord, { kind: "user" }>["images"] = [];
@@ -105,12 +101,12 @@ function nativeSessionPath(sessionId: string): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
 }
 export async function loadClaudeTranscript(_workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
-  const text = await nativeJsonlText(nativeSessionPath(sessionId));
+  const text = await readTextIfExists(nativeSessionPath(sessionId));
   return text === undefined ? undefined : claudeTranscriptRecords(text);
 }
 
 export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
-  const text = await nativeJsonlText(nativeSessionPath(sessionId));
+  const text = await readTextIfExists(nativeSessionPath(sessionId));
   if (text === undefined) return new Response("Not found", { status: 404 });
   for (const row of nativeJsonlRows(text, rowSchema)) {
     if (row.uuid !== entryId || !row.message || !Array.isArray(row.message.content)) continue;
@@ -119,6 +115,11 @@ export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId:
     return nativeImageResponse(source.data, source.media_type);
   }
   return new Response("Not found", { status: 404 });
+}
+
+export async function claudeHistoryFiles(_workspaceId: string, sessionId: string): Promise<string[]> {
+  const path = nativeSessionPath(sessionId);
+  return await Bun.file(path).exists() ? [path] : [];
 }
 
 export async function hasClaudeSession(sessionId: string): Promise<boolean> {

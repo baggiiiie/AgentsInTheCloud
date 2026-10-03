@@ -42,6 +42,8 @@ export {
   shellQuote,
 } from "./shell.ts";
 
+export { isNotFoundError, readTextIfExists, writeFileAtomic, writeJsonAtomic } from "./fs.ts";
+
 export {
   agentsInTheCloudDataPath,
   dockerHostAgentsInTheCloudDataPath,

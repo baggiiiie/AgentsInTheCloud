@@ -4,7 +4,7 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { progressButtonHtml } from "@agents-in-the-cloud/design-system/progress-button";
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { transientFeedbackHtml } from "@agents-in-the-cloud/design-system/transient-feedback";
-import { escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@agents-in-the-cloud/shared";
+import { errorMessage, escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@agents-in-the-cloud/shared";
 import { isReleaseChannel, type ReleaseChannel } from "./channels.ts";
 import { detectSelfUpdateRuntime, prepareUpdate, type PreparedUpdate, type PullProgress, type SelfUpdateRuntime } from "./docker.ts";
 import { fetchChannelImageMetadata, repository, type ImageMetadata } from "./registry.ts";
@@ -100,7 +100,7 @@ export class UpdateManager {
     } catch (error) {
       // A superseded channel's failures are as stale as its successful responses.
       if (generation !== this.channelGeneration || this.pullPromise || this.prepared || this.restarting) return;
-      this.setState("failed", { error: error instanceof Error ? error.message : String(error) });
+      this.setState("failed", { error: errorMessage(error) });
       throw error;
     }
     if (generation !== this.channelGeneration || this.pullPromise || this.prepared || this.restarting) return;
@@ -138,7 +138,7 @@ export class UpdateManager {
       throw new UpdateConflictError("No update is available to download. Check the selected channel first.");
     }
     this.pullPromise = this.pullNewestTarget().catch((error) => {
-      this.setState("failed", { error: error instanceof Error ? error.message : String(error) });
+      this.setState("failed", { error: errorMessage(error) });
     }).finally(() => {
       this.pullPromise = undefined;
     });
@@ -168,7 +168,7 @@ export class UpdateManager {
       await (this.deps.requestUpdate ?? requestSupervisorUpdate)(this.prepared.imageId);
     } catch (error) {
       this.restarting = false;
-      this.setState("ready_to_restart", { error: error instanceof Error ? error.message : String(error) });
+      this.setState("ready_to_restart", { error: errorMessage(error) });
       throw error;
     }
   }
@@ -332,7 +332,7 @@ export function createUpdateRouteHandler(updateManager: UpdateManager): (request
       } catch (error) {
         const surface = url.searchParams.get("surface");
         if (surface !== "settings" && surface !== "sidebar") return new Response("Missing update control surface", { status: 400 });
-        const message = error instanceof Error ? error.message : String(error);
+        const message = errorMessage(error);
         return turboStreamResponse(turboStream("replace", restartFeedbackId(surface), renderRestartFeedback(surface, message)));
       }
     }

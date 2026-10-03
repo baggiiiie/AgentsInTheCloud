@@ -1,3 +1,4 @@
+import { shellQuote } from "@agents-in-the-cloud/core";
 import { workspaceContainerName } from "@agents-in-the-cloud/workspace";
 import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
 
@@ -39,7 +40,7 @@ export async function workspaceFileEndpoint(workspaceId: string, path: string, r
   if (!path.startsWith("/") || path.includes("..") || path.includes("\0")) return new Response("bad path", { status: 400 });
 
   const container = workspaceContainerName(workspaceId);
-  const quoted = `'${path.replaceAll("'", `'\\''`)}'`;
+  const quoted = shellQuote(path);
   const stat = Bun.spawnSync(["docker", "exec", container, "sh", "-c", `stat -c %s ${quoted} 2>/dev/null || stat -f %z ${quoted}`]);
   const size = Number(new TextDecoder().decode(stat.stdout).trim());
   if (stat.exitCode !== 0 || !Number.isFinite(size)) return new Response("not found", { status: 404 });

@@ -2,11 +2,11 @@ import { createHash } from "node:crypto";
 import { workspaceHomeMounts } from "./home.ts";
 import { workspaceImagePreloader } from "./preload.ts";
 import type { WorkspaceImageConfigureEvent } from "./events.ts";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AgentsInTheCloudCoreError, agentsInTheCloudDataPath, createProcessFileLock, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, gitHubCredentialHelperShellBody, invalidArguments, isJsonObject, requireDocker, runDocker, runDockerBuffer, withManagedDockerCommand, withCommandSignal, waitForCommand, shellQuote, type AgentsInTheCloudEventBus, type CommandInput, type JsonObject } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, agentsInTheCloudDataPath, createProcessFileLock, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, gitHubCredentialHelperShellBody, invalidArguments, isJsonObject, readTextIfExists, requireDocker, runDocker, runDockerBuffer, withManagedDockerCommand, withCommandSignal, waitForCommand, shellQuote, writeJsonAtomic, type AgentsInTheCloudEventBus, type CommandInput, type JsonObject } from "@agents-in-the-cloud/core";
 import { runHostObservableCommand, stripTerminalControls, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
-import { isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceGateway, type WorkspaceHttpAppBackend, type WorkspaceServerProvisioningHook } from "@agents-in-the-cloud/shared";
+import { errorMessage, isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceGateway, type WorkspaceHttpAppBackend, type WorkspaceServerProvisioningHook } from "@agents-in-the-cloud/shared";
 import { inspectWorkspaceImage, resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import { prepareWorkspaceSystemd } from "./systemd.ts";
 import { Type } from "typebox";
@@ -140,13 +140,9 @@ function workspaceIdentityTombstonePath(): string {
 }
 
 async function readRetiredWorkspaceIds(): Promise<Set<string>> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(workspaceIdentityTombstonePath(), "utf8"));
-    return new Set(Value.Parse(stringArraySchema, parsed));
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return new Set();
-    throw error;
-  }
+  const text = await readTextIfExists(workspaceIdentityTombstonePath());
+  if (text === undefined) return new Set();
+  return new Set(Value.Parse(stringArraySchema, JSON.parse(text)));
 }
 
 function workspaceIdentityKey(id: string): string {
@@ -161,11 +157,7 @@ async function retireWorkspaceId(id: string): Promise<void> {
   await withWorkspaceIdentityLock(async () => {
     const retired = await readRetiredWorkspaceIds();
     retired.add(workspaceIdentityKey(id));
-    const path = workspaceIdentityTombstonePath();
-    await mkdir(dirname(path), { recursive: true });
-    const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`;
-    await writeFile(temporary, `${JSON.stringify([...retired].sort(), null, 2)}\n`);
-    await rename(temporary, path);
+    await writeJsonAtomic(workspaceIdentityTombstonePath(), [...retired].sort());
   });
 }
 
@@ -251,7 +243,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   try {
     parsed = JSON.parse(text);
   } catch (error) {
-    throw invalidArguments(`invalid ${path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw invalidArguments(`invalid ${path}: ${errorMessage(error)}`);
   }
   if (!isJsonObject(parsed)) throw invalidArguments(`invalid ${path}: expected object`);
   const record = parsed;

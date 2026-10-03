@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { getAgentsInTheCloudRuntimeContext, shellQuote } from "@agents-in-the-cloud/core";
+import { getAgentsInTheCloudRuntimeContext, isNotFoundError, shellQuote } from "@agents-in-the-cloud/core";
 import { execWorkspaceShell } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 type ImageRef = WorkspaceAgentInput["images"][number];
@@ -82,7 +82,7 @@ export async function findStagedAttachment(draftId: string, attachmentId: string
   try {
     names = await readdir(dir);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+    if (isNotFoundError(error)) return undefined;
     throw error;
   }
   const [name] = names;
@@ -98,7 +98,7 @@ export async function listStagedAttachments(draftId: string): Promise<StagedAtta
   try {
     entries = await readdir(attachmentDraftDir(draftId));
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    if (isNotFoundError(error)) return [];
     throw error;
   }
   const attachments: StagedAttachment[] = [];

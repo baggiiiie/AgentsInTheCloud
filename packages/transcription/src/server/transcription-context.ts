@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readTextIfExists } from "@agents-in-the-cloud/core";
 import { join } from "node:path";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -9,10 +9,7 @@ const sessionSchema = Type.Record(Type.String(), Type.Unknown());
 /** Read the workspace's pronunciation hints at the start of each dictation session. */
 export async function readTranscriptionContext(workspaceRoot: string): Promise<string[]> {
   const path = join(workspaceRoot, ".agents-in-the-cloud", "transcription-context");
-  const contents = await readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return "";
-    throw error;
-  });
+  const contents = await readTextIfExists(path) ?? "";
   return contents.split(/\r?\n/).map((line) => line.split("#", 1)[0]!.trim()).filter(Boolean);
 }
 

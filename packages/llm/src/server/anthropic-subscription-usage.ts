@@ -1,8 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { SubscriptionUsageError, type SubscriptionUsage } from "./subscription-usage.ts";
-
-type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
+import { readSubscriptionUsageJson, requestSubscriptionUsage, SubscriptionUsageError, type Fetcher, type SubscriptionUsage } from "./subscription-usage.ts";
 type UsageWindow = SubscriptionUsage["windows"][number];
 
 const accountWindowSchema = Type.Object({
@@ -10,7 +8,8 @@ const accountWindowSchema = Type.Object({
   resets_at: Type.Union([Type.String(), Type.Null()]),
 });
 const unrecognizedHeaders = () => new SubscriptionUsageError("Anthropic returned unrecognized rate limit headers.");
-const unrecognizedAccountUsage = () => new SubscriptionUsageError("Anthropic returned an unrecognized usage response.");
+const unrecognizedAccountUsageMessage = "Anthropic returned an unrecognized usage response.";
+const unrecognizedAccountUsage = () => new SubscriptionUsageError(unrecognizedAccountUsageMessage);
 const unitSeconds = new Map([["h", 3600], ["hour", 3600], ["d", 86400], ["day", 86400]]);
 const numberWords = new Map(["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"].map((word, index) => [word, index + 1]));
 
@@ -32,11 +31,7 @@ function namedWindows(reported: Array<{ count: number; unit: string; feature: st
 
 async function requestAnthropic(url: string, accessToken: string, init: { method?: string; headers?: Record<string, string>; body?: string }, fetcher: Fetcher): Promise<Response> {
   const headers = { ...init.headers, Authorization: `Bearer ${accessToken}`, "anthropic-beta": "oauth-2025-04-20", Accept: "application/json" };
-  try {
-    return await fetcher(url, { ...init, headers, signal: AbortSignal.timeout(10_000), redirect: "error" });
-  } catch {
-    throw new SubscriptionUsageError("Could not reach Anthropic to check subscription usage. Try again.");
-  }
+  return await requestSubscriptionUsage(url, { ...init, headers }, "Could not reach Anthropic to check subscription usage. Try again.", fetcher);
 }
 
 function anthropicHttpError(response: Response): SubscriptionUsageError {
@@ -52,9 +47,10 @@ function anthropicHttpError(response: Response): SubscriptionUsageError {
 export async function fetchAnthropicAccountUsage(accessToken: string, fetcher: Fetcher = fetch): Promise<UsageWindow[]> {
   const response = await requestAnthropic("https://api.anthropic.com/api/oauth/usage", accessToken, {}, fetcher);
   if (!response.ok) throw anthropicHttpError(response);
-  let payload: unknown;
-  try { payload = await response.json(); } catch { throw new SubscriptionUsageError("Anthropic returned an invalid usage response."); }
-  if (!Value.Check(Type.Record(Type.String(), Type.Unknown()), payload)) throw unrecognizedAccountUsage();
+  const payload = await readSubscriptionUsageJson(response, Type.Record(Type.String(), Type.Unknown()), {
+    invalid: "Anthropic returned an invalid usage response.",
+    unrecognized: unrecognizedAccountUsageMessage,
+  });
   return namedWindows(Object.entries(payload).flatMap(([key, window]) => {
     const name = key.match(/^([a-z]+)_(hour|day)(?:_(.+))?$/);
     const count = name && numberWords.get(name[1]!);

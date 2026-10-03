@@ -8,6 +8,7 @@ import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { SubscriptionUsageError } from "./subscription-usage.ts";
 import { recordSubscriptionInference } from "./recent-subscription-activity.ts";
 import { usesProviderSubscription } from "./subscription.ts";
+import { codexAccountId } from "./codex-token.ts";
 
 const codexToken = "agents-in-the-cloud-subscription-codex-access";
 const codexAccount = "agents-in-the-cloud-subscription-codex-account";
@@ -64,11 +65,6 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     } },
     anthropicSubscription: { placeholder: anthropicToken, hosts: ["api.anthropic.com"], value: "", resolve: () => subscriptionToken("anthropic") },
   });
-}
-
-function codexAccountId(token: string): string {
-  const claims = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString());
-  return Value.Parse(Type.Object({ "https://api.openai.com/auth": Type.Object({ chatgpt_account_id: Type.String({ minLength: 1 }) }) }), claims)["https://api.openai.com/auth"].chatgpt_account_id;
 }
 
 /** Codex 0.154+ checks that its selected account appears in accounts/check.

@@ -6,6 +6,7 @@ export * from "./workspace-gateway.ts";
 
 export { providerBadgeHtml, providerBrandColor, providerBrandIconHtml } from "./brand-icons.ts";
 export { escapeHtml } from "./html.ts";
+export { errorMessage, formatBytes } from "./format.ts";
 export { hopByHopHeaderNames, isHopByHopHeader, stripHopByHopHeaders } from "./proxy-headers.ts";
 
 export const agentsInTheCloudName = "AgentsInTheCloud" as const;

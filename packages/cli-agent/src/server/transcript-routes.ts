@@ -3,6 +3,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
 import type { CliAgentAdapter } from "./adapter.ts";
 import type { CliSessions } from "./sessions.ts";
 
@@ -47,9 +48,9 @@ export function cliTranscriptRoutes(adapter: CliAgentAdapter, sessions: CliSessi
     if (match[4] === "transcript-items") {
       const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
       const html = records && renderReadOnlyTranscriptDetail(ctx, records, decodeURIComponent(match[5]!), count, openEnded);
-      return new Response(html ?? "Not found", { status: html ? 200 : 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+      return response(html ?? "Not found", { status: html ? 200 : 404 });
     }
     const content = records?.length ? renderReadOnlyTranscript(ctx, records, openEnded) : `<div class="cli-transcript-empty">No ${escapeHtml(adapter.label)} transcript is available yet. Return to the terminal and try again after a message.</div>`;
-    return new Response(`<turbo-frame id="${escapeHtml(ids.transcript(ctx))}"><div class="agent-transcript-content">${content}</div></turbo-frame>`, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+    return response(`<turbo-frame id="${escapeHtml(ids.transcript(ctx))}"><div class="agent-transcript-content">${content}</div></turbo-frame>`);
   };
 }

@@ -1,4 +1,5 @@
 import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
 import { inlineDesignSystemCss } from "@agents-in-the-cloud/design-system/styles/server";
 import type { DesktopStatus } from "./runtime.ts";
 
@@ -25,14 +26,13 @@ function renderDesktopStatus(status: DesktopStatus): string {
 
 export async function desktopViewerResponse(url: URL, status: () => Promise<DesktopStatus>): Promise<Response> {
   const path = url.pathname;
-  const headers = { "cache-control": "no-store" };
-  if (path === "/status") return new Response(renderDesktopStatus(await status()), { headers: { ...headers, "content-type": "text/html; charset=utf-8" } });
-  if (path === "/desktop-client.js") return new Response((await viewerAssets()).script, { headers: { ...headers, "content-type": "text/javascript; charset=utf-8" } });
+  if (path === "/status") return response(renderDesktopStatus(await status()));
+  if (path === "/desktop-client.js") return response((await viewerAssets()).script, { headers: { "content-type": "text/javascript; charset=utf-8" } });
   if (path !== "/") return new Response("Not found", { status: 404 });
   const current = await status();
-  return new Response(`<!doctype html><html lang="en" data-theme="${escapeHtml(url.searchParams.get("theme") ?? "")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Desktop</title><style>${(await viewerAssets()).css}</style><script type="module" src="/desktop-client.js"></script></head>
+  return response(`<!doctype html><html lang="en" data-theme="${escapeHtml(url.searchParams.get("theme") ?? "")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Desktop</title><style>${(await viewerAssets()).css}</style><script type="module" src="/desktop-client.js"></script></head>
 <body data-controller="desktop" data-action="pagehide@window->desktop#disconnect message@window->desktop#receive">
   <div data-desktop-target="runtime" hidden>${renderDesktopStatus(current)}</div>
   <div class="desktop-screen" data-desktop-target="screen" aria-label="Workspace desktop"></div>
-</body></html>`, { headers: { ...headers, "content-type": "text/html; charset=utf-8" } });
+</body></html>`);
 }

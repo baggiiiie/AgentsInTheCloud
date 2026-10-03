@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { getAgentsInTheCloudRuntimeContext, type JsonValue } from "@agents-in-the-cloud/core";
+import { getAgentsInTheCloudRuntimeContext, isNotFoundError, type JsonValue } from "@agents-in-the-cloud/core";
 
 export interface WorkspaceMetadataState<State extends object> {
   read(workspaceId: string): State;
@@ -24,7 +24,7 @@ export function createWorkspaceMetadataState<State extends object>(filename: str
       try {
         state = parse(JSON.parse(readFileSync(path, "utf8")));
       } catch (error) {
-        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+        if (!isNotFoundError(error)) throw error;
         state = initial();
       }
       loaded.set(workspaceId, state);

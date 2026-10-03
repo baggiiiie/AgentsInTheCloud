@@ -1,5 +1,5 @@
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
-import type { WorkspaceServerSocketHandler, WorkspaceSocketConnection } from "@agents-in-the-cloud/shared";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
+import { errorMessage, type WorkspaceServerSocketHandler, type WorkspaceSocketConnection } from "@agents-in-the-cloud/shared";
 import { stat } from "node:fs/promises";
 import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { cachedProjectSourcePath } from "@agents-in-the-cloud/projects";
@@ -33,9 +33,9 @@ async function artifactProgress(modelId: TranscriptionModelId): Promise<number> 
   const { artifact } = transcriptionModel(modelId);
   const path = join(transcriptionCacheDir(), "nemo-speech", "models", artifact.repository, artifact.revision, artifact.filename);
   const size = await stat(path).then((file) => file.size).catch(async (error) => {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!isNotFoundError(error)) throw error;
     return await stat(`${path}.partial`).then((file) => file.size).catch((partialError) => {
-      if (partialError instanceof Error && "code" in partialError && partialError.code === "ENOENT") return 0;
+      if (isNotFoundError(partialError)) return 0;
       throw partialError;
     });
   });
@@ -131,7 +131,7 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
       upstream.addEventListener("close", () => browser?.close());
     } catch (error) {
       if (!browser) return;
-      status(browser, "error", error instanceof Error ? error.message : String(error));
+      status(browser, "error", errorMessage(error));
       browser.close(1011, "transcription service unavailable");
     } finally {
       if (progressTimer) clearInterval(progressTimer);

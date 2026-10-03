@@ -1,7 +1,7 @@
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rename, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
-import { createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, isJsonObject } from "@agents-in-the-cloud/core";
+import { createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, isJsonObject, readTextIfExists, writeJsonAtomic } from "@agents-in-the-cloud/core";
 import type { GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
 import { isGitProjectInit } from "@agents-in-the-cloud/projects";
 import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
@@ -70,10 +70,7 @@ function conversationMetadataPath(workspaceId: string): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata", "agent-conversations.json");
 }
 async function conversationRecords(workspaceId: string): Promise<ConversationRecord[]> {
-  const content = await readFile(conversationMetadataPath(workspaceId), "utf8").catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
-    throw error;
-  });
+  const content = await readTextIfExists(conversationMetadataPath(workspaceId));
   const value: unknown = content ? JSON.parse(content) : undefined;
   if (isJsonObject(value) && value.version !== undefined) {
     Value.Assert(conversationsSchema, value);
@@ -94,11 +91,7 @@ async function conversationRecords(workspaceId: string): Promise<ConversationRec
   return records;
 }
 async function saveConversationRecords(workspaceId: string, records: ConversationRecord[]): Promise<void> {
-  const path = conversationMetadataPath(workspaceId);
-  const temporary = `${path}.tmp-${randomUUID()}`;
-  await mkdir(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata"), { recursive: true });
-  await writeFile(temporary, JSON.stringify({ version: 1, conversations: records }));
-  await rename(temporary, path);
+  await writeJsonAtomic(conversationMetadataPath(workspaceId), { version: 1, conversations: records });
 }
 async function persistConversation(agent: WorkspaceAgentConversationInfo): Promise<void> {
   const records = (await conversationRecords(agent.workspaceId)).filter((item) => item.conversationId !== agent.conversationId);

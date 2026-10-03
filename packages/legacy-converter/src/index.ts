@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { isNotFoundError } from "@agents-in-the-cloud/core";
 import { contentText } from "@earendil-works/pi-ai";
 import { migrateSessionEntries, type FileEntry } from "@earendil-works/pi-coding-agent";
 import { AssistantEntry, UserEntry, ToolResultEntry, type EntryDraft, type ConversationId } from "@earendil-works/pi-durable";
@@ -112,7 +113,7 @@ export async function convertLegacyConversations(options: LegacyConversion): Pro
   const { workspaceId, metadata, shareDirectory: directory } = options;
   const records = metadata === undefined ? [] : Value.Parse(oldMetadata, JSON.parse(metadata)).conversations;
   const files = await readdir(directory).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return [];
+    if (isNotFoundError(error)) return [];
     throw error;
   });
   const sources = new Map(records.filter(record => !record.storage).map(record => [record.conversationId, {

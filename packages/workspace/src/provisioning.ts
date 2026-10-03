@@ -1,5 +1,5 @@
 import { AgentsInTheCloudCoreError, invalidArguments, withCommandSignal, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import type { WorkspaceProvisionRecovery } from "@agents-in-the-cloud/shared";
+import { errorMessage, type WorkspaceProvisionRecovery } from "@agents-in-the-cloud/shared";
 
 export interface WorkspaceProvisionProgress {
   detail?: string;
@@ -140,7 +140,7 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
                 checkCancelled();
                 step.durationMs = Math.round(performance.now() - startedAt);
                 step.status = "failed";
-                step.error = error instanceof Error ? error.message : String(error);
+                step.error = errorMessage(error);
                 if (!recovery) {
                   changed();
                   throw error;
@@ -175,7 +175,7 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
         if (state.status !== "cancelled") {
           state.totalMs = Math.round(performance.now() - state.startedAt);
           state.status = "failed";
-          state.error = error instanceof Error ? error.message : String(error);
+          state.error = errorMessage(error);
           changed();
         }
         throw error;

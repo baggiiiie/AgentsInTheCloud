@@ -1,6 +1,6 @@
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { escapeHtml, domId } from "@agents-in-the-cloud/shared";
+import { escapeHtml, domId, formatBytes } from "@agents-in-the-cloud/shared";
 
 export function renderAttachmentChip(attachment: { id: string; name: string; size: number; isImage: boolean }, draftId: string): string {
   const chipId = domId("agent_draft_chip", draftId, attachment.id);
@@ -30,10 +30,4 @@ export function renderAttachmentPicker(kind: "caption" | "icon-only" = "caption"
         : { kind, label: "Attach files", iconHtml: Icons.Paperclip },
       attributesHtml: `data-popular-button="${kind === "caption" ? "touch" : ""}" data-action="agent-attachments#openPicker"`,
     })}`;
-}
-
-function formatBytes(size: number): string {
-  if (size >= 1_000_000) return `${(size / 1_000_000).toFixed(1)} MB`;
-  if (size >= 1000) return `${Math.round(size / 1000)} KB`;
-  return `${size} B`;
 }

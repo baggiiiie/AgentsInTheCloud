@@ -1,4 +1,4 @@
-import type { WorkspaceAppRef } from "@agents-in-the-cloud/shared";
+import { errorMessage, type WorkspaceAppRef } from "@agents-in-the-cloud/shared";
 
 export class UnknownWorkspaceAppError extends Error {
   constructor(public readonly app: WorkspaceAppRef) {
@@ -25,7 +25,7 @@ export class WorkspaceUpstreamError extends Error {
 /** A transport failure on the AgentsInTheCloud-to-workspace hop, not the app hop. */
 export class WorkspaceConnectionError extends Error {
   constructor(cause: unknown) {
-    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    super(errorMessage(cause), { cause });
     this.name = "WorkspaceConnectionError";
   }
 }

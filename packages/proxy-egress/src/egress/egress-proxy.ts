@@ -8,7 +8,7 @@ import { createServer as createHttpsServer } from "node:https";
 import net, { type AddressInfo } from "node:net";
 import { Readable, type Duplex } from "node:stream";
 import tls from "node:tls";
-import { agentsInTheCloudDataPath, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
 import { HttpRequestBlockedError } from "../secrets/errors.ts";
 import { matchHostname } from "../secrets/patterns.ts";
 import { workspaceRequestTransformMatchesHost, createWorkspaceSecretContext, forgetWorkspaceSecretContext, getWorkspaceSecretContext, type WorkspaceSecretContext } from "../secrets/workspace-secrets.ts";
@@ -119,7 +119,7 @@ export async function startWorkspaceEgressProxy({ socketPath, ca, getContext, up
     socket.end(connectErrorResponse(proxyFailure(error)));
   }));
   await mkdir(dirname(socketPath), { recursive: true });
-  try { await unlink(socketPath); } catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+  try { await unlink(socketPath); } catch (error) { if (!isNotFoundError(error)) throw error; }
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(socketPath, () => { server.off("error", reject); resolve(); });

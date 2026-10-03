@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { isNotFoundError, writeFileAtomic } from "@agents-in-the-cloud/core";
 import type { WorkspaceVisibilityReport } from "@agents-in-the-cloud/shared";
 import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { Type, type Static, type TSchema } from "typebox";
@@ -66,24 +66,18 @@ interface FileValueStore<T> {
 
 function createFileValueStore<Schema extends TSchema>(path: string, schema: Schema, empty: () => Static<Schema>): FileValueStore<Static<Schema>> {
   let saveChain = Promise.resolve();
-  let tempCounter = 0;
   return {
     async load() {
       try {
         return Value.Parse(schema, JSON.parse(await readFile(path, "utf8")));
       } catch (error) {
-        if (error instanceof Error && "code" in error && error.code === "ENOENT") return empty();
+        if (isNotFoundError(error)) return empty();
         throw error;
       }
     },
     save(values) {
       const snapshot = `${JSON.stringify(values, null, 2)}\n`;
-      const nextSave = saveChain.catch(() => undefined).then(async () => {
-        await mkdir(dirname(path), { recursive: true });
-        const tempPath = `${path}.${process.pid}.${++tempCounter}.tmp`;
-        await writeFile(tempPath, snapshot);
-        await rename(tempPath, path);
-      });
+      const nextSave = saveChain.catch(() => undefined).then(() => writeFileAtomic(path, snapshot));
       saveChain = nextSave;
       return nextSave;
     },

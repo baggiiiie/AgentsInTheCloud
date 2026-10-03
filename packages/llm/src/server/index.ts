@@ -13,3 +13,4 @@ export { providerAvailability } from "./provider-availability.ts";
 export { anthropicSubscriptionUnavailableReason, requireProviderSubscription, usesProviderSubscription } from "./subscription.ts";
 
 export { availableProviderModels, cheapestAvailableProviderModel } from "./known-model-provider-incorrectness.ts";
+export { codexAccountId, codexTokenClaims } from "./codex-token.ts";

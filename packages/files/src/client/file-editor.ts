@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { setToggleValue, type ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
-import { type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
+import { errorMessage, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
@@ -53,7 +53,7 @@ function fileDraft(url: string, file: EditableFileResponse): FileDraft {
       backupErrors.delete(draft);
     } catch (error) {
       // Storage quotas and browser privacy settings must not prevent disk saves.
-      backupErrors.set(draft, `Draft backup failed: ${error instanceof Error ? error.message : String(error)}. Keep this tab open until saved.`);
+      backupErrors.set(draft, `Draft backup failed: ${errorMessage(error)}. Keep this tab open until saved.`);
     }
   });
   drafts.set(url, draft);

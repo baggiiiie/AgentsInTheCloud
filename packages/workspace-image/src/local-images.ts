@@ -1,6 +1,6 @@
 import { runDocker, type CommandResult } from "@agents-in-the-cloud/core";
 
-type DockerCommand = (args: string[]) => Promise<CommandResult>;
+export type DockerCommand = (args: string[]) => Promise<CommandResult>;
 
 export async function dockerServerPlatform(docker: DockerCommand = runDocker): Promise<string> {
   const result = await docker(["version", "--format", "{{.Server.Os}}/{{.Server.Arch}}"]);

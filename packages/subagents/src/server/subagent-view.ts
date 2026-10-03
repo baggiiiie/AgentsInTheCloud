@@ -5,6 +5,7 @@ import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { createLivePresentation, escapeHtml as h } from "@agents-in-the-cloud/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { nativeSnapshot, viewPath, type NativeAgentView as SubagentRecord } from "./native-view-state.ts";
@@ -43,7 +44,7 @@ export const handleSubagentRequest: AgentRouteHandler = async (request, url) => 
   const open = new Set(url.searchParams.getAll("open"));
   let revealed = agents.find((agent) => agent.id === url.searchParams.get("reveal"));
   while (revealed) { open.add(revealed.id); revealed = agents.find((agent) => agent.id === revealed!.parentId); }
-  return new Response(`<turbo-frame id="subagents-content-${h(workspaceId)}" data-turbo-permanent refresh="morph">${renderSubagentTree(workspaceId, parent.conversationId, agents, open)}</turbo-frame>`, { headers: { "content-type": "text/html; charset=utf-8" } });
+  return response(`<turbo-frame id="subagents-content-${h(workspaceId)}" data-turbo-permanent refresh="morph">${renderSubagentTree(workspaceId, parent.conversationId, agents, open)}</turbo-frame>`);
 };
 
 function childrenId(workspaceId: string, parentId: string): string { return `subagent-children-${workspaceId}-${parentId}`; }

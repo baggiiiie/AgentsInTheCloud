@@ -1,6 +1,7 @@
 import { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
 import { expandPromptTemplate } from "./prompt-templates.ts";
-import { matchRoute, type AgentRouteHandler } from "./route-support.ts";
+import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/http";
+import { type AgentRouteHandler } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 
 export const handleCompletionRequest: AgentRouteHandler = async (request, url) => {
@@ -9,13 +10,13 @@ export const handleCompletionRequest: AgentRouteHandler = async (request, url) =
     await resolveAgentConversation(params[0], params[1]);
     const query = url.searchParams.get("q") ?? "";
     const mode = url.searchParams.get("mode") === "fuzzy" ? "fuzzy" : "direct";
-    return new Response(renderFileCompletionMenu(await listFileCompletions(params[0], query, mode)), { headers: { "content-type": "text/html; charset=utf-8" } });
+    return response(renderFileCompletionMenu(await listFileCompletions(params[0], query, mode)));
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/completions\/prompt-template-expand$/)) && request.method === "POST") {
     await resolveAgentConversation(params[0], params[1]);
     const form = await request.formData();
     const expanded = await expandPromptTemplate(params[0], String(form.get("text") ?? ""));
-    return new Response(expanded, { headers: { "content-type": "text/plain; charset=utf-8" } });
+    return textResponse(expanded);
   }
   return undefined;
 };

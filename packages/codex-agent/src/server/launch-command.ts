@@ -1,12 +1,12 @@
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
-import { cliLaunchScript, turnSignalArgv, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
+import { cliLaunchScript, cliPromptText, turnSignalArgv, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { codexAgentsInTheCloudTmTheme, codexThemeName } from "./theme.ts";
 import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
 export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resumeId?: string): string {
-  const prompt = [input.text, ...input.attachmentNotes].filter(Boolean).join("\n\n");
+  const prompt = cliPromptText(input);
   // Invocation-local overrides avoid trust prompts without changing shared config.
   // Codex splits dotted keys literally, so encode project paths in a TOML table value.
   // Config overrides also keep current Codex on its embedded server rather than a shared daemon.

@@ -2,8 +2,9 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { usesProviderSubscription } from "./subscription.ts";
+import { codexTokenClaims } from "./codex-token.ts";
+import type { Fetcher } from "./subscription-usage.ts";
 
-type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 type AccountRuntime = Pick<ModelRuntime, "getProviderAuthStatus" | "listCredentials" | "getAuth">;
 
 const codexClaimsSchema = Type.Object({
@@ -24,7 +25,7 @@ function planLabel(plan: string): string {
 
 /** The access token is a JWT that names the signed-in ChatGPT account. */
 export function codexAccountSummary(accessToken: string): string {
-  const claims = Value.Parse(codexClaimsSchema, JSON.parse(Buffer.from(accessToken.split(".")[1]!, "base64url").toString()));
+  const claims = codexTokenClaims(accessToken, codexClaimsSchema);
   const plan = claims["https://api.openai.com/auth"].chatgpt_plan_type;
   return [claims["https://api.openai.com/profile"].email, plan && planLabel(plan)].filter(Boolean).join(" · ");
 }

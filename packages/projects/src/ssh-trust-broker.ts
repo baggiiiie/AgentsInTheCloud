@@ -1,6 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { agentsInTheCloudDataPath, createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, invalidArguments } from "@agents-in-the-cloud/core";
+import { readFile } from "node:fs/promises";
+import { agentsInTheCloudDataPath, createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, invalidArguments, readTextIfExists, writeFileAtomic } from "@agents-in-the-cloud/core";
 import { scanFingerprint, type SshTrustCandidate } from "./ssh-trust-recovery.ts";
 
 export interface WorkspaceSshTrustRequest extends SshTrustCandidate {
@@ -29,10 +28,7 @@ function workspaceTrustPath(workspaceId: string): string {
 }
 
 export async function workspaceKnownHosts(workspaceId: string): Promise<string> {
-  return readFile(workspaceTrustPath(workspaceId), "utf8").catch(error => {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return "";
-    throw error;
-  });
+  return await readTextIfExists(workspaceTrustPath(workspaceId)) ?? "";
 }
 
 /** Workspace-local OpenSSH sends the keys it observed on its own network path. The socket identifies the workspace. */
@@ -86,10 +82,7 @@ export async function decideWorkspaceSshTrust(workspaceId: string, requestId: st
       const address = item.request.port === 22 ? item.request.host : `[${item.request.host}]:${item.request.port}`;
       const retained = item.request.changed ? previous.split("\n").filter(line => line && !line.split(/\s+/)[0]?.split(",").includes(address)).join("\n") : previous.trimEnd();
       const content = `${retained ? `${retained}\n` : ""}${(item.request.changed ? accepted : additions).join("\n")}\n`;
-      await mkdir(dirname(path), { recursive: true });
-      const temporary = `${path}.${crypto.randomUUID()}.tmp`;
-      await writeFile(temporary, content);
-      await rename(temporary, path);
+      await writeFileAtomic(path, content);
       item.resolve(content);
     } else item.resolve("");
     pending.delete(requestId);

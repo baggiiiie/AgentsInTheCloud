@@ -1,8 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, readTextIfExists, writeFileAtomic } from "@agents-in-the-cloud/core";
 import type { WorkspaceAppRef } from "@agents-in-the-cloud/shared";
 import type { PortRange } from "./tailscale-serve.ts";
 
@@ -66,17 +64,13 @@ function store(read: () => Promise<State>, write: (state: State) => Promise<void
 export function createFileOriginIdentityStore(path = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "proxy", "origin-identities.json")): OriginIdentityStore {
   const lock = serialize();
   return store(async () => {
-    let text: string;
-    try { text = await readFile(path, "utf8"); }
-    catch (error) { if ((error instanceof Error && "code" in error && error.code === "ENOENT")) return empty(); throw error; }
+    const text = await readTextIfExists(path);
+    if (text === undefined) return empty();
     const state: unknown = JSON.parse(text);
     if (!Value.Check(stateSchema, state)) throw new Error("Invalid ingress origin state");
     return state;
   }, async (state) => {
-    await mkdir(dirname(path), { recursive: true });
-    const temporary = `${path}.${crypto.randomUUID()}.tmp`;
-    await writeFile(temporary, JSON.stringify(state));
-    await rename(temporary, path);
+    await writeFileAtomic(path, JSON.stringify(state));
   }, lock);
 }
 

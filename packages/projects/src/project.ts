@@ -1,7 +1,7 @@
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-import { acquireFileLock, AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { acquireFileLock, AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isNotFoundError, writeJsonAtomic } from "@agents-in-the-cloud/core";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -143,17 +143,13 @@ export async function readProjectStore(file: string): Promise<ProjectStore> {
     }
     return store;
   } catch (error) {
-    const code = error instanceof Error && "code" in error ? error.code : undefined;
-    if (code === "ENOENT") return { projects: [] };
+    if (isNotFoundError(error)) return { projects: [] };
     throw error;
   }
 }
 
 async function writeProjectStore(file: string, store: ProjectStore): Promise<void> {
-  await mkdir(dirname(file), { recursive: true });
-  const tempFile = `${file}.${randomUUID()}.tmp`;
-  await writeFile(tempFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
-  await rename(tempFile, file);
+  await writeJsonAtomic(file, store);
 }
 
 const projectStoreListeners = new Set<() => void>();

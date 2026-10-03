@@ -234,6 +234,7 @@
     "packages/legacy-converter": {
       "name": "@agents-in-the-cloud/legacy-converter",
       "dependencies": {
+        "@agents-in-the-cloud/core": "workspace:*",
         "@earendil-works/pi-ai": "catalog:",
         "@earendil-works/pi-coding-agent": "catalog:",
         "@earendil-works/pi-durable": "catalog:",
@@ -428,6 +429,7 @@
       "dependencies": {
         "@agents-in-the-cloud/core": "workspace:*",
         "@agents-in-the-cloud/observable-terminal": "workspace:*",
+        "@agents-in-the-cloud/shared": "workspace:*",
         "typebox": "^1.0.57",
       },
     },

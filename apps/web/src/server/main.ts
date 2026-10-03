@@ -13,7 +13,8 @@ import {
   publicWorkspaceAppOrigin,
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
-import { agentsInTheCloudName, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { agentsInTheCloudName, errorMessage, escapeHtml, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
+import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
 import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { ServerWebSocket } from "bun";
@@ -124,7 +125,7 @@ function authCookieAttributes(request: Request, maxAge = authCookieMaxAgeSeconds
 }
 
 function loginPage(next: string, error = ""): Response {
-  return new Response(`<!doctype html>
+  return response(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -156,7 +157,7 @@ function loginPage(next: string, error = ""): Response {
   <button type="submit">Sign in</button>
 </form>
 </body>
-</html>`, { headers: { "content-type": "text/html; charset=utf-8" } });
+</html>`);
 }
 
 function redirectToLogin(request: Request): Response {
@@ -187,7 +188,7 @@ async function authResponse(request: Request): Promise<Response | undefined> {
   if (await isAuthenticated(request)) return undefined;
   const accepts = request.headers.get("accept") ?? "";
   if (request.method === "GET" && accepts.includes("text/html")) return redirectToLogin(request);
-  return new Response("unauthorized\n", { status: 401, headers: { "content-type": "text/plain; charset=utf-8" } });
+  return textResponse("unauthorized\n", { status: 401 });
 }
 
 const agentsInTheCloudEvents = createAgentsInTheCloudEventBus();
@@ -300,7 +301,7 @@ function requestAcceptsGzip(request: Request): boolean {
 }
 
 async function serveStatic(pathname: string, request: Request): Promise<Response | undefined> {
-  if (pathname === "/design-system-catalogue.html") return new Response(await designSystemCatalogueHtml({ reloadUrl: devReloadFile ? "/__agents-in-the-cloud_dev_reload" : undefined }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if (pathname === "/design-system-catalogue.html") return response(await designSystemCatalogueHtml({ reloadUrl: devReloadFile ? "/__agents-in-the-cloud_dev_reload" : undefined }));
   let assetCacheControl = "public, max-age=31536000, immutable";
   if (pathname === "/design-system.js") {
     const manifest = parseAssetManifest(await Bun.file(new URL("../../public/assets-manifest.json", import.meta.url)).text());
@@ -309,7 +310,7 @@ async function serveStatic(pathname: string, request: Request): Promise<Response
   }
   if (pathname.startsWith("/assets/")) {
     const file = Bun.file(new URL(`../../public${pathname}`, import.meta.url));
-    if (!(await file.exists())) return new Response("not found", { status: 404, headers: { "content-type": "text/plain" } });
+    if (!(await file.exists())) return textResponse("not found", { status: 404 });
     const headers = new Headers({
       "content-type": contentTypeForStaticPath(pathname),
       "cache-control": assetCacheControl,
@@ -328,7 +329,7 @@ async function serveStatic(pathname: string, request: Request): Promise<Response
   const entry = legacyStaticFiles[pathname];
   if (!entry) return undefined;
   const file = Bun.file(entry.url);
-  if (!(await file.exists())) return new Response("not found", { status: 404, headers: { "content-type": "text/plain" } });
+  if (!(await file.exists())) return textResponse("not found", { status: 404 });
   const headers = new Headers({ "content-type": entry.contentType });
   if (["/workspace.js", "/service-worker.js", "/manifest.webmanifest", "/design-system-catalogue.html", "/design-system.css"].includes(pathname)) headers.set("cache-control", "no-store");
   return new Response(file, { headers });
@@ -391,7 +392,7 @@ const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runt
     const keys = form.get("keys");
     if (!Value.Check(Type.String(), host) || !Value.Check(Type.String(), port) || !Value.Check(Type.String(), keys)) return new Response("Invalid SSH host keys", { status: 400 });
     try {
-      return new Response(await requestWorkspaceSshTrust(workspaceId, host, Number(port), keys), { headers: { "content-type": "text/plain; charset=utf-8" } });
+      return textResponse(await requestWorkspaceSshTrust(workspaceId, host, Number(port), keys));
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "invalid_arguments") return new Response(error.message, { status: 400 });
       throw error;
@@ -462,7 +463,7 @@ function openProvisionTermSocket(ws: ProvisionTermSocket, data: ProvisionTermSoc
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     }
-    try { ws.send(`\r\n[provision terminal attach failed: ${lastError instanceof Error ? lastError.message : String(lastError)}]\r\n`); } catch { /* closed */ }
+    try { ws.send(`\r\n[provision terminal attach failed: ${errorMessage(lastError)}]\r\n`); } catch { /* closed */ }
     ws.close();
   })();
 }
@@ -494,9 +495,9 @@ const server = Bun.serve<SocketData>({
 
     if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
       const socketData = await validateSocket(request, url);
-      if (!socketData) return new Response("not found", { status: 404, headers: { "content-type": "text/plain; charset=utf-8" } });
+      if (!socketData) return textResponse("not found", { status: 404 });
       if (server.upgrade(request, { data: socketData })) return undefined;
-      return new Response("websocket upgrade failed", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+      return textResponse("websocket upgrade failed", { status: 400 });
     }
 
     if (url.pathname === "/debug/connections" && request.method === "GET") {

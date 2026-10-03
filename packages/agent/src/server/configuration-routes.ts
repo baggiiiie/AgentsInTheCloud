@@ -1,7 +1,8 @@
 import { AgentsInTheCloudCoreError, readJsonObject, requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { parseModelRef, setAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
-import { invalidateAgentView, matchRoute, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
+import { matchRoute } from "@agents-in-the-cloud/shared/http";
+import { invalidateAgentView, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
 
 export const handleConfigurationRequest: AgentRouteHandler = async (request, url, options) => {
   let params: string[] | undefined;

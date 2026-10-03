@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { invalidArguments, runCommand, shellQuote } from "@agents-in-the-cloud/core";
+import { invalidArguments, runCommand, shellQuote, writeFileAtomic } from "@agents-in-the-cloud/core";
 import { gitHubKnownHosts } from "./github-host-keys.ts";
 import { findProjectRecord, projectsFile, readProjectStore, updateProjectStore } from "./project.ts";
 
@@ -37,10 +37,8 @@ export async function setProjectSshKnownHosts(projectId: string, input: string, 
 export async function prepareWorkspaceSshTrust(directory: string, projectId?: string): Promise<string> {
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, "known_hosts");
-  const temporary = `${path}.${crypto.randomUUID()}.tmp`;
   const projectHosts = projectId ? await getProjectSshKnownHosts(projectId) : "";
-  await writeFile(temporary, `${gitHubKnownHosts}${projectHosts}`, { mode: 0o644 });
-  await rename(temporary, path);
+  await writeFileAtomic(path, `${gitHubKnownHosts}${projectHosts}`, { mode: 0o644 });
   return path;
 }
 

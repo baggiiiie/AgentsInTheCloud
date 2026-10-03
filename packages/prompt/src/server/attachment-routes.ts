@@ -8,10 +8,8 @@ import {
   validDraftId,
 } from "./attachment-drafts.ts";
 import { domId, turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { matchRoute } from "@agents-in-the-cloud/shared/http";
 import { renderAttachmentChip } from "./render-attachments.ts";
-function matchRoute(url: URL, expression: RegExp): string[] | undefined {
-  return url.pathname.match(expression)?.slice(1).map(decodeURIComponent);
-}
 
 export const handleAttachmentRequest = async (request: Request, url: URL): Promise<Response | undefined> => {
   let params: string[] | undefined;

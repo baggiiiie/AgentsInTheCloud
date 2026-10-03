@@ -1,4 +1,4 @@
-import { type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
+import { errorMessage, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 declare global {
   interface Window {
@@ -35,7 +35,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           }
           window.Turbo!.renderStreamMessage(await response.text());
         } catch (error) {
-          this.errorTarget.textContent = `Could not request the update: ${error instanceof Error ? error.message : String(error)}`;
+          this.errorTarget.textContent = `Could not request the update: ${errorMessage(error)}`;
           this.errorTarget.hidden = false;
           submit.removeAttribute("aria-busy");
           for (const button of buttons) button.disabled = false;

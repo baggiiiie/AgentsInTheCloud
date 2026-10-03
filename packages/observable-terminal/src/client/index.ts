@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import type { TerminalTheme } from "@gespenst/core";
-import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
+import { copyTextToClipboard, errorMessage } from "@agents-in-the-cloud/shared";
 import { encodeObservableTerminalMessage } from "../shared/index.ts";
 import { terminalFileAt, type TerminalFileLink } from "./file-links.ts";
 
@@ -205,7 +205,7 @@ export function createObservableTerminalViewer(options: ObservableTerminalViewer
       console.error("Terminal initialization failed", error);
       if (!disposed) {
         mount.classList.add("observable-terminal-painted");
-        mount.textContent = `[terminal initialization failed: ${error instanceof Error ? error.message : String(error)}]`;
+        mount.textContent = `[terminal initialization failed: ${errorMessage(error)}]`;
         reportConnection("unavailable");
       }
     }).finally(() => { initializing = false; });

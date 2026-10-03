@@ -1,5 +1,5 @@
 import { AgentsInTheCloudCoreError, withCommandSignal, type JsonValue } from "@agents-in-the-cloud/core";
-import type { DeleteCurrentWorkspaceResult, WorkspaceDeletionAssessment } from "@agents-in-the-cloud/shared";
+import { errorMessage, type DeleteCurrentWorkspaceResult, type WorkspaceDeletionAssessment } from "@agents-in-the-cloud/shared";
 import type { WorkspaceDeletionState, WorkspaceRegistry } from "./workspace-registry.ts";
 
 /** Owns deletion assessment, confirmation, retries, and restart recovery. */
@@ -40,7 +40,7 @@ export function createWorkspaceDeletion(options: {
       return undefined;
     } catch (error) {
       console.error(`Workspace ${id} deletion failed`, error);
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       await setState(id, { status: "failed", forced, operation: "deleting", error: message });
       return message;
     }
@@ -63,7 +63,7 @@ export function createWorkspaceDeletion(options: {
         return { deleted: false, blocked: true, details: assessment.details };
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       await setState(id, { status: "failed", operation: "checking", error: message });
       return { deleted: false, blocked: false };
     }

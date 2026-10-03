@@ -1,9 +1,9 @@
 import { prepareCodexMcp } from "./mcp.ts";
-import { createCliAgentModule, createCliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
+import { createCliAgentModule, emptyAgentInput, createCliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
 import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscription } from "@agents-in-the-cloud/llm/server";
 import { providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { codexLaunchScript } from "./launch-command.ts";
-import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId } from "./transcript.ts";
+import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId, codexHistoryFiles } from "./transcript.ts";
 
 export const codexModelSettings = createCliModelSettings({
   agentProvider: "codex", provider: "openai-codex", label: "Codex",
@@ -17,7 +17,8 @@ export const agentsInTheCloudServerModule = createCliAgentModule({
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
   prepareSession: prepareCodexMcp,
   launchScript: codexLaunchScript,
-  resumeScript: async (workspaceId, settings, session) => codexLaunchScript({ text: "", images: [], attachmentNotes: [] }, [], settings, session, await codexResumeId(workspaceId, session.id)),
+  resumeScript: async (workspaceId, settings, session) => codexLaunchScript(emptyAgentInput(), [], settings, session, await codexResumeId(workspaceId, session.id)),
   loadTranscript: loadCodexTranscript,
   loadTranscriptImage: loadCodexTranscriptImage,
+  historyFiles: codexHistoryFiles,
 });

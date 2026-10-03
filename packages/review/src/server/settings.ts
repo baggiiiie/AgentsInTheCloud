@@ -1,7 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, type JsonObject } from "@agents-in-the-cloud/core";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import {
@@ -31,19 +29,16 @@ export function isReviewViewport(value: string): value is ReviewViewport {
   return value === "mobile" || value === "desktop";
 }
 
+function parseReviewSettings(settings: JsonObject): ReviewSettings {
+  return { ...defaultReviewSettings, ...Value.Parse(settingsSchema, { ...defaultReviewSettings, ...settings }) };
+}
+
 export async function readReviewSettings(path = settingsPath()): Promise<ReviewSettings> {
-  const text = await readFile(path, "utf8").catch((error) => {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  if (!text) return { ...defaultReviewSettings };
-  return { ...defaultReviewSettings, ...Value.Parse(settingsSchema, JSON.parse(text)) };
+  return parseReviewSettings(await readJsonSettings(path));
 }
 
 export async function updateReviewSettings(update: Partial<ReviewSettings>, path = settingsPath()): Promise<void> {
-  const settings = { ...await readReviewSettings(path), ...update };
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(settings, null, 2)}\n`);
-  await rename(temporaryPath, path);
+  await updateJsonSettings(path, (settings) => {
+    Object.assign(settings, parseReviewSettings(settings), update);
+  });
 }

@@ -1,3 +1,4 @@
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import type { EditableFileResponse, FileSaveRequest } from "./protocol.ts";
 
 export type SaveResult = { revision: string } | { conflict: EditableFileResponse };
@@ -64,7 +65,7 @@ export class FileDraft {
         this.notify();
       }
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error);
+      this.error = errorMessage(error);
     } finally {
       this.saving = false;
       this.notify();

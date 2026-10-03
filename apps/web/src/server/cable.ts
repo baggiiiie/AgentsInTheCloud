@@ -1,6 +1,7 @@
 import { AgentsInTheCloudCoreError, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import {
   decodeCableClientMessage,
+  errorMessage,
   serializeCableIdentifier,
   type CableChannelAdapter,
   type CableClientMessage,
@@ -130,7 +131,7 @@ export function createCableServer(options: CableServerOptions): CableServer {
       if (!attemptIsCurrent(attempt)) { subscription.unsubscribe(); return; }
       attempt.unsubscribe = () => subscription.unsubscribe();
     } catch (error) {
-      reject(attempt, error instanceof Error ? error.message : String(error));
+      reject(attempt, errorMessage(error));
     }
   }
 
@@ -147,7 +148,7 @@ export function createCableServer(options: CableServerOptions): CableServer {
       try {
         authorize(identifier);
       } catch (error) {
-        reject(attempt, error instanceof Error ? error.message : String(error));
+        reject(attempt, errorMessage(error));
         return;
       }
     }
@@ -176,7 +177,7 @@ export function createCableServer(options: CableServerOptions): CableServer {
       else if (message.command === "unsubscribe") unsubscribe(ws, message.identifier, message.subscriptionId);
     } catch (error) {
       if (!connections.has(ws)) return;
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       send(ws, { type: "error", message: reason });
       logError(`cable message failed: ${reason}`);
     }

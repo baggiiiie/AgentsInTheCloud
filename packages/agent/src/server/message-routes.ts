@@ -8,7 +8,8 @@ import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { expandPromptTemplate, parseCompactCommand } from "./prompt-templates.ts";
 import { runAgentSessionNameCommand } from "./session-name-command.ts";
-import { matchRoute, resolveAgentController, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
+import { matchRoute } from "@agents-in-the-cloud/shared/http";
+import { resolveAgentController, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 
 export const handleMessageRequest: AgentRouteHandler = async (request, url, options) => {

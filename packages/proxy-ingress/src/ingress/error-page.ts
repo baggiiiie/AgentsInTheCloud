@@ -1,4 +1,5 @@
 import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { response } from "@agents-in-the-cloud/shared/http";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { inlineDesignSystemCss } from "@agents-in-the-cloud/design-system/styles/server";
 import { errorCategory, WorkspaceConnectionError, WorkspaceUpstreamError } from "./failure.ts";
@@ -99,7 +100,7 @@ export async function ingressErrorPage(error: Error, workspaceName: string): Pro
   const css = await (styles ??= inlineDesignSystemCss());
   // An empty reference navigates to this document’s URL, including its query.
   const retry = actionLinkHtml({ href: "", variant: "secondary", content: { kind: "caption", caption: "Retry" } });
-  return new Response(`<!doctype html><html lang="en" data-theme="nord"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)} · AgentsInTheCloud</title><style>${css}
+  return response(`<!doctype html><html lang="en" data-theme="nord"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)} · AgentsInTheCloud</title><style>${css}
 body {
   margin: 0;
   background: var(--bg);
@@ -124,6 +125,6 @@ pre {
 }
 </style></head><body><main><h1 class="title">${escapeHtml(title)}</h1><p>${escapeHtml(explanation)}</p><p>${escapeHtml(guidance)}</p><div class="actions">${retry}</div><details><summary>Technical details</summary><pre>${escapeHtml(`Workspace: ${workspaceName}\n${error instanceof WorkspaceUpstreamError ? `Attempted address: 127.0.0.1:${error.port} inside this workspace\n` : ""}\n${error.message}`)}</pre></details></main></body></html>`, {
     status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'", "x-content-type-options": "nosniff" },
+    headers: { "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'", "x-content-type-options": "nosniff" },
   });
 }

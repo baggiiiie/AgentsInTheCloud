@@ -1,8 +1,5 @@
 import { Type } from "typebox";
-import { Value } from "typebox/value";
-import { SubscriptionUsageError, type SubscriptionUsage } from "./subscription-usage.ts";
-
-type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
+import { fetchSubscriptionUsageJson, type Fetcher, type SubscriptionUsage } from "./subscription-usage.ts";
 
 const payloadSchema = Type.Object({
   currency: Type.String({ minLength: 1 }),
@@ -12,21 +9,15 @@ const payloadSchema = Type.Object({
 
 /** Radius bills prepaid organization credits, so it reports a balance rather than allowance windows. */
 export async function fetchRadiusUsage(accessToken: string, fetcher: Fetcher = fetch): Promise<SubscriptionUsage> {
-  let response: Response;
-  try {
-    response = await fetcher("https://radius.pi.dev/v1/billing", {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-      signal: AbortSignal.timeout(10_000),
-      redirect: "error",
-    });
-  } catch {
-    throw new SubscriptionUsageError("Could not reach Radius to check credits. Try again.");
-  }
-  if (response.status === 401) throw new SubscriptionUsageError("Radius rejected the credentials. Reconnect Radius.");
-  if (!response.ok) throw new SubscriptionUsageError(`Radius credits are unavailable (HTTP ${response.status}). Try again later.`);
-  let payload: unknown;
-  try { payload = await response.json(); } catch { throw new SubscriptionUsageError("Radius returned an invalid billing response."); }
-  if (!Value.Check(payloadSchema, payload)) throw new SubscriptionUsageError("Radius returned an unrecognized billing response.");
+  const payload = await fetchSubscriptionUsageJson("https://radius.pi.dev/v1/billing", {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  }, payloadSchema, {
+    unreachable: "Could not reach Radius to check credits. Try again.",
+    rejected: "Radius rejected the credentials. Reconnect Radius.",
+    unavailable: (status) => `Radius credits are unavailable (HTTP ${status}). Try again later.`,
+    invalid: "Radius returned an invalid billing response.",
+    unrecognized: "Radius returned an unrecognized billing response.",
+  }, fetcher);
   return {
     plan: null,
     checkedAt: new Date().toISOString(),

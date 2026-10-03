@@ -29,9 +29,8 @@ import { domId, escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/sha
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
-import { jsonResponse } from "./http-responses.ts";
 import { instanceUrlHtml } from "./instance-url.ts";
-import { replace, response, update, wantsStream } from "@agents-in-the-cloud/shared/http";
+import { jsonResponse, matchRoute, replace, response, textResponse, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 const jsonStringSchema = Type.String();
 const jsonBooleanSchema = Type.Boolean();
@@ -548,9 +547,9 @@ export function createProjectRoutes(deps: {
     const query = url.searchParams.get("q") ?? "";
     try {
       const repositories = shouldSearchGitHubRepositories(query) ? await searchGitHubRepositories(query) : [];
-      return new Response(renderGitHubRepositorySearchMenu(repositories, query), { headers: { "content-type": "text/html; charset=utf-8" } });
+      return response(renderGitHubRepositorySearchMenu(repositories, query));
     } catch (error) {
-      if (error instanceof GitHubRepositorySearchRateLimitError) return new Response(renderGitHubRepositorySearchRateLimitMenu(error), { status: 429, headers: { "content-type": "text/html; charset=utf-8" } });
+      if (error instanceof GitHubRepositorySearchRateLimitError) return response(renderGitHubRepositorySearchRateLimitMenu(error), { status: 429 });
       throw error;
     }
   }
@@ -575,33 +574,29 @@ export function createProjectRoutes(deps: {
     if (url.pathname === "/projects" && request.method === "POST") return await createProjectEndpoint(request, url);
     if (url.pathname === "/projects/github-search" && request.method === "GET") return await githubRepositorySearchEndpoint(url);
 
-    const match = (pattern: RegExp): string[] | undefined => {
-      const result = url.pathname.match(pattern);
-      return result ? result.slice(1).map(decodeURIComponent) : undefined;
-    };
     let params: string[] | undefined;
-    if ((params = match(/^\/projects\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateProjectDockerfileEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateProjectPreloadImagesEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/launch-composer$/)) && request.method === "GET") return response(await deps.renderLaunchComposer(await projectById(params[0]!)));
-    if ((params = match(/^\/projects\/([^/]+)$/)) && request.method === "GET" && requestAcceptsJson(request)) return await projectDetailEndpoint(params[0]!);
-    if ((params = match(/^\/projects\/([^/]+)$/)) && request.method === "POST") return await updateProjectEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/environment$/)) && request.method === "POST") return await createProjectEnvironmentVariableEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/environment\/([^/]+)$/)) && request.method === "POST") return await updateProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/environment\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/secrets$/)) && request.method === "POST") return await createProjectSecretEndpoint(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/secrets\/([^/]+)$/)) && request.method === "POST") return await updateProjectSecretEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/secrets\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSecretEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/ssh-known-hosts$/))) {
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateProjectDockerfileEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateProjectPreloadImagesEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/launch-composer$/)) && request.method === "GET") return response(await deps.renderLaunchComposer(await projectById(params[0]!)));
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)$/)) && request.method === "GET" && requestAcceptsJson(request)) return await projectDetailEndpoint(params[0]!);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)$/)) && request.method === "POST") return await updateProjectEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/environment$/)) && request.method === "POST") return await createProjectEnvironmentVariableEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/environment\/([^/]+)$/)) && request.method === "POST") return await updateProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/environment\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEnvironmentVariableEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/secrets$/)) && request.method === "POST") return await createProjectSecretEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/secrets\/([^/]+)$/)) && request.method === "POST") return await updateProjectSecretEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/secrets\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSecretEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/ssh-known-hosts$/))) {
       const projectId = params[0]!;
       if (request.method === "GET" && requestAcceptsJson(request)) return jsonResponse({ knownHosts: await getProjectSshKnownHosts(projectId) });
       if (request.method === "POST") return updateProjectSshKnownHostsEndpoint(projectId, request);
     }
-    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys$/)) && request.method === "POST") return await createProjectSshKeyFromForm(params[0]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/public-key$/)) && request.method === "GET") return new Response(await deriveProjectSshPublicKey(params[0]!, params[1]!), { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
-    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)$/)) && request.method === "POST") return await renameProjectSshKeyEndpoint(params[0]!, params[1]!, request);
-    if ((params = match(/^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSshKeyFromForm(params[0]!, params[1]!);
-    if ((params = match(/^\/projects\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEndpoint(params[0]!, request);
-    if ((params = match(/^\/project-agent-workspaces\/([^/]+)$/)) && request.method === "POST") return await createProjectAgentWorkspaceEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/ssh-keys$/)) && request.method === "POST") return await createProjectSshKeyFromForm(params[0]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/public-key$/)) && request.method === "GET") return textResponse(await deriveProjectSshPublicKey(params[0]!, params[1]!));
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/ssh-keys\/([^/]+)$/)) && request.method === "POST") return await renameProjectSshKeyEndpoint(params[0]!, params[1]!, request);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/ssh-keys\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectSshKeyFromForm(params[0]!, params[1]!);
+    if ((params = matchRoute(url, /^\/projects\/([^/]+)\/delete$/)) && request.method === "POST") return await deleteProjectEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/project-agent-workspaces\/([^/]+)$/)) && request.method === "POST") return await createProjectAgentWorkspaceEndpoint(params[0]!, request);
     return undefined;
   }
 

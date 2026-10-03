@@ -1,8 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createKeyedOperationQueue, AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isJsonObject, type JsonValue } from "@agents-in-the-cloud/core";
-import type { WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
+import { createKeyedOperationQueue, AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isJsonObject, isNotFoundError, writeJsonAtomic, type JsonValue } from "@agents-in-the-cloud/core";
+import { errorMessage, type WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 export type { WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
@@ -80,7 +79,7 @@ export function createWorkspacePresentationStore(options: WorkspacePresentationS
     try {
       return adapter.parseReference(value);
     } catch (error) {
-      throw referenceError(workspaceId, error instanceof Error ? error.message : String(error), stored);
+      throw referenceError(workspaceId, errorMessage(error), stored);
     }
   }
 
@@ -112,18 +111,14 @@ export function createWorkspacePresentationStore(options: WorkspacePresentationS
     try {
       return parse(workspaceId, JSON.parse(await readFile(pathFor(workspaceId), "utf8")));
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+      if (isNotFoundError(error)) return undefined;
       if (error instanceof SyntaxError) throw presentationError(workspaceId, error.message);
       throw error;
     }
   }
 
   async function write(workspaceId: string, state: StoredPresentation): Promise<void> {
-    const path = pathFor(workspaceId);
-    await mkdir(join(dataDir, "workspaces", workspaceId, "metadata"), { recursive: true });
-    const temporaryPath = `${path}.tmp-${process.pid}-${randomUUID()}`;
-    await writeFile(temporaryPath, `${JSON.stringify(state, null, 2)}\n`);
-    await rename(temporaryPath, path);
+    await writeJsonAtomic(pathFor(workspaceId), state);
   }
 
   async function requiredState(workspaceId: string): Promise<StoredPresentation> {

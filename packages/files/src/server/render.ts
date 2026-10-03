@@ -6,7 +6,7 @@ import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
-import { domId, escapeHtml, workspaceFileOpenUrl, workspaceProxyUrl, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
+import { domId, escapeHtml, formatBytes, workspaceFileOpenUrl, workspaceProxyUrl, type WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { posix } from "node:path";
 import type { FileEntry } from "./files.ts";
@@ -49,13 +49,6 @@ function refreshButton(): string {
     content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh files" },
     attributesHtml: 'data-action="files-view#refresh"',
   });
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1_000) return `${bytes} B`;
-  if (bytes < 1_000_000) return `${(bytes / 1_000).toFixed(bytes < 10_000 ? 1 : 0)} KB`;
-  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
-  return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
 }
 
 function directoryToggleUrl(workspaceId: string, viewId: string, path: string, expand: boolean): string {
@@ -113,7 +106,7 @@ function renderEntryRow(workspaceId: string, viewId: string, entry: FileEntry, e
     ? ` data-files-destination="${escapeHtml(entry.directoryPath ?? entry.path)}" data-action="dragenter->files#folderDragEnter dragover->files#folderDragOver dragleave->files#folderDragLeave drop->files#folderDrop" aria-expanded="${expanded}"`
     : entry.openable ? ' data-action="files-view#collapse"' : "";
   const selectedAttribute = entry.path === selectedPath ? ' aria-selected="true"' : "";
-  const size = entry.kind === "directory" ? "" : `<span class="files-row-size">${formatSize(entry.size)}</span>`;
+  const size = entry.kind === "directory" ? "" : `<span class="files-row-size">${formatBytes(entry.size)}</span>`;
   return actionItemHtml({
     kind: "single",
     primary: Boolean(destination),

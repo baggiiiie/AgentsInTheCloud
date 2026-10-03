@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { recordsFromSessionEntries, type TranscriptRecord } from "@agents-in-the-cloud/agent/server";
-import { nativeImageResponse, nativeImageTypes, nativeJsonlFiles, nativeJsonlRows } from "@agents-in-the-cloud/cli-agent/server";
+import { latestNativeSessionFile, loadNativeTranscriptFiles, loadNativeTranscriptImage, nativeImageTypes, nativeJsonlRows, nativeSessionFiles } from "@agents-in-the-cloud/cli-agent/server";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -30,27 +29,25 @@ export function piTranscriptRecords(jsonl: string): TranscriptRecord[] {
 function sessionDirectory(workspaceId: string, sessionId: string): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "pi", "sessions", sessionId);
 }
-async function sessionFiles(workspaceId: string, sessionId: string): Promise<string[]> {
-  return (await nativeJsonlFiles(sessionDirectory(workspaceId, sessionId))).sort();
+export async function piHistoryFiles(workspaceId: string, sessionId: string): Promise<string[]> {
+  return nativeSessionFiles(sessionDirectory(workspaceId, sessionId));
 }
 export async function loadPiTranscript(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
-  const files = await sessionFiles(workspaceId, sessionId);
-  if (!files.length) return undefined;
-  return (await Promise.all(files.map(async (file) => piTranscriptRecords(await readFile(file, "utf8"))))).flat();
+  return loadNativeTranscriptFiles(await piHistoryFiles(workspaceId, sessionId), piTranscriptRecords);
 }
 export async function loadPiTranscriptImage(workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
-  for (const file of await sessionFiles(workspaceId, sessionId)) {
-    for (const entry of nativeJsonlRows(await readFile(file, "utf8"), rowSchema)) {
+  return loadNativeTranscriptImage(await piHistoryFiles(workspaceId, sessionId), (jsonl) => {
+    for (const entry of nativeJsonlRows(jsonl, rowSchema)) {
       if (entry.id !== entryId || entry.type !== "message" || !Array.isArray(entry.message?.content)) continue;
       const image = entry.message.content[contentIndex];
-      if (Value.Check(imageSchema, image) && nativeImageTypes.has(image.mimeType)) return nativeImageResponse(image.data, image.mimeType);
+      if (Value.Check(imageSchema, image) && nativeImageTypes.has(image.mimeType)) return image;
     }
-  }
-  return new Response("Not found", { status: 404 });
+    return undefined;
+  });
 }
 
 /** Session storage is private to this tab, not the workspace's most recent agent. */
 export async function piResumePath(workspaceId: string, sessionId: string): Promise<string | undefined> {
-  const file = (await sessionFiles(workspaceId, sessionId)).at(-1);
+  const file = await latestNativeSessionFile(sessionDirectory(workspaceId, sessionId));
   return file?.replace(join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local"), "/home/agents-in-the-cloud");
 }

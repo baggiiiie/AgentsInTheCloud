@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { observableWebSocketUrl } from "@agents-in-the-cloud/observable-terminal/client";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
+import { composerSubmitKey, errorMessage, focusLikelyOpensSoftwareKeyboard, notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { type MicrophoneLease, SharedMicrophone } from "./microphone.ts";
@@ -207,7 +207,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
         this.setState("recording", "Listening…");
         this.animateWaveform();
       } catch (error) {
-        if (this.socket === socket) this.fail(error instanceof Error ? error.message : String(error));
+        if (this.socket === socket) this.fail(errorMessage(error));
       }
     }
 

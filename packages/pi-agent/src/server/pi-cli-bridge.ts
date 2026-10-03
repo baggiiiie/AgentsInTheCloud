@@ -3,7 +3,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { HttpRequestBlockedError, type SecretRequestTransform } from "@agents-in-the-cloud/proxy-egress/server";
-import { availableProviderModels, anthropicSubscriptionUnavailableReason, modelRefValue, type ModelRef, type ConfiguredModel } from "@agents-in-the-cloud/llm/server";
+import { availableProviderModels, anthropicSubscriptionUnavailableReason, codexAccountId, modelRefValue, type ModelRef, type ConfiguredModel } from "@agents-in-the-cloud/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
 // Every use is checked against the *current* host-side catalogue and authentication.
@@ -150,9 +150,7 @@ export function createPiCliCredentialTransform(getRuntime: () => Promise<Runtime
         else {
           if (model.api !== "openai-codex-responses") throw new HttpRequestBlockedError("Pi account placeholders are only valid for Codex models");
           try {
-            const payload: unknown = JSON.parse(Buffer.from(auth.auth.apiKey!.split(".")[1]!, "base64url").toString());
-            const claims = Value.Parse(Type.Object({ "https://api.openai.com/auth": Type.Object({ chatgpt_account_id: Type.String() }) }), payload);
-            replacement = claims["https://api.openai.com/auth"].chatgpt_account_id;
+            replacement = codexAccountId(auth.auth.apiKey!);
           } catch {
             // Credential parsing errors must not include any part of a real token in proxy diagnostics.
             throw new HttpRequestBlockedError("Could not resolve the Pi Codex account; reconnect the provider in AgentsInTheCloud");

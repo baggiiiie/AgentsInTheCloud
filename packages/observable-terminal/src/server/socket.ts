@@ -1,3 +1,4 @@
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import { parseObservableTerminalMessage, type ObservableTerminalProgressMessage } from "../shared/index.ts";
 import { attachObservableTerminal, type ObservableTerminalAttachOptions, type ObservableTerminalConnection } from "./attach.ts";
 
@@ -29,7 +30,7 @@ export function createObservableTerminalSocket(options: ObservableTerminalAttach
           onExit: () => socket.close(),
         });
       } catch (error) {
-        socket.send(`\r\n[terminal attach failed: ${error instanceof Error ? error.message : String(error)}]\r\n`);
+        socket.send(`\r\n[terminal attach failed: ${errorMessage(error)}]\r\n`);
         socket.close();
       }
     },

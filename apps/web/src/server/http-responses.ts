@@ -1,13 +1,5 @@
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
-
-type HtmlResponseInit = Omit<ResponseInit, "headers"> & { headers?: Record<string, string> };
-
-export function jsonResponse<Body extends object>(body: Body, init: HtmlResponseInit = {}): Response {
-  const headers = new Headers(init.headers);
-  headers.set("content-type", "application/json; charset=utf-8");
-  if (!headers.has("cache-control")) headers.set("cache-control", "no-store");
-  return new Response(JSON.stringify(body), { ...init, headers });
-}
+import { jsonResponse } from "@agents-in-the-cloud/shared/http";
 
 export function httpErrorStatus(error: Error): number {
   return error instanceof AgentsInTheCloudCoreError && ["invalid_arguments", "invalid_git_url", "terminal_invalid_cwd"].includes(error.code) ? 400

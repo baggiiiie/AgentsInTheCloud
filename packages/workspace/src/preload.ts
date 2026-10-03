@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile, rename, stat } from "node:fs/promises";
+import { mkdir, readFile, writeFile, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { requireDocker, workloadCommand, runCommand, waitForCommand, withCommandSignal, shellQuote } from "@agents-in-the-cloud/core";
+import { isNotFoundError, requireDocker, workloadCommand, runCommand, waitForCommand, withCommandSignal, shellQuote, writeFileAtomic } from "@agents-in-the-cloud/core";
 import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 
 import { runHostObservableCommand, stripTerminalControls, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
@@ -94,7 +94,7 @@ export function createImagePreloader(run: Command = command, docker: typeof requ
             if (!file.isFile() || file.size < 4096) throw new Error(`Invalid cached EROFS layer: ${diffID}`);
             return true;
           } catch (error) {
-            if (error instanceof Error && "code" in error && error.code === "ENOENT") return false;
+            if (isNotFoundError(error)) return false;
             throw error;
           }
         }));
@@ -136,9 +136,7 @@ export function createImagePreloader(run: Command = command, docker: typeof requ
         if (image.reference) continue;
         report(`Resolving image ${image.requested}`);
         image.reference = await resolve(image.requested);
-        const temporary = join(directory, "preloads.json.tmp");
-        await writeFile(temporary, JSON.stringify(images));
-        await rename(temporary, join(directory, "preloads.json"));
+        await writeFileAtomic(join(directory, "preloads.json"), JSON.stringify(images));
       }
       return images;
     },

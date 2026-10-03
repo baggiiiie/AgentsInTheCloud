@@ -1,6 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, readTextIfExists } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -24,17 +24,14 @@ export async function stageInitialPrompt(workspaceId: string, conversationId: st
 }
 
 export async function readInitialPromptDraft(workspaceId: string, conversationId: string): Promise<{ prompt: string } | undefined> {
-  try {
-    const draft = Value.Parse(initialPromptDraftSchema, JSON.parse(await readFile(initialPromptDraftPath(workspaceId, conversationId), "utf8")));
-    if (draft.accepted === false) {
-      await removeInitialPromptDraft(workspaceId, conversationId);
-      return undefined;
-    }
-    return { prompt: draft.prompt };
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
+  const text = await readTextIfExists(initialPromptDraftPath(workspaceId, conversationId));
+  if (text === undefined) return undefined;
+  const draft = Value.Parse(initialPromptDraftSchema, JSON.parse(text));
+  if (draft.accepted === false) {
+    await removeInitialPromptDraft(workspaceId, conversationId);
+    return undefined;
   }
+  return { prompt: draft.prompt };
 }
 
 export async function removeInitialPromptDraft(workspaceId: string, conversationId: string): Promise<void> {

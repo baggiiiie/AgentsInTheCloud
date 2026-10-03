@@ -1,5 +1,15 @@
 import { shellQuote } from "@agents-in-the-cloud/core";
+import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
+
+/** Resume launches restore native context without submitting a prompt. */
+export function emptyAgentInput(): WorkspaceAgentInput {
+  return { text: "", images: [], attachmentNotes: [] };
+}
+
+export function cliPromptText(input: WorkspaceAgentInput, extraNotes: string[] = []): string {
+  return [input.text, ...input.attachmentNotes, ...extraNotes].filter(Boolean).join("\n\n");
+}
 
 /** Install once in shared home, then launch in tmux with visible startup diagnostics. */
 export function cliLaunchScript(options: { executable: string; label: string; npmPackage: string; version?: string; installDirectory?: string; args: string[]; setup?: string }): string {

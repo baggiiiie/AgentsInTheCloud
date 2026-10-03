@@ -27,7 +27,7 @@ import {
   type ConfiguredModel,
   type PiAuthPrompt,
 } from "./pi-config-models.ts";
-import { domId, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
+import { domId, errorMessage, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
 import { append, remove, replace, replaceTargets, response, stream, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 type ProviderSummary = { provider: string; label: string; connection: ProviderConnection; subscription: boolean; account?: string; methods: string[] };
@@ -387,7 +387,7 @@ async function startOAuthFlow(provider: string, label: string, surface: ModelSet
     if (flow.abort.signal.aborted) return;
     flow.status = "error";
     flow.prompt = undefined;
-    flow.error = error instanceof Error ? error.message : String(error);
+    flow.error = errorMessage(error);
   });
   await waitForOAuthFlowReady(flow);
   return flow;
@@ -601,7 +601,7 @@ export async function handleModelSettingsRequest(request: Request, url: URL, ren
         ? { error: `Model catalogue refresh was incomplete. ${errors.join(" ")}` }
         : { status: "Model catalogue refreshed." };
     } catch (error) {
-      feedback = { error: `Model catalogue refresh failed. ${error instanceof Error ? error.message : String(error)}` };
+      feedback = { error: `Model catalogue refresh failed. ${errorMessage(error)}` };
     }
     return stream(replace("model_setup_settings", await renderModelSetup("settings", { open: true, ...feedback })) + await renderPickerUpdates());
   }
@@ -621,7 +621,7 @@ export async function handleModelSettingsRequest(request: Request, url: URL, ren
         : "Custom model configuration saved.";
       return stream(replace("model_setup_settings", await renderModelSetup("settings", { open: true, status })) + await renderPickerUpdates());
     } catch (error) {
-      return stream(replace("custom_models_settings", renderCustomModelsSettings({ source, open: true, error: error instanceof Error ? error.message : String(error) })));
+      return stream(replace("custom_models_settings", renderCustomModelsSettings({ source, open: true, error: errorMessage(error) })));
     }
   }
   let match = url.pathname.match(/^\/settings\/providers\/([^/]+)\/flow$/);
@@ -646,7 +646,7 @@ export async function handleModelSettingsRequest(request: Request, url: URL, ren
       await seedProviderFavoriteModels(provider);
     } catch (error) {
       if (error instanceof ProviderCatalogueRefreshError) return connectedStep(provider, surface, renderPickerUpdates, error.message);
-      return stream(replace(setupId(surface), renderApiKeyConnectionStep(provider, summary.label, surface, error instanceof Error ? error.message : String(error))));
+      return stream(replace(setupId(surface), renderApiKeyConnectionStep(provider, summary.label, surface, errorMessage(error))));
     }
     return connectedStep(provider, surface, renderPickerUpdates);
   }

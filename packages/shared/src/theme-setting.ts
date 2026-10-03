@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
 import { updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { parseThemeSettings, type AgentsInTheCloudTheme } from "./theme.ts";
 
@@ -16,7 +16,7 @@ export function readThemeSetting(): AgentsInTheCloudTheme {
   try {
     text = readFileSync(themeSettingPath(), "utf8");
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!isNotFoundError(error)) throw error;
   }
   // An AgentsInTheCloud running inside a workspace looks different from the host by default.
   return parseThemeSettings(text, process.env.ATELIER_HOST_UID ? "cappuccino" : "nord");

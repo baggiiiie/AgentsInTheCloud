@@ -2,6 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { claudeHistoryFiles } from "../../claude-agent/src/server/transcript.ts";
+import { codexHistoryFiles } from "../../codex-agent/src/server/transcript.ts";
+import { piHistoryFiles } from "../../pi-agent/src/server/transcript.ts";
 import { exportCliHistory } from "../src/server/history.ts";
 
 let directory: string;
@@ -29,14 +32,14 @@ test("exports native Pi and Codex sessions beside built-in sessions, without con
   await source(join(local, "agents-in-the-cloud-agents", "tab", "codex", "sessions", "2026", "rollout-123.jsonl"), "codex turn 1\n");
   await source(join(local, "agents-in-the-cloud-agents", "tab", "codex", "config.toml"), "secret");
   const shared = join(root, "session-shares", "team-project");
-  await exportCliHistory("workspace", "pi", "tab", "named-task");
-  await exportCliHistory("workspace", "codex", "tab", "named-task");
+  await exportCliHistory("workspace", "pi", "tab", "named-task", await piHistoryFiles("workspace", "tab"));
+  await exportCliHistory("workspace", "codex", "tab", "named-task", await codexHistoryFiles("workspace", "tab"));
   expect((await readdir(shared)).sort()).toEqual([
     "codex--named-task--workspace--tab--rollout-123.jsonl",
     "pi--named-task--workspace--tab--native-pi.jsonl",
   ]);
   await source(join(local, "pi", "sessions", "tab", "-work", "native-pi.jsonl"), "pi turn 1\npi turn 2\n");
-  await exportCliHistory("workspace", "pi", "tab", "named-task");
+  await exportCliHistory("workspace", "pi", "tab", "named-task", await piHistoryFiles("workspace", "tab"));
   expect(await Bun.file(join(shared, "pi--named-task--workspace--tab--native-pi.jsonl")).text()).toBe("pi turn 1\npi turn 2\n");
 });
 
@@ -45,7 +48,7 @@ test("exports only Claude's session ID from the shared home", async () => {
   const home = join(root, "home", ".claude", "projects", "-work");
   await source(join(home, "tab.jsonl"), "correct\n");
   await source(join(home, "other.jsonl"), "unrelated\n");
-  await exportCliHistory("workspace", "claude", "tab", "named-task");
+  await exportCliHistory("workspace", "claude", "tab", "named-task", await claudeHistoryFiles("workspace", "tab"));
   const shared = join(root, "session-shares", "team-project");
   expect(await readdir(shared)).toEqual(["claude--named-task--workspace--tab--tab.jsonl"]);
   expect(await Bun.file(join(shared, "claude--named-task--workspace--tab--tab.jsonl")).text()).toBe("correct\n");
@@ -53,6 +56,6 @@ test("exports only Claude's session ID from the shared home", async () => {
 
 test("missing native session does not publish an empty transcript", async () => {
   const root = await setup();
-  await exportCliHistory("workspace", "pi", "tab", "named-task");
+  await exportCliHistory("workspace", "pi", "tab", "named-task", await piHistoryFiles("workspace", "tab"));
   expect(await Bun.file(join(root, "session-shares", "team-project", "pi--named-task--workspace--tab--tab.jsonl")).exists()).toBe(false);
 });

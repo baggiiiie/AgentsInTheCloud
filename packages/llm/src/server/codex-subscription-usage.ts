@@ -1,4 +1,5 @@
-import { SubscriptionUsageError, type SubscriptionUsage } from "./subscription-usage.ts";
+import { fetchSubscriptionUsageJson, subscriptionUsageMessages, SubscriptionUsageError, type Fetcher, type SubscriptionUsage } from "./subscription-usage.ts";
+import { codexTokenClaims } from "./codex-token.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -33,33 +34,17 @@ const payloadSchema = Type.Object({
 });
 
 /** ChatGPT's account endpoint, also used by the Codex CLI. Not a public, versioned API. */
-export async function fetchCodexSubscriptionUsage(accessToken: string, fetcher: (url: string, init: RequestInit) => Promise<Response> = fetch): Promise<SubscriptionUsage> {
-  let claims: unknown;
+export async function fetchCodexSubscriptionUsage(accessToken: string, fetcher: Fetcher = fetch): Promise<SubscriptionUsage> {
+  let claims: Static<typeof claimsSchema>;
   try {
-    claims = JSON.parse(Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString());
+    claims = codexTokenClaims(accessToken, claimsSchema);
   } catch {
     throw new SubscriptionUsageError("OpenAI credentials are invalid. Reconnect OpenAI Codex.");
   }
-  if (!Value.Check(claimsSchema, claims)) throw new SubscriptionUsageError("OpenAI credentials are invalid. Reconnect OpenAI Codex.");
   const headers = new Headers({ Authorization: `Bearer ${accessToken}`, Accept: "application/json" });
   const accountId = claims["https://api.openai.com/auth"]?.chatgpt_account_id;
   if (accountId) headers.set("ChatGPT-Account-Id", accountId);
-  let response: Response;
-  try {
-    response = await fetcher("https://chatgpt.com/backend-api/wham/usage", {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-      redirect: "error",
-    });
-  } catch {
-    throw new SubscriptionUsageError("Could not reach OpenAI to check subscription usage. Try again.");
-  }
-  if (response.status === 401) throw new SubscriptionUsageError("OpenAI rejected the credentials. Reconnect OpenAI Codex.");
-  if (!response.ok) throw new SubscriptionUsageError(`OpenAI usage is unavailable (HTTP ${response.status}). Try again later.`);
-  let payload: unknown;
-  try { payload = await response.json(); } catch { throw new SubscriptionUsageError("OpenAI returned an invalid usage response."); }
-  if (!Value.Check(payloadSchema, payload)) throw new SubscriptionUsageError("OpenAI returned an unrecognized usage response.");
-  return normalizeUsage(payload);
+  return normalizeUsage(await fetchSubscriptionUsageJson("https://chatgpt.com/backend-api/wham/usage", { headers }, payloadSchema, subscriptionUsageMessages("OpenAI", "OpenAI Codex"), fetcher));
 }
 
 function normalizeUsage(payload: Static<typeof payloadSchema>): SubscriptionUsage {

@@ -2,7 +2,8 @@ import { stopDurableWorkspaceAgentConversation } from "./runtime.ts";
 import { existingDurableController } from "./runtime.ts";
 import { AgentsInTheCloudCoreError, requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
-import { invalidateAgentView, matchRoute, requireAgentPresentation, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
+import { matchRoute, response } from "@agents-in-the-cloud/shared/http";
+import { invalidateAgentView, requireAgentPresentation, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";
 
@@ -17,7 +18,7 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     const runtime = await requireAgentPresentation(params[0], params[1], options);
     const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
     const html = await runtime.detailHtml(params[2], count);
-    return new Response(html || "not found", { status: html ? 200 : 404, headers: { "content-type": "text/html; charset=utf-8" } });
+    return response(html || "not found", { status: html ? 200 : 404 });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
     const agent = await resolveAgentConversation(params[0], params[1]);
@@ -26,9 +27,9 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tree(\/summary|\/label|)$/))) {
     const [workspaceId, conversationId, suffix] = params;
-    const response = await handleAgentTreeRequest(request, url, suffix, async () => await requireAgentPresentation(workspaceId, conversationId, options), async () => await requireAgentController(workspaceId, conversationId, options));
-    if (response && request.method === "POST") await invalidateAgentView(options, workspaceId, conversationId);
-    return response;
+    const treeResponse = await handleAgentTreeRequest(request, url, suffix, async () => await requireAgentPresentation(workspaceId, conversationId, options), async () => await requireAgentController(workspaceId, conversationId, options));
+    if (treeResponse && request.method === "POST") await invalidateAgentView(options, workspaceId, conversationId);
+    return treeResponse;
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
     const agent = await resolveAgentConversation(params[0], params[1]);

@@ -1,5 +1,5 @@
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
-import { cliLaunchScript, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings, type TurnBoundary } from "@agents-in-the-cloud/cli-agent/server";
+import { cliLaunchScript, cliPromptText, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings, type TurnBoundary } from "@agents-in-the-cloud/cli-agent/server";
 import { claudeMcpConfigPath } from "./mcp.ts";
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
@@ -15,7 +15,7 @@ function turnBoundaryHooks(turnSignalCommand: string) {
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
 export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resume = false): string {
   // Claude has no --image flag. Its Read tool opens the materialized images.
-  const prompt = [input.text, ...input.attachmentNotes, ...imagePaths.map((path) => `Read the attached image at ${JSON.stringify(path)}.`)].filter(Boolean).join("\n\n");
+  const prompt = cliPromptText(input, imagePaths.map((path) => `Read the attached image at ${JSON.stringify(path)}.`));
   const cliSettings = {
     skipDangerousModePermissionPrompt: true,
     theme: `custom:${claudeThemeName}`,

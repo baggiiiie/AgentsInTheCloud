@@ -1,4 +1,5 @@
 import { withCommandSignal } from "@agents-in-the-cloud/core";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import type { WorkspaceProvisioning, WorkspaceProvisionRun } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceRegistry } from "./workspace-registry.ts";
 
@@ -18,7 +19,7 @@ async function prepare(id: string, registry: WorkspaceRegistry, operations: Work
       if (current()) registry.setIssue(id, "readiness");
     } catch (error) {
       if (!current()) return;
-      const message = `${error instanceof Error ? error.message : String(error)} Required images or gateways may be unavailable.`;
+      const message = `${errorMessage(error)} Required images or gateways may be unavailable.`;
       console.error(`workspace preparation failed ${id}`, error);
       registry.setIssue(id, "readiness", message);
       throw error;
@@ -58,7 +59,7 @@ export async function recoverWorkspaces(
       } catch (error) {
         if (!current()) return;
         console.error(`could not restore workspace ${id}`, error);
-        registry.setProvisioningState(id, "failed", error instanceof Error ? error.message : String(error));
+        registry.setProvisioningState(id, "failed", errorMessage(error));
       }
     };
     const inspectImage = async () => {

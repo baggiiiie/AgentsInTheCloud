@@ -1,5 +1,6 @@
-import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { writeFileAtomic } from "@agents-in-the-cloud/core";
 
 /** Merge shared and package-owned documentation into the existing read-only bind mount. */
 export async function syncWorkspaceDocs(repositoryRoot: string, destination: string): Promise<void> {
@@ -46,9 +47,6 @@ export async function syncWorkspaceDocs(repositoryRoot: string, destination: str
   await prune();
   for (const directory of directories) await mkdir(join(destination, directory), { recursive: true });
   for (const [path, source] of files) {
-    const target = join(destination, path);
-    const temporary = `${target}.tmp-${process.pid}-${Date.now()}`;
-    await writeFile(temporary, await readFile(source), { mode: 0o444 });
-    await rename(temporary, target);
+    await writeFileAtomic(join(destination, path), await readFile(source), { mode: 0o444 });
   }
 }

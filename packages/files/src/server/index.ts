@@ -2,6 +2,7 @@ import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { renderMarkdown } from "@agents-in-the-cloud/markdown";
 import { parseWorkspaceFileTarget, type WorkspaceFileTarget, type WorkspaceModule, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
+import { jsonResponse, matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -14,18 +15,6 @@ import { closeFilesView, createFilesView, defaultFilesViewId, deleteFilesViewSta
 const filesWorkViewReferenceSchema = Type.Object({ type: Type.Literal("files"), id: Type.String() });
 type FilesWorkViewReference = Static<typeof filesWorkViewReferenceSchema>;
 
-function textResponse(message: string, status: number): Response {
-  return new Response(message, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
-}
-
-function htmlResponse(html: string): Response {
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-}
-
-function jsonResponse<Body extends object>(value: Body, status = 200): Response {
-  return Response.json(value, { status, headers: { "cache-control": "no-store" } });
-}
-
 async function filesEndpoint(workspaceId: string, url: URL): Promise<Response> {
   const viewId = url.searchParams.get("filesView") ?? defaultFilesViewId;
   const filesState = filesView(workspaceId, viewId);
@@ -35,16 +24,16 @@ async function filesEndpoint(workspaceId: string, url: URL): Promise<Response> {
     const selectedPath = filesState.path;
     const expandedPaths = new Set(url.searchParams.getAll("expanded"));
     const entries = normalizedQuery ? await searchFiles(workspaceId, normalizedQuery, expandedPaths) : (await listFiles(workspaceId, workspaceRoot, undefined, expandedPaths)).entries;
-    return htmlResponse(renderFilesTreeResultsFrame(workspaceId, viewId, entries, selectedPath, Boolean(normalizedQuery)));
+    return response(renderFilesTreeResultsFrame(workspaceId, viewId, entries, selectedPath, Boolean(normalizedQuery)));
   }
   const view = url.searchParams.get("view");
   if (view === "inline" || view === "collapsed") {
     const entry = await getDirectoryEntry(workspaceId, url.searchParams.get("path"));
     const listing = view === "inline" ? await listFiles(workspaceId, entry.directoryPath ?? entry.path) : undefined;
-    return htmlResponse(renderFilesDirectoryFrame(workspaceId, viewId, entry, listing?.entries, filesState.path));
+    return response(renderFilesDirectoryFrame(workspaceId, viewId, entry, listing?.entries, filesState.path));
   }
   const listing = await listFiles(workspaceId, workspaceRoot, filesState.path);
-  return htmlResponse(renderFilesTreeFrame(workspaceId, viewId, listing.entries, filesState.path));
+  return response(renderFilesTreeFrame(workspaceId, viewId, listing.entries, filesState.path));
 }
 
 export async function openFileInFiles(workspaceId: string, target: WorkspaceFileTarget, openWorkView: WorkspaceModuleRouteContext["openWorkView"], requestedViewId?: string): Promise<Response> {
@@ -55,25 +44,25 @@ export async function openFileInFiles(workspaceId: string, target: WorkspaceFile
 }
 
 async function markdownPreviewEndpoint(workspaceId: string, request: Request, url: URL): Promise<Response> {
-  if (request.method !== "POST") return textResponse("Method not allowed", 405);
+  if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
   const sourcePath = url.searchParams.get("path");
   const options = sourcePath?.startsWith("/") ? { sourcePath, frontmatter: true } : { frontmatter: true };
-  return new Response(renderMarkdown(workspaceId, await request.text(), options), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  return response(renderMarkdown(workspaceId, await request.text(), options));
 }
 
 async function fileContentEndpoint(workspaceId: string, request: Request, url: URL): Promise<Response> {
   const path = url.searchParams.get("path");
   if (request.method === "GET") return jsonResponse(await readEditableFile(workspaceId, path));
-  if (request.method !== "PUT") return textResponse("Method not allowed", 405);
+  if (request.method !== "PUT") return textResponse("Method not allowed", { status: 405 });
   const body: unknown = await request.json();
-  if (!Value.Check(fileSaveRequestSchema, body)) return textResponse("Invalid file save", 422);
+  if (!Value.Check(fileSaveRequestSchema, body)) return textResponse("Invalid file save", { status: 422 });
   const save: FileSaveRequest = body;
   try {
     const revision = await writeEditableFile(workspaceId, path, save.content, save.revision, save.force === true);
     filesDiskChanged(workspaceId);
     return jsonResponse({ revision });
   } catch (error) {
-    if (error instanceof EditableFileError && error.status === 409) return jsonResponse(await readEditableFile(workspaceId, path), 409);
+    if (error instanceof EditableFileError && error.status === 409) return jsonResponse(await readEditableFile(workspaceId, path), { status: 409 });
     throw error;
   }
 }
@@ -114,24 +103,24 @@ const filesWorkspaceModule: WorkspaceModule = {
   routes: [{
     async handle(request, url, context) {
       try {
-        let match = url.pathname.match(/^\/workspaces\/([^/]+)\/files-view\/(open|content|markdown-preview)$/);
+        let match = matchRoute(url, /^\/workspaces\/([^/]+)\/files-view\/(open|content|markdown-preview)$/);
         if (match) {
-          const workspaceId = decodeURIComponent(match[1]!);
-          if (match[2] === "open") return request.method === "GET" ? await openFileInFiles(workspaceId, parseWorkspaceFileTarget(url.searchParams), context.openWorkView, url.searchParams.get("filesView") ?? undefined) : textResponse("Method not allowed", 405);
-          if (match[2] === "content") return await fileContentEndpoint(workspaceId, request, url);
+          const workspaceId = match[0]!;
+          if (match[1] === "open") return request.method === "GET" ? await openFileInFiles(workspaceId, parseWorkspaceFileTarget(url.searchParams), context.openWorkView, url.searchParams.get("filesView") ?? undefined) : textResponse("Method not allowed", { status: 405 });
+          if (match[1] === "content") return await fileContentEndpoint(workspaceId, request, url);
           return await markdownPreviewEndpoint(workspaceId, request, url);
         }
 
-        match = url.pathname.match(/^\/workspaces\/([^/]+)\/files$/);
-        if (match) return request.method === "GET" ? await filesEndpoint(decodeURIComponent(match[1]!), url) : textResponse("Method not allowed", 405);
+        match = matchRoute(url, /^\/workspaces\/([^/]+)\/files$/);
+        if (match) return request.method === "GET" ? await filesEndpoint(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
 
-        match = url.pathname.match(/^\/workspaces\/([^/]+)\/file-browser\/(upload|delete)$/);
+        match = matchRoute(url, /^\/workspaces\/([^/]+)\/file-browser\/(upload|delete)$/);
         if (!match) return undefined;
-        const workspaceId = decodeURIComponent(match[1]!);
-        if (match[2] === "upload") return request.method === "POST" ? await uploadEndpoint(workspaceId, request, url) : textResponse("Method not allowed", 405);
-        return request.method === "POST" ? await deleteEndpoint(workspaceId, request, context.openWorkView) : textResponse("Method not allowed", 405);
+        const workspaceId = match[0]!;
+        if (match[1] === "upload") return request.method === "POST" ? await uploadEndpoint(workspaceId, request, url) : textResponse("Method not allowed", { status: 405 });
+        return request.method === "POST" ? await deleteEndpoint(workspaceId, request, context.openWorkView) : textResponse("Method not allowed", { status: 405 });
       } catch (error) {
-        if (error instanceof FilesPathError || error instanceof EditableFileError) return textResponse(error.message, error.status);
+        if (error instanceof FilesPathError || error instanceof EditableFileError) return textResponse(error.message, { status: error.status });
         throw error;
       }
     },

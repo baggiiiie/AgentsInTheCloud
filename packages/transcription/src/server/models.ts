@@ -1,7 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -20,12 +18,12 @@ export type TranscriptionModelId = (typeof transcriptionModels)[number]["id"];
 export const defaultTranscriptionModel: TranscriptionModelId = "nemotron-en";
 
 const settingsSchema = Type.Object({
-  model: Type.Union([
+  model: Type.Optional(Type.Union([
     ...transcriptionModels.map(({ id }) => Type.Literal(id)),
     // Accept retired selections in older persisted settings only.
     Type.Literal("parakeet-tdt"),
     Type.Literal("parakeet-ctc"),
-  ]),
+  ])),
 });
 
 function settingsPath(): string {
@@ -43,19 +41,12 @@ export function transcriptionModel(id: TranscriptionModelId): (typeof transcript
 }
 
 export async function readTranscriptionModel(): Promise<TranscriptionModelId> {
-  const text = await readFile(settingsPath(), "utf8").catch((error) => {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
-    throw error;
-  });
-  if (!text) return defaultTranscriptionModel;
-  const { model } = Value.Parse(settingsSchema, JSON.parse(text));
-  return isTranscriptionModelId(model) ? model : defaultTranscriptionModel;
+  const { model } = Value.Parse(settingsSchema, await readJsonSettings(settingsPath()));
+  return model && isTranscriptionModelId(model) ? model : defaultTranscriptionModel;
 }
 
 export async function writeTranscriptionModel(model: TranscriptionModelId): Promise<void> {
-  const path = settingsPath();
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify({ model }, null, 2)}\n`);
-  await rename(temporaryPath, path);
+  await updateJsonSettings(settingsPath(), (settings) => {
+    settings.model = model;
+  });
 }

@@ -1,10 +1,11 @@
 import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@agents-in-the-cloud/agent/server";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
+import { emptyAgentInput } from "./launch-script.ts";
 import { AgentsInTheCloudCoreError, createKeyedOperationQueue, shellQuote } from "@agents-in-the-cloud/core";
 import { buildObservableSessionCommand } from "@agents-in-the-cloud/observable-terminal/server";
 import { imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
-import type { AgentWorkspaceParameters, WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
+import { errorMessage, type AgentWorkspaceParameters, type WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { createWorkspaceMetadataState, execWorkspaceShell, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -87,7 +88,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       store().write(workspaceId, { sessions: list(workspaceId) });
     } catch (error) {
       // Startup failure is durable session state, shown in its tab rather than discarded.
-      session.error = error instanceof Error ? error.message : String(error);
+      session.error = errorMessage(error);
       store().write(workspaceId, { sessions: list(workspaceId) });
       await revokeAgentMcp(workspaceId, id);
     } finally {
@@ -146,11 +147,11 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   }
 
   function create(workspaceId: string, settings: AgentWorkspaceParameters = {}): Promise<string> {
-    return serialize(workspaceId, () => launch(workspaceId, settings.input ?? { text: "", images: [], attachmentNotes: [] }, settings));
+    return serialize(workspaceId, () => launch(workspaceId, settings.input ?? emptyAgentInput(), settings));
   }
   function prepareWorkspace(workspaceId: string, settings: AgentWorkspaceParameters = {}): Promise<void> {
     return serialize(workspaceId, async () => {
-      if (!list(workspaceId).length) await launch(workspaceId, settings.input ?? { text: "", images: [], attachmentNotes: [] }, settings);
+      if (!list(workspaceId).length) await launch(workspaceId, settings.input ?? emptyAgentInput(), settings);
     });
   }
   async function ready(workspaceId: string, id: string): Promise<CliSession> {
@@ -175,7 +176,8 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     });
   }
   async function exportHistory(workspaceId: string, id: string): Promise<void> {
-    if (!["pi", "codex", "claude"].includes(adapter.id)) return;
+    const historyFiles = adapter.historyFiles;
+    if (!historyFiles) return;
     await serialize(workspaceId, async () => {
       const session = list(workspaceId).find((item) => item.id === id);
       if (!session || session.error) return;
@@ -184,7 +186,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
         if (!session.historySlug) return;
         store().write(workspaceId, { sessions: list(workspaceId) });
       }
-      await exportCliHistory(workspaceId, adapter.id, session.id, session.historySlug);
+      await exportCliHistory(workspaceId, adapter.id, session.id, session.historySlug, await historyFiles(workspaceId, session.id));
     });
   }
   async function close(workspaceId: string, id: string): Promise<void> {

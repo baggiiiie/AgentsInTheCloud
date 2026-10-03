@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { requireDocker, runDocker, waitForCommand, commandSignal, workloadBuildArgs, shellQuote, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { runHostObservableCommand, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import { type WorkspaceImageMetadata } from "./metadata.ts";
 import { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } from "./default-image.ts";
 export { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } from "./default-image.ts";
@@ -121,7 +122,7 @@ async function waitForBuildTask(task: WorkspaceImageBuildTask, options: ResolveW
     if (task.owner === options.workspaceId) await task.promise;
     else await waitForCommand(task.promise);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw new Error(`${message}\n\n${task.output}`.trim());
   } finally {
     if (!commandSignal()?.aborted) await reportImageProgress(options.events, options.workspaceId, task);

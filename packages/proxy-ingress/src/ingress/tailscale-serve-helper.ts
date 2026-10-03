@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import {
   defaultPublicOriginPortRange,
   defaultTailscaleLocalApiSocketPath,
@@ -69,6 +70,6 @@ function usage(): never {
 }
 
 main(process.argv.slice(2)).catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(errorMessage(error));
   process.exit(1);
 });

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
-import { nativeImageResponse, nativeImageTypes, nativeJsonlRows, nativeJsonlFiles } from "@agents-in-the-cloud/cli-agent/server";
+import { latestNativeSessionFile, loadNativeTranscriptFiles, loadNativeTranscriptImage, nativeImageTypes, nativeJsonlRows, nativeSessionFiles, nativeTimestamp } from "@agents-in-the-cloud/cli-agent/server";
 import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -67,7 +67,7 @@ export function codexTranscriptRecords(jsonl: string, fallbackPrefix = "codex"):
     if (row.type !== "response_item") continue; // event_msg duplicates response items
     const p = row.payload;
     const id = p.id ?? `${fallbackPrefix}-${index++}`;
-    const timestamp = Date.parse(row.timestamp ?? "") || 0;
+    const timestamp = nativeTimestamp(row.timestamp);
     if (p.type === "message" && p.role === "user") {
       const images = (p.content ?? []).flatMap((part, contentIndex) => {
         const source = image(part);
@@ -102,32 +102,29 @@ export function codexTranscriptRecords(jsonl: string, fallbackPrefix = "codex"):
 function sessionDirectory(workspaceId: string, sessionId: string): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "home-local", ".local", "share", "agents-in-the-cloud-agents", sessionId, "codex", "sessions");
 }
-async function sessionFiles(workspaceId: string, sessionId: string): Promise<string[]> {
-  return (await nativeJsonlFiles(sessionDirectory(workspaceId, sessionId))).sort();
+export async function codexHistoryFiles(workspaceId: string, sessionId: string): Promise<string[]> {
+  return nativeSessionFiles(sessionDirectory(workspaceId, sessionId));
 }
 export async function loadCodexTranscript(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
-  const files = await sessionFiles(workspaceId, sessionId);
-  if (!files.length) return undefined;
-  return (await Promise.all(files.map(async (file) => codexTranscriptRecords((await readFile(file, "utf8")), basename(file, ".jsonl"))))).flat();
+  return loadNativeTranscriptFiles(await codexHistoryFiles(workspaceId, sessionId), (jsonl, file) => codexTranscriptRecords(jsonl, basename(file, ".jsonl")));
 }
 export async function loadCodexTranscriptImage(workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
-  for (const file of await sessionFiles(workspaceId, sessionId)) {
-    const content = await readFile(file, "utf8");
+  return loadNativeTranscriptImage(await codexHistoryFiles(workspaceId, sessionId), (jsonl, file) => {
     let index = 0;
-    for (const row of nativeJsonlRows(content, rowSchema)) {
+    for (const row of nativeJsonlRows(jsonl, rowSchema)) {
       if (row.type !== "response_item") continue;
       const id = row.payload.id ?? `${basename(file, ".jsonl")}-${index++}`;
       if (id !== entryId || row.payload.type !== "message" || row.payload.role !== "user") continue;
       const source = image(row.payload.content?.[contentIndex]);
-      if (source) return nativeImageResponse(source.data, source.mimeType);
+      if (source) return source;
     }
-  }
-  return new Response("Not found", { status: 404 });
+    return undefined;
+  });
 }
 
 /** Read the native ID from the tab-private rollout, never use workspace-wide --last. */
 export async function codexResumeId(workspaceId: string, sessionId: string): Promise<string | undefined> {
-  const file = (await sessionFiles(workspaceId, sessionId)).at(-1);
+  const file = await latestNativeSessionFile(sessionDirectory(workspaceId, sessionId));
   if (!file) return undefined;
   const schema = Type.Object({ type: Type.Literal("session_meta"), payload: Type.Object({ id: Type.String() }) });
   const id = Array.from(nativeJsonlRows(await readFile(file, "utf8"), schema))[0]?.payload.id;

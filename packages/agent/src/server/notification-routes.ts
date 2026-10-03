@@ -3,7 +3,8 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { notificationFeedbackId, notificationFrameId, renderNotificationControl, renderNotificationFeedback } from "./render-notification.ts";
-import { matchRoute, requireAgentPresentation, type AgentRouteHandler } from "./route-support.ts";
+import { jsonResponse, matchRoute, response } from "@agents-in-the-cloud/shared/http";
+import { requireAgentPresentation, type AgentRouteHandler } from "./route-support.ts";
 import { currentNotificationTurn, setTurnNotification } from "./turn-notifications.ts";
 import { parsePushSubscription, pushPublicKey } from "./web-push.ts";
 
@@ -21,8 +22,8 @@ export const handleNotificationRequest: AgentRouteHandler = async (request, url,
     const turn = currentNotificationTurn(ctx);
     return { turnId: turn?.id ?? null, busy: runtime.isStreaming, armed: turn?.armed ?? false };
   };
-  if (request.method === "GET" && requestAcceptsJson(request)) return Response.json(state(), { headers: { "cache-control": "no-store" } });
-  if (request.method === "GET") return new Response(`<turbo-frame id="${notificationFrameId(ctx)}">${renderNotificationControl(ctx, runtime.isStreaming)}</turbo-frame>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if (request.method === "GET" && requestAcceptsJson(request)) return jsonResponse(state());
+  if (request.method === "GET") return response(`<turbo-frame id="${notificationFrameId(ctx)}">${renderNotificationControl(ctx, runtime.isStreaming)}</turbo-frame>`);
   const reply = (message: string, status = 200): Response => requestAcceptsJson(request)
     ? Response.json(status < 400 ? { ...state(), message } : { error: { code: status === 409 ? "turn_ended" : "invalid_arguments", message } }, { status })
     : turboStreamResponse(turboStream("replace", notificationFeedbackId(ctx.workspaceId, ctx.conversationId), renderNotificationFeedback(ctx.workspaceId, ctx.conversationId, message, status >= 400)), { status });

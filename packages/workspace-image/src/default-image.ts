@@ -1,8 +1,8 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runDocker, runCommand, workloadBuildArgs, type CommandResult } from "@agents-in-the-cloud/core";
-import { reuseDefaultWorkspaceImage } from "./local-images.ts";
+import { runDocker, runCommand, workloadBuildArgs } from "@agents-in-the-cloud/core";
+import { reuseDefaultWorkspaceImage, type DockerCommand } from "./local-images.ts";
 import { parseWorkspaceImageMetadata, type WorkspaceImageMetadata } from "./metadata.ts";
 
 export interface DefaultWorkspaceImageContext {
@@ -12,7 +12,6 @@ export interface DefaultWorkspaceImageContext {
   dispose(): Promise<void>;
 }
 
-type DockerCommand = (args: string[]) => Promise<CommandResult>;
 export interface EnsureDefaultImageOptions {
   docker?: DockerCommand;
   force?: boolean;

@@ -1,4 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { isNotFoundError } from "@agents-in-the-cloud/core";
 import type { TSchema, Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -20,11 +22,47 @@ export function* nativeJsonlRows<T extends TSchema>(jsonl: string, schema: T): G
   }
 }
 
-export async function nativeJsonlText(path: string): Promise<string | undefined> {
-  return readFile(path, "utf8").catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return undefined;
+async function nativeJsonlFiles(directory: string): Promise<string[]> {
+  let entries;
+  try { entries = await readdir(directory, { withFileTypes: true }); }
+  catch (error) {
+    if (isNotFoundError(error)) return [];
     throw error;
-  });
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await nativeJsonlFiles(path));
+    else if (entry.isFile() && entry.name.endsWith(".jsonl")) files.push(path);
+  }
+  return files;
+}
+
+/** Session files in chronological order, oldest first. */
+export async function nativeSessionFiles(directory: string): Promise<string[]> {
+  return (await nativeJsonlFiles(directory)).sort();
+}
+
+/** The newest session file, which a resumed CLI continues. */
+export async function latestNativeSessionFile(directory: string): Promise<string | undefined> {
+  return (await nativeSessionFiles(directory)).at(-1);
+}
+
+export async function loadNativeTranscriptFiles<T>(files: string[], parse: (jsonl: string, file: string) => T[]): Promise<T[] | undefined> {
+  if (!files.length) return undefined;
+  return (await Promise.all(files.map(async (file) => parse(await readFile(file, "utf8"), file)))).flat();
+}
+
+export async function loadNativeTranscriptImage(files: string[], find: (jsonl: string, file: string) => { data: string; mimeType: string } | undefined): Promise<Response> {
+  for (const file of files) {
+    const image = find(await readFile(file, "utf8"), file);
+    if (image) return nativeImageResponse(image.data, image.mimeType);
+  }
+  return new Response("Not found", { status: 404 });
+}
+
+export function nativeTimestamp(value: string | undefined): number {
+  return Date.parse(value ?? "") || 0;
 }
 
 export const nativeImageTypes = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);

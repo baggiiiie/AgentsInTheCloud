@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { Value } from "typebox/value";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import type { WorkspaceTool } from "./workspace-tool.ts";
 import { authenticateAgentRequest, type AgentMcpIdentity } from "./mcp-credentials.ts";
 
@@ -51,7 +52,7 @@ export function createAgentMcpServer(options: AgentMcpServerOptions) {
           await updates;
           return { content: result.content };
         } catch (error) {
-          return { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }] };
+          return { isError: true, content: [{ type: "text", text: errorMessage(error) }] };
         }
       });
       await server.connect(transport);

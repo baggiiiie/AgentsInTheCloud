@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
 import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
+import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, git, gitResult, type ReviewFileStats } from "./diff.ts";
 import { renderFileStats, renderFileSummary, renderReadOnlyReviewFile } from "./render.ts";
@@ -112,28 +113,24 @@ export const reviewDeletionReview: WorkspaceDeletionReview = { inspect, renderEv
 function reviewRequest(workspaceId: string, url: URL) {
   const assessment = assessments.get(workspaceId);
   const fingerprint = url.searchParams.get("fingerprint") ?? "";
-  if (!assessment || assessment.fingerprint !== fingerprint) return new Response("Deletion assessment is no longer current", { status: 409 });
+  if (!assessment || assessment.fingerprint !== fingerprint) return textResponse("Deletion assessment is no longer current", { status: 409 });
   const relativePath = url.searchParams.get("repository") ?? "";
   const repository = assessment.details.repositories.find((candidate) => candidate.relativePath === relativePath);
-  if (!repository) return new Response("Review repository is no longer available", { status: 404 });
+  if (!repository) return textResponse("Review repository is no longer available", { status: 404 });
   const commit = url.searchParams.get("commit") ?? "";
-  if (commit && !repository.unpushedCommits.some((candidate) => candidate.hash === commit)) return new Response("Review commit is no longer available", { status: 404 });
+  if (commit && !repository.unpushedCommits.some((candidate) => candidate.hash === commit)) return textResponse("Review commit is no longer available", { status: 404 });
   return { fingerprint, repository, commit, root: join(workspaceWorkHostPath(workspaceId), relativePath) };
-}
-
-function htmlResponse(html: string): Response {
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 }
 
 export async function deletionReviewCommitResponse(workspaceId: string, url: URL): Promise<Response> {
   const context = reviewRequest(workspaceId, url);
   if (context instanceof Response) return context;
   const { fingerprint, repository, commit, root } = context;
-  if (!commit) return new Response("Review commit is required", { status: 400 });
+  if (!commit) return textResponse("Review commit is required", { status: 400 });
   const files = await collectCommitReviewStats(root, commit);
   const frameId = commitFrameId(workspaceId, fingerprint, repository.relativePath, commit);
   const body = files.length ? fileList(workspaceId, fingerprint, repository.relativePath, files, commit) : '<p class="workspace-deletion-empty">This commit has no file changes.</p>';
-  return htmlResponse(`<turbo-frame id="${frameId}">${body}</turbo-frame>`);
+  return response(`<turbo-frame id="${frameId}">${body}</turbo-frame>`);
 }
 
 export async function deletionReviewFileResponse(workspaceId: string, url: URL): Promise<Response> {
@@ -141,11 +138,11 @@ export async function deletionReviewFileResponse(workspaceId: string, url: URL):
   if (context instanceof Response) return context;
   const { fingerprint, repository, commit, root } = context;
   const path = url.searchParams.get("path") ?? "";
-  if (!commit && !repository.uncommitted.some((file) => file.path === path)) return new Response("Review file is no longer available", { status: 404 });
+  if (!commit && !repository.uncommitted.some((file) => file.path === path)) return textResponse("Review file is no longer available", { status: 404 });
   const file = commit ? await collectCommitReviewFile(root, commit, path) : await collectReviewFile(root, path);
-  if (!file) return new Response("Review file is no longer available", { status: commit ? 404 : 409 });
+  if (!file) return textResponse("Review file is no longer available", { status: commit ? 404 : 409 });
   const frameId = fileFrameId(workspaceId, fingerprint, repository.relativePath, path, commit);
-  return htmlResponse(await renderReadOnlyReviewFile(frameId, file));
+  return response(await renderReadOnlyReviewFile(frameId, file));
 }
 
 export function clearDeletionReview(workspaceId: string): void {

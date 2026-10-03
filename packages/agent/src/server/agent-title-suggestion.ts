@@ -1,4 +1,5 @@
 import { createKeyedOperationQueue, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@agents-in-the-cloud/workspace";
 import { resolveNewWorkspaceAgentModel } from "./model-state.ts";
 import { cheapestAvailableProviderModel, createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/server";
@@ -173,7 +174,7 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
       }
       return true;
     } catch (error) {
-      logAgentTitleSuggestionError(agent, titleModelRef, error instanceof Error ? error.message : String(error), { error });
+      logAgentTitleSuggestionError(agent, titleModelRef, errorMessage(error), { error });
       return false;
     }
   };

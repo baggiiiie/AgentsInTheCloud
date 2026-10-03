@@ -1,4 +1,5 @@
 import { runDocker } from "@agents-in-the-cloud/core";
+import { errorMessage } from "@agents-in-the-cloud/shared";
 import { dockerImageStoreQueue } from "./image-store-queue.ts";
 
 export type WorkspaceImageKind = "default" | "repository";
@@ -21,6 +22,6 @@ export function pruneSupersededWorkspaceImages(kind: WorkspaceImageKind, buildSt
   void dockerImageStoreQueue.run({ label: `Pruning old ${kind} workspace images` }, () => runDocker(workspaceImagePruneArgs(kind, buildStartedAt))).then((result) => {
     if (result.exitCode !== 0) console.warn(`[workspace-image] background prune failed: ${result.stderr.trim()}`);
   }).catch((error) => {
-    console.warn(`[workspace-image] background prune failed: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(`[workspace-image] background prune failed: ${errorMessage(error)}`);
   });
 }
