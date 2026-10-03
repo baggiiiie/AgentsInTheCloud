@@ -295,7 +295,7 @@ function renderEmptyWorkPane(workspaceId: string, workCommands: NonNullable<Work
     const item = actionItemHtml({ kind: "single", label: { kind: "text", text: command.label }, leadingHtml: command.iconHtml ?? Icons.Plus, element: { tag: "button", attributesHtml: 'type="submit"' } });
     return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}">${item}</form>`;
   }).join("");
-  return `<div id="${workViewDomId(workspaceId, "empty")}" class="fixed-shell-empty-work empty-state"><div class="fixed-shell-empty-work-content"><p>You can add any of these:</p><div class="fixed-shell-empty-work-launchers action-list">${launchers}</div></div></div>`;
+  return `<div id="${workViewDomId(workspaceId, "empty")}" class="fixed-shell-empty-work empty-state"><div class="fixed-shell-empty-work-content"><div class="fixed-shell-empty-work-launchers action-list">${launchers}</div></div></div>`;
 }
 
 function renderWorkPane(presentation: WorkspacePresentation): string {
