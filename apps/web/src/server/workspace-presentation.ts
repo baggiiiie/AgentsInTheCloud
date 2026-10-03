@@ -8,6 +8,7 @@ import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { tabHtml, tabStripHtml } from "@agents-in-the-cloud/design-system/tab-strip";
 import { domId, escapeHtml, turboStream, workspaceWorkViewLabelDomId } from "@agents-in-the-cloud/shared";
+import { formatShortcutBinding } from "../shortcut-binding.ts";
 import { renderAgentPane, renderMobileAgentAttention, type AgentPaneContribution } from "./agent-pane.ts";
 import { renderPwaReminder } from "./pwa-reminder.ts";
 import type { WorkspaceDeletionState } from "./workspace-registry.ts";
@@ -76,7 +77,7 @@ export interface WorkspacePresentation {
   agentConversations: readonly AgentPaneContribution[];
   agentProviders: readonly { id: string; label: string; iconHtml: string }[];
   workViews: readonly WorkPaneContribution[];
-  commands?: readonly { id: string; label: string; description?: string; scope: string; iconHtml?: string; placement?: "work-launcher" | "agent-action"; binding?: string }[];
+  commands?: readonly { id: string; label: string; description?: string; scope: string; iconHtml?: string; placement?: "work-launcher" | "agent-action"; binding?: string; shortcutCommandId?: string }[];
   overlayHtml?: readonly string[];
   warningsHtml?: string;
   workPresentationIntent?: { key: string; revision: string };
@@ -290,9 +291,20 @@ function renderWorkLauncherCommand(command: NonNullable<WorkspacePresentation["c
   return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}"${actionAttribute}>${item}</form>`;
 }
 
-function renderEmptyWorkPane(workspaceId: string, workCommands: NonNullable<WorkspacePresentation["commands"]>): string {
-  const launchers = workCommands.map((command) => {
-    const item = actionItemHtml({ kind: "single", label: { kind: "text", text: command.label }, leadingHtml: command.iconHtml ?? Icons.Plus, element: { tag: "button", attributesHtml: 'type="submit"' } });
+function renderEmptyWorkPane(workspaceId: string, commands: NonNullable<WorkspacePresentation["commands"]>): string {
+  const launchers = commands.filter((command) => command.placement === "work-launcher").map((command) => {
+    const shortcutCommand = command.shortcutCommandId
+      ? commands.find((candidate) => candidate.id === command.shortcutCommandId)!
+      : command;
+    const item = actionItemHtml({
+      kind: "single",
+      label: { kind: "text", text: command.label },
+      leadingHtml: command.iconHtml ?? Icons.Plus,
+      trailingHtml: shortcutCommand.binding
+        ? `<span class="work-launcher-shortcut">${escapeHtml(formatShortcutBinding(shortcutCommand.binding))}</span>`
+        : undefined,
+      element: { tag: "button", attributesHtml: 'type="submit"' },
+    });
     return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}">${item}</form>`;
   }).join("");
   return `<div id="${workViewDomId(workspaceId, "empty")}" class="fixed-shell-empty-work empty-state"><div class="fixed-shell-empty-work-content"><div class="fixed-shell-empty-work-launchers action-list">${launchers}</div></div></div>`;
@@ -312,7 +324,7 @@ function renderWorkPane(presentation: WorkspacePresentation): string {
   return `<div class="fixed-shell-work-pane">${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="work" data-workspace-presentation-target="workPane" aria-label="Work"' },
     headerHtml: `${presentation.workViews.length ? "" : '<span class="panel__title">Views</span>'}${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
-    bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || renderEmptyWorkPane(presentation.workspace.id, workCommands)}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
+    bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || renderEmptyWorkPane(presentation.workspace.id, presentation.commands ?? [])}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
   })}</div>`;
 }
 

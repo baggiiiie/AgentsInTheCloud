@@ -3,6 +3,7 @@ import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml, isApplePlatform, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
+import { formatShortcutBinding } from "../shortcut-binding.ts";
 import { submitFormWithFirstButton } from "./form-submission.ts";
 import { clientHooks, type PaletteResult } from "./workspace-client-hooks.ts";
 import { registerWorkspaceControllers, residencyController, workspaceNavigationController } from "./workspace-controller-registry.ts";
@@ -31,7 +32,7 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
           id: `command:${command.id}`,
           title: command.label,
           subtitle: command.description,
-          badge: command.binding ? this.formatBinding(command.binding) : undefined,
+          badge: command.binding ? formatShortcutBinding(command.binding) : undefined,
           keywords: [command.id, command.scope, command.binding ?? ""],
           run: command.run,
         })),
@@ -295,7 +296,7 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
       const button = actionItemElement<HTMLButtonElement>({
         kind: "single",
         label: { kind: "text", text: command.label },
-        trailingHtml: `<kbd class="shortcut-overlay-binding">${escapeHtml(this.formatBinding(command.binding))}</kbd>`,
+        trailingHtml: `<kbd class="shortcut-overlay-binding">${escapeHtml(formatShortcutBinding(command.binding))}</kbd>`,
         element: { tag: "button",  attributesHtml: 'type="button"' },
       });
       button.addEventListener("click", () => {
@@ -308,27 +309,6 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
 
     document.body.append(overlay);
     this.shortcutOverlay = overlay;
-  }
-
-  private formatBinding(binding: string): string {
-    return binding.split("+").map((part) => {
-      switch (part) {
-        case "Meta": return "⌘";
-        case "Alt": return "⌥";
-        case "Control": return "⌃";
-        case "Shift": return "⇧";
-        case "Comma": return ",";
-        case "Period": return ".";
-        case "Slash": return "/";
-        case "Quote": return "'";
-        case "Semicolon": return ";";
-        case "Backslash": return "\\";
-        case "Backspace": return "⌫";
-        case "BracketLeft": return "[";
-        case "BracketRight": return "]";
-        default: return part.replace(/^Key/, "");
-      }
-    }).join("");
   }
 
   private matchesBinding(event: KeyboardEvent, binding: string): boolean {

@@ -128,6 +128,8 @@ export interface WorkspaceModuleWorkViewAdapter<Reference extends WorkspaceWorkV
 
 export interface WorkspaceCommandUiSurface {
   iconHtml?: string;
+  /** Related command whose shortcut opens this view (when launching and opening differ). */
+  shortcutCommandId?: string;
   /** Where the server-rendered web UI should place this command. */
   placement: "work-launcher" | "agent-action";
   label?: string;

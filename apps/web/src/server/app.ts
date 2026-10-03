@@ -436,6 +436,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       ...agentProviders.map((provider) => ({ id: `agent.create.${provider.id}`, label: `New ${provider.label} agent`, scope: "workspace" as const })),
     ];
     const commands = commandContributions.map((command) => ({
+      shortcutCommandId: command.surfaces?.ui?.shortcutCommandId,
       id: command.id, label: command.surfaces?.ui?.label ?? command.label, description: command.description, scope: command.scope, placement: command.surfaces?.ui?.placement, iconHtml: command.surfaces?.ui?.iconHtml, binding: command.surfaces?.shortcut?.defaultBinding,
     }));
     const warningState = await workspaceWarningState(entry);
