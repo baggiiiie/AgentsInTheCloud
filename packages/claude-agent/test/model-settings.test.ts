@@ -1,27 +1,34 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
-// Isolate catalogue mocks from the real provider registry used by the web tests.
+// Isolate catalogue mocks and saved preferences from the real provider registry.
 async function scenario(script: string) {
-  const child = Bun.spawn([process.execPath, "-e", `
-    import { expect, mock } from "bun:test";
-    const llm = await import("@agents-in-the-cloud/llm/server");
-    const favorites = [
-      { provider: "openai-codex", id: "codex", label: "Codex" },
-      { provider: "anthropic", id: "first", label: "First" },
-      { provider: "anthropic", id: "second", label: "Second" },
-      { provider: "anthropic", id: "unavailable", label: "Unavailable" },
-    ];
-    mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
-      getConfiguredModels: async () => favorites,
-      createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
-      modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high", "xhigh"],
-    }));
-    const { claudeModelSettings: { prepare } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
-    ${script}
-  `], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
-  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-  expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+  const directory = await mkdtemp(join(tmpdir(), "claude-model-settings-"));
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `
+      import { expect, mock } from "bun:test";
+      const llm = await import("@agents-in-the-cloud/llm/server");
+      const favorites = [
+        { provider: "openai-codex", id: "codex", label: "Codex" },
+        { provider: "anthropic", id: "first", label: "First" },
+        { provider: "anthropic", id: "second", label: "Second" },
+        { provider: "anthropic", id: "unavailable", label: "Unavailable" },
+      ];
+      mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
+        getConfiguredModels: async () => favorites,
+        createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
+        modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high", "xhigh"],
+      }));
+      const { claudeModelSettings: { prepare } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
+      ${script}
+    `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 test("defaults to the first available Claude favorite, never another provider", () => scenario(`

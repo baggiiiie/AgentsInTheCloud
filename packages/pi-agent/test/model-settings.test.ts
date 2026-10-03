@@ -1,39 +1,47 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
+// Isolate catalogue mocks and saved preferences from the real provider registry.
 async function scenario(script: string) {
-  const child = Bun.spawn([process.execPath, "-e", `
-    import { expect, mock } from "bun:test";
-    const llm = await import("@agents-in-the-cloud/llm/server");
-    let runtimeCreations = 0;
-    let runtime;
-    let availabilityChecks = 0;
-    let favorites = [
-      { provider: "anthropic", id: "claude", label: "Claude" },
-      { provider: "openai-codex", id: "gpt", label: "GPT" },
-      { provider: "custom", id: "model", label: "Custom" },
-      { provider: "custom", id: "unavailable", label: "Unavailable" },
-      { provider: "amazon-bedrock", id: "ambient", label: "AWS profile" },
-    ];
-    mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
-      getConfiguredModels: async () => favorites,
-      createPiModelRuntime: async () => {
-        runtimeCreations++;
-        return runtime = { getAvailable: async () => favorites.filter(m => m.id !== "unavailable"), checkAuth: async () => true, getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
-      },
-      hasConnectedModelProvider: () => true,
-      modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high"],
-    }));
-    mock.module(${JSON.stringify(join(import.meta.dir, "../src/server/pi-cli-bridge.ts"))}, () => ({ piCliModelUnavailableReason: async (actualRuntime, model) => {
-      expect(actualRuntime).toBe(runtime);
-      availabilityChecks++;
-      return model.id === "ambient" ? "Requires a bearer token" : undefined;
-    } }));
-    const { piModelSettings: { prepare: preparePiModelSettings } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/model-settings.ts"))});
-    ${script}
-  `], { cwd: join(import.meta.dir, ".."), stdout: "pipe", stderr: "pipe" });
-  const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
-  expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+  const directory = await mkdtemp(join(tmpdir(), "pi-model-settings-"));
+  try {
+    const child = Bun.spawn([process.execPath, "-e", `
+      import { expect, mock } from "bun:test";
+      const llm = await import("@agents-in-the-cloud/llm/server");
+      let runtimeCreations = 0;
+      let runtime;
+      let availabilityChecks = 0;
+      let favorites = [
+        { provider: "anthropic", id: "claude", label: "Claude" },
+        { provider: "openai-codex", id: "gpt", label: "GPT" },
+        { provider: "custom", id: "model", label: "Custom" },
+        { provider: "custom", id: "unavailable", label: "Unavailable" },
+        { provider: "amazon-bedrock", id: "ambient", label: "AWS profile" },
+      ];
+      mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
+        getConfiguredModels: async () => favorites,
+        createPiModelRuntime: async () => {
+          runtimeCreations++;
+          return runtime = { getAvailable: async () => favorites.filter(m => m.id !== "unavailable"), checkAuth: async () => true, getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
+        },
+        hasConnectedModelProvider: () => true,
+        modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high"],
+      }));
+      mock.module(${JSON.stringify(join(import.meta.dir, "../src/server/pi-cli-bridge.ts"))}, () => ({ piCliModelUnavailableReason: async (actualRuntime, model) => {
+        expect(actualRuntime).toBe(runtime);
+        availabilityChecks++;
+        return model.id === "ambient" ? "Requires a bearer token" : undefined;
+      } }));
+      const { piModelSettings: { prepare: preparePiModelSettings } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/model-settings.ts"))});
+      ${script}
+    `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
+    expect({ code, stdout, stderr }).toEqual({ code: 0, stdout: "", stderr: "" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 }
 
 test("uses AgentsInTheCloud favorites across providers, including custom providers", () => scenario(`

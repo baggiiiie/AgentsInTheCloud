@@ -7,5 +7,6 @@ exact = true
 frozenLockfile = true
 
 [test]
-# Lint alongside every test run, including single files and directories.
-preload = ["./scripts/test-lint-preload.ts"]
+# Lint alongside every test run, including single files and directories, and keep
+# tests out of the real host data directory.
+preload = ["./scripts/test-lint-preload.ts", "./scripts/test-data-dir-preload.ts"]
