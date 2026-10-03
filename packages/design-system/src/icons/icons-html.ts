@@ -2,8 +2,11 @@ function iconHtml(paths: string): string {
   return `<svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
 }
 
-/** Product mark for dialogs and agent controls. Accessible names belong on the containing UI. */
+/** Product mark for app branding. Accessible names belong on the containing UI. */
 export const agentsInTheCloudBrandIconHtml = '<img class="agents-in-the-cloud-brand-icon" src="/agents-in-the-cloud-brand.png" width="24" height="24" alt="" aria-hidden="true">';
+
+/** The social-card A robot identifies Builtin agents, distinct from app branding. */
+export const builtinAgentIconHtml = '<img class="builtin-agent-icon" src="/builtin-agent.png" width="24" height="24" alt="" aria-hidden="true">';
 
 /** Canonical decorative icons. Accessible names belong on the control or content that contains them. */
 export const Icons = {

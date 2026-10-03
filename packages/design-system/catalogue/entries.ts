@@ -19,7 +19,7 @@ import { toggleHtml } from "../src/toggle/toggle-html.ts";
 import { autocompleteHtml } from "../src/autocomplete/autocomplete-html.ts";
 import { transientFeedbackHtml } from "../src/transient-feedback/transient-feedback-html.ts";
 import { warningBannerHtml } from "../src/warning-banner/warning-banner-html.ts";
-import { agentsInTheCloudBrandIconHtml, Icons } from "../src/icons/icons-html.ts";
+import { agentsInTheCloudBrandIconHtml, builtinAgentIconHtml, Icons } from "../src/icons/icons-html.ts";
 
 export interface CatalogueEntry {
   id: string;
@@ -1078,12 +1078,16 @@ export const entries: CatalogueEntry[] = [
     title: "Icons",
     when: "Shared decorative vocabulary. Use icon-only Button for standalone icon actions.",
     contract:
-      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for dialogs and agent controls. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
+      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for app branding. builtinAgentIconHtml is the transparent A robot from the social card, used for Builtin agent tabs and launchers. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
     imports: { icons: "Icons" },
     examples: [
       {
         title: "Product brand mark",
         render: () => `<span class="catalogue-icon">${agentsInTheCloudBrandIconHtml}<span>AgentsInTheCloud</span></span>`,
+      },
+      {
+        title: "Builtin agent mark",
+        render: () => `<span class="catalogue-icon">${builtinAgentIconHtml}<span>Builtin</span></span>`,
       },
       {
         title: "Icon vocabulary",

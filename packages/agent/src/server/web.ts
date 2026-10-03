@@ -1,5 +1,5 @@
 import { AgentsInTheCloudCoreError, createKeyedOperationQueue, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import { agentsInTheCloudBrandIconHtml } from "@agents-in-the-cloud/design-system/icons";
+import { builtinAgentIconHtml } from "@agents-in-the-cloud/design-system/icons";
 import type { WorkspaceAgentTabProvider, WorkspaceCommandContribution, WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
 import type { WorkspaceDockerMount, WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
@@ -181,7 +181,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     },
   }],
   agentProvider: {
-    id: "builtin", label: "Builtin", iconHtml: agentsInTheCloudBrandIconHtml,
+    id: "builtin", label: "Builtin", iconHtml: builtinAgentIconHtml,
     tabs: workspaceAgentTabProvider,
     create: createBuiltinAgent,
     launch: nativeAgentLaunch,
