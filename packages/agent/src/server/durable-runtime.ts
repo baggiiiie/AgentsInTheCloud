@@ -409,6 +409,17 @@ export async function openDurableAgentRuntime(
           await configure({ model });
         });
       },
+      /** Cancel one live tool and its owned work, without withdrawing the turn or queued input. */
+      abortTool(callId: string) {
+        return command(async () => {
+          const live = await harness.snapshot(LiveDoc, conversation.id, context);
+          const slot = live?.tools?.find(tool => tool.callId === callId);
+          if (!slot?.taskId || slot.status === "done") return false;
+          await readyForExecution();
+          await harness.abortTask(slot.taskId, context);
+          return true;
+        });
+      },
       /** Explicit Stop withdraws queued input and cancels owned work. */
       stop() {
         return command(async () => {

@@ -1,5 +1,7 @@
 import { agentDelegation } from "./delegation.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
+import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { isJsonObject, type JsonObject } from "@agents-in-the-cloud/core";
 import { Type, type Static, type TSchema } from "typebox";
@@ -9,7 +11,7 @@ import { diffStats, type DiffOperation } from "./diff.ts";
 import { embeddedBashCommand, formatBashCommandForDisplay, highlightedBashCommandHtml } from "./embedded-code.ts";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { isBashTool, formatDuration, type ToolView } from "./transcript.ts";
-import { ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
+import { agentPath, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptActionItemHtml } from "./render-markup.ts";
 
 type ToolArgumentKey = "command" | "path" | "file_path" | "content" | "offset" | "limit" | "timeout" | "edits" | "oldText" | "newText";
@@ -33,8 +35,8 @@ function summaryHtml(parts: Array<string | undefined>): string {
 function bashSummary(tool: ToolView): string {
   const details = tool.details;
   const timeout = numberArg(toolArgs(tool), "timeout") ?? 600;
-  if (tool.status === "running") return "";
-  const duration = tool.durationMs === undefined ? "" : `${formatDuration(tool.durationMs)} / ${formatDuration(timeout * 1000)}`;
+  const elapsed = tool.status === "running" && tool.issuedAt !== undefined ? Date.now() - tool.issuedAt : tool.durationMs;
+  const duration = elapsed === undefined ? "" : `${formatDuration(elapsed)} / ${formatDuration(timeout * 1000)}`;
   const outcome = details?.timedOut === true ? "timed out" : details?.aborted === true ? "aborted" : details?.exitCode !== undefined && details.exitCode !== 0 ? `exitcode ${details.exitCode}` : "";
   return summaryHtml([duration, outcome]);
 }
@@ -81,10 +83,23 @@ function lazyTranscriptItemFrame(ctx: AgentRenderContext, key: string): string {
 }
 
 export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolView, options: { open?: boolean; live?: boolean } = {}): string {
-  const label = { kind: "text" as const, text: toolSummaryText(tool) };
+  const liveDuration = isBashTool(tool.name) && tool.status === "running" && tool.issuedAt !== undefined && !ctx.readOnly;
+  const timeout = numberArg(toolArgs(tool), "timeout") ?? 600;
+  const label = {
+    kind: "text" as const,
+    text: toolSummaryText(tool),
+    attributesHtml: liveDuration ? `data-controller="agent-elapsed" data-agent-elapsed-since-value="${tool.issuedAt}" data-agent-elapsed-prefix-value="${escapeHtml(tool.name)} · " data-agent-elapsed-suffix-value=" / ${formatDuration(timeout * 1000)}" data-agent-elapsed-format-value="duration"` : undefined,
+    textAttributesHtml: liveDuration ? 'data-agent-elapsed-target="time"' : undefined,
+  };
   const labelOptions = {
     leadingHtml: `<span id="${ids.itemSummaryStatus(ctx, key)}" class="agent-tool-status">${statusHtml(tool.status, ctx.readOnly)}</span>`,
     labelId: ids.itemSummaryContent(ctx, key),
+    trailingHtml: tool.canAbort && !ctx.readOnly ? `<form method="post" action="${escapeHtml(agentPath(ctx, `/tools/${encodeURIComponent(tool.callId)}/abort`))}">${destructiveConfirmationHtml({
+      id: domId(ids.item(ctx, key), "abort"),
+      trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Stop, label: "Stop this tool only; the agent will continue" } },
+      confirmCaption: "Stop tool only",
+      cancelCaption: "Keep running",
+    })}</form>` : undefined,
   };
   const active = tool.status === "streaming" || tool.status === "running";
   if (!toolPresentation(tool).showsDetail) {

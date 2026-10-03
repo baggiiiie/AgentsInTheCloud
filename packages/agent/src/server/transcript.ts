@@ -80,6 +80,7 @@ export interface ToolView {
   resultText?: string;
   resultImages?: SessionImageRef[];
   tmuxSession?: string;
+  canAbort?: boolean;
   durationMs?: number;
   details?: ToolViewDetails;
   /** Timestamp of the assistant entry that issued this call. */

@@ -205,3 +205,24 @@ runpy.run_path(script, run_name="__main__")
 `, join(import.meta.dir, "../../workspace_tools/agents-in-the-cloud-agent-bash"), f.root, JSON.stringify(input)]);
   expect(JSON.parse(output)).toEqual({ status: "done", aborted: true });
 });
+
+test("aborting a bash tool cancels its command group but lets the agent finish the turn", async () => {
+  const f = await fixture();
+  const launched = Promise.withResolvers<void>();
+  let input!: BashOperationRequest;
+  const operations: BashOperations = async (...args) => {
+    const receipt = await f.operations(...args);
+    if (args[0] === "ensure") { input = args[1]; launched.resolve(); }
+    return receipt;
+  };
+  const h = await harness(f, operations, `sleep 3; touch ${shellQuote(join(f.path, "after-abort"))}`);
+  const submission = await h.conversation.submit({ type: "input", content: "Run", requestId: "abort-tool" }, context);
+  await launched.promise;
+  const inspection = await h.workspace.harness.inspect(context);
+  const tool = inspection.tasks.find(({ record }) => record.kind === "pi.tool")!;
+  await h.workspace.harness.abortTask(tool.record.id, context);
+  expect((await submission.wait(context)).status).toBe("done");
+  expect(await finish(f.operations, input)).toMatchObject({ status: "done", aborted: true });
+  await Bun.sleep(3100);
+  expect(await Bun.file(join(f.path, "after-abort")).exists()).toBe(false);
+});

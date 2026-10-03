@@ -31,6 +31,13 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     if (treeResponse && request.method === "POST") await invalidateAgentView(options, workspaceId, conversationId);
     return treeResponse;
   }
+  if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tools\/([^/]+)\/abort$/)) && request.method === "POST") {
+    const [workspaceId, conversationId, callId] = params;
+    const controller = await requireAgentController(workspaceId, conversationId, options);
+    const aborted = await controller.abortTool(callId);
+    await invalidateAgentView(options, workspaceId, conversationId);
+    return requestAcceptsJson(request) ? Response.json({ tool: { callId, aborted } }) : turboStreamResponse("");
+  }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
     const agent = await resolveAgentConversation(params[0], params[1]);
     await stopDurableWorkspaceAgentConversation(agent, options);

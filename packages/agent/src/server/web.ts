@@ -168,6 +168,11 @@ export const agentWorkspaceModule: WorkspaceModule = {
       },
     },
     ...usageOpenApiPaths,
+    "/workspaces/{id}/agents/{conversationId}/tools/{callId}/abort": { post: {
+      summary: "Abort one live tool call and its owned work without stopping the agent turn",
+      parameters: ["id", "conversationId", "callId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),
+      responses: { "200": { description: "Cancellation requested; aborted is false if the call is no longer active. HTML clients receive a Turbo Stream.", content: { "application/json": { schema: { type: "object", properties: { tool: { type: "object", required: ["callId", "aborted"], properties: { callId: { type: "string" }, aborted: { type: "boolean" } } } } } } } } },
+    } },
     "/workspaces/{id}/agents/{conversationId}/reveal/{target}": { get: {
       summary: "Resolve the enclosing turn for a transcript navigation target",
       parameters: ["id", "conversationId", "target"].map((name) => ({ name, in: "path", required: true, schema: { type: "string" } })),

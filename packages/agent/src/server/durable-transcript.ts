@@ -3,7 +3,7 @@ import { applyTranscriptContributions } from "./transcript-contributions.ts";
 import { durableTimingEntry, DurableTurnTiming } from "./durable-timing.ts";
 import { historyNote } from "@agents-in-the-cloud/legacy-converter/entries";
 import { contentText, type Message } from "@earendil-works/pi-ai";
-import { AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
+import { AgentDoc, CompactionEntry, InboxDoc, LiveDoc, ResetEntry, ToolResultEntry, UsageDoc, type AgentState, type ConversationView, type InboxState, type LiveState, type UsageState } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { isJsonObject } from "@agents-in-the-cloud/core";
@@ -58,7 +58,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
   let turn: string | undefined;
   let pendingBoundary = true;
 
-  function appendMessage(message: Message, key: string, imageEntryId: string, offset: number, partial = false) {
+  function appendMessage(message: Message, key: string, imageEntryId: string, offset: number, partial = false, aborted = false) {
     if (message.role === "system") return;
     if (message.role === "user") {
       const startsTurn = pendingBoundary || !turn;
@@ -82,8 +82,9 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       }
     } else {
       completedTools.add(message.toolCallId);
-      records.push({ kind: "toolResult", callId: message.toolCallId, text: contentText(message.content), images: images(message.content, imageEntryId, offset), timestamp: message.timestamp, isError: message.isError,
-        details: isToolViewDetails(message.details) ? message.details : undefined });
+      let details = isToolViewDetails(message.details) ? message.details : undefined;
+      if (aborted) details = isJsonObject(details) ? { ...details, aborted: true } : { aborted: true };
+      records.push({ kind: "toolResult", callId: message.toolCallId, text: contentText(message.content), images: images(message.content, imageEntryId, offset), timestamp: message.timestamp, isError: message.isError, details });
     }
   }
 
@@ -115,7 +116,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
     }
     let offset = 0;
     for (const [index, message] of (entry.model ?? []).entries()) {
-      appendMessage(message, index === 0 ? String(entry.id) : `${entry.id}:message:${index}`, String(entry.id), offset);
+      appendMessage(message, index === 0 ? String(entry.id) : `${entry.id}:message:${index}`, String(entry.id), offset, false, ToolResultEntry.is(entry) && entry.data.diagnostics.some(diagnostic => diagnostic.code === "aborted"));
       offset += Array.isArray(message.content) ? message.content.length : 1;
     }
   }
@@ -139,6 +140,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       return;
     }
     tool.status = "running";
+    tool.canAbort = slot.taskId !== undefined;
     tool.resultText = slot.output;
     let details = slot.details;
     // SDK capability updates are snapshots { content, details }; native bash

@@ -977,3 +977,47 @@ test("unknown model selection rejects with invalid_arguments and leaves settings
   await agent.configure({ model: { provider: "faux", modelId: "large" } });
   expect((await agent.settings()).model?.modelId).toBe("large");
 });
+
+test("aborting one tool preserves the turn and other tool calls", async () => {
+  const { runtime, faux, registry } = await setup();
+  const started = Promise.withResolvers<void>();
+  const survivor = Promise.withResolvers<void>();
+  let running = 0;
+  let cancelled = false;
+  registry.install(defineExtension({ name: "tool-cancellation", tools: [defineTool({
+    name: "block", description: "Wait", parameters: Type.Object({ stop: Type.Boolean() }),
+    async execute(args, _api, invocation) {
+      if (++running === 2) started.resolve();
+      if (!args.stop) {
+        await survivor.promise;
+        return { content: [{ type: "text", text: "Other tool completed" }] };
+      }
+      return new Promise<never>((_resolve, reject) => {
+        invocation.abortSignal!.addEventListener("abort", () => {
+          cancelled = true;
+          reject(invocation.abortSignal!.reason);
+        }, { once: true });
+      });
+    },
+  })] }));
+  const stopping = fauxToolCall("block", { stop: true });
+  const continuing = fauxToolCall("block", { stop: false });
+  faux.setResponses([
+    fauxAssistantMessage([stopping, continuing], { stopReason: "toolUse" }),
+    request => {
+      expect(JSON.stringify(request)).toContain("was aborted");
+      expect(JSON.stringify(request)).toContain("Other tool completed");
+      return fauxAssistantMessage("Continued after stopping just one tool");
+    },
+  ]);
+  const agent = await runtime.conversation(record);
+  const submission = await agent.submit({ requestId: "abort-one", text: "Begin" });
+  await started.promise;
+  expect(await agent.abortTool("unknown-call")).toBe(false);
+  expect(await agent.abortTool(stopping.id)).toBe(true);
+  expect(cancelled).toBe(true);
+  survivor.resolve();
+  expect((await submission.wait(context)).status).toBe("done");
+  expect(faux.state.callCount).toBe(2);
+  expect(await agent.abortTool(stopping.id)).toBe(false);
+});
