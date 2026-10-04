@@ -32,7 +32,7 @@ export function cliTranscriptAttributes(adapter: CliAgentAdapter, conversationId
 function cliTranscriptChannelName(adapter: CliAgentAdapter): string { return `${adapter.id}-transcript`; }
 
 /** Publishes whether the transcript is available whenever the CLI starts or finishes a turn, with the transcript itself for panes showing it. */
-export function cliTranscriptChannel(adapter: CliAgentAdapter, sessions: CliSessions): CableChannelAdapter {
+export function cliTranscriptChannel(adapter: CliAgentAdapter, sessions: Pick<CliSessions, "ready">): CableChannelAdapter {
   // Agent keys name conversations, which are unique across workspaces.
   const busy = new Set<string>();
   const watchers = new Set<{ agentKey: string; changed(): void }>();
@@ -57,7 +57,14 @@ export function cliTranscriptChannel(adapter: CliAgentAdapter, sessions: CliSess
       const publish = async () => listener(await render(workspaceId, conversationId, transcript !== undefined));
       // Turn boundaries can arrive while the transcript loads; publish each in order.
       let latest = publish();
-      const watcher = { agentKey: agentConversationKey(conversationId), changed() { latest = latest.then(publish); } };
+      const watcher = {
+        agentKey: agentConversationKey(conversationId),
+        changed() {
+          latest = latest.then(publish).catch((error) => {
+            console.error(`Could not publish ${adapter.label} transcript for ${conversationId}`, error);
+          });
+        },
+      };
       watchers.add(watcher);
       try { await latest; } catch (error) { watchers.delete(watcher); throw error; }
       return { unsubscribe: () => { watchers.delete(watcher); } };
