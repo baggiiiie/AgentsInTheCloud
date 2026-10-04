@@ -11,17 +11,18 @@ export function agentsInTheCloudFileHref(workspaceId: string, rawHref: string, s
   try {
     url = new URL(rawHref);
   } catch {
-    if (!sourcePath || rawHref.startsWith("#") || rawHref.startsWith("?") || rawHref.startsWith("//")) return undefined;
+    if (rawHref.startsWith("#") || rawHref.startsWith("?") || rawHref.startsWith("//")) return undefined;
     let relativePath: string;
     try {
       relativePath = decodeURIComponent(rawHref.split(/[?#]/, 1)[0]!);
     } catch {
       return undefined;
     }
-    if (!relativePath) return undefined;
-    return workspaceFileOpenUrl(workspaceId, posix.resolve(posix.dirname(sourcePath), relativePath));
+    if (!relativePath || relativePath.includes("\0")) return undefined;
+    return workspaceFileOpenUrl(workspaceId, posix.resolve(sourcePath ? posix.dirname(sourcePath) : "/work", relativePath));
   }
-  if (url.protocol !== "agents-in-the-cloud:" || url.hostname !== "file") return undefined;
+  const isFileUrl = url.protocol === "file:" && (url.hostname === "" || url.hostname === "localhost");
+  if (!isFileUrl && (url.protocol !== "agents-in-the-cloud:" || url.hostname !== "file")) return undefined;
 
   let path: string;
   try {
@@ -29,6 +30,7 @@ export function agentsInTheCloudFileHref(workspaceId: string, rawHref: string, s
   } catch {
     return undefined;
   }
+  if (!path || path.includes("\0")) return undefined;
   const position: AgentsInTheCloudFilePosition = {};
   for (const name of ["line", "column"] as const) {
     const value = url.searchParams.get(name);

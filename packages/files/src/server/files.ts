@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import { isImageFile } from "../image-file.ts";
 import { maxEditableFileBytes } from "./editable-file.ts";
 import { execWorkspaceCommand, execWorkspaceCommandBuffer, workspaceRoot } from "@agents-in-the-cloud/workspace";
 
@@ -50,7 +51,7 @@ function parseFindOutput(stdout: Buffer, directory: string): RawFileEntry[] {
 }
 
 async function openablePaths(workspaceId: string, entries: Array<{ path: string; kind: FileEntry["kind"]; size: number }>): Promise<Set<string>> {
-  const paths = entries.filter((entry) => entry.kind === "file" && entry.size <= maxEditableFileBytes).map((entry) => entry.path);
+  const paths = entries.filter((entry) => entry.kind === "file" && !isImageFile(entry.path) && entry.size <= maxEditableFileBytes).map((entry) => entry.path);
   if (paths.length === 0) return new Set();
   const script = `for path do
   encoding=$(file -b --mime-encoding -- "$path")
@@ -63,7 +64,7 @@ done`;
 
 function fileEntries(rawEntries: RawFileEntry[], openable: Set<string>): FileEntry[] {
   return rawEntries
-    .map((entry) => ({ ...entry, openable: openable.has(entry.path) }))
+    .map((entry) => ({ ...entry, openable: openable.has(entry.path) || (entry.kind === "file" && isImageFile(entry.path)) }))
     .sort((left, right) => Number(right.kind === "directory") - Number(left.kind === "directory") || left.name.localeCompare(right.name));
 }
 

@@ -22,6 +22,11 @@ const markdown = new MarkdownIt({
   linkify: true,
   typographer: false,
 });
+const defaultValidateLink = markdown.validateLink.bind(markdown);
+markdown.validateLink = (url) => /^file:\/\//i.test(url)
+  ? agentsInTheCloudFileHref("", url) !== undefined
+  : defaultValidateLink(url);
+
 // Only explicit http(s) URLs: fuzzy matching would link file names like README.md.
 markdown.linkify.set({ fuzzyLink: false, fuzzyEmail: false, fuzzyIP: false });
 markdown.linkify.add("ftp:", null).add("//", null).add("mailto:", null);

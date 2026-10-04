@@ -10,6 +10,7 @@ import { domId, escapeHtml, formatBytes, workspaceFileOpenUrl, workspaceProxyUrl
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { posix } from "node:path";
 import type { FileEntry } from "./files.ts";
+import { isImageFile } from "../image-file.ts";
 import { defaultFilesViewId, filesDiskGeneration, filesNavigationRequest, type FilesView } from "./state.ts";
 
 function filesTreeFrameId(workspaceId: string, viewId: string): string {
@@ -56,7 +57,7 @@ function directoryToggleUrl(workspaceId: string, viewId: string, path: string, e
   return `/workspaces/${encodeURIComponent(workspaceId)}/files?${query}`;
 }
 
-function selectedFileActions(workspaceId: string, view: FilesView): string {
+function selectedFileActions(workspaceId: string, view: FilesView, image = false): string {
   const path = view.path!;
   const name = posix.basename(path);
   const contentUrl = workspaceProxyUrl(workspaceId, "file", path);
@@ -89,7 +90,7 @@ function selectedFileActions(workspaceId: string, view: FilesView): string {
     orientation: "horizontal",
     semantics: "group",
     label: "Actions for selected file",
-    itemsHtml: `${copyButton}${downloadButton}${deleteForm}`,
+    itemsHtml: `${image ? "" : copyButton}${downloadButton}${deleteForm}`,
   });
 }
 
@@ -219,6 +220,15 @@ function markdownDisplayToggle(): string {
 export function renderFilesEditorFrame(workspaceId: string, view: FilesView): string {
   const frameId = filesEditorFrameId(workspaceId, view.id);
   if (!view.path) return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane files-editor-empty"><header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path">Choose a file</span>${filesPaneToggle("expand")}</header><p>Select a file to view or edit. Drop files into the Files pane to upload, or create them in Terminal and choose Refresh.</p></section></turbo-frame>`;
+  if (isImageFile(view.path)) {
+    const name = posix.basename(view.path);
+    const imageUrl = workspaceProxyUrl(workspaceId, "file", view.path);
+    const fullscreenButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="agents-in-the-cloud-fullscreen#open"' });
+    return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(name)}">
+      <header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path" title="${escapeHtml(view.path)}">${escapeHtml(view.path)}</span><span class="file-editor-toolbar-actions">${fullscreenButton}${selectedFileActions(workspaceId, view, true)}${filesPaneToggle("expand")}</span></header>
+      <div class="file-image-preview"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" decoding="async" loading="lazy"></div>
+    </section></turbo-frame>`;
+  }
   const contentUrl = `/workspaces/${encodeURIComponent(workspaceId)}/files-view/content?${new URLSearchParams({ path: view.path })}`;
   const markdown = /\.(?:md|markdown)$/i.test(view.path);
   const editorId = `${frameId}_${Bun.hash(view.path).toString(16)}`;

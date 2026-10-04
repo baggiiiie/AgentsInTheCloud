@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { shellQuote } from "@agents-in-the-cloud/core";
-import { claudeLaunchScript } from "../src/server/launch-command.ts";
+import { claudeFileLinkInstructions, claudeLaunchScript } from "../src/server/launch-command.ts";
 import { claudeMcpConfigPath } from "../src/server/mcp.ts";
 
 let home: string;
@@ -21,7 +21,7 @@ function run(script: string) {
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: "custom:agents-in-the-cloud" })];
+const baseArgs = ["--dangerously-skip-permissions", "--settings", JSON.stringify({ skipDangerousModePermissionPrompt: true, theme: "custom:agents-in-the-cloud" }), "--append-system-prompt", claudeFileLinkInstructions];
 
 test("reuses home Claude and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.claude/local/node_modules/.bin/claude`, 'printf "%s\\0" "$@"');

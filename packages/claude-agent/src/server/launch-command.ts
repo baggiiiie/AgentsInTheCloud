@@ -7,6 +7,8 @@ import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { readThemeSetting } from "@agents-in-the-cloud/shared/theme";
 import { claudeAgentsInTheCloudTheme, claudeThemeName } from "./theme.ts";
 
+export const claudeFileLinkInstructions = "When referring to a file you created or want the user to open, emit a Markdown link with its absolute workspace path, for example [image](/work/output.png). Use links rather than bare or code-formatted paths so the user can tap them in the AgentsInTheCloud transcript. Image links open an image viewer even though the CLI cannot display images.";
+
 function turnBoundaryHooks(turnSignalCommand: string) {
   const hook = (boundary: TurnBoundary) => [{ hooks: [{ type: "command", command: turnSignalShell(turnSignalCommand, boundary) }] }];
   return { UserPromptSubmit: hook("started"), Stop: hook("finished") };
@@ -23,7 +25,7 @@ export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: strin
   };
   // Added to whatever MCP servers the user configured; Claude merges both sets.
   const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session)] : [];
-  const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), ...mcpArgs,
+  const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), "--append-system-prompt", claudeFileLinkInstructions, ...mcpArgs,
     ...(session ? [resume ? "--resume" : "--session-id", session.id] : []),
     ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["--effort", settings.thinkingLevel] : []), ...(prompt ? ["--", prompt] : [])];
