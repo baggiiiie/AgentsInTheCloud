@@ -362,6 +362,10 @@ button { border: 0; background: none; cursor: pointer; }
 .settings-sec h2 { margin: 0 24px 0 0; font-size: var(--text-body); font-weight: var(--weight-bold); letter-spacing: normal; }
 .settings-sec-theme > h2, .update-settings-control > h2 { font-weight: 400; }
 .settings-sec > .instance-url { margin-top: 8px; }
+.settings-choice-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.settings-choice-row > h2 { flex: 1; margin-right: 0; }
+.settings-choice-row > .button-toggle { margin-left: auto; }
+.settings-choice-row + p { margin-top: 8px; }
 .settings-sec-inline { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .settings-development-action { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 0; }
 .settings-development-action + .settings-development-action { border-top: 1px solid var(--line); }

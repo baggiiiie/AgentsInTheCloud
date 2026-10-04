@@ -16,7 +16,7 @@ const docker = (...args: string[]) => exec("docker", ...args);
 async function api(
   path: string,
   method = "GET",
-  data?: { image: string },
+  data?: { image: string } | { mode: "localhost" | "tailscale" },
   port = 3001,
 ): Promise<any> {
   const code = `const r=await fetch(${JSON.stringify(`http://127.0.0.1:${port}${path}`)},{method:${JSON.stringify(method)},headers:{"content-type":"application/json"},body:${data === undefined ? "undefined" : JSON.stringify(JSON.stringify(data))}});console.log(JSON.stringify({status:r.status,body:await r.text()}));`;
@@ -174,3 +174,19 @@ console.log(
     marker: original.marker,
   }),
 );
+
+// Local mode must not start the Tailscale daemon, including after a System restart.
+if ((await api("/access")).mode === "localhost") {
+  const tailscaleRunning = async () => (await exec("sh", "-c", "if pgrep -x tailscaled > /dev/null; then echo running; else echo stopped; fi")) === "running";
+  assert.equal(await tailscaleRunning(), false, "local startup must leave Tailscale stopped");
+  await api("/access", "POST", { mode: "tailscale" });
+  assert.equal((await api("/access")).mode, "tailscale", "Tailscale choice must be saved before sign-in");
+  await until(tailscaleRunning, "Tailscale starts on request");
+  await api("/access", "POST", { mode: "localhost" });
+  await until(async () => !await tailscaleRunning(), "Tailscale stops in computer-only mode");
+  const access = await api("/access");
+  assert.equal(access.connectionState, "Stopped");
+  assert.equal(access.authUrl, undefined);
+  assert.equal((await status()).healthy, true, "switching connection mode must not restart the app");
+  console.log("PASS: local mode leaves Tailscale stopped; explicit selection starts it; computer-only mode stops it without restarting the app");
+}

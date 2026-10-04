@@ -14,3 +14,10 @@ test("one output callback supplies the raw stream for progress and logging", asy
   expect(await command(["printf", "first\nsecond\n"], chunk => { output += chunk; })).toBe("first\nsecond");
   expect(output).toBe("first\nsecond\n");
 });
+
+test("cancelling an operation terminates its process", async () => {
+  const controller = new AbortController();
+  const operation = command(["sleep", "10"], undefined, 1000, controller.signal);
+  controller.abort();
+  await expect(operation).rejects.toThrow("aborted");
+});

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
+import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
@@ -14,10 +15,31 @@ export async function renderAccessSettings(source = true): Promise<string> {
   if (!status.ok) throw new Error(`System access status: ${status.status}`);
   const access = Value.Parse(schema, await status.json());
   const remote = access.mode === "tailscale";
-  const caption = remote ? "Use local access" : "Enable remote access";
-  const reconnect = remote && access.connectionState !== "Running" ? `<form action="/settings/access" method="post"><input type="hidden" name="mode" value="tailscale">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Reconnect remote access" } })}</form>` : "";
-  const login = access.authUrl ? actionLinkHtml({ href: access.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" }, attributesHtml: 'target="_blank" rel="noreferrer"' }) : "";
-  return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="access-settings"><section class="settings-sec"><h2>Access</h2><p>${remote ? access.connectionState === "Running" ? "Remote access is connected." : "Remote access is disconnected." : "Using local access."}</p>${access.error ? `<p class="settings-error">${escapeHtml(access.error)}</p>` : ""}${login}${reconnect}<form action="/settings/access" method="post"><input type="hidden" name="mode" value="${remote ? "localhost" : "tailscale"}">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption } })}</form></section></turbo-frame>`;
+  const modeToggle = toggleHtml({
+    variant: "button",
+    label: "Connect to AgentsInTheCloud",
+    name: "mode",
+    value: access.mode,
+    form: { action: "/settings/access" },
+    options: [
+      { value: "localhost", label: "This computer only" },
+      { value: "tailscale", label: "Tailscale" },
+    ],
+  });
+  const connected = remote && access.connectionState === "Running";
+  const connectionAction = !remote || connected ? "" : access.authUrl
+    ? actionLinkHtml({ href: access.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
+    : `<form action="/settings/access" method="post"><input type="hidden" name="mode" value="tailscale">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Retry Tailscale connection" } })}</form>`;
+  return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="access-settings">
+    <section class="settings-sec">
+      <div class="settings-choice-row"><h2>Connect to AgentsInTheCloud</h2>${modeToggle}</div>
+      <p>${remote ? "Via Tailscale — use it from any device on your tailnet." : "This computer only — Tailscale is off."}</p>
+      ${remote && !connected ? "<p>Tailscale isn’t connected yet.</p>" : ""}
+      ${connected ? "<p>Switching to this computer only will disconnect devices using Tailscale.</p>" : ""}
+      ${access.error ? `<p class="settings-error">${escapeHtml(access.error)}</p>` : ""}
+      ${connectionAction}
+    </section>
+  </turbo-frame>`;
 }
 export async function handleAccessSettings(request: Request, url: URL): Promise<Response | undefined> {
   if (!url.pathname.startsWith("/settings/access")) return;

@@ -52,7 +52,7 @@ function foldout(id: string, label: string, body: string): string {
 }
 
 export function supervisorFragment(view: SupervisorView): string {
-  const title = view.stopping ? "Stopping AgentsInTheCloud" : view.failure ? "AgentsInTheCloud needs attention" : view.connectionAction ? "Setting up remote access" : view.healthy ? "AgentsInTheCloud is ready" : view.operation === "update" ? "Updating AgentsInTheCloud" : "Starting AgentsInTheCloud";
+  const title = view.stopping ? "Stopping AgentsInTheCloud" : view.failure ? "AgentsInTheCloud needs attention" : view.connectionAction ? "Setting up Tailscale" : view.healthy ? "AgentsInTheCloud is ready" : view.operation === "update" ? "Updating AgentsInTheCloud" : "Starting AgentsInTheCloud";
   const labels = ["Prepare AgentsInTheCloud images", "Stop the previous version", "Start AgentsInTheCloud", "Check health", "Open AgentsInTheCloud"];
   const checklist = labels.map((label, index) => {
     const done = (view.healthy || index < view.phase) && !(index === 4 && view.connectionAction);
@@ -68,12 +68,21 @@ export function supervisorFragment(view: SupervisorView): string {
       <form method="post" action="/retry">${button(view.recoveringHealth ? "Restart AgentsInTheCloud" : "Retry startup")}</form>
     </div>` : "";
 
+  const remote = view.accessMode === "tailscale";
+  const accessSummary = remote
+    ? `Via Tailscale — use it from any device on your tailnet.<br>Tailscale: ${escapeHtml(view.connectionState)}`
+    : "This computer only — Tailscale is off.";
+  const accessActions = `
+    ${!remote || (!view.authUrl && view.connectionState !== "Running") ? `<form method="post" action="/connect">${button(remote ? "Retry Tailscale connection" : "Use Tailscale")}</form>` : ""}
+    ${remote && view.connectionState === "Running" ? "<p>Switching to this computer only will disconnect devices using Tailscale.</p>" : ""}
+    ${remote ? `<form method="post" action="/local">${button("Use this computer only")}</form>` : ""}`;
+
   return `<section aria-label="AgentsInTheCloud System"><h1>${title}</h1>
     <section class="system-checklist" aria-label="AgentsInTheCloud preparation">${view.stopping ? "" : `<ol class="status-list">${checklist}</ol>`}${failureActions}</section>
-    ${view.authUrl ? `<p>Sign in to finish setting up remote access.</p>${actionLinkHtml({ href: view.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" } })}` : ""}
+    ${view.authUrl ? `<p>Sign in to use AgentsInTheCloud from devices on your tailnet.</p>${actionLinkHtml({ href: view.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" } })}` : ""}
     ${view.connectionAction ? `<p>${escapeHtml(view.connectionAction.description)}</p>${view.connectionAction.url ? actionLinkHtml({ href: view.connectionAction.url, variant: "primary", content: { kind: "caption", caption: "Open Tailscale DNS settings" }, attributesHtml: 'target="_blank" rel="noreferrer"' }) : ""}` : ""}
     ${view.connectionProblem ? `<p class="system-error">${escapeHtml(view.connectionProblem)}</p>` : ""}
     ${foldout("system-logs", "Docker logs", `<pre class="system-log" data-progress-log>${escapeHtml(view.logs.join("\n") || "Waiting for output…")}</pre>`)}
-    ${foldout("system-access", "Connection & system details", `<p>Access: ${escapeHtml(view.accessMode)}<br>Tailscale: ${escapeHtml(view.connectionState)}</p><p class="system-detail">Image: ${escapeHtml(view.candidate)}</p><div class="system-actions"><form method="post" action="/connect">${button("Enable remote access")}</form><form method="post" action="/local">${button("Use local access")}</form></div>`)}
+    ${foldout("system-access", "Connection & system details", `<p>${accessSummary}</p><p class="system-detail">Image: ${escapeHtml(view.candidate)}</p><div class="system-actions">${accessActions}</div>`)}
   </section>`;
 }

@@ -290,7 +290,7 @@ function renderUpdateChannelSettings(updateManager: UpdateManager): string {
       { value: "latest", label: "Latest", disabled },
     ],
   });
-  return `<section class="settings-sec update-channel-setting" id="settings-sec-update-channel"><div class="update-settings-summary"><h2>Update channel</h2></div>${channel}</section>`;
+  return `<section class="settings-sec settings-choice-row" id="settings-sec-update-channel"><h2>Update channel</h2>${channel}</section>`;
 }
 
 function updateSettingsStream(updateManager: UpdateManager, checked = false): string {

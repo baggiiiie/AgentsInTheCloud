@@ -2,9 +2,8 @@
 .update-sidebar-row { display: flex; flex-direction: column; gap: 12px; }
 .update-sidebar-row p { margin: 0; font: var(--text-body)/var(--leading-standard) var(--font-sans); }
 .update-sidebar-row form, .update-settings-control form { display: flex; margin: 0; }
-.update-settings-control, .update-channel-setting { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.update-settings-control { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .update-settings-summary { flex: 1 1 260px; }
-.update-channel-setting .update-settings-summary { flex: 1; }
 /* Keep room to the left of Restart for the adjacent confirmation. */
 .update-actions { flex: 0 0 280px; max-width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: flex-end; }
 .update-sidebar-row .update-actions { flex: none; width: 100%; }

@@ -9,10 +9,12 @@ export async function command(
   args: string[],
   onOutput?: (chunk: string) => void,
   timeoutMs = 120_000,
+  signal?: AbortSignal,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(args[0]!, args.slice(1), {
       stdio: ["ignore", "pipe", "pipe"],
+      signal,
     });
     let timedOut = false;
     const timer = setTimeout(() => {
@@ -20,10 +22,11 @@ export async function command(
       child.kill("SIGKILL");
     }, timeoutMs);
     commands.add(child);
-    child.once("close", () => {
+    const cleanup = () => {
       clearTimeout(timer);
       commands.delete(child);
-    });
+    };
+    child.once("close", cleanup);
     const output: string[] = [];
     for (const stream of [child.stdout, child.stderr])
       stream.on("data", (data: Buffer) => {
@@ -31,7 +34,10 @@ export async function command(
         output.push(text);
         onOutput?.(text);
       });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      cleanup();
+      reject(error);
+    });
     child.on("close", (code) =>
       code === 0
         ? resolve(output.join("").trim())

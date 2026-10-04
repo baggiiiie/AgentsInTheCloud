@@ -52,7 +52,7 @@ const persisted: State = (await Bun.file(`${stateDir}/state.json`).exists())
   ? JSON.parse(await readFile(`${stateDir}/state.json`, "utf8"))
   : {};
 persisted.accessMode ??= Value.Parse(Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), values["access-mode"]);
-let remoteRequested = persisted.accessMode === "tailscale";
+const tailscaleSelected = () => persisted.accessMode === "tailscale";
 async function persist() {
   await writeFile(`${stateDir}/state.next`, JSON.stringify(persisted));
   await rename(`${stateDir}/state.next`, `${stateDir}/state.json`);
@@ -75,7 +75,7 @@ let healthy = false;
 let recoveringHealth = false;
 let stopping = false;
 let tailnetHost: string | undefined;
-let connectionState = "Starting";
+let connectionState = tailscaleSelected() ? "Starting" : "Stopped";
 let authUrl: string | undefined;
 let connectionAttempt: "idle" | "running" | "finished" = "idle";
 let connectionFailure: string | undefined;
@@ -90,7 +90,7 @@ const logs: string[] = [];
 const subscribers = new Set<ReadableStreamDefaultController<Uint8Array>>();
 const encoder = new TextEncoder();
 function connectionProblem() {
-  if (persisted.accessMode === "localhost" && !remoteRequested) return;
+  if (!tailscaleSelected()) return;
   if (httpsAction) return;
   if (connectionFailure) return connectionFailure;
   if (networkError && Date.now() - lastNetworkSuccess >= 60_000)
@@ -102,7 +102,7 @@ function connectionProblem() {
 }
 function fragment() {
   return supervisorFragment({ operation, phase, healthy, recoveringHealth, stopping, failure, candidate,
-    accessMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), connectionAction: remoteRequested ? httpsAction : undefined, authUrl, logs });
+    accessMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), connectionAction: tailscaleSelected() ? httpsAction : undefined, authUrl: tailscaleSelected() ? authUrl : undefined, logs });
 }
 function emit(event = "progress", data = fragment()) {
   for (const subscriber of subscribers)
@@ -115,6 +115,16 @@ function emit(event = "progress", data = fragment()) {
 function accessChanged() {
   emit("access", "changed");
   emit();
+}
+async function setAccessMode(mode: "localhost" | "tailscale") {
+  persisted.accessMode = mode;
+  if (mode === "tailscale" && connectionAttempt !== "running") {
+    connectionAttempt = "idle";
+    connectionFailure = networkError = undefined;
+    connectionStateSince = lastNetworkSuccess = Date.now();
+  }
+  await persist();
+  accessChanged();
 }
 setInterval(() => emit("ping", ""), 15000);
 function log(text: string) {
@@ -135,6 +145,7 @@ function stage(text: string, nextPhase = phase) {
   log(text);
 }
 const children: ChildProcess[] = [];
+const intentionallyStopped = new WeakSet<ChildProcess>();
 function daemon(args: string[]) {
   const child = spawn(args[0]!, args.slice(1), { stdio: "inherit" });
   children.push(child);
@@ -143,7 +154,8 @@ function daemon(args: string[]) {
     void shutdown(1);
   });
   child.on("exit", (code, signal) => {
-    if (!stopping) {
+    children.splice(children.indexOf(child), 1);
+    if (!stopping && !intentionallyStopped.has(child)) {
       log(`${args[0]} exited (${code ?? signal})`);
       void shutdown(1);
     }
@@ -219,7 +231,7 @@ function configureRoutes(target: number): Promise<void> {
     } catch {
       /* Previous caller reports failure; this is its retry. */
     }
-    while (tailnetHost && !stopping) {
+    while (tailscaleSelected() && tailnetHost && !stopping) {
       const key = `${tailnetHost}:${routeTarget}`;
       if (appliedRoute === key) return;
       const target = routeTarget;
@@ -379,14 +391,8 @@ const server = Bun.serve({
         const body: unknown = await request.json().catch(() => null);
         if (!Value.Check(Type.Object({ mode: Type.Optional(Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")])), localPort: Type.Optional(Type.Integer({ minimum: 1, maximum: 65535 })) }), body)) return new Response("Invalid access setting", { status: 400 });
         if (body.localPort) persisted.localPort = body.localPort;
-        if (body.mode === "localhost") { persisted.accessMode = "localhost"; remoteRequested = false; }
-        if (body.mode === "tailscale") {
-          remoteRequested = true;
-          if (connectionState === "Running") persisted.accessMode = "tailscale";
-          else { connectionAttempt = "idle"; connectionFailure = undefined; connectionStateSince = Date.now(); }
-        }
-        await persist();
-        accessChanged();
+        if (body.mode) await setAccessMode(body.mode);
+        else { await persist(); accessChanged(); }
       }
       return Response.json({ mode: persisted.accessMode, localPort: persisted.localPort, connectionState, authUrl, error: connectionFailure ?? networkError });
     }
@@ -400,7 +406,7 @@ const server = Bun.serve({
           stopping, busy, appResponding, hostname: tailnetHost, appliedRoute,
           connectionState, authUrl, connectionAction: httpsAction, logs,
           localOrigin: persisted.localPort ? `http://agents-in-the-cloud.localhost:${persisted.localPort}` : undefined,
-          localMode: persisted.accessMode === "localhost" && !remoteRequested,
+          localMode: !tailscaleSelected(),
         }),
         failure,
         healthy,
@@ -448,18 +454,12 @@ const server = Bun.serve({
       if (!allowedOrigin(request))
         return new Response("Forbidden", { status: 403 });
       if (url.pathname === "/local") {
-        persisted.accessMode = "localhost"; remoteRequested = false; await persist(); accessChanged();
+        await setAccessMode("localhost");
         return Response.redirect(url.origin, 303);
       }
       if (url.pathname === "/connect") {
-        remoteRequested = true;
         if (stopping) return new Response("System is stopping", { status: 503 });
-        if (connectionAttempt !== "running") {
-          connectionAttempt = "idle";
-          connectionFailure = undefined;
-          networkError = undefined;
-          connectionStateSince = lastNetworkSuccess = Date.now();
-        }
+        await setAccessMode("tailscale");
         return request.headers.get("accept")?.includes("text/html") ? Response.redirect(url.origin, 303) : new Response(null, { status: 202 });
       }
       if (!initialized || stopping)
@@ -689,11 +689,6 @@ async function initialize() {
     "containerd",
   );
   daemon(["dockerd", "--config-file", "/run/agents-in-the-cloud-system/daemon.json"]);
-  daemon([
-    "tailscaled",
-    "--state=/data/tailscale/tailscaled.state",
-    "--socket=/var/run/tailscale/tailscaled.sock",
-  ]);
   await waitFor(
     async () => {
       try {
@@ -714,24 +709,63 @@ async function initialize() {
   void (async () => {
     connectionStateSince = lastNetworkSuccess = Date.now();
     let lastAccess = "";
+    let tailscaleProcess: ChildProcess | undefined;
+    let login: AbortController | undefined;
+    function notifyAccessChanges() {
+      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError, httpsAction]);
+      if (nextAccess !== lastAccess) { lastAccess = nextAccess; accessChanged(); }
+    }
     while (!stopping) {
+      if (!tailscaleSelected()) {
+        if (tailscaleProcess) {
+          login?.abort();
+          login = undefined;
+          intentionallyStopped.add(tailscaleProcess);
+          const child = tailscaleProcess;
+          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+          tailscaleProcess.kill("SIGTERM");
+          await exited;
+          tailscaleProcess = undefined;
+        }
+        connectionState = "Stopped";
+        authUrl = tailnetHost = connectionFailure = networkError = undefined;
+        httpsAction = undefined;
+        appliedRoute = "";
+        connectionAttempt = "idle";
+        tailscaleHttps.reset();
+        notifyAccessChanges();
+        await sleep(3000);
+        continue;
+      }
+      if (!tailscaleProcess) {
+        tailscaleProcess = daemon([
+          "tailscaled",
+          "--state=/data/tailscale/tailscaled.state",
+          "--socket=/var/run/tailscale/tailscaled.sock",
+        ]);
+        connectionStateSince = lastNetworkSuccess = Date.now();
+      }
       try {
         const status = JSON.parse(
           await command(["tailscale", "status", "--json"], undefined, 5000),
         );
+        if (!tailscaleSelected()) continue;
         if (status.BackendState !== connectionState) connectionStateSince = Date.now();
         connectionState = status.BackendState;
         authUrl = status.AuthURL || undefined;
-        if (remoteRequested && connectionAttempt === "idle" &&
+        if (connectionAttempt === "idle" &&
             (connectionState === "NeedsLogin" || connectionState === "Stopped")) {
           connectionAttempt = "running";
           // The browser sign-in is the user's consent; generating its URL does
           // not connect an account. System owns this command and its deadline.
-          void command(["tailscale", "up", "--timeout=10m"], log, 610_000)
+          const attempt = new AbortController();
+          login = attempt;
+          void command(["tailscale", "up", "--timeout=10m"], log, 610_000, attempt.signal)
             .catch((error) => {
+              if (!tailscaleSelected() || attempt.signal.aborted) return;
               connectionFailure = `Could not connect AgentsInTheCloud: ${String(error)}`;
               log(connectionFailure);
-            }).finally(() => { connectionAttempt = "finished"; });
+            }).finally(() => { if (tailscaleSelected() && !attempt.signal.aborted) connectionAttempt = "finished"; });
         }
         const host =
           status.BackendState === "Running"
@@ -746,8 +780,8 @@ async function initialize() {
             accessChanged();
           }
           await tailscaleHttps.prepare(host, Value.Parse(Type.Optional(Type.Union([Type.Null(), Type.Array(Type.String())])), status.CertDomains));
+          if (!tailscaleSelected()) continue;
           tailnetHost = host;
-          if (remoteRequested && persisted.accessMode !== "tailscale") { persisted.accessMode = "tailscale"; await persist(); emit(); }
           await configureRoutes(routeTarget);
           if (changed) log(`Tailscale ready: https://${host}`);
         } else {
@@ -760,6 +794,7 @@ async function initialize() {
         httpsAction = undefined;
         if (host) connectionFailure = undefined;
       } catch (error) {
+        if (!tailscaleSelected()) continue;
         networkError = error instanceof Error ? error.message : String(error);
         if (error instanceof TailscaleHttpsDisabledError || error instanceof TailscaleCertificateError) {
           tailnetHost = undefined;
@@ -770,8 +805,7 @@ async function initialize() {
         }
         log(`Tailscale: ${networkError}`);
       }
-      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError, httpsAction]);
-      if (nextAccess !== lastAccess) { lastAccess = nextAccess; accessChanged(); }
+      notifyAccessChanges();
       await sleep(3000);
     }
   })();
