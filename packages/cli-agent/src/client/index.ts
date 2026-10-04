@@ -1,12 +1,12 @@
 import { createNativeTerminalTextInputController, createTerminalKeyBarController, agentsInTheCloudObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalFrame, type ObservableTerminalViewer } from "@agents-in-the-cloud/observable-terminal/client";
-import { anchorScrollBottom, changeLayout, composerSubmitKey, errorMessage, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
+import { anchorScrollBottom, CableTopics, changeLayout, type CableSubscription, composerSubmitKey, errorMessage, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller, hooks }) {
-    const terminals = new Set<{ element: HTMLElement; hasTranscriptTarget: boolean; toggleMode(): void }>();
+    const terminals = new Set<{ element: HTMLElement; canToggleMode: boolean; toggleMode(): void }>();
     hooks.registerCommandProvider(() => {
-      const terminal = [...terminals].find((controller) => controller.hasTranscriptTarget && isWorkspacePaneVisible(controller.element));
+      const terminal = [...terminals].find((controller) => controller.canToggleMode && isWorkspacePaneVisible(controller.element));
       return terminal ? [{
         id: "cli-agent.toggle-mode",
         label: "Switch terminal / transcript",
@@ -17,17 +17,20 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
     });
     application.register("native-terminal-text-input", createNativeTerminalTextInputController(Controller));
     application.register("cli-terminal", class extends createTerminalKeyBarController(Controller) {
-      static values = { url: String, workspaceId: String };
-      static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptEnd"];
+      static values = { url: String, workspaceId: String, conversationId: String, transcriptChannel: String };
+      static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptContent", "transcriptEnd"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
+      declare readonly conversationIdValue: string;
+      declare readonly transcriptChannelValue: string;
       declare readonly formTarget: HTMLFormElement;
       declare readonly inputTarget: HTMLTextAreaElement;
       declare readonly hasFormTarget: boolean;
       declare readonly terminalTarget: HTMLElement;
       declare readonly connectionStatusTarget: HTMLElement;
       declare readonly transcriptTarget: HTMLElement;
+      declare readonly transcriptContentTarget: HTMLElement;
       declare readonly transcriptEndTarget: HTMLButtonElement;
       declare readonly hasTranscriptTarget: boolean;
       declare readonly hasTerminalTarget: boolean;
@@ -41,6 +44,10 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       private momentum = 0;
       private frame?: TerminalFrame;
       private releaseTranscriptAnchor?: () => void;
+      private transcriptSubscription?: CableSubscription;
+      // Transcript mode shows the transcript only while the agent waits between turns.
+      private transcriptMode = false;
+      private transcriptAvailable = false;
       private resize = new ResizeObserver(() => this.frame?.update());
 
       connect(): void {
@@ -51,6 +58,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           this.inputTarget.addEventListener("input", this.inputChanged);
         }
         if (this.hasTranscriptTarget) {
+          this.subscribeTranscript();
           this.releaseTranscriptAnchor = anchorScrollBottom(this.transcriptTarget, {
             active: () => this.element.classList.contains("cli-transcript-mode") && this.transcriptTarget.checkVisibility(),
             restored: () => this.transcriptScrolled(),
@@ -102,6 +110,8 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         this.frame?.dispose();
         this.frame = undefined;
         this.releaseTranscriptAnchor?.();
+        this.transcriptSubscription?.unsubscribe();
+        this.transcriptSubscription = undefined;
         if (this.hasFormTarget) {
           this.inputTarget.removeEventListener("input", this.inputChanged);
         }
@@ -195,29 +205,46 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         if (data !== event.detail.data) event.target!.dispatchEvent(new Event("terminal-text-input:reset"));
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
+      get canToggleMode(): boolean { return this.transcriptAvailable; }
       toggleMode(): void {
         if (this.element.classList.contains("cli-transcript-mode")) {
           this.showTerminal();
           this.focus();
         } else {
-          this.element.querySelector<HTMLAnchorElement>('a[data-action="cli-terminal#showTranscript"]')!.click();
+          this.showTranscript();
         }
       }
-      showTranscript(): void {
-        if (!this.hasTranscriptTarget) return;
-        this.transcriptEndTarget.hidden = true;
-        this.element.classList.add("cli-transcript-mode");
-        // Never show the previous snapshot while Turbo loads the fresh one into the frame.
-        this.transcriptTarget.replaceChildren();
+      showTranscript(): void { this.setTranscriptMode(true); }
+      showTerminal(): void { this.setTranscriptMode(false); }
+      private setTranscriptMode(transcriptMode: boolean): void {
+        if (transcriptMode !== this.transcriptMode) {
+          this.transcriptMode = transcriptMode;
+          this.subscribeTranscript();
+        }
+        this.syncTranscript();
+      }
+      /** Only a pane in transcript mode receives the transcript itself. */
+      private subscribeTranscript(): void {
+        this.transcriptSubscription?.unsubscribe();
+        const conversationId = this.conversationIdValue;
+        this.transcriptSubscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.module(this.transcriptChannelValue, this.workspaceIdValue, this.transcriptMode ? { conversationId, transcript: "shown" } : { conversationId }));
+      }
+      private syncTranscript(): void {
+        this.element.classList.toggle("cli-transcript-available", this.transcriptAvailable);
+        const showing = this.transcriptMode && this.transcriptAvailable;
+        if (showing === this.element.classList.contains("cli-transcript-mode")) return;
+        this.element.classList.toggle("cli-transcript-mode", showing);
+        if (showing) this.transcriptEndTarget.hidden = true;
+        // A full redraw is slow; the terminal only needs one after being hidden.
+        else this.viewer?.refresh();
       }
       private transcriptEndTop(): number {
         const transcript = this.transcriptTarget;
-        const content = transcript.querySelector<HTMLElement>(".agent-transcript-content");
-        if (!content) return 0;
-        return Math.max(0, transcript.scrollTop + content.getBoundingClientRect().bottom - transcript.getBoundingClientRect().top - transcript.clientHeight + 24);
+        return Math.max(0, transcript.scrollTop + this.transcriptContentTarget.getBoundingClientRect().bottom - transcript.getBoundingClientRect().top - transcript.clientHeight + 24);
       }
-      transcriptLoaded(event: Event): void {
-        if (event.target !== this.transcriptTarget) return;
+      transcriptContentTargetConnected(content: HTMLElement): void {
+        this.transcriptAvailable = content.dataset.available === "true";
+        this.syncTranscript();
         requestAnimationFrame(() => { this.transcriptTarget.scrollTop = this.transcriptEndTop(); this.transcriptScrolled(); });
       }
       transcriptScrolled(): void {
@@ -225,12 +252,6 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       }
       scrollToTranscriptEnd(): void {
         this.transcriptTarget.scrollTo({ top: this.transcriptEndTop(), behavior: "smooth" });
-      }
-      showTerminal(): void {
-        // A full redraw is slow; the terminal only needs one after being hidden.
-        if (!this.element.classList.contains("cli-transcript-mode")) return;
-        this.element.classList.remove("cli-transcript-mode");
-        this.viewer?.refresh();
       }
       inputKeydown(event: KeyboardEvent): void {
         if (this.element.querySelector<HTMLElement>(".agent-completion-menu-host:not([hidden])")?.checkVisibility()) return;
@@ -292,10 +313,12 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         catch (error) { this.failed(); status.textContent = errorMessage(error); status.hidden = false; }
         finally { this.sending = false; }
       }
-      /** The terminal replaces the frozen transcript before anything else moves; the composer empties at once. */
+      /** The terminal replaces the transcript before anything else moves; the composer empties at once. */
       private startSending(fromComposer: boolean): void {
         changeLayout(() => {
-          this.showTerminal();
+          // Don't wait for the agent to report its turn; the channel confirms it.
+          this.transcriptAvailable = false;
+          this.syncTranscript();
           if (fromComposer) setTextInputValue(this.inputTarget, "");
           this.element.dispatchEvent(new Event("agent-composer:sending"));
         });
@@ -325,7 +348,10 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       retry(): void {
         this.viewer!.reconnect();
       }
-      focus(): void { this.start(); this.viewer?.focus(); }
+      focus(): void {
+        this.start();
+        if (!this.element.classList.contains("cli-transcript-mode")) this.viewer?.focus();
+      }
       refresh(): void {
         if (!this.hasTerminalTarget || !isWorkspacePaneVisible(this.element)) return;
         this.frame?.update();

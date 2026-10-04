@@ -62,6 +62,8 @@ const sel = {
   followLatest: '.floating-stack :is([data-agent-pane-target="transcriptEnd"], [data-cli-terminal-target="transcriptEnd"])',
   terminal: ".observable-terminal-host",
   viewTranscript: '.floating-stack [data-action~="cli-terminal#showTranscript"]',
+  showTerminal: '.floating-stack [data-action~="cli-terminal#showTerminal"]',
+  cliTranscript: ".cli-agent-body.cli-transcript-mode .cli-transcript-view .agent-transcript-content",
 };
 
 const bottom = (box: Box): number => box ? box[1] + box[3] : Number.NaN;
@@ -311,6 +313,17 @@ await scenario("mobile-D2-send", "D2: sending on mobile closes the composer in o
 
 await page.navigate(piUrl, sel.terminal);
 await Bun.sleep(2500);
+// The view switch only appears once Pi has finished a turn.
+if (!await page.visible(sel.viewTranscript)) {
+  log("giving Pi a turn");
+  await openComposer();
+  await resetComposerText();
+  await page.tap(sel.input);
+  await page.insertText("Reply with just the word OK.");
+  await page.tap(".cli-agent-body .composer-send button");
+  await page.waitFor(sel.viewTranscript, 120_000);
+  await page.evaluate<boolean>("(document.activeElement.blur(), true)");
+}
 
 await scenario("mobile-D14-terminal-focus", "D14: focusing the Pi terminal collapses the open composer (keeping its draft) in one step; the terminal moves, never resizes.", async (recorder) => {
   await openComposer();
@@ -336,20 +349,20 @@ await scenario("mobile-D21-pi-floating", "D21: on a CLI agent the view switch si
     ...floatingStackChecks(terminal.after, false, terminal.after.terminal),
   );
   await page.tap(sel.viewTranscript);
-  await page.waitFor(".cli-agent-body.cli-transcript-mode .cli-transcript-view .agent-transcript-content", 15_000);
+  await page.waitFor(sel.cliTranscript, 15_000);
   await Bun.sleep(800);
   await page.wheel(".cli-transcript-view", -900);
   await Bun.sleep(900);
   const reading = await transition(recorder, "CLI transcript, scrolled up", async () => {}, { waitMs: 200, expectChange: false });
   recorder.add(...floatingStackChecks(reading.after, false));
   await recorder.file("pi-transcript.png", await page.screenshot());
-  await page.tap('.floating-stack [data-action~="cli-terminal#showTerminal"]');
+  await page.tap(sel.showTerminal);
   await Bun.sleep(800);
 });
 
 await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcript shows switches to the terminal instantly, in the same frame as the composer closing.", async (recorder) => {
   await page.tap(sel.viewTranscript);
-  await page.waitFor(".cli-agent-body.cli-transcript-mode .cli-transcript-view .agent-transcript-content", 15_000);
+  await page.waitFor(sel.cliTranscript, 15_000);
   await Bun.sleep(800);
   await openComposer();
   await resetComposerText();
@@ -362,8 +375,13 @@ await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcri
     check("D18: terminal showing after send", after.transcript === null && after.terminal !== null, `transcript ${JSON.stringify(after.transcript)}, terminal ${JSON.stringify(after.terminal)}`),
     check("D2: composer closed after send", after.composer === null, JSON.stringify(after.composer)),
     check("D17: terminal not focused after send", !after.focus.includes("gespenst__input"), `focus: ${after.focus || "body"}`),
+    check("D18: no view switch while the agent works", !await page.visible(sel.viewTranscript) && !await page.visible(sel.showTerminal), "view switch hidden"),
   );
-  await Bun.sleep(6000);
+  await page.waitFor(sel.cliTranscript, 120_000);
+  recorder.add(check("D18: transcript returns when the turn finishes", await page.visible(sel.showTerminal), "Back to terminal shown"));
+  await recorder.file("pi-transcript-after-turn.png", await page.screenshot());
+  await page.tap(sel.showTerminal);
+  await Bun.sleep(800);
 });
 
 // A terminal tab gets its size the first time it is shown; the scenario starts after that.

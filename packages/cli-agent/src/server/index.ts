@@ -8,7 +8,7 @@ import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliSessions } from "./sessions.ts";
 import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
-import { cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
+import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
@@ -43,6 +43,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
         await sessions.exportWorkspaceHistory(workspaceId);
       });
     },
+    cableChannels: adapter.loadTranscript ? [cliTranscriptChannel(adapter, sessions)] : [],
     routes: [{ handle: cliComposerRoutes(adapter.id, sessions) }, { handle: cliTranscriptRoutes(adapter, sessions) }],
     agentProvider: {
       id: adapter.id, label: adapter.label, iconHtml: adapter.iconHtml,
@@ -59,7 +60,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const draftId = agentAttachmentDraftId(workspaceId, `${adapter.id}:${conversationId}`);
           const rowId = domId("cli_attach", workspaceId, conversationId);
           const composerUrl = `${url}/composer`;
-          const transcriptControls = renderCliTranscriptControls(adapter, workspaceId, conversationId);
+          const transcriptControls = renderCliTranscriptControls(adapter);
           const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-transcription-composer-workspace-id-value="${escapeHtml(workspaceId)}">
             <div class="composer-surface">
               <form id="${domId("cli_composer_form", workspaceId, conversationId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
@@ -74,7 +75,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
               <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
             </div>
           </div>` : "";
-          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${composerAttachmentAttributes(draftId, rowId, `agents-in-the-cloud:workspace-pane-visible@window->cli-terminal#refresh agents-in-the-cloud:workspace-agent-focus->cli-terminal#focus agents-in-the-cloud:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>
+          return `<section id="${domId("cli_agent", workspaceId, conversationId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${cliTranscriptAttributes(adapter, conversationId)} ${composerAttachmentAttributes(draftId, rowId, `agents-in-the-cloud:workspace-pane-visible@window->cli-terminal#refresh agents-in-the-cloud:workspace-agent-focus->cli-terminal#focus agents-in-the-cloud:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>
             <div class="cli-terminal-status" role="status">${session.error ? failureStatus(session.error) : terminalStatus(terminal)}</div>
             <div class="cli-agent-stage">
               ${terminal.exists ? renderTerminalConnectionStatus("cli-terminal") : ""}
