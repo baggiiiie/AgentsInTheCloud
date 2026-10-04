@@ -79,6 +79,7 @@ export class UpdateManager {
     const sidebarHtml = renderSidebarRow(this.snapshot());
     this.context?.globalSidebarContributions.set(updateSidebarContributionId, sidebarHtml || undefined, [
       { target: "settings-sec-update", html: renderUpdateSettings(this, checked), action: "replace" },
+      { target: "settings-sec-update-channel", html: renderUpdateChannelSettings(this), action: "replace" },
     ]);
   }
 
@@ -197,8 +198,8 @@ function renderCheckForm(): string {
 
 function renderDownloadControl(snapshot: StateSnapshot): string {
   const content = {
-    initialContent: { kind: "text" as const, text: "Download AgentsInTheCloud" },
-    progressContent: { kind: "text" as const, text: "Download AgentsInTheCloud" },
+    initialContent: { kind: "text" as const, text: "Download update" },
+    progressContent: { kind: "text" as const, text: "Downloading…" },
     variant: "primary" as const,
     type: "submit" as const,
   };
@@ -216,8 +217,8 @@ function restartFeedbackId(surface: UpdateControlSurface): string {
 function restartFormHtml(surface: UpdateControlSurface): string {
   const confirmation = destructiveConfirmationHtml({
     id: `restart_${surface}`,
-    trigger: { type: "button", variant: "primary", content: { kind: "caption", caption: "Restart" } },
-    confirmCaption: "Restart",
+    trigger: { type: "button", variant: "primary", content: { kind: "caption", caption: "Restart to update" } },
+    confirmCaption: "Restart now",
     cancelCaption: "Cancel",
   });
   return `<form method="post" action="/update/restart?surface=${surface}" data-turbo="false" data-controller="update-restart" data-action="submit->update-restart#submit">${confirmation}<p role="alert" data-update-restart-target="error" hidden></p></form>`;
@@ -227,7 +228,7 @@ function renderRestartFeedback(surface: UpdateControlSurface, message?: string):
   return transientFeedbackHtml({
     element: { tag: "div",  attributesHtml: `id="${restartFeedbackId(surface)}"` },
     initialContent: { kind: "html", html: restartFormHtml(surface) },
-    feedbackContent: { kind: "html", html: `<span class="transient-feedback__status update-restart-error">Could not restart AgentsInTheCloud: ${escapeHtml(message ?? "")}</span>` },
+    feedbackContent: { kind: "html", html: `<span class="transient-feedback__status update-restart-error">Could not restart: ${escapeHtml(message ?? "")}</span>` },
     state: message === undefined ? "initial" : "feedback",
   });
 }
@@ -248,16 +249,35 @@ function renderUpdateControl(snapshot: StateSnapshot, surface: UpdateControlSurf
   if (snapshot.state === "available" || snapshot.state === "failed" || snapshot.state === "pulling") return renderDownloadControl(snapshot);
   if (snapshot.state === "ready_to_restart") return renderRestartFeedback(surface);
   return progressButtonHtml({
-    initialContent: { kind: "text", text: "Restart" },
+    initialContent: { kind: "text", text: "Restart to update" },
     progressContent: { kind: "text", text: "Restarting…" },
     state: "in-progress",
     variant: "primary",
   });
 }
 
+function updateDescription(snapshot: StateSnapshot): string {
+  if (!snapshot.selfUpdatable) return "Updates require a System-managed installation.";
+  switch (snapshot.state) {
+    case "idle": return "Check for new updates.";
+    case "checking": return "Checking for updates…";
+    case "available": return "An update is available.";
+    case "pulling": return "Downloading the update…";
+    case "ready_to_restart": return "";
+    case "restarting": return "";
+    case "failed": return "The update needs attention.";
+  }
+}
+
 function renderUpdateSettings(updateManager: UpdateManager, checked = false): string {
   const snapshot = updateManager.snapshot();
   const control = checked && snapshot.state === "idle" ? renderCheckFeedback("initial", true) : renderUpdateControl(snapshot, "settings");
+  const description = updateDescription(snapshot);
+  return `<section class="settings-sec update-settings-control" id="settings-sec-update"><div class="update-settings-summary"><h2>Updates</h2>${description ? `<p class="settings-sub">${description}</p>` : ""}</div><div class="update-actions">${control}</div>${renderError(snapshot)}</section>`;
+}
+
+function renderUpdateChannelSettings(updateManager: UpdateManager): string {
+  const snapshot = updateManager.snapshot();
   const disabled = !snapshot.selfUpdatable || snapshot.state === "pulling" || snapshot.state === "restarting";
   const channel = toggleHtml({
     variant: "button",
@@ -270,10 +290,7 @@ function renderUpdateSettings(updateManager: UpdateManager, checked = false): st
       { value: "latest", label: "Latest", disabled },
     ],
   });
-  const description = snapshot.selfUpdatable
-    ? "Latest follows the newest builds; Stable follows tested releases."
-    : "Updates are available when AgentsInTheCloud runs inside AgentsInTheCloud System.";
-  return `<section class="settings-sec update-settings-control" id="settings-sec-update"><div><h2>Updates</h2><p class="settings-sub">${description}</p></div><div class="update-settings-actions">${control}${channel}</div>${renderError(snapshot)}</section>`;
+  return `<section class="settings-sec update-channel-setting" id="settings-sec-update-channel"><div class="update-settings-summary"><h2>Update channel</h2></div>${channel}</section>`;
 }
 
 function updateSettingsStream(updateManager: UpdateManager, checked = false): string {
@@ -287,9 +304,17 @@ const updateSettingsContribution: SettingsContribution = {
   render: async () => renderUpdateSettings(manager),
 };
 
+const updateChannelSettingsContribution: SettingsContribution = {
+  id: "update-channel",
+  label: "Update channel",
+  order: 14,
+  render: async () => renderUpdateChannelSettings(manager),
+};
+
 function renderSidebarRow(snapshot: StateSnapshot): string {
   if (!snapshot.selfUpdatable || snapshot.state === "idle" || snapshot.state === "checking") return "";
-  return `<section class="update-sidebar-section"><div id="update_sidebar_row" class="update-sidebar-row"><p>${snapshot.state === "failed" ? "AgentsInTheCloud update needs attention." : "There's a new version of AgentsInTheCloud!"}</p>${renderUpdateControl(snapshot, "sidebar")}${renderError(snapshot)}</div></section>`;
+  const description = updateDescription(snapshot);
+  return `<section class="update-sidebar-section"><div id="update_sidebar_row" class="update-sidebar-row">${description ? `<p>${description}</p>` : ""}<div class="update-actions">${renderUpdateControl(snapshot, "sidebar")}</div>${renderError(snapshot)}</div></section>`;
 }
 
 function renderError(snapshot: StateSnapshot): string {
@@ -342,7 +367,7 @@ export function createUpdateRouteHandler(updateManager: UpdateManager): (request
 
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "agents-in-the-cloud-update",
-  settingsContributions: [updateSettingsContribution],
+  settingsContributions: [updateChannelSettingsContribution, updateSettingsContribution],
   staticFiles: {
     "/update-client.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   },
