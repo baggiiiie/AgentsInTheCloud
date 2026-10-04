@@ -59,7 +59,9 @@ for (const local of ["amd64", "arm64"]) {
     }
     const merge = calls.find(({ args }) => args.includes("imagetools") && args.includes("create"))!;
     expect(merge.args.slice(-2)).toEqual(["amd64", "arm64"].map(arch => `ghcr.io/lucasmeijer/agents-in-the-cloud-system@${digest(arch)}`));
-    expect(calls.some(({ args }) => args.some(arg => /binfmt|qemu|:latest|:stable/.test(arg)))).toBe(false);
+    const promote = calls.findLast(({ args }) => args.includes("imagetools") && args.includes("create"))!;
+    expect(promote.args.slice(-3)).toEqual(["--tag", "ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest", `ghcr.io/lucasmeijer/agents-in-the-cloud-system@sha256:${"3".repeat(64)}`]);
+    expect(calls.some(({ args }) => args.some(arg => /binfmt|qemu|:stable/.test(arg)))).toBe(false);
     expect(calls.find(({ args }) => args.includes("login"))?.input).toBe("test-package-token");
     expect(calls.flatMap(call => call.args)).not.toContain("test-package-token");
   });

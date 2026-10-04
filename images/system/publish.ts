@@ -43,7 +43,10 @@ export async function publishSystem(run: Run, directory: string, check = false) 
       throw new Error(`${ref}: combined manifest does not contain verified slice ${slice}`);
   }
   console.log(`Published ${ref}@${combined.digest}`);
-  console.log("Channel tags are unchanged. Promote the verified digest after release validation.");
+  await run(["docker", "buildx", "imagetools", "create", "--tag", `${image}:latest`, `${image}@${combined.digest}`], { stream: true });
+  if ((await inspectImage(run, `${image}:latest`))!.digest !== combined.digest)
+    throw new Error(`${image}:latest: registry digest differs from ${ref}`);
+  console.log(`Promoted ${image}:latest to ${combined.digest}`);
 }
 
 if (import.meta.main) {
@@ -52,7 +55,7 @@ if (import.meta.main) {
     console.error("Usage: images/system/publish.sh [--check]");
     process.exitCode = 1;
   } else if (args.includes("--help") || args.includes("-h")) {
-    console.log("Publish System's commit image using two native Docker daemons.\nRequires ATELIER_RELEASE_HELPER=[user@]hostname and GH_PACKAGE_TOKEN.\n--check validates both native builders without publishing. Channel tags are not changed.");
+    console.log("Publish System's commit image using two native Docker daemons and move latest to it.\nRequires ATELIER_RELEASE_HELPER=[user@]hostname and GH_PACKAGE_TOKEN.\n--check validates both native builders without publishing.");
   } else {
     const directory = mkdtempSync(join(tmpdir(), "agents-in-the-cloud-system-publish-"));
     const commands = commandRunner(root, text => process.stdout.write(text));

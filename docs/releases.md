@@ -18,7 +18,7 @@ App, System and workspace images pin its multi-platform digest; commit updated
 pins before releasing.
 
 For the VM test, publish this branch's app and separately publish its System image
-as `ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest`; this release command
+as `ghcr.io/lucasmeijer/agents-in-the-cloud-system:latest` (`images/system/publish.sh` moves latest); this release command
 publishes only the app and its workspace dependency. Use the branch's installer
 (which defaults to latest images) and record both tested image digests. The new
 installation starts empty: do not mount Atelier storage or import its settings.
