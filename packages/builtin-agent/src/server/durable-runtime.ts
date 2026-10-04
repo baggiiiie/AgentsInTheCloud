@@ -32,7 +32,7 @@ const dependencies = {
   async validateModel(ref: AgentChange["model"]) {
     const selected = ref && { provider: ref.provider, id: ref.modelId };
     const model = selected && (await configuredModelOptionViews(selected)).find(item => item.provider === selected.provider && item.id === selected.id);
-    if (!model?.available) throw new AgentsInTheCloudCoreError("invalid_arguments", model?.unavailableReason ?? "Choose a connected model in Settings → Models");
+    if (!model?.available) throw new AgentsInTheCloudCoreError("invalid_arguments", model?.unavailableReason ?? "Choose a connected model in Models");
   },
 };
 

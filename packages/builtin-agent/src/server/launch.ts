@@ -3,7 +3,7 @@ import { reconcileAgentModelPreferences } from "@agents-in-the-cloud/agent/serve
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
-import { renderModelSetupDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
+import { renderModelsDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
 import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@agents-in-the-cloud/shared";
 import { listStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
@@ -50,7 +50,7 @@ export const nativeAgentLaunch: WorkspaceAgentLaunch = {
   async submit(form) {
     const hasPrompt = String(form.get("text") ?? "").trim().length > 0
       || (await listStagedAttachments(String(form.get("attachmentDraft") ?? ""))).length > 0;
-    if (hasPrompt && !await hasAvailableBuiltinAgentModel()) return { response: turboStreamResponse(turboStream("update", "settings_modal_host", await renderModelSetupDialog()), { status: 422 }) };
+    if (hasPrompt && !await hasAvailableBuiltinAgentModel()) return { response: turboStreamResponse(turboStream("update", "settings_modal_host", await renderModelsDialog({ focus: "models" })), { status: 422 }) };
     const model = String(form.get("model") ?? "");
     const thinkingLevel = String(form.get("level") ?? "");
     return {

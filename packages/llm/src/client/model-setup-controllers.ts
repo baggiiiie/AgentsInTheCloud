@@ -36,7 +36,7 @@ export function createAgentModelSetupController(Controller: WorkspaceClientContr
       const controlledMenuId = this.element.getAttribute("aria-controls");
       const menu = this.element.closest<HTMLElement>(".popup-menu[popover]") ?? (controlledMenuId ? document.getElementById(controlledMenuId) : null);
       if (menu?.matches(":popover-open")) menu.hidePopover();
-      const response = await fetch("/settings/models/dialog", { headers: { Accept: "text/vnd.turbo-stream.html" } });
+      const response = await fetch("/models", { headers: { Accept: "text/vnd.turbo-stream.html" } });
       window.Turbo!.renderStreamMessage(await response.text());
     }
   };

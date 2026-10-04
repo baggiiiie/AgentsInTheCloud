@@ -3,7 +3,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
+import { createPiModelRuntime, modelsDialogId, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
 import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
@@ -151,7 +151,7 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
   if (url.pathname === "/settings/reset" && request.method === "POST") {
     await deleteAllStoredSettings();
     const pickerUpdates = await options.renderModelPickerUpdates();
-    return stream(`${pickerUpdates}${replace("settings_dialog", await renderDevelopmentSettingsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove("model_setup_dialog")}`);
+    return stream(`${pickerUpdates}${replace("settings_dialog", await renderDevelopmentSettingsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove(modelsDialogId)}`);
   }
   if (url.pathname === "/settings/workspaces/force-delete" && request.method === "POST" && devSettingsEnabled()) {
     const result = options.forceDeleteAllWorkspaces

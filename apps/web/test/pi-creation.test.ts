@@ -11,7 +11,7 @@ test("Pi workspace creation requires a connected favorite model before provision
   const { app, registry } = createTestApp({ provision: async () => { provisioned = true; } });
   const response = await app.fetch(postJson("/workspaces", { agent: { provider: "pi", initialPrompt: "Do not run without authentication" } }));
   expect(response.status).toBe(409);
-  expect((await response.json()).error).toMatchObject({ code: "agent_setup_required", setupUrl: "/settings?section=models" });
+  expect((await response.json()).error).toMatchObject({ code: "agent_setup_required", setupUrl: "/models?focus=models" });
   expect(provisioned).toBe(false);
   expect(registry.list()).toHaveLength(0);
   expect((await defaultAgentProvider()).id).toBe("builtin");

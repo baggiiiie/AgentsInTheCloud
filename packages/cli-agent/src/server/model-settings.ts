@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
-import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, createPiModelRuntime, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@agents-in-the-cloud/llm/server";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, createPiModelRuntime, modelUnavailableReason, providerAvailability, getConfiguredModels, hasConnectedModelProvider, modelRefValue, modelThinkingLevels, renderLaunchModelSettings, type ComposerModelOption, type ModelRef } from "@agents-in-the-cloud/llm/server";
 import type { AgentLaunchFooterContext } from "@agents-in-the-cloud/shared";
 
 const settingsSchema = Type.Object({ model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()) });
@@ -21,10 +21,8 @@ export function createCliModelSettings(options: {
     const favorites = (await getConfiguredModels()).filter((model) => !options.provider || model.provider === options.provider);
     const availability = await providerAvailability(runtime, favorites.map((model) => model.provider));
     const models: ComposerModelOption[] = await Promise.all(favorites.map(async (model) => {
-      const { modelIds, connection } = availability.get(model.provider)!;
-      const unavailableReason = modelIds.has(model.id)
-        ? await options.unavailableReason?.(runtime, model)
-        : connection === "needs_attention" ? "Reconnect in Settings → Models" : "Model unavailable for this account";
+      const unavailableReason = modelUnavailableReason(availability.get(model.provider)!, model, runtime)
+        ?? await options.unavailableReason?.(runtime, model);
       return { ...model, name: model.label, selected: false, available: !unavailableReason, unavailableReason };
     }));
     const preferredModel = requestedModel || (remembered ? modelRefValue(remembered) : undefined);

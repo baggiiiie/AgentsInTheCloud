@@ -9,7 +9,7 @@ test("requires that provider's subscription, not an API key or another provider'
     for (const credentials of [[], [{ providerId: provider, type: "api_key" }], [{ providerId: "openai-codex", type: "oauth" }]] satisfies CredentialInfo[][]) {
       await expect(requireProviderSubscription(runtime(credentials), provider, "Agent")).rejects.toMatchObject({
         code: "agent_setup_required",
-        details: { setupUrl: `/settings/models/step?provider=${provider}` },
+        details: { setupUrl: `/models?connect=${provider}` },
       });
     }
     await requireProviderSubscription(runtime([{ providerId: provider, type: "oauth" }]), provider, "Agent");

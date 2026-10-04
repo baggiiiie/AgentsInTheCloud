@@ -26,7 +26,7 @@ JSON and other response formats remain the module route's responsibility.
 
 The Agent module owns the complete Usage feature:
 
-- `packages/agent/src/server/usage-web.ts`: header action, dialog, and routes.
+- `packages/agent/src/server/usage-web.ts`: header action, the limits and rings frames shown on Models panel provider cards, and routes.
 - `packages/agent/src/server/usage-openapi.ts`: endpoint descriptions and schemas.
 - `packages/agent/src/client/usage-controllers.ts`: provider selection and refresh.
 - `packages/agent/src/client/usage.css`: feature-specific presentation.
@@ -35,4 +35,4 @@ The Agent module owns the complete Usage feature:
 `web.ts`, `static.ts`, and `agent-controllers.ts` assemble these contributions.
 The app does not import Usage or know its routes, provider state, or ring values.
 The comparison ring remains a reusable design-system Action link capability.
-The `/usage` URLs and JSON representations are unchanged.
+The `/usage` JSON representations are unchanged; the Usage button opens the Models dialog (`/models`).

@@ -3,10 +3,7 @@ import { supportedUsageProviders } from "@agents-in-the-cloud/llm/server";
 
 const errorResponse = { description: "Request failed", content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } };
 const htmlSurfaceResponses = (description: string) => ({ "200": { description, content: { "text/html": { schema: { type: "string" } } } }, "400": errorResponse, "404": errorResponse });
-const jsonAndHtmlResponse = (description: string, schema: JsonObject) => ({
-  ...htmlSurfaceResponses(description),
-  "200": { description, content: { "application/json": { schema }, "text/html": { schema: { type: "string" } } } },
-});
+const jsonResponse = (description: string, schema: JsonObject) => ({ "200": { description, content: { "application/json": { schema } } }, "400": errorResponse, "404": errorResponse });
 
 const reportedUsageWindowSchema = {
   type: "object",
@@ -40,16 +37,15 @@ const refreshParameter = { name: "refresh", in: "query", required: false, schema
 
 export const usageOpenApiPaths = {
   "/usage": { get: {
-    summary: "Open Usage or inspect all connected, supported providers",
+    summary: "Inspect all connected, supported providers",
     parameters: [refreshParameter],
-    description: "HTML opens the Usage dialog in the AgentsInTheCloud shell. JSON includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key; its main limits come from Claude Code responses through the workspace proxy. AgentsInTheCloud asks Anthropic with a one-token message to its cheapest model only on the first read after start or a credential change, after a window resets, and on refresh. Provider failures are explicit per-provider errors.",
-    responses: jsonAndHtmlResponse("Usage overview", { type: "object", properties: { providers: { type: "array", items: providerUsageSchema } } }),
+    description: "JSON only; in the app, usage shows on each provider in the Models dialog (`GET /models`). Includes provider-reported subscription windows and pacing. Supports OpenAI Codex and Anthropic subscriptions. Anthropic requires OAuth sign-in, not an API key; its main limits come from Claude Code responses through the workspace proxy. AgentsInTheCloud asks Anthropic with a one-token message to its cheapest model only on the first read after start or a credential change, after a window resets, and on refresh. Provider failures are explicit per-provider errors.",
+    responses: jsonResponse("Usage overview", { type: "object", properties: { providers: { type: "array", items: providerUsageSchema } } }),
   } },
-  "/usage/button": { get: { summary: "Usage button perimeter for the most urgent recently used subscription", responses: htmlSurfaceResponses("Server-rendered button frame. Among subscriptions used in the 30 minutes ending at the last recorded inference, shows the active allowance projected to reach 100% soonest before its next reset, at its average consumption rate since the window began. Projections stop at the next reset; limits that will not fill before then have infinite runway. Ties prefer higher usage. Green is Time beyond Usage; red is Usage beyond Time. No ring without recorded activity or an active reported limit.") } },
-  "/usage/overview": { get: { summary: "Refresh the server-rendered Usage overview frame", parameters: [refreshParameter], responses: htmlSurfaceResponses("Usage overview frame") } },
+  "/usage/button": { get: { summary: "Usage button perimeter for the most urgent recently used subscription", responses: htmlSurfaceResponses("Server-rendered button frame; it opens the Models dialog with that provider expanded. Among subscriptions used in the 30 minutes ending at the last recorded inference, shows the active allowance projected to reach 100% soonest before its next reset, at its average consumption rate since the window began. Projections stop at the next reset; limits that will not fill before then have infinite runway. Ties prefer higher usage. Green is Time beyond Usage; red is Usage beyond Time. No ring without recorded activity or an active reported limit.") } },
   "/usage/providers/{provider}": { get: {
     summary: "Refresh subscription limits for a provider",
     parameters: [{ name: "provider", in: "path", required: true, schema: { type: "string", enum: supportedUsageProviders.map((provider) => provider.id) } }, refreshParameter],
-    responses: jsonAndHtmlResponse("Provider usage, including any provider error", providerUsageSchema),
+    responses: jsonResponse("Provider usage, including any provider error", providerUsageSchema),
   } },
 } satisfies Record<string, JsonObject>;

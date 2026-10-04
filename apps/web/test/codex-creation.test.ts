@@ -11,7 +11,7 @@ test("Codex workspace creation requires its subscription before provisioning", a
   const { app, registry } = createTestApp({ provision: async () => { provisioned = true; } });
   const response = await app.fetch(postJson("/workspaces", { agent: { provider: "codex", initialPrompt: "Do not run without authentication" } }));
   expect(response.status).toBe(409);
-  expect((await response.json()).error).toMatchObject({ code: "agent_setup_required", setupUrl: "/settings/models/step?provider=openai-codex" });
+  expect((await response.json()).error).toMatchObject({ code: "agent_setup_required", setupUrl: "/models?connect=openai-codex" });
   expect(provisioned).toBe(false);
   expect(registry.list()).toHaveLength(0);
   expect((await defaultAgentProvider()).id).toBe("builtin");

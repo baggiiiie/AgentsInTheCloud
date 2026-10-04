@@ -16,7 +16,7 @@ import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
-import { parseModelRef } from "@agents-in-the-cloud/llm/server";
+import { parseModelRef, renderModelsDialog } from "@agents-in-the-cloud/llm/server";
 import { getWorkspaceTemplateConfiguration, isGitWorkspaceTemplateInit, isSshAuthenticationFailure, listWorkspaceTemplates, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, workspaceInitFromTemplate, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSummary } from "@agents-in-the-cloud/workspace-templates";
 import { validDraftId } from "@agents-in-the-cloud/prompt/server";
 import {
@@ -573,13 +573,15 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     | { kind: "module-modal"; dialogHtml: string }
     | { kind: "workspace-template-editor"; dialogHtml: string }
     | { kind: "new-workspace"; workspaceTemplate?: WorkspaceTemplateSummary }
-    | { kind: "settings"; request: Request; section: string | undefined; development?: true };
+    | { kind: "settings"; request: Request; section: string | undefined; development?: true }
+    | { kind: "models"; focus: string | undefined };
 
   async function renderWorkspaceShell(selectedId?: string, surface?: ShellSurface, initialSelection?: FixedWorkspacePresentation["initialSelection"]): Promise<string> {
     const pane = await workspacePaneCollections(selectedId ?? "");
     const workspaceTemplateEditor = surface?.kind === "workspace-template-editor" ? surface.dialogHtml : '<div id="workspace-template-editor-modal"></div>';
     const settings = surface?.kind === "settings"
       ? surface.development ? await renderDevelopmentSettingsDialog() : await renderSettingsDialog(surface.request, surface.section)
+      : surface?.kind === "models" ? await renderModelsDialog({ focus: surface.focus })
       : "";
     const launchComposer = surface?.kind === "new-workspace"
       ? surface.workspaceTemplate ? await renderWorkspaceTemplateLaunchComposerFrame(surface.workspaceTemplate) : await renderEmptyLaunchComposerFrame()
@@ -1181,6 +1183,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       return workspaceTemplateEditorResponse(request, { kind: "new" });
     }
     if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
+    if (url.pathname === "/models" && request.method === "GET" && !wantsStream(request) && !url.searchParams.has("host")) return await surfacePage({ kind: "models", focus: url.searchParams.get("focus") ?? undefined });
     if (url.pathname === "/settings/development" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: undefined, development: true });
     if (url.pathname === "/workspaces" && request.method === "GET") return workspaceListEndpoint(request, url);
     if (url.pathname === "/workspaces" && request.method === "POST") return await createWorkspaceEndpoint(request);

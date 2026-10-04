@@ -1,6 +1,6 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { getConfiguredAgentModels } from "./model-preferences.ts";
-import { createPiModelRuntime, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@agents-in-the-cloud/llm/server";
+import { createPiModelRuntime, modelUnavailableReason, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@agents-in-the-cloud/llm/server";
 
 export interface AgentModelOptionView {
   provider: string;
@@ -32,19 +32,14 @@ export async function configuredModelOptionViews(current?: ModelRef | null, runt
   const models = (await getConfiguredAgentModels()).filter((model) => model.provider !== hiddenProvider);
   const availability = await providerAvailability(runtime, models.map((model) => model.provider));
   return models.map((model) => {
-    const { modelIds, connection } = availability.get(model.provider)!;
-    const isAvailable = modelIds.has(model.id);
+    const unavailableReason = modelUnavailableReason(availability.get(model.provider)!, model, runtime);
     return {
       provider: model.provider,
       id: model.id,
       name: model.label,
       selected: current === undefined ? Boolean(model.active) : current !== null && current.provider === model.provider && current.id === model.id,
-      available: isAvailable,
-      unavailableReason: isAvailable ? undefined
-        : connection === "needs_attention" ? "Reconnect in Settings → Models"
-        : !runtime.getModel(model.provider, model.id) ? "Model not found in provider catalog"
-        : connection === "disconnected" ? "Provider not connected"
-        : "Model unavailable for this account",
+      available: !unavailableReason,
+      unavailableReason,
     };
   });
 }

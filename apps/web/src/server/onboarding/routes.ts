@@ -5,7 +5,7 @@ import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { agentsInTheCloudBrandIconHtml } from "@agents-in-the-cloud/design-system/icons";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { hasWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { hasAvailableConfiguredModel, renderModelSetupDialog } from "@agents-in-the-cloud/llm/server";
+import { hasAvailableConfiguredModel, renderModelsDialog } from "@agents-in-the-cloud/llm/server";
 import { renderGitHubConnectButton, renderGitHubSetup } from "../settings/github.ts";
 import { update } from "@agents-in-the-cloud/shared/http";
 
@@ -13,13 +13,13 @@ export async function renderOnboardingDialog(options: { includeCompleted?: boole
   if (!options.includeCompleted && !options.resumeAfter && await onboardingCompleted()) return "";
   const githubConnected = hasWorkspaceGitHubToken();
   const modelsReady = await hasAvailableConfiguredModel();
-  if (options.resumeAfter) return renderModelSetupDialog("onboarding");
-  if (!options.includeCompleted && githubConnected) return modelsReady ? "" : renderModelSetupDialog("onboarding");
+  if (options.resumeAfter) return renderModelsDialog({ host: "onboarding" });
+  if (!options.includeCompleted && githubConnected) return modelsReady ? "" : renderModelsDialog({ host: "onboarding" });
 
   const needsModelsStep = options.includeCompleted || !modelsReady;
   const caption = githubConnected ? "Continue" : "Continue without GitHub";
   const continueAction = needsModelsStep
-    ? actionLinkHtml({ href: "/onboarding/models", variant: "secondary", content: { kind: "caption", caption }, attributesHtml: 'data-turbo-stream="true"' })
+    ? actionLinkHtml({ href: "/models?host=onboarding", variant: "secondary", content: { kind: "caption", caption }, attributesHtml: 'data-turbo-stream="true"' })
     : `<form method="post" action="/onboarding/finish" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption } })}</form>`;
   return dialogHtml({
     element: { id: "onboarding_dialog", attributesHtml: "data-dialog-auto-show" },
@@ -34,7 +34,6 @@ export async function renderOnboardingDialog(options: { includeCompleted?: boole
 }
 
 export async function handleOnboardingRequest(request: Request, url: URL): Promise<Response | undefined> {
-  if (url.pathname === "/onboarding/models" && request.method === "GET") return turboStreamResponse(update("onboarding_modal_host", await renderModelSetupDialog("onboarding")));
   if (url.pathname === "/onboarding/finish" && request.method === "POST") return finishOnboarding();
   if (url.pathname === "/onboarding" && request.method === "GET") {
     const html = await renderOnboardingDialog({ includeCompleted: true });

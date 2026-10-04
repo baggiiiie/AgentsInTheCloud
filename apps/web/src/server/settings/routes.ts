@@ -1,6 +1,6 @@
 import { handleAccessSettings } from "./access.ts";
 import { handleGitHubSettingsRequest } from "./github.ts";
-import { handleModelSettingsRequest } from "@agents-in-the-cloud/llm/server";
+import { handleModelsRequest } from "@agents-in-the-cloud/llm/server";
 import { finishOnboarding } from "../onboarding/state.ts";
 import { handleSettingsPageRequest, type WorkspaceCleanupResult } from "./page.ts";
 import { listSettingsContributions } from "./registry.ts";
@@ -15,7 +15,7 @@ export async function handleSettingsRequest(
     ?? await handleThemeSettingsRequest(request, url, options.themeChanged)
     ?? await handleSettingsPageRequest(request, url, options)
     ?? await handleGitHubSettingsRequest(request, url)
-    ?? await handleModelSettingsRequest(request, url, options.renderModelPickerUpdates, finishOnboarding);
+    ?? await handleModelsRequest(request, url, options.renderModelPickerUpdates, finishOnboarding);
   if (response) return response;
 
   for (const contribution of listSettingsContributions()) {

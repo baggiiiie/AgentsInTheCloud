@@ -57,7 +57,7 @@ Other browser-navigable surfaces are:
 /workspaces/new                                           # Launch composer for an empty workspace
 /workspace-templates/:workspaceTemplateId/workspaces/new  # Launch composer for a workspace from a template
 /workspace-templates/new                                  # Add a template
-/usage                                  # Provider-reported limits
+/models                                 # Models: providers, their usage, and your models
 /settings                               # AgentsInTheCloud settings
 /settings?section=models                # A specific settings section
 /settings/development                   # Development settings
@@ -176,13 +176,14 @@ their reported usage, with null reset and timing values and timing state `unknow
 Null buckets are omitted; monetary extra usage is not a paced allowance. Anthropic
 does not report a plan name or account-wide allowed/limit-reached flags, so these
 are null.
-The HTML representations drive the Usage dialog next to workspace Settings.
+In the app, each provider’s usage shows on its card in the Models dialog; the
+workspace Usage button opens that dialog with its provider expanded.
 
 Each result includes provider-reported windows, their durations and resets,
 and pacing relative to elapsed time. Provider failures populate `error`.
 The Usage feature does not record or persist installation-wide token totals.
 
-The Usage dialog groups provider-reported 0% windows under **Unused limits**
+A provider card groups provider-reported 0% windows under **Unused limits**
 (collapsed when there are used limits, expanded when all limits are unused)
 and renders reset countdowns such as `3d 12h`. The workspace Usage button traces
 Time and Usage for the subscription whose active allowance is furthest ahead of pace
@@ -191,7 +192,7 @@ last recorded inference. Limits are checked at display time, not frozen at the t
 of that inference. Built-in Agent inference and connected-subscription CLI traffic
 through workspace egress contribute activity; API-key traffic does not. Activity is
 kept in memory and cleared on credential changes. The button refreshes every minute
-while visible, on focus, and after a dialog refresh. No recorded activity or no
+while visible, on focus, and whenever a provider card loads fresh limits. No recorded activity or no
 available active limits means no comparison ring. Both arcs start at twelve
 o’clock and run clockwise on the same circle. Their shared portion is neutral;
 Time beyond Usage is green, and Usage beyond Time is red. A dim full-circle
@@ -205,11 +206,11 @@ Expired/not-started windows and windows with unknown reset timing are excluded.
 Each window also includes `timing`: the inferred start (`reset − duration`),
 elapsed-time percentage, and usage-minus-time difference in percentage points.
 `paceDifferenceSeconds` converts that difference to distance along the allowance
-schedule (`paceDifferencePoints / 100 × durationSeconds`). The dialog and button
+schedule (`paceDifferencePoints / 100 × durationSeconds`). Provider cards and the button
 label show compact durations such as `30m ahead of pace` or `1d 4h behind pace`.
 Positive means consumption is ahead; negative means behind. This is not time
 until exhaustion. Both difference fields are null outside an active window.
-The dialog shows Time and Usage percentages above one comparison bar per allowance.
+Each provider card shows Time and Usage percentages above one comparison bar per allowance.
 Both grow from the left: overlap is neutral, Time beyond Usage is green, and Usage
 beyond Time is red. Outside an active window the bar stays neutral. This is a linear pacing
 reference, not a billing forecast; pacing is omitted before a window starts or

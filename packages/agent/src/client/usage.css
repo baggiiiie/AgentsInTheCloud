@@ -1,10 +1,5 @@
-#usage_dialog { width: min(720px, calc(100vw - 32px)); }
-.usage-overview { display: grid; gap: 12px; }
 .usage-caption { margin: 0; color: var(--text-muted); line-height: var(--leading-standard); font-size: var(--text-small); }
-.usage-provider { display: grid; gap: 12px; }
-.usage-provider-heading, .usage-limit-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
-.usage-provider-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--text-title); }
-.usage-plan { color: var(--text-muted); text-transform: capitalize; }
+.usage-limit-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
 .usage-section { display: grid; gap: 8px; }
 .usage-limit h3 { margin: 0; font-size: var(--text-body); }
 .usage-limit { display: grid; min-width: 0; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-surface); background: var(--bg); }
@@ -20,10 +15,9 @@
 
 .usage-unused > .usage-section { margin-top: 8px; }
 
-.usage-provider-icon { width: 28px; height: 28px; border-radius: var(--radius-control); display: grid; place-items: center; background: var(--provider-color); color: #fff; flex-shrink: 0; }
-.usage-provider-icon .brand-icon { width: 18px; height: 18px; }
-.usage-provider-icon .brand-icon-fallback { width: 100%; height: 100%; }
 .usage-error { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-surface); padding: 8px; }
+.usage-unavailable { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-surface); color: var(--text); }
+.usage-unavailable p { margin: 0; }
 
 .usage-account { display: grid; gap: 8px; margin: 0; font-size: var(--text-small); }
 .usage-account dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }

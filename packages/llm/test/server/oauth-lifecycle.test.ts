@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as models from "../../src/server/pi-config-models.ts";
-import { handleModelSettingsRequest } from "../../src/server/settings.ts";
+import { handleModelsRequest } from "../../src/server/models-panel.ts";
 
 let directory: string | undefined;
 let previous: string | undefined;
@@ -28,9 +28,9 @@ test("a new provider login cancels its abandoned pending attempt instead of queu
     });
   });
   try {
-    const url = new URL("http://localhost/settings/models/step?provider=openai-codex");
+    const url = new URL("http://localhost/models/providers/openai-codex/connect");
     for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await handleModelSettingsRequest(new Request(url), url, async () => "", async () => new Response());
+      const response = await handleModelsRequest(new Request(url, { method: "POST" }), url, async () => "", async () => new Response());
       expect(response?.status).toBe(200);
     }
     expect(signals).toHaveLength(2);

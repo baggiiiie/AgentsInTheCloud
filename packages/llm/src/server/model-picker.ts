@@ -30,7 +30,7 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
   const hasAvailableModel = models.some((model) => model.available !== false);
   const menuId = `${formId}_popup`;
   const setupAction = 'data-controller="agent-model-setup" data-action="click->agent-model-setup#open"';
-  const configure = actionItemHtml({ kind: "single", label: { kind: "text", text: "Configure models" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
+  const configure = actionItemHtml({ kind: "single", label: { kind: "text", text: "Manage models…" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
   const modelItems = models.map((model) => {
     return actionItemHtml({
       kind: "single",

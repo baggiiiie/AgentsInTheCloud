@@ -1,12 +1,11 @@
 import { response } from "@agents-in-the-cloud/shared/http";
 import { requestAcceptsJson } from "@agents-in-the-cloud/core";
-import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, secondsUntilUsageLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@agents-in-the-cloud/llm/server";
+import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, secondsUntilUsageLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview } from "@agents-in-the-cloud/llm/server";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
-import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { helpTipHtml } from "@agents-in-the-cloud/design-system/help-tip";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
+import { escapeHtml, turboStream, turboStreamResponse } from "@agents-in-the-cloud/shared";
 
 function jsonResponse<Body extends object>(body: Body, status = 200): Response {
   return Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -21,9 +20,6 @@ export function renderUsagePaneAction(): string {
   ].join(" ");
   return `<span data-controller="usage-button" data-action="${actions}"><template data-usage-button-target="empty">${button}</template><turbo-frame id="usage_button_content">${button}</turbo-frame></span>`;
 }
-const overviewFrameId = "usage_overview";
-const providerPath = (id: string, refresh: boolean) => `/usage/providers/${encodeURIComponent(id)}${refresh ? "?refresh=1" : ""}`;
-const providerFrameId = (id: string) => `usage_provider_${id}`;
 const number = (value: number) => value.toLocaleString("en-US", { maximumFractionDigits: 1 });
 
 /** Two compact units for allowance windows, reset countdowns, and pacing gaps. */
@@ -82,8 +78,9 @@ function shownUsageWindows(windows: PacedUsageWindow[]) {
   };
 }
 
+/** A failed usage check says nothing about whether the provider's models work, so it reads as a note, not an alert. */
 function renderUsageLimits({ reported, error, windows }: ProviderUsageOverview): string {
-  if (error) return `<p class="usage-error" role="alert">${escapeHtml(error)}</p>`;
+  if (error) return `<div class="usage-unavailable" role="status"><p>Couldn’t check usage limits. This only affects the usage shown here; your models may still work fine.</p><p class="usage-caption">${escapeHtml(error)}</p></div>`;
   if (!reported) return "<p>Disconnected.</p>";
   const { used, unused } = shownUsageWindows(windows);
   return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length || reported.balance ? "" : '<p>No limits reported.</p>'}`;
@@ -104,16 +101,6 @@ function renderUsageAccount({ reported, error }: ProviderUsageOverview): string 
   return `<article class="usage-limit"><h3>${balance ? "Credits" : "Account allowance"}</h3><dl class="usage-account">${rows.join("")}</dl></article>`;
 }
 
-function renderUsageProvider(overview: ProviderUsageOverview): string {
-  const { reported } = overview;
-  return `<section class="usage-provider" data-controller="usage-snapshot"><header class="usage-provider-heading"><h2>${providerBadgeHtml(overview.provider.id, overview.provider.label, "usage-provider-icon")}${escapeHtml(overview.provider.label)}</h2>${reported?.plan ? `<span class="usage-plan">${escapeHtml(reported.plan)}</span>` : ""}</header>
-    <section class="usage-section">
-      ${renderUsageLimits(overview)}
-      ${renderUsageAccount(overview)}
-    </section>
-  </section>`;
-}
-
 function usageWindowCaption(window: PacedUsageWindow["reported"]): string {
   return window.meteredFeature === null ? usageDuration(window.durationSeconds).split(" ")[0]! : window.limitName.slice(0, 2);
 }
@@ -131,14 +118,16 @@ function renderUsageRings({ provider, reported, error, windows }: ProviderUsageO
   return `<turbo-frame class="usage-rings" id="${providerUsageFrameId("rings", provider.id, scope)}">${rings || balance || `<span class="usage-caption"${error ? ` title="${escapeHtml(error)}"` : ""}>Usage unavailable</span>`}</turbo-frame>`;
 }
 
-/** Limits alone, for surfaces that already name the provider. */
+/** Limits alone, for the provider card that already names the provider. Showing fresh limits also refreshes the Usage button. */
 function renderUsageProviderLimits(overview: ProviderUsageOverview, scope: string): string {
-  return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section></turbo-frame>`;
+  return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section" data-controller="usage-snapshot">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section></turbo-frame>`;
 }
 
-function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: number }, label = "Usage", caption?: string): string {
+/** Opens the Models dialog, with the provider whose limit the ring shows already open. */
+function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: number }, label = "Usage", caption?: string, provider?: string): string {
   const iconHtml = caption === undefined ? Icons.Usage : `<span class="comparison-ring__caption">${escapeHtml(caption)}</span>`;
-  return actionLinkHtml({ href: "/usage", variant: "secondary", content: { kind: "icon-only", iconHtml, label }, perimeterComparison: comparison, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` });
+  const href = provider ? `/models?focus=${encodeURIComponent(provider)}` : "/models";
+  return actionLinkHtml({ href, variant: "secondary", content: { kind: "icon-only", iconHtml, label }, perimeterComparison: comparison, attributesHtml: 'data-turbo-stream="true"' });
 }
 
 async function renderUsageButton(): Promise<string> {
@@ -150,29 +139,10 @@ async function renderUsageButton(): Promise<string> {
   const { provider, window: { reported, timing } } = selected;
   if (timing.state !== "active") throw new Error("Selected subscription limit must be active");
   const pace = usagePace(timing.paceDifferenceSeconds);
-  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace} · Providers from 30 minutes before last inference`, usageWindowCaption(reported));
+  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace} · Providers from 30 minutes before last inference`, usageWindowCaption(reported), provider.id);
 }
 
-function providerPlaceholder(provider: UsageProvider, refresh: boolean): string {
-  return `<turbo-frame id="${providerFrameId(provider.id)}" src="${escapeHtml(providerPath(provider.id, refresh))}"><section class="usage-provider"><h2>${escapeHtml(provider.label)}</h2><p role="status"><span class="status-spinner" aria-hidden="true"></span> Loading…</p></section></turbo-frame>`;
-}
-
-async function renderUsageOverview(refresh = false): Promise<string> {
-  const providers = await connectedUsageProviders();
-  return `<turbo-frame id="${overviewFrameId}" class="usage-overview">${providers.map((provider) => providerPlaceholder(provider, refresh)).join("") || '<p class="usage-caption">Connect OpenAI Codex or an Anthropic subscription in Settings to see usage.</p>'}</turbo-frame>`;
-}
-
-async function renderUsageDialog(): Promise<string> {
-  return dialogHtml({
-    element: { id: "usage_dialog", attributesHtml: "data-dialog-auto-show" },
-    iconHtml: Icons.Usage,
-    titleCaption: "Usage",
-    bodyHtml: await renderUsageOverview(),
-    footerHtml: actionLinkHtml({ href: "/usage/overview?refresh=1", variant: "secondary", content: { kind: "caption", caption: "Refresh" }, attributesHtml: `data-turbo-frame="${overviewFrameId}"` }),
-  });
-}
-
-export async function handleUsageRequest(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
+export async function handleUsageRequest(request: Request, url: URL): Promise<Response | undefined> {
   if (request.method !== "GET") return undefined;
   const json = requestAcceptsJson(request);
   const refresh = url.searchParams.has("refresh");
@@ -182,23 +152,15 @@ export async function handleUsageRequest(request: Request, url: URL, context: Wo
       ? turboStreamResponse(turboStream("update", "usage_button_content", button))
       : response(`<turbo-frame id="usage_button_content">${button}</turbo-frame>`);
   }
-  if (url.pathname === "/usage") {
-    if (json) return jsonResponse({ providers: await Promise.all((await connectedUsageProviders()).map((provider) => getProviderUsageOverview(provider, { refresh }))) });
-    const dialog = await renderUsageDialog();
-    return request.headers.has("turbo-frame")
-      ? response(`<turbo-frame id="${workspaceModuleModalFrameId}">${dialog}</turbo-frame>`)
-      : context.renderModalPage(dialog);
-  }
-  if (url.pathname === "/usage/overview") return response(await renderUsageOverview(refresh));
+  if (url.pathname === "/usage" && json) return jsonResponse({ providers: await Promise.all((await connectedUsageProviders()).map((provider) => getProviderUsageOverview(provider, { refresh }))) });
+  // The bare provider URL is JSON only; its limits and rings frames are what Models panel cards embed.
   const match = url.pathname.match(/^\/usage\/providers\/([^/]+)(?:\/(limits|rings))?$/);
-  if (!match) return undefined;
+  if (!match || (!match[2] && !json)) return undefined;
   const provider = supportedUsageProviders.find((provider) => provider.id === match[1]);
   if (!provider) return jsonResponse({ error: { code: "unsupported_usage_provider", message: "Subscription usage is not supported for this provider." } }, 404);
   const overview = await getProviderUsageOverview(provider, { refresh });
-  if (json) return jsonResponse(overview);
-  // Surfaces that embed these frames name their scope so their frame ids match.
+  if (!match[2]) return jsonResponse(overview);
+  // Each Models panel host names its scope so its frame ids match.
   const scope = url.searchParams.get("scope") ?? "";
-  if (match[2] === "limits") return response(renderUsageProviderLimits(overview, scope));
-  if (match[2] === "rings") return response(renderUsageRings(overview, scope));
-  return response(`<turbo-frame id="${providerFrameId(provider.id)}">${renderUsageProvider(overview)}</turbo-frame>`);
+  return response(match[2] === "limits" ? renderUsageProviderLimits(overview, scope) : renderUsageRings(overview, scope));
 }
