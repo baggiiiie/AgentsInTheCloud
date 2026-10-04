@@ -46,6 +46,9 @@
 .action-item__status { flex: 0 0 auto; }
 .action-item__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 .action-item__actions > form { display: flex; margin: 0; }
+/* Leading controls sit in the row's start padding and stay visible; the primary action keeps its own hit area. */
+.action-item:has(> .action-item__actions--leading) { padding-inline-start: 2px; }
+.action-item__actions--leading { margin-inline-end: 2px; }
 .action-item__actions--engaged { opacity: 0; pointer-events: none; }
 .action-item:is(:hover, :has(:focus-visible), :has(> .action-item__actions--engaged :popover-open)) > .action-item__actions--engaged { opacity: 1; pointer-events: auto; }
 /* Idle titles use the whole content area, including selected items. Hover,

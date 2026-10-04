@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addProject, createProjectSecret, updateProjectSecret, deleteProjectSecret, type GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
+import { addWorkspaceTemplate, createWorkspaceTemplateSecret, updateWorkspaceTemplateSecret, deleteWorkspaceTemplateSecret, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
 import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearWorkspaceGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setWorkspaceGitHubToken } from "../../src/secrets/workspace-secrets.ts";
 
-function projectInit(projectId: string): GitProjectInitInstruction {
-  return { type: "project.git", projectId, name: "Project", gitUrl: "https://github.com/org/repo.git", branch: null, sessionShareKey: "Project" };
+function workspaceTemplateInit(workspaceTemplateId: string): GitWorkspaceTemplateInitInstruction {
+  return { type: "project.git", projectId: workspaceTemplateId, name: "Project", gitUrl: "https://github.com/org/repo.git", branch: null, sessionShareKey: "Project" };
 }
 
 describe("workspace secrets", () => {
@@ -45,13 +45,13 @@ describe("workspace secrets", () => {
   });
 
   test("includes encrypted project secrets with default and custom placeholders", async () => {
-    const project = (await addProject("https://github.com/org/repo.git")).project;
-    await createProjectSecret(project.id, { envName: "API_TOKEN", hostPattern: "api.example.com, *.example.org", secretValue: "real-secret" });
-    await createProjectSecret(project.id, { envName: "STRICT_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "strict-secret" });
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern: "api.example.com, *.example.org", secretValue: "real-secret" });
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "STRICT_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "strict-secret" });
 
-    await createProjectSecret(project.id, { envName: "MISSING_TOKEN", hostPattern: "api.example.com", annotation: "Integration tests" });
-    await createProjectSecret(project.id, { envName: "OPTIONAL_TOKEN", hostPattern: "api.example.com", optional: true });
-    const context = await createWorkspaceSecretContext("test-workspace", projectInit(project.id));
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "MISSING_TOKEN", hostPattern: "api.example.com", annotation: "Integration tests" });
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "OPTIONAL_TOKEN", hostPattern: "api.example.com", optional: true });
+    const context = await createWorkspaceSecretContext("test-workspace", workspaceTemplateInit(workspaceTemplate.id));
     expect(context.env).not.toHaveProperty("MISSING_TOKEN");
     expect(context.env).not.toHaveProperty("OPTIONAL_TOKEN");
     const result = await context.hooks.onRequest(new Request("https://api.example.com/v1/sk-test-placeholder", { headers: { authorization: "Bearer sk-test-placeholder" } }));
@@ -65,9 +65,9 @@ describe("workspace secrets", () => {
   });
 
   test.each(["api.example.com; *.example.org", " ; api.example.com, ; *.example.org;; "])("accepts semicolon-separated secret hosts: %s", async (hostPattern) => {
-    const project = (await addProject("https://github.com/org/repo.git")).project;
-    await createProjectSecret(project.id, { envName: "API_TOKEN", hostPattern, secretValue: "real-secret" });
-    const context = await createWorkspaceSecretContext("test-workspace", projectInit(project.id));
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern, secretValue: "real-secret" });
+    const context = await createWorkspaceSecretContext("test-workspace", workspaceTemplateInit(workspaceTemplate.id));
 
     expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "ATELIER_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
     for (const host of ["api.example.com", "service.example.org"]) {
@@ -78,9 +78,9 @@ describe("workspace secrets", () => {
   });
 
   test("reloads persisted project secrets when rebuilding context after restart", async () => {
-    const project = (await addProject("https://github.com/org/repo.git")).project;
-    await createProjectSecret(project.id, { envName: "PACKAGE_TOKEN", hostPattern: "registry.example.com", placeholder: "PACKAGE_TOKEN", secretValue: "real-package-secret" });
-    const init = projectInit(project.id);
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "PACKAGE_TOKEN", hostPattern: "registry.example.com", placeholder: "PACKAGE_TOKEN", secretValue: "real-package-secret" });
+    const init = workspaceTemplateInit(workspaceTemplate.id);
     await createWorkspaceSecretContext("test-workspace", init);
     forgetWorkspaceSecretContext("test-workspace");
 
@@ -96,29 +96,29 @@ describe("workspace secrets", () => {
   });
 
   test("new, replaced and deleted secrets take effect on running workspace egress without restart", async () => {
-    const project = (await addProject("https://github.com/org/repo.git")).project;
-    const init = projectInit(project.id);
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
+    const init = workspaceTemplateInit(workspaceTemplate.id);
     const initial = await createWorkspaceSecretContext("test-workspace", init);
     expect(initial.env.TOKEN).toBeUndefined();
-    const secret = await createProjectSecret(project.id, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "first" });
+    const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "first" });
     const load = () => getWorkspaceSecretContext("test-workspace", async () => init);
     const first = await load();
     const outbound = () => new Request("https://api.example.com/", { headers: { authorization: "Bearer ATELIER_PROXY_READY_TOKEN" } });
     expect((await first.hooks.onRequest(outbound())).headers.get("authorization")).toBe("Bearer first");
     // The old process's environment is unchanged; callers explicitly supply the placeholder.
     expect(initial.env.TOKEN).toBeUndefined();
-    await updateProjectSecret(project.id, secret.id, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "second" });
+    await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "second" });
     expect((await (await load()).hooks.onRequest(outbound())).headers.get("authorization")).toBe("Bearer second");
-    await deleteProjectSecret(project.id, secret.id);
+    await deleteWorkspaceTemplateSecret(workspaceTemplate.id, secret.id);
     expect((await load()).env.TOKEN).toBeUndefined();
   });
 
   test("path injection defaults to Telegram only and respects live per-secret overrides", async () => {
     setWorkspaceGitHubToken("github-credential");
-    const project = (await addProject("https://github.com/org/path-secrets.git")).project;
-    const init = projectInit(project.id);
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/path-secrets.git")).workspaceTemplate;
+    const init = workspaceTemplateInit(workspaceTemplate.id);
     const values = { envName: "BOT_TOKEN", hostPattern: "api.telegram.org", secretValue: "123:telegram-credential" };
-    const bot = await createProjectSecret(project.id, values);
+    const bot = await createWorkspaceTemplateSecret(workspaceTemplate.id, values);
     const load = () => getWorkspaceSecretContext("test-workspace", async () => init);
     for (const scheme of ["http", "https"]) {
       const context = await load();
@@ -129,14 +129,14 @@ describe("workspace secrets", () => {
     }
     const botRequest = () => new Request("https://api.telegram.org/botATELIER_PROXY_READY_BOT_TOKEN/getMe");
     expect((await (await load()).hooks.onRequest(botRequest())).url).toBe("https://api.telegram.org/bot123:telegram-credential/getMe");
-    await updateProjectSecret(project.id, bot.id, { ...values, allowInPath: false });
+    await updateWorkspaceTemplateSecret(workspaceTemplate.id, bot.id, { ...values, allowInPath: false });
     expect((await (await load()).hooks.onRequest(botRequest())).url).toBe(botRequest().url);
-    await updateProjectSecret(project.id, bot.id, { ...values, allowInPath: true });
+    await updateWorkspaceTemplateSecret(workspaceTemplate.id, bot.id, { ...values, allowInPath: true });
     expect((await (await load()).hooks.onRequest(botRequest())).url).toContain("bot123:telegram-credential/");
-    const custom = await createProjectSecret(project.id, { envName: "CUSTOM", hostPattern: "api.example.com", secretValue: "custom-credential", allowInPath: true });
+    const custom = await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "CUSTOM", hostPattern: "api.example.com", secretValue: "custom-credential", allowInPath: true });
     const customRequest = () => new Request("https://api.example.com/ATELIER_PROXY_READY_CUSTOM");
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe("https://api.example.com/custom-credential");
-    await updateProjectSecret(project.id, custom.id, { envName: "CUSTOM", hostPattern: "api.example.com", allowInPath: false });
+    await updateWorkspaceTemplateSecret(workspaceTemplate.id, custom.id, { envName: "CUSTOM", hostPattern: "api.example.com", allowInPath: false });
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe(customRequest().url);
   });
 

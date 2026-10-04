@@ -50,7 +50,7 @@ describe("initial Agent prompt drafts", () => {
     expect(secondRender).not.toContain("Wait for a model");
   });
 
-  test("discards a project-preparation suggestion left by an older server", async () => {
+  test("discards a workspace-template-preparation suggestion left by an older server", async () => {
     await useTemporaryDataDir();
     const path = join(temporaryDataDir!, "agent-initial-prompt-drafts", "workspace-1", "agent-a.json");
     await mkdir(dirname(path), { recursive: true });

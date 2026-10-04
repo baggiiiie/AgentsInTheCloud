@@ -3,7 +3,7 @@ import { createAgentsInTheCloudEventBus, getAgentsInTheCloudRuntimeContext } fro
 import { designSystemCatalogueHtml } from "@agents-in-the-cloud/design-system/catalogue";
 import { attachHostObservableTerminal, observableTerminalCols, observableTerminalRows, type ObservableTerminalConnection } from "@agents-in-the-cloud/observable-terminal/server";
 import { deliverAttachmentDraft, removeAttachmentDraft, validDraftId } from "@agents-in-the-cloud/prompt/server";
-import { requestWorkspaceSshTrust } from "@agents-in-the-cloud/projects";
+import { requestWorkspaceSshTrust } from "@agents-in-the-cloud/workspace-templates";
 import {
   createFileOriginIdentityStore,
   createWorkspaceIngress,
@@ -98,7 +98,7 @@ app = createWebApp({
 
 agentsInTheCloudEvents.on("workspace_user_activity", ({ workspaceId }) => registry.touch(workspaceId));
 agentsInTheCloudEvents.on("workspace_title_changed", ({ workspaceId, title }) => registry.setTitle(workspaceId, title || null));
-// Discover identity and project metadata before serving. Runtime health is checked in the background.
+// Discover identity and template metadata before serving. Runtime health is checked in the background.
 const persistedWorkspaces = (await listWorkspaces({ inspectImages: false })).workspaces;
 await registry.seed(persistedWorkspaces.map((workspace) => ({ ...workspace, provisioning: !workspace.parked })));
 

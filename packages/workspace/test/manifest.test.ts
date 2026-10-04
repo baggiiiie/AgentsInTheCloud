@@ -18,11 +18,11 @@ describe("workspace manifest config seeding", () => {
     expect(parse({
       version: 1,
       seedPiConfig: { authJson: "/nested/auth.json", modelsJson: "/nested/models.json", modelsStoreJson: "/nested/models-store.json" },
-      seedAgentsInTheCloudConfig: { projectsJson: "/nested/projects.json" },
+      seedAgentsInTheCloudConfig: { projectsJson: "/nested/workspace-templates.json" },
     })).toEqual({
       version: 1,
       seedPiConfig: { authJson: "/nested/auth.json", modelsJson: "/nested/models.json", modelsStoreJson: "/nested/models-store.json" },
-      seedAgentsInTheCloudConfig: { projectsJson: "/nested/projects.json" },
+      seedAgentsInTheCloudConfig: { projectsJson: "/nested/workspace-templates.json" },
     });
   });
 
@@ -51,7 +51,7 @@ describe("workspace manifest Docker configuration", () => {
     expect(parse({ version: 1 })).toEqual({ version: 1 });
     const removedSettings: JsonObject[] = [{}, { privileged: true }, { privileged: false }, { privileged: "true" }];
     for (const docker of removedSettings) {
-      expectInvalid({ version: 1, docker }, "docker settings are no longer supported; use Project settings");
+      expectInvalid({ version: 1, docker }, "docker settings are no longer supported; use template settings");
     }
   });
 

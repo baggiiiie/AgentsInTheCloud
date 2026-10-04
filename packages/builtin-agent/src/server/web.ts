@@ -1,6 +1,6 @@
 import { AgentsInTheCloudCoreError, createKeyedOperationQueue, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { builtinAgentIconHtml } from "@agents-in-the-cloud/design-system/icons";
-import type { WorkspaceAgentTabProvider, WorkspaceCommandContribution, WorkspaceModule } from "@agents-in-the-cloud/shared";
+import { launchComposerCommand, type WorkspaceAgentTabProvider, type WorkspaceCommandContribution, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { registerAgentEvents } from "./agent-events.ts";
 import { resolveAgentConversation } from "./delegation.ts";
 import { removeWorkspaceInitialPromptDrafts } from "./initial-prompt-draft.ts";
@@ -71,12 +71,12 @@ export const workspaceAgentTabProvider = createWorkspaceAgentTabProvider({
   archive: archiveWorkspaceAgentConversation,
 });
 
-const projectAgentWorkspaceCommand: WorkspaceCommandContribution = {
-  id: "agent.open-launch-composer",
-  label: "New Workspace With Same Project",
-  description: "Open a LaunchComposer using the current Workspace's Project.",
+const launchComposerCommandContribution: WorkspaceCommandContribution = {
+  id: launchComposerCommand.id,
+  label: launchComposerCommand.label,
+  description: launchComposerCommand.description,
   scope: "global",
-  surfaces: { shortcut: { defaultBinding: "Meta+Alt+Quote" } },
+  surfaces: { shortcut: { defaultBinding: launchComposerCommand.binding } },
 };
 
 async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, source: WorkspaceAgentConversationInfo | undefined, events?: AgentsInTheCloudEventBus): Promise<void> {
@@ -171,7 +171,7 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
     context.onWorkspaceRemoved(removeWorkspaceInitialPromptDrafts);
   },
   attachToWorkspace() {
-    return { commands: [projectAgentWorkspaceCommand] };
+    return { commands: [launchComposerCommandContribution] };
   },
 };
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { addProject, createProjectEnvironmentVariable, createProjectSecret, deleteProjectEnvironmentVariable, deleteProjectSecret, getProjectConfiguration, isGitProjectInit, listProjects, updateProject, projectWorkspaceInit, setProjectDockerfile, updateProjectSecret } from "@agents-in-the-cloud/projects";
+import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplateEnvironmentVariable, deleteWorkspaceTemplateSecret, getWorkspaceTemplateConfiguration, isGitWorkspaceTemplateInit, listWorkspaceTemplates, updateWorkspaceTemplate, workspaceInitFromTemplate, setWorkspaceTemplateDockerfile, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
 import { workspaceWarnings } from "../src/server/workspace-warnings.ts";
 import type { WorkspaceEntry } from "../src/server/workspace-registry.ts";
 import { temporaryAgentsInTheCloudDataDir } from "./support/test-web-app.ts";
@@ -13,49 +13,49 @@ function entry(init?: WorkspaceEntry["init"]): WorkspaceEntry {
 }
 
 async function warningsFor(workspace: WorkspaceEntry) {
-  return workspaceWarnings(workspace, isGitProjectInit(workspace.init) ? await getProjectConfiguration(workspace.init.projectId) : undefined);
+  return workspaceWarnings(workspace, isGitWorkspaceTemplateInit(workspace.init) ? await getWorkspaceTemplateConfiguration(workspace.init.projectId) : undefined);
 }
 
 test("setup changes are compared to creation, survive reconstruction, and reverting removes the condition", async () => {
-  const { project } = await addProject("https://github.com/org/example.git");
-  const workspace = entry(projectWorkspaceInit(project));
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/example.git");
+  const workspace = entry(workspaceInitFromTemplate(workspaceTemplate));
   expect(await warningsFor(workspace)).toEqual([]);
-  const variable = await createProjectEnvironmentVariable(project.id, { name: "REGION", value: "eu" });
+  const variable = await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "REGION", value: "eu" });
   const changed = await warningsFor(workspace);
   expect(changed.map((warning) => warning.kind)).toEqual(["project-settings-changed"]);
   expect(await warningsFor(entry(JSON.parse(JSON.stringify(workspace.init))))).toEqual(changed);
-  expect(await warningsFor(entry(projectWorkspaceInit((await listProjects()).projects[0]!)))).toEqual([]);
-  await deleteProjectEnvironmentVariable(project.id, variable.id);
+  expect(await warningsFor(entry(workspaceInitFromTemplate((await listWorkspaceTemplates()).workspaceTemplates[0]!)))).toEqual([]);
+  await deleteWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, variable.id);
   expect(await warningsFor(workspace)).toEqual([]);
-  await setProjectDockerfile(project.id, "FROM agents-in-the-cloud-workspace\nRUN echo ready");
+  await setWorkspaceTemplateDockerfile(workspaceTemplate.id, "FROM agents-in-the-cloud-workspace\nRUN echo ready");
   expect((await warningsFor(workspace))[0]!.state).not.toBe(changed[0]!.state);
 });
 
 test("renaming a project is not a setup change", async () => {
-  const { project } = await addProject("https://github.com/org/example.git");
-  const workspace = entry(projectWorkspaceInit(project));
-  await updateProject(project.id, { name: "Renamed", spec: "https://github.com/org/example.git" });
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/example.git");
+  const workspace = entry(workspaceInitFromTemplate(workspaceTemplate));
+  await updateWorkspaceTemplate(workspaceTemplate.id, { name: "Renamed", spec: "https://github.com/org/example.git" });
   expect(await warningsFor(workspace)).toEqual([]);
 });
 
 test("missing mandatory secrets and changed settings are separate, while annotations are live metadata", async () => {
-  const { project } = await addProject("https://github.com/org/example.git");
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/example.git");
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
-  const secret = await createProjectSecret(project.id, values);
-  const workspace = entry(projectWorkspaceInit((await listProjects()).projects[0]!));
+  const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, values);
+  const workspace = entry(workspaceInitFromTemplate((await listWorkspaceTemplates()).workspaceTemplates[0]!));
   expect((await warningsFor(workspace)).map((warning) => warning.kind)).toEqual(["missing-secrets"]);
-  await updateProjectSecret(project.id, secret.id, { ...values, annotation: "Tests", optional: true });
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "Tests", optional: true });
   expect(await warningsFor(workspace)).toEqual([]);
-  await updateProjectSecret(project.id, secret.id, { ...values, secretValue: "never expose this" });
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "never expose this" });
   const warnings = await warningsFor(workspace);
   expect(warnings.map((warning) => warning.kind)).toEqual(["project-settings-changed"]);
   expect(JSON.stringify(warnings)).not.toContain("never expose this");
 });
 
 test("legacy snapshots do not invent configuration drift; gateway and image issues remain independent", async () => {
-  const { project } = await addProject("https://github.com/org/example.git");
-  const workspace = entry({ type: "project.git", projectId: project.id, name: project.name, gitUrl: project.gitUrl, branch: null, sessionShareKey: project.sessionShareKey });
-  await createProjectEnvironmentVariable(project.id, { name: "REGION", value: "eu" });
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/example.git");
+  const workspace = entry({ type: "project.git", projectId: workspaceTemplate.id, name: workspaceTemplate.name, gitUrl: workspaceTemplate.gitUrl, branch: null, sessionShareKey: workspaceTemplate.sessionShareKey });
+  await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "REGION", value: "eu" });
   expect(await warningsFor(workspace)).toEqual([]);
   workspace.imageOutdated = true;
   workspace.issues = [{ kind: "readiness", message: "Gateway unavailable" }, { kind: "image", message: "Image inspection failed" }];
@@ -64,33 +64,33 @@ test("legacy snapshots do not invent configuration drift; gateway and image issu
 
 
 test("only configured secrets contribute to setup drift", async () => {
-  const { project } = await addProject("https://github.com/org/declarations.git");
-  const workspace = entry(projectWorkspaceInit(project));
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/declarations.git");
+  const workspace = entry(workspaceInitFromTemplate(workspaceTemplate));
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
-  const secret = await createProjectSecret(project.id, { ...values, optional: true });
+  const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { ...values, optional: true });
   expect(await warningsFor(workspace)).toEqual([]);
-  expect((await getProjectConfiguration(project.id)).configurationFingerprint).toBe(project.configurationFingerprint);
-  await updateProjectSecret(project.id, secret.id, { ...values, optional: false, placeholder: "TOKEN_PLACEHOLDER", annotation: "Tests" });
+  expect((await getWorkspaceTemplateConfiguration(workspaceTemplate.id)).configurationFingerprint).toBe(workspaceTemplate.configurationFingerprint);
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, optional: false, placeholder: "TOKEN_PLACEHOLDER", annotation: "Tests" });
   expect((await warningsFor(workspace)).map(({ kind }) => kind)).toEqual(["missing-secrets"]);
-  await updateProjectSecret(project.id, secret.id, { ...values, secretValue: "configured-value" });
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "configured-value" });
   expect((await warningsFor(workspace)).map(({ kind }) => kind)).toEqual(["project-settings-changed"]);
-  const snapshot = await getProjectConfiguration(project.id);
+  const snapshot = await getWorkspaceTemplateConfiguration(workspaceTemplate.id);
   expect(snapshot.secrets[0]!.configured).toBe(true);
   expect(JSON.stringify(snapshot)).not.toContain("configured-value");
   expect(JSON.stringify(snapshot)).not.toContain("encryptedSecret");
-  await deleteProjectSecret(project.id, secret.id);
+  await deleteWorkspaceTemplateSecret(workspaceTemplate.id, secret.id);
   expect(await warningsFor(workspace)).toEqual([]);
 });
 
 test("one project snapshot supplies consistent warnings to every workspace in a refresh", async () => {
-  const { project } = await addProject("https://github.com/org/snapshot.git");
-  const first = entry(projectWorkspaceInit(project));
+  const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/snapshot.git");
+  const first = entry(workspaceInitFromTemplate(workspaceTemplate));
   const second = { ...first, id: "second" };
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
-  const secret = await createProjectSecret(project.id, values);
-  const snapshot = await getProjectConfiguration(project.id);
+  const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, values);
+  const snapshot = await getWorkspaceTemplateConfiguration(workspaceTemplate.id);
   const before = workspaceWarnings(first, snapshot);
-  await updateProjectSecret(project.id, secret.id, { ...values, secretValue: "real-value" });
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "real-value" });
   expect(workspaceWarnings(second, snapshot)).toEqual(before);
   expect(before.map(({ kind }) => kind)).toEqual(["missing-secrets"]);
   expect((await warningsFor(second)).map(({ kind }) => kind)).toEqual(["project-settings-changed"]);

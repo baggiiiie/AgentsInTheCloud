@@ -47,7 +47,7 @@ export async function copyTextToClipboard(text: string): Promise<void> {
   if (!ok) throw new Error("copy command failed");
 }
 
-export function looksLikeProjectSpec(value: string): boolean {
+export function looksLikeWorkspaceTemplateSpec(value: string): boolean {
   return /^(https?:\/\/|git@|ssh:\/\/|\/|\.\/|\.\.\/|[A-Za-z]:\\|github\.com\/)/i.test(value.trim());
 }
 
@@ -436,7 +436,15 @@ export interface WorkspacePaletteProvider {
   search(context: WorkspacePaletteSearchContext): WorkspacePaletteItem[] | Promise<WorkspacePaletteItem[]>;
 }
 
-export const recentWorkspaceProjectStorageKey = "agents-in-the-cloud:recent-workspace-project-id";
+export const recentWorkspaceTemplateStorageKey = "agents-in-the-cloud:recent-workspace-template-id";
+
+/** The hot path for starting work: a launch composer seeded from the current workspace's template. */
+export const launchComposerCommand = {
+  id: "agent.open-launch-composer",
+  label: "New workspace from same template",
+  description: "Open the launch composer for a new workspace from the current workspace's template.",
+  binding: "Meta+Alt+Quote",
+} as const;
 
 export interface WorkspaceClientCommand {
   id: string;

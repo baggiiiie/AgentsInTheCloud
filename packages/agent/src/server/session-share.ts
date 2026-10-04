@@ -2,8 +2,8 @@ import { copyFile, mkdir, rename, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
-import type { GitProjectInitInstruction } from "@agents-in-the-cloud/projects";
-import { isGitProjectInit } from "@agents-in-the-cloud/projects";
+import type { GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
+import { isGitWorkspaceTemplateInit } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 
 export const projectlessSessionShareKey = "projectless";
@@ -13,11 +13,11 @@ function workspaceMetadataInitPath(workspaceId: string, dataDir = getAgentsInThe
   return join(dataDir, "workspaces", workspaceId, "metadata", "init.json");
 }
 
-async function workspaceProjectInit(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): Promise<GitProjectInitInstruction | undefined> {
+async function readWorkspaceTemplateInit(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): Promise<GitWorkspaceTemplateInitInstruction | undefined> {
   const file = Bun.file(workspaceMetadataInitPath(workspaceId, dataDir));
   if (!(await file.exists())) return undefined;
   const init: unknown = JSON.parse(await file.text());
-  return isGitProjectInit(init) ? init : undefined;
+  return isGitWorkspaceTemplateInit(init) ? init : undefined;
 }
 
 function sessionSlug(value: string, maxLength: number, fallback: string): string {
@@ -35,7 +35,7 @@ export function sessionShareKeySlug(value: string): string {
 }
 
 export function sessionShareKeyForInit(init: WorkspaceInitInstruction | undefined): string {
-  if (!isGitProjectInit(init)) return projectlessSessionShareKey;
+  if (!isGitWorkspaceTemplateInit(init)) return projectlessSessionShareKey;
   const key = init.sessionShareKey.trim()
     ? init.sessionShareKey
     : init.name;
@@ -43,7 +43,7 @@ export function sessionShareKeyForInit(init: WorkspaceInitInstruction | undefine
 }
 
 export async function workspaceSessionShareKey(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): Promise<string> {
-  return sessionShareKeyForInit(await workspaceProjectInit(workspaceId, dataDir));
+  return sessionShareKeyForInit(await readWorkspaceTemplateInit(workspaceId, dataDir));
 }
 
 export function sessionShareDir(shareKey: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {

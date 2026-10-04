@@ -38,25 +38,25 @@ Workspace, Agent conversation, and Work-view destinations are browser-navigable 
 
 The `agent` and `workView` parameters may be combined to choose both sides of the desktop workspace. Use `GET /workspaces/:workspaceId` with `Accept: application/json` to discover the available Agent conversation IDs and the `key` of each Work view.
 
-## Present project settings
+## Present workspace template settings
 
-Project settings has a browser-navigable surface that agents can pass directly to their presentation tool:
+Workspace template settings has a browser-navigable surface that agents can pass directly to their presentation tool:
 
 ```text
-/projects/:projectId/settings
-/projects/:projectId/settings?section=environment
+/workspace-templates/:workspaceTemplateId/settings
+/workspace-templates/:workspaceTemplateId/settings?section=environment
 ```
 
-Supported sections are `repository`, `secrets`, `ssh-keys`, `environment`, `dockerfile`, `preload-images`, and `danger`. Direct navigation renders the complete AgentsInTheCloud shell, opens Project settings, expands configurable sections when selected, and scrolls the selected section into view.
+Supported sections are `repository`, `secrets`, `ssh-keys`, `environment`, `dockerfile`, `preload-images`, and `danger`. Direct navigation renders the complete AgentsInTheCloud shell, opens template settings, expands configurable sections when selected, and scrolls the selected section into view.
 
-Use `GET /projects` with `Accept: application/json` to discover the project ID before constructing the presentation URL.
+Use `GET /workspace-templates` with `Accept: application/json` to discover the template ID before constructing the presentation URL.
 
 Other browser-navigable surfaces are:
 
 ```text
-/workspaces/new                         # New projectless workspace
-/projects/:projectId/workspaces/new     # New workspace for a project
-/projects/new                           # Add a project
+/workspaces/new                                           # Launch composer for an empty workspace
+/workspace-templates/:workspaceTemplateId/workspaces/new  # Launch composer for a workspace from a template
+/workspace-templates/new                                  # Add a template
 /usage                                  # Provider-reported limits
 /settings                               # AgentsInTheCloud settings
 /settings?section=models                # A specific settings section
@@ -80,7 +80,7 @@ created=$(curl -sS -X POST http://localhost:3000/workspaces \
 id=$(jq -r '.workspace.id' <<<"$created")
 ```
 
-`source` may be `{ "type": "empty" }` or `{ "type": "project", "project": "name-or-id" }`. Optional `agent` fields are `initialPrompt`, `model`, `thinkingLevel`, `serviceTier`, and `attachmentDraft`.
+`source` may be `{ "type": "empty" }` or `{ "type": "workspace-template", "workspaceTemplate": "name-or-id" }`. Optional `agent` fields are `initialPrompt`, `model`, `thinkingLevel`, `serviceTier`, and `attachmentDraft`.
 
 Poll the same UI URL with JSON content negotiation:
 
@@ -109,7 +109,7 @@ The list and detail responses include optional `issues` entries with `kind` and
 `message`. Image inspection runs independently at AgentsInTheCloud startup. Readiness checks
 run again when a workspace resumes or AgentsInTheCloud restarts; bypassing a failure does not
 permanently disable checks. Existing workspaces keep their saved preload references
-when project settings change.
+when template settings change.
 
 A running-phase response advertises its `agentConversations`, typed `workViews`, and available `commands` with their `inputSchema`.
 

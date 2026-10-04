@@ -239,9 +239,9 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   if (!isJsonObject(parsed)) throw invalidArguments(`invalid ${path}: expected object`);
   const record = parsed;
   if (record.version !== 1) throw invalidArguments(`invalid ${path}: unsupported version`);
-  if (record.privileged !== undefined) throw invalidArguments(`invalid ${path}: privileged is no longer supported; use Project settings`);
+  if (record.privileged !== undefined) throw invalidArguments(`invalid ${path}: privileged is no longer supported; use template settings`);
   if (record.isAgentsInTheCloud !== undefined) throw invalidArguments(`invalid ${path}: isAgentsInTheCloud is no longer supported`);
-  if (record.docker !== undefined) throw invalidArguments(`invalid ${path}: docker settings are no longer supported; use Project settings`);
+  if (record.docker !== undefined) throw invalidArguments(`invalid ${path}: docker settings are no longer supported; use template settings`);
   const initScripts = record.initScripts;
   if (initScripts !== undefined && !Value.Check(stringArraySchema, initScripts)) throw invalidArguments(`invalid ${path}: initScripts must be an array of strings`);
   const seedPiConfigRecord = optionalRecord(record, "seedPiConfig", path);
@@ -315,7 +315,7 @@ export async function execWorkspaceShell(id: string, script: string, options: Wo
 const workspaceSetupScript = ".agents-in-the-cloud/setup.sh";
 export const workspaceSetupProvisioningHook: WorkspaceServerProvisioningHook = {
   id: "workspace.setup",
-  label: "Run project setup",
+  label: "Run repository setup",
   recovery: "continue",
   async run({ workspaceId: id, events }) {
     if (!(await Bun.file(join(workspaceWorkHostPath(id), workspaceSetupScript)).exists())) {
@@ -433,7 +433,7 @@ function workspaceInitScript(plan: WorkspaceDockerPlan): string {
     workspaceInitStepScript("gateway-credential", "chown root:root /etc/agents-in-the-cloud-workspace-gateway-token; chmod 600 /etc/agents-in-the-cloud-workspace-gateway-token"),
     workspaceInitStepScript("align-user", alignWorkspaceUserScript()),
     workspaceInitStepScript("agents-in-the-cloud-dir", `install -d -o agents-in-the-cloud -g agents-in-the-cloud /.agents-in-the-cloud`),
-    // Start after UID/GID alignment, before project hooks can create sessions.
+    // Start after UID/GID alignment, before repository hooks can create sessions.
     workspaceInitStepScript("tmux", "systemctl start agents-in-the-cloud-tmux.service"),
     ...plan.initScripts.map((script, index) => workspaceInitStepScript(`init-${index + 1}`, script)),
     "startup_log_step gateway.start",
@@ -661,7 +661,7 @@ export async function setWorkspaceParked(id: string, parked: boolean): Promise<n
   return null;
 }
 
-/** Repeated on resume and app recovery; the persisted list never rereads project settings. */
+/** Repeated on resume and app recovery; the persisted list never rereads template settings. */
 export async function checkWorkspaceReadiness(id: string, report: (detail: string) => void = () => {}, activity: (progress: WorkspaceProvisionProgress) => void = () => {}): Promise<void> {
   report("Checking workspace gateway");
   await checkWorkspaceGateway(id);

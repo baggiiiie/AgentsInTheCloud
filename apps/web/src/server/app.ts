@@ -17,7 +17,7 @@ import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
-import { getProjectConfiguration, isGitProjectInit, isSshAuthenticationFailure, listProjects, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, projectWorkspaceInit, type ProjectConfiguration, type ProjectSummary } from "@agents-in-the-cloud/projects";
+import { getWorkspaceTemplateConfiguration, isGitWorkspaceTemplateInit, isSshAuthenticationFailure, listWorkspaceTemplates, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, workspaceInitFromTemplate, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSummary } from "@agents-in-the-cloud/workspace-templates";
 import { validDraftId } from "@agents-in-the-cloud/prompt/server";
 import {
   domId,
@@ -27,6 +27,7 @@ import {
   parseWorkspaceFileTarget,
   turboStreamResponse,
   workspaceModuleModalFrameId,
+  launchComposerCommand,
   type CableIdentifier,
   type DeleteCurrentWorkspaceResult,
   type GlobalSidebarContributionRegistry,
@@ -55,14 +56,14 @@ import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
-import { createProjectRoutes, type ProjectEditorModalOptions } from "./project-routes.ts";
+import { createWorkspaceTemplateRoutes, type WorkspaceTemplateEditorModalOptions } from "./workspace-template-routes.ts";
 import { renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/page.ts";
 import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
-import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workspacePaneOnboardingState, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneProject } from "./workspace-presentation.ts";
+import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workspacePaneOnboardingState, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneWorkspaceTemplate } from "./workspace-presentation.ts";
 import type { WorkspaceDeletionState, WorkspaceEntry, WorkspaceRegistry } from "./workspace-registry.ts";
 import { workspaceWarnings, type WorkspaceWarning } from "./workspace-warnings.ts";
 
@@ -217,14 +218,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   const launchComposerSubmissions = new Map<string, Promise<CreatedWorkspace>>();
   const launchComposerSettingsFrameId = "launch_composer_settings";
   const launchComposerFormId = "launch_composer_form";
-  const projectRoutes = createProjectRoutes({
-    referencingWorkspaces: (projectId) => registry.list()
-      .filter((entry) => isGitProjectInit(entry.init) && entry.init.projectId === projectId)
+  const workspaceTemplateRoutes = createWorkspaceTemplateRoutes({
+    referencingWorkspaces: (workspaceTemplateId) => registry.list()
+      .filter((entry) => isGitWorkspaceTemplateInit(entry.init) && entry.init.projectId === workspaceTemplateId)
       .map((entry) => ({ workspaceId: entry.id, title: workspaceTitle(entry) })),
     invalidatePresentation,
-    renderLaunchComposer: renderProjectLaunchComposerFrame,
-    createAgentWorkspace: async (project, request) => await createAgentWorkspaceFromForm(request, { project }),
-    workspaceCommandModalHostId,
+    createAgentWorkspace: (workspaceTemplate, request) => createAgentWorkspaceFromForm(request, { workspaceTemplate }),
   });
 
   function workspaceResidentId(id: string): string {
@@ -248,7 +247,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   };
 
   function workspaceTitle(entry: WorkspaceEntry): string {
-    return entry.title || (isGitProjectInit(entry.init) ? entry.init.name : undefined) || `Workspace ${entry.id}`;
+    return entry.title || (isGitWorkspaceTemplateInit(entry.init) ? entry.init.name : undefined) || `Workspace ${entry.id}`;
   }
 
   const persistWorkspaceParked = deps.persistWorkspaceParked ?? setWorkspaceParked;
@@ -287,10 +286,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return { frameId: launchComposerSettingsFrameId, formId: launchComposerFormId, url: "/launch-composer/settings", query };
   }
 
-  async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; projectId?: string }): Promise<string> {
+  async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; workspaceTemplateId?: string }): Promise<string> {
     const draftId = crypto.randomUUID();
     const providers = await orderedAgentProviders();
-    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, provider: providers[0]!, providers, projectId: options.projectId });
+    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, provider: providers[0]!, providers, workspaceTemplateId: options.workspaceTemplateId });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
         attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
@@ -303,18 +302,18 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     })}</turbo-frame>`;
   }
 
-  async function renderProjectlessLaunchComposerFrame(): Promise<string> {
+  async function renderEmptyLaunchComposerFrame(): Promise<string> {
     return await renderLaunchComposerFrame({
       titleCaption: "Create empty workspace, and then…",
       action: "/agent-workspaces",
     });
   }
 
-  async function renderProjectLaunchComposerFrame(project: ProjectSummary): Promise<string> {
+  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary): Promise<string> {
     return await renderLaunchComposerFrame({
-      titleCaption: `Create workspace from ${project.name}, and then…`,
-      action: `/project-agent-workspaces/${encodeURIComponent(project.id)}`,
-      projectId: project.id,
+      titleCaption: `Create workspace from ${workspaceTemplate.name}, and then…`,
+      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}`,
+      workspaceTemplateId: workspaceTemplate.id,
     });
   }
 
@@ -351,22 +350,20 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }
 
   async function workspacePaneCollections(activeWorkspaceId: string): Promise<WorkspacePanePresentation> {
-    const { projects: savedProjects, lastProjectlessWorkspaceCreatedAt } = await listProjects();
-    const projectsById = new Map<string, WorkspacePaneProject>(savedProjects.map((project) => [project.id, {
-      id: project.id, title: project.name, lastWorkspaceCreatedAt: project.lastWorkspaceCreatedAt,
-    }]));
+    const { workspaceTemplates: savedWorkspaceTemplates } = await listWorkspaceTemplates();
+    const workspaceTemplates: WorkspacePaneWorkspaceTemplate[] = savedWorkspaceTemplates.map(({ id, name, lastUsedAt }) => ({ id, title: name, lastUsedAt }));
+    const workspaceTemplatesById = new Map(workspaceTemplates.map((workspaceTemplate) => [workspaceTemplate.id, workspaceTemplate]));
     const workspaces = registry.list().map((entry) => {
-      let project: WorkspacePaneProject | undefined;
-      if (isGitProjectInit(entry.init)) {
-        project = projectsById.get(entry.init.projectId) ?? { id: entry.init.projectId, title: entry.init.name };
-        projectsById.set(project.id, project);
+      let workspaceTemplate: WorkspacePaneWorkspaceTemplate | undefined;
+      if (isGitWorkspaceTemplateInit(entry.init)) {
+        workspaceTemplate = workspaceTemplatesById.get(entry.init.projectId) ?? { id: entry.init.projectId, title: entry.init.name };
       }
       return {
         id: entry.id,
         title: workspaceTitle(entry),
         active: entry.id === activeWorkspaceId,
         parked: entry.parked,
-        project,
+        workspaceTemplate,
         busy: entry.phase.busy,
         requestingAttention: entry.requestingAttention,
         attentionAt: entry.attentionAt,
@@ -376,7 +373,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
         issues: entry.issues,
       };
     });
-    return { projects: [...projectsById.values()], lastProjectlessWorkspaceCreatedAt, workspaces };
+    return { workspaceTemplates, workspaces };
   }
 
   function workViewPresentations(workspaceId: string, currentWorkViews: readonly WorkspaceWorkViewPresentation[], storedWorkViews: readonly WorkspaceWorkViewState[]): WorkPaneContribution[] {
@@ -404,9 +401,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     dismissedWarnings: Record<string, string>;
   }
 
-  async function workspaceWarningState(entry: WorkspaceEntry, project?: ProjectConfiguration): Promise<WorkspaceWarningState> {
+  async function workspaceWarningState(entry: WorkspaceEntry, workspaceTemplate?: WorkspaceTemplateConfiguration): Promise<WorkspaceWarningState> {
     const [configuration, dismissedWarnings] = await Promise.all([
-      project ?? (isGitProjectInit(entry.init) ? getProjectConfiguration(entry.init.projectId) : undefined),
+      workspaceTemplate ?? (isGitWorkspaceTemplateInit(entry.init) ? getWorkspaceTemplateConfiguration(entry.init.projectId) : undefined),
       presentationStore.dismissedWarnings(entry.id),
     ]);
     return { warnings: workspaceWarnings(entry, configuration), dismissedWarnings };
@@ -508,7 +505,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }
 
   function workspaceBootResidentHtml(entry: WorkspaceEntry): string {
-    const projectId = isGitProjectInit(entry.init) ? entry.init.projectId : undefined;
+    const workspaceTemplateId = isGitWorkspaceTemplateInit(entry.init) ? entry.init.projectId : undefined;
     const snapshot = provisioning.snapshot(entry.id);
     const failed = entry.phase.kind === "provisioningPhase" && entry.phase.status === "failed";
     // Deleting is a recovery decision; offer it only once provisioning has stopped progressing.
@@ -521,12 +518,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const hostFailure = sourceFailure && sshHostTrustFailure(sourceError);
     const missingHost = hostFailure && !hostFailure.changed ? hostFailure : undefined;
     const changedHost = hostFailure?.changed ?? sourceError.includes("REMOTE HOST IDENTIFICATION HAS CHANGED");
-    const recoveryActions = (failed || sourceFailure) && projectId
-      ? actionLinkHtml({ href: hostFailure ? `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust` : `/projects/${encodeURIComponent(projectId)}/settings?section=${needsSshKey || changedHost ? "ssh-keys" : "repository"}`, variant: "primary", content: { kind: "caption", caption: hostFailure ? changedHost ? "Investigate changed SSH identity" : "Review SSH server identity" : needsSshKey ? "Add project SSH key" : "Open Project settings" }, attributesHtml: 'data-turbo-stream="true"' })
+    const recoveryActions = (failed || sourceFailure) && workspaceTemplateId
+      ? actionLinkHtml({ href: hostFailure ? `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust` : `/workspace-templates/${encodeURIComponent(workspaceTemplateId)}/settings?section=${needsSshKey || changedHost ? "ssh-keys" : "repository"}`, variant: "primary", content: { kind: "caption", caption: hostFailure ? changedHost ? "Investigate changed SSH identity" : "Review SSH server identity" : needsSshKey ? "Add an SSH key" : "Open template settings" }, attributesHtml: 'data-turbo-stream="true"' })
       : "";
     const recovery = sourceFailure ? {
       stepId: sourceFailure.id,
-      description: missingHost ? `AgentsInTheCloud does not yet trust ${missingHost.host}. Verify its fingerprint before trusting it and retrying.` : changedHost ? "The server's identity changed. Do not retry until your administrator verifies the new key. Update Trusted SSH servers in Project settings only after verification." : needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this project, then retry." : undefined,
+      description: missingHost ? `AgentsInTheCloud does not yet trust ${missingHost.host}. Verify its fingerprint before trusting it and retrying.` : changedHost ? "The server's identity changed. Do not retry until your administrator verifies the new key. Update Trusted SSH servers in template settings only after verification." : needsSshKey ? "SSH authentication failed. An SSH key with access to this repository may resolve this. Add it to this template, then retry." : undefined,
       actionsHtml: recoveryActions,
     } : undefined;
     const inner = `${renderWorkspaceProvisioning(entry.id, snapshot, { failed, error: entry.phase.error, recovery })}${sourceFailure ? "" : recoveryActions}${deleteAction}`;
@@ -539,11 +536,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   function emptyWorkspaceOnboardingHtml(pane: WorkspacePanePresentation): string {
     const state = workspacePaneOnboardingState(pane);
-    const copy = state === "first-project"
-      ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first project</strong> to get started!</p>'
-      : state === "first-workspace"
-        ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first workspace</strong> to get started!</p>'
-        : '<h1>Welcome to your AgentsInTheCloud</h1><p><strong data-empty-workspace-onboarding-target="origin">Select a workspace</strong> to get started.</p>';
+    const copy = state === "first-workspace"
+      ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first workspace</strong> to get started!</p>'
+      : '<h1>Welcome to your AgentsInTheCloud</h1><p><strong data-empty-workspace-onboarding-target="origin">Select a workspace</strong> to get started.</p>';
     const welcome = `<section class="workspace-empty-welcome" data-empty-workspace-state="${state}">${copy}</section>`;
     if (state === "workspaces") return `<div id="${emptyWorkspaceOnboardingId}">${welcome}</div>`;
     return `<div id="${emptyWorkspaceOnboardingId}" data-controller="empty-workspace-onboarding" data-empty-workspace-onboarding-destination-value="${state}">
@@ -576,25 +571,25 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   type ShellSurface =
     | { kind: "module-modal"; dialogHtml: string }
-    | { kind: "project-editor"; dialogHtml: string }
-    | { kind: "new-workspace"; project?: ProjectSummary }
+    | { kind: "workspace-template-editor"; dialogHtml: string }
+    | { kind: "new-workspace"; workspaceTemplate?: WorkspaceTemplateSummary }
     | { kind: "settings"; request: Request; section: string | undefined; development?: true };
 
   async function renderWorkspaceShell(selectedId?: string, surface?: ShellSurface, initialSelection?: FixedWorkspacePresentation["initialSelection"]): Promise<string> {
     const pane = await workspacePaneCollections(selectedId ?? "");
-    const projectEditor = surface?.kind === "project-editor" ? surface.dialogHtml : '<div id="project-editor-modal"></div>';
+    const workspaceTemplateEditor = surface?.kind === "workspace-template-editor" ? surface.dialogHtml : '<div id="workspace-template-editor-modal"></div>';
     const settings = surface?.kind === "settings"
       ? surface.development ? await renderDevelopmentSettingsDialog() : await renderSettingsDialog(surface.request, surface.section)
       : "";
     const launchComposer = surface?.kind === "new-workspace"
-      ? surface.project ? await renderProjectLaunchComposerFrame(surface.project) : await renderProjectlessLaunchComposerFrame()
+      ? surface.workspaceTemplate ? await renderWorkspaceTemplateLaunchComposerFrame(surface.workspaceTemplate) : await renderEmptyLaunchComposerFrame()
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
     return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
-    ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""))}
+    ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""), launchComposerCommand.binding)}
     <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}</main>
     ${renderAgentsInTheCloudBar()}
   </div>
-  ${projectEditor}
+  ${workspaceTemplateEditor}
   <div id="update_modal_host"></div>
   <div id="settings_modal_host">${settings}</div>
   <turbo-frame id="${workspaceModuleModalFrameId}">${surface?.kind === "module-modal" ? surface.dialogHtml : ""}</turbo-frame>
@@ -608,11 +603,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return response(layout(await renderWorkspaceShell(selected?.id)));
   }
 
-  async function projectEditorResponse(request: Request, options: ProjectEditorModalOptions): Promise<Response> {
-    const dialogHtml = await projectRoutes.editorModal(options, request);
+  async function workspaceTemplateEditorResponse(request: Request, options: WorkspaceTemplateEditorModalOptions): Promise<Response> {
+    const dialogHtml = await workspaceTemplateRoutes.editorModal(options, request);
     return wantsStream(request)
-      ? turboStreamResponse(replace("project-editor-modal", dialogHtml))
-      : surfacePage({ kind: "project-editor", dialogHtml });
+      ? turboStreamResponse(replace("workspace-template-editor-modal", dialogHtml))
+      : surfacePage({ kind: "workspace-template-editor", dialogHtml });
   }
 
   async function surfacePage(surface: ShellSurface): Promise<Response> {
@@ -663,7 +658,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   function workspaceListEndpoint(request: Request, url: URL): Response {
     if (!requestAcceptsJson(request)) return Response.redirect(new URL("/", url).toString(), 302);
     return jsonResponse({ workspaces: registry.list().map((entry) => {
-      const workspace: Pick<WorkspaceEntry, "id" | "phase" | "parked" | "requestingAttention" | "issues"> & { title: string; projectId?: string } = {
+      const workspace: Pick<WorkspaceEntry, "id" | "phase" | "parked" | "requestingAttention" | "issues"> & { title: string; workspaceTemplateId?: string } = {
         id: entry.id,
         title: workspaceTitle(entry),
         phase: entry.phase,
@@ -671,7 +666,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       requestingAttention: entry.requestingAttention,
       };
       if (entry.issues?.length) workspace.issues = entry.issues;
-      if (isGitProjectInit(entry.init)) workspace.projectId = entry.init.projectId;
+      if (isGitWorkspaceTemplateInit(entry.init)) workspace.workspaceTemplateId = entry.init.projectId;
       return workspace;
     }) });
   }
@@ -752,24 +747,28 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (requestAcceptsJson(request)) {
       const body = await readWorkspaceCreateJson(request);
       const sourceType = stringField(body.source?.type, "source.type") ?? "empty";
-      if (sourceType !== "empty" && sourceType !== "project") throw invalidArguments("source.type must be empty or project");
-      const projectReference = stringField(body.source?.project, "source.project");
+      if (sourceType !== "empty" && sourceType !== "workspace-template") throw invalidArguments("source.type must be empty or workspace-template");
+      const workspaceTemplateReference = stringField(body.source?.workspaceTemplate, "source.workspaceTemplate");
       let init: WorkspaceInitInstruction | undefined;
-      if (sourceType === "project") {
-        if (!projectReference) throw invalidArguments("source.project is required for project workspaces");
-        init = projectWorkspaceInit(await projectRoutes.byReference(projectReference));
+      if (sourceType === "workspace-template") {
+        if (!workspaceTemplateReference) throw invalidArguments("source.workspaceTemplate is required for workspace-template workspaces");
+        init = workspaceInitFromTemplate(await workspaceTemplateRoutes.byReference(workspaceTemplateReference));
       }
       const { id } = await createWorkspaceFromCommand({ init, title: stringField(body.title, "title"), agent: body.agent });
       return workspaceCreatedJsonResponse(id);
     }
 
-    const { id } = await createWorkspaceFromCommand({});
+    // The template picker posts a form; automation and older callers may post no body at all.
+    const form = request.headers.get("content-type")?.includes("form") ? await request.formData() : undefined;
+    const workspaceTemplateReference = String(form?.get("workspaceTemplate") ?? "");
+    const init = workspaceTemplateReference ? workspaceInitFromTemplate(await workspaceTemplateRoutes.byReference(workspaceTemplateReference)) : undefined;
+    const { id } = await createWorkspaceFromCommand({ init });
     const location = `/workspaces/${encodeURIComponent(id)}`;
-    if (wantsStream(request)) return turboStreamResponse("", { headers: { location } });
+    if (wantsStream(request)) return turboStreamResponse(selectWorkspaceTurboStream(id), { headers: { location } });
     return new Response(null, { status: 303, headers: { location } });
   }
 
-  async function createAgentWorkspaceFromForm(request: Request, options: { project?: ProjectSummary } = {}): Promise<Response> {
+  async function createAgentWorkspaceFromForm(request: Request, options: { workspaceTemplate?: WorkspaceTemplateSummary } = {}): Promise<Response> {
     const form = await request.formData();
     const submissionId = String(form.get("attachmentDraft") ?? "");
     if (!validDraftId(submissionId)) throw invalidArguments("Invalid attachment draft");
@@ -781,7 +780,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       launch = (async () => {
         const prepared = await submission.prepare();
         return createWorkspaceFromCommand({
-          init: options.project ? projectWorkspaceInit(options.project) : undefined,
+          init: options.workspaceTemplate ? workspaceInitFromTemplate(options.workspaceTemplate) : undefined,
           context: { ...prepared, agent: { ...prepared.agent, provider: provider.id, initialPrompt: String(form.get("text") ?? ""), attachmentDraft: submissionId } },
         });
       })();
@@ -847,7 +846,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const snapshot = provisioning.snapshot(id);
     const source = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
     const address = source && sshHostTrustFailure(`${source.output ?? ""}\n${source.error ?? ""}`);
-    if (!isGitProjectInit(entry.init) || !address || snapshot?.waiting?.stepId !== "workspace.source" || !snapshot.waiting.retryable) {
+    if (!isGitWorkspaceTemplateInit(entry.init) || !address || snapshot?.waiting?.stepId !== "workspace.source" || !snapshot.waiting.retryable) {
       throw new AgentsInTheCloudCoreError("workspace_not_ready", "This workspace is not waiting for SSH server trust");
     }
     if (request.method === "POST") {
@@ -1161,20 +1160,25 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       return jsonResponse({ defaultProviderId: providers[0]!.id, providers: providers.map(({ id, label }) => ({ id, label })) });
     }
     if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(agentsInTheCloudOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
-    if (url.pathname === "/launch-composer" && request.method === "GET") return response(await renderProjectlessLaunchComposerFrame());
+    if (url.pathname === "/launch-composer" && request.method === "GET") {
+      const workspaceTemplateReference = url.searchParams.get("workspaceTemplate");
+      return response(workspaceTemplateReference
+        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference))
+        : await renderEmptyLaunchComposerFrame());
+    }
     if (url.pathname === "/launch-composer/provider" && request.method === "GET") return response(await renderLaunchProvider(agentProvider(url.searchParams.get("provider") ?? "builtin"), await orderedAgentProviders(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await agentProvider(url.searchParams.get("provider") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
-    const projectSettingsMatch = matchRoute(url, /^\/projects\/([^/]+)\/settings$/);
-    if (projectSettingsMatch && request.method === "GET") {
-      const projectId = projectSettingsMatch[0]!;
+    const workspaceTemplateSettingsMatch = matchRoute(url, /^\/workspace-templates\/([^/]+)\/settings$/);
+    if (workspaceTemplateSettingsMatch && request.method === "GET") {
+      const workspaceTemplateId = workspaceTemplateSettingsMatch[0]!;
       const section = url.searchParams.get("section") ?? undefined;
-      return projectEditorResponse(request, { kind: "settings", projectId, section });
+      return workspaceTemplateEditorResponse(request, { kind: "settings", workspaceTemplateId, section });
     }
-    const projectWorkspaceMatch = matchRoute(url, /^\/projects\/([^/]+)\/workspaces\/new$/);
-    if (projectWorkspaceMatch && request.method === "GET") return await surfacePage({ kind: "new-workspace", project: await projectRoutes.byReference(projectWorkspaceMatch[0]!) });
+    const workspaceTemplateWorkspaceMatch = matchRoute(url, /^\/workspace-templates\/([^/]+)\/workspaces\/new$/);
+    if (workspaceTemplateWorkspaceMatch && request.method === "GET") return await surfacePage({ kind: "new-workspace", workspaceTemplate: await workspaceTemplateRoutes.byReference(workspaceTemplateWorkspaceMatch[0]!) });
     if (url.pathname === "/workspaces/new" && request.method === "GET") return await surfacePage({ kind: "new-workspace" });
-    if (url.pathname === "/projects/new" && request.method === "GET") {
-      return projectEditorResponse(request, { kind: "new" });
+    if (url.pathname === "/workspace-templates/new" && request.method === "GET") {
+      return workspaceTemplateEditorResponse(request, { kind: "new" });
     }
     if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
     if (url.pathname === "/settings/development" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: undefined, development: true });
@@ -1182,8 +1186,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/workspaces" && request.method === "POST") return await createWorkspaceEndpoint(request);
     if (url.pathname === "/workspaces/open-oldest-attention" && request.method === "POST") return openOldestAttentionWorkspaceEndpoint();
 
-    const projectResponse = await projectRoutes.handle(request, url);
-    if (projectResponse) return projectResponse;
+    const workspaceTemplateResponse = await workspaceTemplateRoutes.handle(request, url);
+    if (workspaceTemplateResponse) return workspaceTemplateResponse;
 
     const routeParam = (values: string[], index: number): string => {
       const value = values[index];

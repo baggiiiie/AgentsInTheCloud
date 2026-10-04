@@ -1,5 +1,5 @@
 import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
-import { addProject, isGitProjectInit } from "@agents-in-the-cloud/projects";
+import { addWorkspaceTemplate, isGitWorkspaceTemplateInit } from "@agents-in-the-cloud/workspace-templates";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   createTestApp,
@@ -148,11 +148,11 @@ describe("workspace lifecycle", () => {
 
   test("project workspace creation records project identity and temporary title", async () => {
     await configureLaunchModel();
-    const project = (await addProject("https://github.com/org/sample-project.git")).project;
+    const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/sample-project.git")).workspaceTemplate;
     const { app, registry } = createTestApp();
     await registry.seed([]);
 
-    const response = await app.fetch(postForm(`/project-agent-workspaces/${encodeURIComponent(project.id)}`, new URLSearchParams({
+    const response = await app.fetch(postForm(`/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}`, new URLSearchParams({
       text: "do it",
       attachmentDraft: crypto.randomUUID(),
     })));
@@ -160,8 +160,8 @@ describe("workspace lifecycle", () => {
 
     expect(response.status).toBe(200);
     expect(entry.title).toBeNull();
-    expect(isGitProjectInit(entry.init)).toBe(true);
-    expect(isGitProjectInit(entry.init) && entry.init).toMatchObject({ projectId: project.id, name: "sample-project" });
+    expect(isGitWorkspaceTemplateInit(entry.init)).toBe(true);
+    expect(isGitWorkspaceTemplateInit(entry.init) && entry.init).toMatchObject({ projectId: workspaceTemplate.id, name: "sample-project" });
   });
 
   test("launch without an available model does not create or provision a workspace", async () => {

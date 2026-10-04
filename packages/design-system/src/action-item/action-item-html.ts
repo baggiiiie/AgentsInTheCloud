@@ -38,6 +38,8 @@ interface CompoundActionItemOptions extends ActionItemContent {
   kind: "compound";
   container?: Omit<ActionItemElement, "tag">;
   primary: ActionItemElement;
+  /** Trusted, always-visible controls before the primary action, such as an identity marker that is its own button. */
+  leadingActionsHtml?: string;
   /** Trusted controls revealed on hover, keyboard focus, or touch devices. */
   engagedActionsHtml?: string;
 }
@@ -65,8 +67,9 @@ export function actionItemHtml(options: ActionItemOptions): string {
 
   const primary = elementHtml(options.primary, "action-item__primary", content);
   const actions = options.engagedActionsHtml ? `<div class="action-item__actions action-item__actions--engaged" data-controller="action-item-actions">${options.engagedActionsHtml}</div>` : "";
+  const leading = options.leadingActionsHtml ? `<div class="action-item__actions action-item__actions--leading">${options.leadingActionsHtml}</div>` : "";
   const container = options.container ?? {};
-  return `<div class="${escapeHtml(classNames("action-item", options.tone === "danger" && "is-danger"))}"${attributesHtml(container.attributesHtml)}>${primary}${actions}</div>`;
+  return `<div class="${escapeHtml(classNames("action-item", options.tone === "danger" && "is-danger"))}"${attributesHtml(container.attributesHtml)}>${leading}${primary}${actions}</div>`;
 }
 
 /** Parses an action item for browser-only UI that needs to attach imperative listeners. */

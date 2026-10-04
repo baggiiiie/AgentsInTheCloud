@@ -1,5 +1,5 @@
 import { getWorkspaceInit, getWorkspaceTitle } from "@agents-in-the-cloud/workspace";
-import { isGitProjectInit } from "@agents-in-the-cloud/projects";
+import { isGitWorkspaceTemplateInit } from "@agents-in-the-cloud/workspace-templates";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
@@ -51,7 +51,7 @@ export async function sendTurnNotification(ctx: AgentRenderContext, subscription
   const title = await getWorkspaceTitle(ctx.workspaceId);
   const init = title ? undefined : await getWorkspaceInit(ctx.workspaceId);
   // Use the same display name as the Workspace sidebar, including unnamed workspaces.
-  const workspaceName = title || (isGitProjectInit(init) ? init.name : undefined) || `Workspace ${ctx.workspaceId}`;
+  const workspaceName = title || (isGitWorkspaceTemplateInit(init) ? init.name : undefined) || `Workspace ${ctx.workspaceId}`;
   try {
     await webPush.sendNotification(subscription, JSON.stringify({
       title: `${workspaceName} is ready`,

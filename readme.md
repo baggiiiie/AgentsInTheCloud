@@ -92,7 +92,7 @@ AgentsInTheCloud has access to your code and development tools, so it shouldn’
 <details>
 <summary>How do I install project dependencies?</summary>
 
-You can give each project its own Dockerfile. Use it to install the versions of Node, Bun, Python, native libraries, or anything else your project needs.
+You can give each workspace template its own Dockerfile. Use it to install the versions of Node, Bun, Python, native libraries, or anything else your project needs.
 
 </details>
 

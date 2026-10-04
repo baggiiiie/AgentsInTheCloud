@@ -65,7 +65,7 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
         rows.push(actionItemHtml({ kind: "single", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.conversationId)}"` } }));
       }
     }
-    return page("Agent history", `<p>Read-only history from this project's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`);
+    return page("Agent history", `<p>Read-only history from this template's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`);
   }
   const history = histories.find(history => history.workspaceId === source);
   const record = history && (await history.owner.catalog()).find(record => record.conversationId === conversationId);

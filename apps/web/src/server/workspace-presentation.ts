@@ -26,7 +26,7 @@ export interface WorkspacePaneEntry {
   title: string;
   active?: boolean;
   parked: boolean;
-  project?: { id: string; title: string };
+  workspaceTemplate?: { id: string; title: string };
   busy?: boolean;
   requestingAttention?: boolean;
   attentionAt?: number;
@@ -36,10 +36,10 @@ export interface WorkspacePaneEntry {
   issues?: readonly { message: string }[];
 }
 
-export interface WorkspacePaneProject {
+export interface WorkspacePaneWorkspaceTemplate {
   id: string;
   title: string;
-  lastWorkspaceCreatedAt?: number;
+  lastUsedAt?: number;
 }
 
 export interface WorkPaneContribution {
@@ -58,17 +58,15 @@ export interface WorkPaneContribution {
 }
 
 export interface WorkspacePanePresentation {
-  projects: readonly WorkspacePaneProject[];
-  lastProjectlessWorkspaceCreatedAt?: number;
+  workspaceTemplates: readonly WorkspacePaneWorkspaceTemplate[];
   /** Already ordered by the workspace registry. */
   workspaces: readonly WorkspacePaneEntry[];
 }
 
-export type WorkspacePaneOnboardingState = "first-project" | "first-workspace" | "workspaces";
+export type WorkspacePaneOnboardingState = "first-workspace" | "workspaces";
 
 export function workspacePaneOnboardingState(presentation: WorkspacePanePresentation): WorkspacePaneOnboardingState {
-  if (presentation.workspaces.length) return "workspaces";
-  return presentation.projects.length ? "first-workspace" : "first-project";
+  return presentation.workspaces.length ? "workspaces" : "first-workspace";
 }
 
 export interface WorkspacePresentation {
@@ -96,28 +94,43 @@ function renderWorkspaceRowStatus(workspace: WorkspacePaneEntry): string {
     return workspaceStatusSlot(busyAttentionIndicator(workspace));
   }
   const issues = (workspace.issues ?? []).map((issue) => issue.message);
-  if (workspace.outdated) issues.push("Workspace created with an older version of AgentsInTheCloud. Some newer features may require a new workspace.");
+  if (workspace.outdated) issues.push("New workspaces get a newer image, after an AgentsInTheCloud update or a Dockerfile change. Make a new workspace to use it.");
   return issues.length
     ? workspaceStatusSlot(`<i class="fixed-shell-workspace-warning" aria-label="${escapeHtml(issues.join("\n"))}" title="${escapeHtml(issues.join("\n"))}">⚠︎</i>`)
     : "";
 }
 
+/** Deterministic swatch color: one of 360 hues at three lightness steps, from an FNV-1a hash of the template id. */
+export function workspaceTemplateSwatchColor(workspaceTemplateId: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of workspaceTemplateId) hash = Math.imul(hash ^ char.charCodeAt(0), 0x01000193) >>> 0;
+  return `oklch(${[0.62, 0.7, 0.78][Math.floor(hash / 360) % 3]} 0.15 ${hash % 360})`;
+}
+
+function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id">): string {
+  return workspaceTemplate
+    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${workspaceTemplateSwatchColor(workspaceTemplate.id)}" aria-hidden="true"></span>`
+    : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
+}
+
 function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
-  const { parked, project } = workspace;
+  const { parked, workspaceTemplate } = workspace;
   const id = workspaceRowDomId(workspace.id);
   const attentionAt = workspace.attentionAt === undefined ? "" : ` data-workspace-attention-at="${workspace.attentionAt}"`;
   const lastActivityAt = workspace.lastActivityAt === undefined ? "" : ` data-workspace-last-activity-at="${workspace.lastActivityAt}"`;
-  const projectAttribute = project ? ` data-project-id="${escapeHtml(project.id)}"` : "";
+  const workspaceTemplateAttribute = workspaceTemplate ? ` data-workspace-template-id="${escapeHtml(workspaceTemplate.id)}"` : "";
   const busyAgents = workspace.busyAgentKeys?.length ? ` data-workspace-busy-agents="${escapeHtml(JSON.stringify(workspace.busyAgentKeys))}"` : "";
   const label = parked ? `Unpark and open ${workspace.title}` : workspace.title;
-  const tooltip = [project?.title, label].filter(Boolean).join(" · ");
+  const tooltip = [workspaceTemplate?.title, label].filter(Boolean).join(" · ");
+  const newFromTemplate = workspaceTemplate ? `New workspace from ${workspaceTemplate.title}` : "New empty workspace";
   const row = actionItemHtml({
-    kind: "single",
+    kind: "compound",
     label: { kind: "text", text: workspace.title },
     trailingHtml: renderWorkspaceRowStatus(workspace),
-    element: {
+    leadingActionsHtml: `<button type="button" class="workspace-template-icon-button" title="${escapeHtml(newFromTemplate)}" aria-label="${escapeHtml(newFromTemplate)}" data-action="workspace-pane#openPickerFor" data-workspace-pane-workspace-template-param="${escapeHtml(workspaceTemplate?.id ?? "")}">${workspaceTemplateIconHtml(workspaceTemplate)}</button>`,
+    primary: {
       tag: "button",
-      attributesHtml: `${parked ? 'data-workspace-parked' : `id="${id}"`} type="${parked ? "submit" : "button"}" title="${escapeHtml(tooltip)}" aria-label="${escapeHtml(label)}"${workspace.active ? ' aria-current="page"' : ""} data-workspace-entry-id="${escapeHtml(workspace.id)}"${attentionAt}${lastActivityAt}${busyAgents}${projectAttribute}${parked ? "" : ' data-action="click->workspace-navigation#selectWorkspace"'}`,
+      attributesHtml: `${parked ? 'data-workspace-parked' : `id="${id}"`} type="${parked ? "submit" : "button"}" title="${escapeHtml(tooltip)}" aria-label="${escapeHtml(label)}"${workspace.active ? ' aria-current="page"' : ""} data-workspace-entry-id="${escapeHtml(workspace.id)}"${attentionAt}${lastActivityAt}${busyAgents}${workspaceTemplateAttribute}${parked ? "" : ' data-action="click->workspace-navigation#selectWorkspace"'}`,
     },
   });
   return parked
@@ -125,26 +138,7 @@ function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
     : row;
 }
 
-const projectDialogTarget = 'data-turbo-frame="_top" data-turbo-stream="true"';
-
-function renderProjectHeading(project?: Pick<WorkspacePaneProject, "id" | "title">, onboardingDestination?: "first-workspace"): string {
-  const title = project?.title ?? "Without project";
-  const id = project && encodeURIComponent(project.id);
-  const href = project ? `/projects/${id}/launch-composer` : "/launch-composer";
-  const settings = project ? actionLinkHtml({
-    href: `/projects/${id}/settings`, variant: "secondary",
-    content: { kind: "icon-only", iconHtml: Icons.More, label: `Project settings: ${title}` },
-    attributesHtml: projectDialogTarget,
-  }) : "";
-  const add = actionLinkHtml({
-    href, variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: project ? `New workspace: ${title}` : "New workspace without project" },
-    attributesHtml: `data-turbo-frame="launch_composer"${onboardingDestination ? ` data-empty-workspace-onboarding-destination="${onboardingDestination}"` : ""}`,
-  });
-  return actionItemHtml({ kind: "compound", label: { kind: "text", text: title },
-    primary: { tag: "a", attributesHtml: `href="${escapeHtml(href)}" data-turbo-frame="launch_composer"` },
-    engagedActionsHtml: buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: settings + add }),
-  });
-}
+const workspaceTemplateDialogTarget = 'data-turbo-frame="_top" data-turbo-stream="true"';
 
 function workspaceRowDomId(id: string): string { return domId("workspace_row", id); }
 
@@ -152,53 +146,93 @@ function workspaceRows(presentation: WorkspacePanePresentation): Array<{ id: str
   return presentation.workspaces.map((workspace) => ({ id: workspaceRowDomId(workspace.id), html: renderWorkspaceRow(workspace) }));
 }
 
-function renderProjectsPane(presentation: WorkspacePanePresentation): string {
-  const paneProjects = [
-    ...presentation.projects.map((project) => ({ project, title: project.title, lastWorkspaceCreatedAt: project.lastWorkspaceCreatedAt })),
-    { project: undefined, title: "Without project", lastWorkspaceCreatedAt: presentation.lastProjectlessWorkspaceCreatedAt },
-  ].sort((left, right) => (right.lastWorkspaceCreatedAt ?? 0) - (left.lastWorkspaceCreatedAt ?? 0) || left.title.localeCompare(right.title));
-  const firstProject = paneProjects.find((entry) => entry.project)?.project;
-  const onboardingState = workspacePaneOnboardingState(presentation);
-  const needsFirstProject = onboardingState === "first-project";
-  const needsFirstWorkspace = onboardingState === "first-workspace";
-  const addProject = actionLinkHtml({
-    href: "/projects/new",
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: Icons.Plus, label: "New project" },
-    attributesHtml: `${projectDialogTarget}${needsFirstProject ? ' data-empty-workspace-onboarding-destination="first-project"' : ""}`,
+function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string {
+  const onboarding = workspacePaneOnboardingState(presentation) === "first-workspace" ? ' data-empty-workspace-onboarding-destination="first-workspace"' : "";
+  return actionItemHtml({
+    kind: "single",
+    leadingHtml: Icons.Plus,
+    label: { kind: "text", text: "New workspace" },
+    element: { tag: "button", attributesHtml: `type="button" data-workspace-pane-target="newWorkspace" data-action="workspace-pane#openPicker"${onboarding}` },
   });
-  const collapseProjects = buttonHtml({
-    type: "button",
+}
+
+function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspaceTemplate): string {
+  const title = workspaceTemplate?.title ?? "Nothing";
+  const settings = workspaceTemplate ? actionLinkHtml({
+    href: `/workspace-templates/${encodeURIComponent(workspaceTemplate.id)}/settings`,
     variant: "secondary",
-    content: { kind: "icon-only", iconHtml: Icons.Disclosure, label: "Collapse Projects pane" },
-    attributesHtml: 'data-action="projects-pane#toggle" data-projects-pane-target="toggle" aria-expanded="true" aria-controls="workspace_projects_list"',
+    content: { kind: "icon-only", iconHtml: Icons.More, label: `${title} settings` },
+    attributesHtml: workspaceTemplateDialogTarget,
+  }) : undefined;
+  return actionItemHtml({
+    kind: "compound",
+    leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
+    label: { kind: "text", text: title },
+    trailingHtml: `<span class="workspace-template-check">${Icons.Check}</span>`,
+    primary: { tag: "button", attributesHtml: `type="button" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose dblclick->workspace-pane#create keydown->workspace-pane#optionKeydown"` },
+    engagedActionsHtml: settings,
   });
-  return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane">${panelHtml({
-    element: { tag: "section", attributesHtml: 'aria-label="Projects"' },
-    headerHtml: `<span class="panel__title">${Icons.Projects}Projects</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${collapseProjects}${addProject}` })}`,
-    bodyOverflow: "scroll",
-    bodyHtml: `<div id="workspace_projects_list" class="fixed-shell-projects-list action-list" data-projects-pane-target="list">${presentation.projects.length ? "" : '<p class="fixed-shell-projects-empty">No projects yet, make one!<svg class="fixed-shell-projects-empty-arrow" width="40" height="36" viewBox="0 0 40 36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 30 Q30 30 30 3 M24 9 L30 3 L36 9" /></svg></p>'}${paneProjects.map(({ project }) => renderProjectHeading(project, needsFirstWorkspace && project === firstProject ? "first-workspace" : undefined)).join("")}</div>`,
-  })}</div>`;
+}
+
+function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation): string {
+  const ordered = [...presentation.workspaceTemplates].sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0) || left.title.localeCompare(right.title));
+  // Until the first template exists, the add action explains what a template is.
+  const addWorkspaceTemplate = ordered.length
+    ? actionItemHtml({
+      kind: "single",
+      leadingHtml: Icons.Plus,
+      label: { kind: "text", text: "A repo I haven’t added yet…" },
+      element: { tag: "a", attributesHtml: `href="/workspace-templates/new" ${workspaceTemplateDialogTarget}` },
+    })
+    : `<a class="workspace-template-first" href="/workspace-templates/new" ${workspaceTemplateDialogTarget} data-workspace-pane-target="addFirst"><span class="workspace-template-first-icon">${Icons.Plus}</span><span><strong>Add your first template</strong><span>Point us at a git repo once. Every new workspace can start as a fresh clone of it.</span></span></a>`;
+  return `<div id="${workspaceTemplateOptionsDomId}" class="workspace-template-options action-list" role="radiogroup" aria-labelledby="workspace_template_question">
+    <p class="workspace-template-question" id="workspace_template_question">What should we put in your new workspace?</p>
+    ${addWorkspaceTemplate}
+    ${ordered.map((workspaceTemplate) => renderWorkspaceTemplateOption(workspaceTemplate)).join("")}
+    ${renderWorkspaceTemplateOption()}
+  </div>`;
+}
+
+function renderWorkspaceTemplatePicker(presentation: WorkspacePanePresentation, launchComposerBinding: string | undefined): string {
+  const actions = buttonGroupHtml({ orientation: "vertical", semantics: "layout", itemsHtml:
+    buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Create" }, attributesHtml: 'data-workspace-pane-target="create"' })
+    + buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Create with prompt", iconHtml: Icons.Agent }, attributesHtml: 'formmethod="get" formaction="/launch-composer" data-turbo-frame="launch_composer" data-workspace-pane-target="createWithPrompt"' }) });
+  const tip = launchComposerBinding
+    ? `<p class="workspace-template-picker-tip">Tip: <kbd>${escapeHtml(formatShortcutBinding(launchComposerBinding))}</kbd> starts one from the current workspace’s template, with a prompt.</p>`
+    : "";
+  return `<form class="workspace-template-picker" method="post" action="/workspaces" data-turbo="true" data-action="submit->workspace-pane#submitted keydown.esc->workspace-pane#back">
+    <input type="hidden" name="workspaceTemplate" value="" data-workspace-pane-target="value">
+    <div class="workspace-template-picker-scroll">${renderWorkspaceTemplateOptions(presentation)}<div class="workspace-template-picker-actions">${actions}</div></div>
+  </form>${tip}`;
 }
 
 const workspacePaneScrollDomId = "fixed_shell_workspace_scroll";
-const workspaceProjectsPaneDomId = "fixed_shell_projects_pane";
+const workspacePaneNewWorkspaceDomId = "fixed_shell_new_workspace";
+const workspaceTemplateOptionsDomId = "workspace_template_options";
 
-export function renderWorkspacePane(presentation: WorkspacePanePresentation, sidebarContributionsHtml = "", moduleActionsHtml = ""): string {
+export function renderWorkspacePane(presentation: WorkspacePanePresentation, sidebarContributionsHtml = "", moduleActionsHtml = "", launchComposerBinding?: string): string {
   const settings = actionLinkHtml({
     href: "/settings",
     variant: "secondary",
     content: { kind: "icon-only", iconHtml: Icons.Settings, label: "Settings" },
     attributesHtml: 'data-controller="settings-prefetch" data-action="pointerenter->settings-prefetch#prefetch focus->settings-prefetch#prefetch click->settings-prefetch#open"',
   });
-  return `<div class="fixed-shell-workspace-pane"><div class="fixed-shell-workspace-main">${panelHtml({
+  const back = buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Back, label: "Back to workspaces" }, attributesHtml: 'data-action="workspace-pane#back"' });
+  return `<div class="fixed-shell-workspace-pane" data-controller="workspace-pane"><div class="fixed-shell-workspace-main">${panelHtml({
     element: { tag: "aside",  attributesHtml: 'aria-label="Workspaces"' },
-    headerHtml: `<span class="panel__title">${Icons.Cloud}Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}`,
-    bodyHtml: `<div class="fixed-shell-pane-collections" data-workspace-pane-collections>
-      <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${workspaceRows(presentation).map((row) => row.html).join("")}</div>
-      <section id="global_sidebar_contributions">${sidebarContributionsHtml}</section>
+    headerHtml: `<div class="workspace-pane-header" data-workspace-pane-target="workspacesHeader"><span class="panel__title">${Icons.Cloud}Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}</div>
+      <div class="workspace-pane-header" data-workspace-pane-target="pickerHeader" hidden>${back}<span class="panel__title">New workspace</span></div>`,
+    bodyHtml: `<div class="workspace-pane-slides" data-action="transitionend->workspace-pane#slid">
+      <section class="workspace-pane-slide" data-workspace-pane-target="workspaces" aria-label="Workspaces">
+        <div id="${workspacePaneNewWorkspaceDomId}" class="workspace-pane-new-workspace">${renderNewWorkspaceRow(presentation)}</div>
+        <div class="fixed-shell-pane-collections" data-workspace-pane-collections>
+          <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${workspaceRows(presentation).map((row) => row.html).join("")}</div>
+          <section id="global_sidebar_contributions">${sidebarContributionsHtml}</section>
+        </div>
+      </section>
+      <section class="workspace-pane-slide" data-workspace-pane-target="picker" aria-label="New workspace" inert>${renderWorkspaceTemplatePicker(presentation, launchComposerBinding)}</section>
     </div>`,
-  })}</div>${renderProjectsPane(presentation)}</div>`;
+  })}</div></div>`;
 }
 
 const agentsInTheCloudNextAttentionDomId = "fixed_shell_agents-in-the-cloud_next_attention";
@@ -210,7 +244,7 @@ function renderAgentsInTheCloudNextAttentionButton(): string {
 
 export function renderAgentsInTheCloudBar(): string {
   const close = barButton("Close workspace list", "click->workspace-navigation#closeWorkspacePane", Icons.Close, "data-close-workspace-pane disabled");
-  const newWorkspace = barButton("New Workspace With Same Project", "click->agents-in-the-cloud-shortcuts#runCommand", Icons.Plus, 'data-command-id="agent.open-launch-composer"');
+  const newWorkspace = barButton("New workspace from same template", "click->agents-in-the-cloud-shortcuts#runCommand", Icons.Plus, 'data-command-id="agent.open-launch-composer"');
   return `<nav class="fixed-shell-mobile-nav fixed-shell-agents-in-the-cloud-bar" data-popular-button aria-label="AgentsInTheCloud">${close}${renderAgentsInTheCloudNextAttentionButton()}${newWorkspace}</nav>`;
 }
 
@@ -440,7 +474,8 @@ export function presentWorkViewTurboStream(workspaceId: string, key: string): st
 export function workspacePaneCollectionsRegions(presentation: WorkspacePanePresentation): import("@agents-in-the-cloud/shared").LiveRegion[] {
   return [
     { target: workspacePaneScrollDomId, html: workspaceRows(presentation).map(row => row.html).join("") },
-    { target: workspaceProjectsPaneDomId, html: renderProjectsPane(presentation), action: "replace" },
+    { target: workspacePaneNewWorkspaceDomId, html: renderNewWorkspaceRow(presentation) },
+    { target: workspaceTemplateOptionsDomId, html: renderWorkspaceTemplateOptions(presentation), action: "replace" },
   ];
 }
 

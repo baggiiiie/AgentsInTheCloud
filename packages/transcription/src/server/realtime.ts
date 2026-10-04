@@ -2,7 +2,7 @@ import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isNotFound
 import { errorMessage, type WorkspaceServerSocketHandler, type WorkspaceSocketConnection } from "@agents-in-the-cloud/shared";
 import { stat } from "node:fs/promises";
 import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
-import { cachedProjectSourcePath } from "@agents-in-the-cloud/projects";
+import { cachedWorkspaceTemplateSourcePath } from "@agents-in-the-cloud/workspace-templates";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import { readTranscriptionModel, transcriptionModel, type TranscriptionModelId } from "./models.ts";
@@ -102,9 +102,9 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
     try {
       const modelId = await readTranscriptionModel();
       const workspaceId = url.searchParams.get("workspaceId");
-      const projectId = url.searchParams.get("projectId");
+      const workspaceTemplateId = url.searchParams.get("workspaceTemplateId");
       const source = workspaceId ? workspaceWorkHostPath(workspaceId)
-        : projectId ? await cachedProjectSourcePath(projectId) : undefined;
+        : workspaceTemplateId ? await cachedWorkspaceTemplateSourcePath(workspaceTemplateId) : undefined;
       phrases = source ? await readTranscriptionContext(source) : [];
       const model = transcriptionModel(modelId);
       let reportedProgress = -1;

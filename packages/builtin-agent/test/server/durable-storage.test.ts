@@ -25,7 +25,7 @@ async function dataDirectory() {
   return path;
 }
 
-async function project(root: string, workspaceId: string, shareKey: string) {
+async function workspaceTemplate(root: string, workspaceId: string, shareKey: string) {
   const metadata = join(root, "workspaces", workspaceId, "metadata");
   await mkdir(metadata, { recursive: true });
   await writeFile(join(metadata, "init.json"), JSON.stringify({ type: "project.git", projectId: "project", name: "repo", gitUrl: "https://example.com/repo.git", branch: null, sessionShareKey: shareKey }));
@@ -33,8 +33,8 @@ async function project(root: string, workspaceId: string, shareKey: string) {
 
 test("journals use the existing project share outside disposable workspace files", async () => {
   const root = await dataDirectory();
-  await project(root, "one", "Product Suite");
-  await project(root, "two", "Other Product");
+  await workspaceTemplate(root, "one", "Product Suite");
+  await workspaceTemplate(root, "two", "Other Product");
   expect(await workspaceDurableJournalDirectory("one")).toBe(join(root, "session-shares", "product-suite", "builtin-durable", "one"));
   expect(await workspaceDurableJournalDirectory("two")).toBe(join(root, "session-shares", "other-product", "builtin-durable", "two"));
   expect(await workspaceDurableJournalDirectory("scratch")).toBe(join(root, "session-shares", "projectless", "builtin-durable", "scratch"));
@@ -47,7 +47,7 @@ test("journals use the existing project share outside disposable workspace files
 
 test("workspace journal retains the original searchable journal and deletion gate after workspace files are removed", async () => {
   const root = await dataDirectory();
-  await project(root, "retained", "Product Suite");
+  await workspaceTemplate(root, "retained", "Product Suite");
   const models = createModels();
   const faux = fauxProvider({ tokensPerSecond: 100_000 });
   models.setProvider(faux.provider);

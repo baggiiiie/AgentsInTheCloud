@@ -1,5 +1,5 @@
 import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
-import { cancelWorkspaceSshTrust, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged, requestWorkspaceSshTrust, workspaceSshTrustRequests } from "@agents-in-the-cloud/projects";
+import { cancelWorkspaceSshTrust, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged, requestWorkspaceSshTrust, workspaceSshTrustRequests } from "@agents-in-the-cloud/workspace-templates";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";

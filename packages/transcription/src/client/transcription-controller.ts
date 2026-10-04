@@ -29,10 +29,10 @@ function composeTranscript(prefix: string, spoken: string, suffix: string) {
 export function createTranscriptionComposerController(Controller: WorkspaceClientControllerConstructor, microphoneSource: SharedMicrophone) {
   return class TranscriptionComposerController extends Controller {
     static targets = ["button", "waveform", "status"];
-    static values = { workspaceId: String, projectId: String };
+    static values = { workspaceId: String, workspaceTemplateId: String };
 
     declare readonly workspaceIdValue: string;
-    declare readonly projectIdValue: string;
+    declare readonly workspaceTemplateIdValue: string;
     declare readonly buttonTarget: HTMLButtonElement;
     declare readonly waveformTarget: HTMLCanvasElement;
     declare readonly statusTarget: HTMLElement;
@@ -121,7 +121,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       this.input.blur();
       this.setProgress(0);
       const query = this.workspaceIdValue ? `?workspaceId=${encodeURIComponent(this.workspaceIdValue)}`
-        : this.projectIdValue ? `?projectId=${encodeURIComponent(this.projectIdValue)}` : "";
+        : this.workspaceTemplateIdValue ? `?workspaceTemplateId=${encodeURIComponent(this.workspaceTemplateIdValue)}` : "";
       const socket = new WebSocket(observableWebSocketUrl(`/transcription/realtime${query}`));
       this.socket = socket;
       socket.addEventListener("message", (event) => {

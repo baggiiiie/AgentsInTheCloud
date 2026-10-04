@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@agents-in-the-cloud/core": "workspace:*",
-    "@agents-in-the-cloud/projects": "workspace:*",
+    "@agents-in-the-cloud/workspace-templates": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@agents-in-the-cloud/workspace": "workspace:*",
     "https-proxy-agent": "7.0.6",

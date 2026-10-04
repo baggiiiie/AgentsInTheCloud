@@ -1,5 +1,5 @@
 import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
-import { isGitProjectInit, revealProjectSecrets, onProjectStoreChanged, projectSecretPlaceholder, projectSecretHosts, projectSecretAllowsPath } from "@agents-in-the-cloud/projects";
+import { isGitWorkspaceTemplateInit, revealWorkspaceTemplateSecrets, onWorkspaceTemplateStoreChanged, workspaceTemplateSecretPlaceholder, workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath } from "@agents-in-the-cloud/workspace-templates";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { matchHostname } from "./patterns.ts";
 import { isWorkspaceDestinationAllowed } from "./workspace-destinations.ts";
@@ -49,7 +49,7 @@ function invalidateContexts(): void {
   configurationGeneration++;
   contexts.clear();
 }
-onProjectStoreChanged(invalidateContexts);
+onWorkspaceTemplateStoreChanged(invalidateContexts);
 
 export { discoverHostGitHubToken };
 
@@ -74,11 +74,11 @@ export async function createWorkspaceSecretContext(workspaceId: string, init?: W
   const generation = configurationGeneration;
   const token = discoverHostGitHubToken();
   const secrets: Record<string, SecretDefinition> = token
-    ? { [githubTokenEnvVar]: { value: token, hosts: githubAllowedHosts(), placeholder: projectSecretPlaceholder(githubTokenEnvVar) } }
+    ? { [githubTokenEnvVar]: { value: token, hosts: githubAllowedHosts(), placeholder: workspaceTemplateSecretPlaceholder(githubTokenEnvVar) } }
     : {};
-  if (isGitProjectInit(init)) {
-    for (const secret of await revealProjectSecrets(init.projectId)) {
-      secrets[secret.envName] = { value: secret.secretValue, allowInPath: projectSecretAllowsPath(secret), hosts: projectSecretHosts(secret.hostPattern), placeholder: secret.placeholder ?? projectSecretPlaceholder(secret.envName) };
+  if (isGitWorkspaceTemplateInit(init)) {
+    for (const secret of await revealWorkspaceTemplateSecrets(init.projectId)) {
+      secrets[secret.envName] = { value: secret.secretValue, allowInPath: workspaceTemplateSecretAllowsPath(secret), hosts: workspaceTemplateSecretHosts(secret.hostPattern), placeholder: secret.placeholder ?? workspaceTemplateSecretPlaceholder(secret.envName) };
     }
   }
   if (generation !== configurationGeneration) return createWorkspaceSecretContext(workspaceId, init);

@@ -20,10 +20,10 @@ test("provisioning supplies setup and PID 1 requirements without replacing image
 test("Docker opt-in keeps the ordinary privileged runtime and snapshots the settings link", async () => {
   const directory = await mkdtemp(join(tmpdir(), "workspace-systemd-"));
   try {
-    const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], privileged: true, initScripts: [], containerFiles: [], cleanup: [], dockerSupportSettingsUrl: "https://agents-in-the-cloud.example/projects/app/settings?section=privileged" };
+    const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], privileged: true, initScripts: [], containerFiles: [], cleanup: [], dockerSupportSettingsUrl: "https://agents-in-the-cloud.example/workspace-templates/app/settings?section=privileged" };
     await prepareWorkspaceSystemd(plan, directory, "echo setup");
     expect(plan.extraArgs).not.toContain("writable-cgroups=true");
     expect(plan.extraArgs).toContain("--privileged");
-    expect(await readFile(join(directory, "agents-in-the-cloud", "docker-support"), "utf8")).toBe("enabled\nhttps://agents-in-the-cloud.example/projects/app/settings?section=privileged\n");
+    expect(await readFile(join(directory, "agents-in-the-cloud", "docker-support"), "utf8")).toBe("enabled\nhttps://agents-in-the-cloud.example/workspace-templates/app/settings?section=privileged\n");
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

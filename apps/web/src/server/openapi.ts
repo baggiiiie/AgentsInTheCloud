@@ -1,4 +1,4 @@
-import { projectSecretPathPermissionSchema } from "@agents-in-the-cloud/projects";
+import { workspaceTemplateSecretPathPermissionSchema } from "@agents-in-the-cloud/workspace-templates";
 import { emptyWorkspaceCommandInputSchema, type WorkspaceModuleCommandHandler } from "@agents-in-the-cloud/shared";
 import type { TSchema } from "typebox";
 import { closeWorkViewRequestSchema, reorderWorkViewRequestSchema, workViewReferenceSchema } from "./work-view-api.ts";
@@ -19,19 +19,19 @@ const jsonAndHtmlResponse = (description: string, schema: TSchema) => ({
 const workspaceId = { name: "id", in: "path", required: true, schema: { type: "string" } };
 const agentConversation = { name: "agent", in: "query", required: false, description: "Agent conversation to select in the browser surface.", schema: { type: "string" } };
 const selectedWorkView = { name: "workView", in: "query", required: false, description: "Work-view key to select and reveal in the browser surface.", schema: { type: "string" } };
-const projectId = { name: "projectId", in: "path", required: true, schema: { type: "string" } };
+const workspaceTemplateId = { name: "workspaceTemplateId", in: "path", required: true, schema: { type: "string" } };
 const variableId = { name: "variableId", in: "path", required: true, schema: { type: "string" } };
 const secretId = { name: "secretId", in: "path", required: true, schema: { type: "string" } };
-const projectSettingsSection = { name: "section", in: "query", required: false, schema: { type: "string", enum: ["repository", "secrets", "ssh-keys", "environment", "dockerfile", "preload-images", "privileged", "danger"] } };
+const workspaceTemplateSettingsSection = { name: "section", in: "query", required: false, schema: { type: "string", enum: ["repository", "secrets", "ssh-keys", "environment", "dockerfile", "preload-images", "privileged", "danger"] } };
 const settingsSection = { name: "section", in: "query", required: false, schema: { type: "string" } };
 const htmlSurfaceResponses = (description: string) => ({ "200": { description, content: { "text/html": { schema: { type: "string" } } } }, "400": errorResponse, "404": errorResponse });
 const agentConversationId = { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } };
 const jsonBody = (schema: TSchema) => ({ required: true, content: { "application/json": { schema } } });
 const emptyObjectSchema = { type: "object", additionalProperties: false };
 const workspaceIssuesSchema = { type: "array", items: { type: "object", required: ["kind", "message"], properties: { kind: { type: "string", enum: ["readiness", "image"] }, message: { type: "string" } }, additionalProperties: false } };
-const projectSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
+const workspaceTemplateSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
 const sshKnownHostsSchema = { type: "object", required: ["knownHosts"], properties: { knownHosts: { type: "string", description: "Operator-verified known_hosts entries; empty clears additional trust. GitHub is trusted by default." } } };
-const projectSummaryProperties = { lastWorkspaceCreatedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent workspace creation for this project; absent if none has been recorded" }, configurationFingerprint: { type: "string", description: "Opaque fingerprint of workspace setup settings" }, id: { type: "string" }, name: { type: "string" }, gitUrl: { type: "string" }, branch: { type: ["string", "null"] }, sessionShareKey: { type: "string" }, privileged: { type: "boolean", default: false, description: "Host-authorized privileged mode for future workspaces; enables Docker at the cost of host isolation" }, dockerfile: { type: "string" }, preloadImages: { type: "array", items: { type: "string" }, description: "Images prepared before newly created workspaces become ready. Does not change existing workspaces." } };
+const workspaceTemplateSummaryProperties = { createdAt: { type: "number", description: "Unix timestamp in milliseconds when the template was added; absent for templates added before this was recorded" }, lastUsedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent use: adding the template or creating a workspace from it" }, lastWorkspaceCreatedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent workspace creation from this template; absent if none has been recorded" }, configurationFingerprint: { type: "string", description: "Opaque fingerprint of workspace setup settings" }, id: { type: "string" }, name: { type: "string" }, gitUrl: { type: "string" }, branch: { type: ["string", "null"] }, sessionShareKey: { type: "string" }, privileged: { type: "boolean", default: false, description: "Host-authorized privileged mode for future workspaces; enables Docker at the cost of host isolation" }, dockerfile: { type: "string" }, preloadImages: { type: "array", items: { type: "string" }, description: "Images prepared before newly created workspaces become ready. Does not change existing workspaces." } };
 const agentConversationSummarySchema = {
   type: "object",
   required: ["id", "title"],
@@ -70,47 +70,47 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
         get: { summary: "List workspaces", responses: jsonResponse("Workspace summaries", { type: "object", required: ["workspaces"], properties: { workspaces: { type: "array", items: { $ref: "#/components/schemas/WorkspaceSummary" } } } }) },
         post: { summary: "Create a workspace asynchronously", requestBody: jsonBody({ $ref: "#/components/schemas/CreateWorkspace" }), responses: { ...jsonResponse("Workspace creation accepted", { $ref: "#/components/schemas/WorkspaceEnvelope" }, "202"), "409": { ...errorResponse, description: "Agent setup required; error.setupUrl identifies its connection flow" } } },
       },
-      "/projects": {
-        get: { summary: "List projects", responses: jsonResponse("Project summaries", { type: "object", required: ["projects"], properties: { projects: { type: "array", items: { $ref: "#/components/schemas/ProjectSummary" } } } }) },
-        post: { summary: "Create or resolve a project", description: "Creates a project, or resolves and returns the existing project when the same repository specification was previously added.", requestBody: jsonBody({ type: "object", required: ["gitUrl"], properties: { gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Project created or resolved", { $ref: "#/components/schemas/ProjectEnvelope" }) },
+      "/workspace-templates": {
+        get: { summary: "List workspace templates", responses: jsonResponse("Workspace template summaries", { type: "object", required: ["workspaceTemplates"], properties: { workspaceTemplates: { type: "array", items: { $ref: "#/components/schemas/WorkspaceTemplateSummary" } } } }) },
+        post: { summary: "Create or resolve a workspace template", description: "Creates a workspace template, or resolves and returns the existing one when the same repository specification was previously added.", requestBody: jsonBody({ type: "object", required: ["gitUrl"], properties: { gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace template created or resolved", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) },
       },
-      "/projects/new": { get: { summary: "Present the new-project screen", responses: htmlSurfaceResponses("AgentsInTheCloud with the new-project screen open") } },
-      "/workspaces/new": { get: { summary: "Present the new projectless workspace composer", responses: htmlSurfaceResponses("AgentsInTheCloud with the workspace composer open") } },
+      "/workspace-templates/new": { get: { summary: "Present the add-template screen", responses: htmlSurfaceResponses("AgentsInTheCloud with the add-template screen open") } },
+      "/workspaces/new": { get: { summary: "Present the launch composer for an empty workspace", responses: htmlSurfaceResponses("AgentsInTheCloud with the workspace composer open") } },
       "/settings": { get: { summary: "Present AgentsInTheCloud settings", parameters: [settingsSection], responses: htmlSurfaceResponses("AgentsInTheCloud with settings open") } },
-      "/projects/{projectId}": {
-        get: { summary: "Inspect project configuration", parameters: [projectId], responses: jsonResponse("Project configuration", { $ref: "#/components/schemas/ProjectConfigurationEnvelope" }) },
-        post: { summary: "Update a project", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["name", "gitUrl"], properties: { name: { type: "string" }, gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Project updated", { $ref: "#/components/schemas/ProjectEnvelope" }) },
+      "/workspace-templates/{workspaceTemplateId}": {
+        get: { summary: "Inspect workspace template configuration", parameters: [workspaceTemplateId], responses: jsonResponse("Workspace template configuration", { $ref: "#/components/schemas/WorkspaceTemplateConfigurationEnvelope" }) },
+        post: { summary: "Update a workspace template", parameters: [workspaceTemplateId], requestBody: jsonBody({ type: "object", required: ["name", "gitUrl"], properties: { name: { type: "string" }, gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace template updated", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) },
       },
-      "/projects/{projectId}/ssh-keys/{keyId}/public-key": {
+      "/workspace-templates/{workspaceTemplateId}/ssh-keys/{keyId}/public-key": {
         get: {
-          summary: "Derive the public key from a stored project private key",
-          parameters: [projectId, { name: "keyId", in: "path", required: true, schema: { type: "string" } }],
+          summary: "Derive the public key from a stored template private key",
+          parameters: [workspaceTemplateId, { name: "keyId", in: "path", required: true, schema: { type: "string" } }],
           responses: { "200": { description: "OpenSSH public key", content: { "text/plain": { schema: { type: "string" } } } } },
         },
       },
-      "/projects/{projectId}/ssh-known-hosts": {
-        get: { summary: "Read explicitly trusted SSH server keys", parameters: [projectId], responses: jsonResponse("Trusted host keys", sshKnownHostsSchema) },
-        post: { summary: "Save operator-verified known_hosts entries for future workspace preparation", parameters: [projectId], requestBody: jsonBody(sshKnownHostsSchema), responses: jsonResponse("Trusted host keys saved", sshKnownHostsSchema) },
+      "/workspace-templates/{workspaceTemplateId}/ssh-known-hosts": {
+        get: { summary: "Read explicitly trusted SSH server keys", parameters: [workspaceTemplateId], responses: jsonResponse("Trusted host keys", sshKnownHostsSchema) },
+        post: { summary: "Save operator-verified known_hosts entries for future workspace preparation", parameters: [workspaceTemplateId], requestBody: jsonBody(sshKnownHostsSchema), responses: jsonResponse("Trusted host keys saved", sshKnownHostsSchema) },
       },
-      "/projects/{projectId}/settings": {
+      "/workspace-templates/{workspaceTemplateId}/settings": {
         get: {
-          summary: "Present project settings",
+          summary: "Present workspace template settings",
           description: "A browser-navigable AgentsInTheCloud surface. Use its URL with the presentation tool.",
-          parameters: [projectId, projectSettingsSection],
-          responses: htmlSurfaceResponses("AgentsInTheCloud with project settings open"),
+          parameters: [workspaceTemplateId, workspaceTemplateSettingsSection],
+          responses: htmlSurfaceResponses("AgentsInTheCloud with workspace template settings open"),
         },
       },
-      "/projects/{projectId}/workspaces/new": { get: { summary: "Present a new project workspace composer", parameters: [projectId], responses: htmlSurfaceResponses("AgentsInTheCloud with the project workspace composer open") } },
-      "/projects/{projectId}/preload-images": { post: { summary: "Set images to preload in future project workspaces", description: "Replaces the image list. An empty array disables preloading. Existing workspaces are unchanged.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["preloadImages"], properties: { preloadImages: { type: "array", items: { type: "string" } } }, additionalProperties: false }), responses: jsonResponse("Preload images saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
-      "/projects/{projectId}/privileged": { post: { summary: "Set privileged mode for future project workspaces", description: "Defaults to false. Enables Docker inside workspaces at the cost of host isolation: agents can access host devices and may read or modify host data. Existing workspaces are unchanged.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["privileged"], properties: { privileged: { type: "boolean" } }, additionalProperties: false }), responses: jsonResponse("Privileged mode saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
-      "/projects/{projectId}/dockerfile": { post: { summary: "Set the project workspace Dockerfile override", description: "Must start with FROM agents-in-the-cloud-workspace. An empty string clears the override. Takes priority over .agents-in-the-cloud/Dockerfile for new workspaces.", parameters: [projectId], requestBody: jsonBody({ type: "object", required: ["dockerfile"], properties: { dockerfile: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Dockerfile saved", { $ref: "#/components/schemas/ProjectEnvelope" }) } },
-      "/projects/{projectId}/environment": { post: { summary: "Create a project environment variable", parameters: [projectId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable created", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
-      "/projects/{projectId}/environment/{variableId}": { post: { summary: "Update a project environment variable", parameters: [projectId, variableId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable updated", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
-      "/projects/{projectId}/environment/{variableId}/delete": { post: { summary: "Delete a project environment variable", parameters: [projectId, variableId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Environment variable deleted", { type: "object", required: ["deleted", "environmentVariable"], properties: { deleted: { const: true }, environmentVariable: { $ref: "#/components/schemas/EnvironmentVariable" } } }) } },
-      "/projects/{projectId}/secrets": { post: { summary: "Create a project secret", description: "Omit secretValue to declare a secret without a value. Values are encrypted and never returned.", parameters: [projectId], requestBody: jsonBody({ $ref: "#/components/schemas/CreateSecret" }), responses: jsonResponse("Secret metadata created", { $ref: "#/components/schemas/SecretEnvelope" }) } },
-      "/projects/{projectId}/secrets/{secretId}": { post: { summary: "Update a project secret", description: "Omit secretValue to preserve the stored secret. The value is never returned.", parameters: [projectId, secretId], requestBody: jsonBody({ $ref: "#/components/schemas/UpdateSecret" }), responses: jsonResponse("Secret metadata updated", { $ref: "#/components/schemas/SecretEnvelope" }) } },
-      "/projects/{projectId}/secrets/{secretId}/delete": { post: { summary: "Delete a project secret", parameters: [projectId, secretId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Secret deleted", { type: "object", required: ["deleted", "secret"], properties: { deleted: { const: true }, secret: { $ref: "#/components/schemas/SecretSummary" } } }) } },
-      "/projects/{projectId}/delete": { post: { summary: "Delete a project", parameters: [projectId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Project deleted or blocked by workspace references", { $ref: "#/components/schemas/DeleteProjectResult" }) } },
+      "/workspace-templates/{workspaceTemplateId}/workspaces/new": { get: { summary: "Present the launch composer for a workspace from this template", parameters: [workspaceTemplateId], responses: htmlSurfaceResponses("AgentsInTheCloud with the launch composer open") } },
+      "/workspace-templates/{workspaceTemplateId}/preload-images": { post: { summary: "Set images to preload in future workspaces from this template", description: "Replaces the image list. An empty array disables preloading. Existing workspaces are unchanged.", parameters: [workspaceTemplateId], requestBody: jsonBody({ type: "object", required: ["preloadImages"], properties: { preloadImages: { type: "array", items: { type: "string" } } }, additionalProperties: false }), responses: jsonResponse("Preload images saved", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/privileged": { post: { summary: "Set privileged mode for future workspaces from this template", description: "Defaults to false. Enables Docker inside workspaces at the cost of host isolation: agents can access host devices and may read or modify host data. Existing workspaces are unchanged.", parameters: [workspaceTemplateId], requestBody: jsonBody({ type: "object", required: ["privileged"], properties: { privileged: { type: "boolean" } }, additionalProperties: false }), responses: jsonResponse("Privileged mode saved", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/dockerfile": { post: { summary: "Set the workspace template Dockerfile override", description: "Must start with FROM agents-in-the-cloud-workspace. An empty string clears the override. Takes priority over .agents-in-the-cloud/Dockerfile for new workspaces.", parameters: [workspaceTemplateId], requestBody: jsonBody({ type: "object", required: ["dockerfile"], properties: { dockerfile: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Dockerfile saved", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/environment": { post: { summary: "Create a workspace template environment variable", parameters: [workspaceTemplateId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable created", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/environment/{variableId}": { post: { summary: "Update a workspace template environment variable", parameters: [workspaceTemplateId, variableId], requestBody: jsonBody({ $ref: "#/components/schemas/EnvironmentVariableInput" }), responses: jsonResponse("Environment variable updated", { $ref: "#/components/schemas/EnvironmentVariableEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/environment/{variableId}/delete": { post: { summary: "Delete a workspace template environment variable", parameters: [workspaceTemplateId, variableId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Environment variable deleted", { type: "object", required: ["deleted", "environmentVariable"], properties: { deleted: { const: true }, environmentVariable: { $ref: "#/components/schemas/EnvironmentVariable" } } }) } },
+      "/workspace-templates/{workspaceTemplateId}/secrets": { post: { summary: "Create a workspace template secret", description: "Omit secretValue to declare a secret without a value. Values are encrypted and never returned.", parameters: [workspaceTemplateId], requestBody: jsonBody({ $ref: "#/components/schemas/CreateSecret" }), responses: jsonResponse("Secret metadata created", { $ref: "#/components/schemas/SecretEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/secrets/{secretId}": { post: { summary: "Update a workspace template secret", description: "Omit secretValue to preserve the stored secret. The value is never returned.", parameters: [workspaceTemplateId, secretId], requestBody: jsonBody({ $ref: "#/components/schemas/UpdateSecret" }), responses: jsonResponse("Secret metadata updated", { $ref: "#/components/schemas/SecretEnvelope" }) } },
+      "/workspace-templates/{workspaceTemplateId}/secrets/{secretId}/delete": { post: { summary: "Delete a workspace template secret", parameters: [workspaceTemplateId, secretId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Secret deleted", { type: "object", required: ["deleted", "secret"], properties: { deleted: { const: true }, secret: { $ref: "#/components/schemas/SecretSummary" } } }) } },
+      "/workspace-templates/{workspaceTemplateId}/delete": { post: { summary: "Delete a workspace template", parameters: [workspaceTemplateId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Workspace template deleted or blocked by workspace references", { $ref: "#/components/schemas/DeleteWorkspaceTemplateResult" }) } },
       "/workspaces/{id}": { get: { summary: "Inspect or present a workspace", description: "JSON requests inspect workspace state. Browser navigation presents the workspace and can select an Agent conversation or Work view.", parameters: [workspaceId, agentConversation, selectedWorkView], responses: jsonAndHtmlResponse("Workspace state or browser surface", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
       "/workspaces/{id}/sidebar-title": { post: { summary: "Rename a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", required: ["title"], properties: { title: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace renamed", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
       "/workspaces/{id}/warnings/{kind}/dismiss": { post: { summary: "Dismiss the current workspace warning state", parameters: [workspaceId, { name: "kind", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ type: "object", required: ["state"], properties: { state: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Warning dismissed", { type: "object", required: ["dismissed"], properties: { dismissed: { const: true } } }) } },
@@ -141,20 +141,20 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
           properties: {
             source: { oneOf: [
               { type: "object", properties: { type: { const: "empty" } }, additionalProperties: false },
-              { type: "object", required: ["type", "project"], properties: { type: { const: "project" }, project: { type: "string" } }, additionalProperties: false },
+              { type: "object", required: ["type", "workspaceTemplate"], properties: { type: { const: "workspace-template" }, workspaceTemplate: { type: "string" } }, additionalProperties: false },
             ] },
             title: { type: "string" },
             agent: { type: "object", properties: { provider: { type: "string", description: "Agent provider ID; defaults to the most recently created provider" }, initialPrompt: { type: "string" }, model: { type: "string" }, thinkingLevel: { type: "string" }, serviceTier: { type: "string", enum: ["default", "priority"] }, attachmentDraft: { type: "string" } }, additionalProperties: false },
           },
           additionalProperties: false,
         },
-        ProjectSummary: {
+        WorkspaceTemplateSummary: {
           type: "object",
           required: ["id", "name", "gitUrl", "branch", "sessionShareKey"],
-          properties: projectSummaryProperties,
+          properties: workspaceTemplateSummaryProperties,
           additionalProperties: false,
         },
-        ProjectEnvelope: { type: "object", required: ["project"], properties: { project: { $ref: "#/components/schemas/ProjectSummary" } } },
+        WorkspaceTemplateEnvelope: { type: "object", required: ["workspaceTemplate"], properties: { workspaceTemplate: { $ref: "#/components/schemas/WorkspaceTemplateSummary" } } },
         EnvironmentVariable: {
           type: "object",
           required: ["id", "projectId", "name", "value", "createdAt", "updatedAt"],
@@ -166,20 +166,20 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
         SecretSummary: {
           type: "object",
           required: ["id", "projectId", "envName", "hostPattern", "createdAt", "updatedAt", "annotation", "optional", "configured"],
-          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: projectSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
+          properties: { id: { type: "string" }, projectId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
           additionalProperties: false,
         },
-        CreateSecret: projectSecretInputSchema,
-        UpdateSecret: projectSecretInputSchema,
+        CreateSecret: workspaceTemplateSecretInputSchema,
+        UpdateSecret: workspaceTemplateSecretInputSchema,
         SecretEnvelope: { type: "object", required: ["secret"], properties: { secret: { $ref: "#/components/schemas/SecretSummary" } } },
-        ProjectConfigurationEnvelope: { type: "object", required: ["project"], properties: { project: {
+        WorkspaceTemplateConfigurationEnvelope: { type: "object", required: ["workspaceTemplate"], properties: { workspaceTemplate: {
           type: "object",
           required: ["id", "name", "gitUrl", "branch", "sessionShareKey", "environment", "secrets"],
-          properties: { ...projectSummaryProperties, environment: { type: "array", items: { $ref: "#/components/schemas/EnvironmentVariable" } }, secrets: { type: "array", items: { $ref: "#/components/schemas/SecretSummary" } } },
+          properties: { ...workspaceTemplateSummaryProperties, environment: { type: "array", items: { $ref: "#/components/schemas/EnvironmentVariable" } }, secrets: { type: "array", items: { $ref: "#/components/schemas/SecretSummary" } } },
           additionalProperties: false,
         } } },
-        DeleteProjectResult: { oneOf: [
-          { type: "object", required: ["deleted", "blocked", "project"], properties: { deleted: { const: true }, blocked: { const: false }, project: { $ref: "#/components/schemas/ProjectSummary" } } },
+        DeleteWorkspaceTemplateResult: { oneOf: [
+          { type: "object", required: ["deleted", "blocked", "workspaceTemplate"], properties: { deleted: { const: true }, blocked: { const: false }, workspaceTemplate: { $ref: "#/components/schemas/WorkspaceTemplateSummary" } } },
           { type: "object", required: ["deleted", "blocked", "references"], properties: { deleted: { const: false }, blocked: { const: true }, references: { type: "array", items: { type: "object", required: ["workspaceId", "title"], properties: { workspaceId: { type: "string" }, title: { type: "string" } }, additionalProperties: false } } } },
         ] },
         WorkspacePhase: { oneOf: [
@@ -187,7 +187,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
           { type: "object", required: ["kind", "busy"], properties: { kind: { const: "runningPhase" }, busy: { type: "boolean" } }, additionalProperties: false },
           { type: "object", required: ["kind", "busy", "deletion"], properties: { kind: { const: "deletingPhase" }, busy: { type: "boolean" }, deletion: { type: "object", required: ["status"], properties: { status: { enum: ["checking", "blocked", "deleting", "failed"] }, provisioningError: { type: "string" }, fingerprint: { type: "string" }, forced: { type: "boolean" }, operation: { enum: ["checking", "deleting"] }, error: { type: "string" } } } }, additionalProperties: false },
         ] },
-        WorkspaceSummary: { type: "object", required: ["id", "title", "phase", "parked", "requestingAttention"], properties: { id: { type: "string" }, title: { type: "string" }, phase: { $ref: "#/components/schemas/WorkspacePhase" }, requestingAttention: { type: "boolean" }, parked: { type: "boolean" }, projectId: { type: "string" }, issues: workspaceIssuesSchema }, additionalProperties: false },
+        WorkspaceSummary: { type: "object", required: ["id", "title", "phase", "parked", "requestingAttention"], properties: { id: { type: "string" }, title: { type: "string" }, phase: { $ref: "#/components/schemas/WorkspacePhase" }, requestingAttention: { type: "boolean" }, parked: { type: "boolean" }, workspaceTemplateId: { type: "string" }, issues: workspaceIssuesSchema }, additionalProperties: false },
         WorkspaceEnvelope: {
           type: "object",
           required: ["workspace"],

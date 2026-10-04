@@ -22,10 +22,10 @@ async function dataDir(): Promise<string> {
 
 const ensureDefaultWorkspaceAgentConversation = ensureNativeConversation;
 
-async function writeProjectInit(workspaceId: string, projectId: string, sessionShareKey: string): Promise<void> {
+async function writeWorkspaceTemplateInit(workspaceId: string, workspaceTemplateId: string, sessionShareKey: string): Promise<void> {
   const path = join(process.env.ATELIER_DATA_DIR!, "workspaces", workspaceId, "metadata");
   await mkdir(path, { recursive: true });
-  await writeFile(join(path, "init.json"), JSON.stringify({ type: "project.git", projectId, name: "repo", gitUrl: "https://example.com/repo.git", branch: null, sessionShareKey }));
+  await writeFile(join(path, "init.json"), JSON.stringify({ type: "project.git", projectId: workspaceTemplateId, name: "repo", gitUrl: "https://example.com/repo.git", branch: null, sessionShareKey }));
 }
 
 afterEach(async () => {
@@ -37,7 +37,7 @@ afterEach(async () => {
 describe("Workspace Agent conversation store", () => {
   test("project and projectless journals resolve through workspace metadata", async () => {
     const root = await dataDir();
-    await writeProjectInit("front", "frontend", "suite");
+    await writeWorkspaceTemplateInit("front", "frontend", "suite");
     const front = await ensureNativeConversation("front");
     expect(front.path).toBe(join(root, "session-shares", "suite", "builtin-durable", "front"));
     const scratch = await ensureNativeConversation("scratch");

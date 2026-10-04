@@ -1,7 +1,7 @@
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { clearWorkspaceGitHubToken, hasWorkspaceGitHubToken, setWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { getStoredGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
+import { getStoredGitIdentity, setGitIdentity } from "@agents-in-the-cloud/workspace-templates";
 import { validateGitHubToken } from "../github-auth.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { replace, stream, update } from "@agents-in-the-cloud/shared/http";

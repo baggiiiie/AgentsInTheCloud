@@ -16,7 +16,7 @@ const supervisorUrl = values["supervisor-url"]!;
 const marker = `agents-in-the-cloud-lifecycle-${randomUUID()}`;
 const repository = `/data/app/${marker}`;
 const fixtures: string[] = [];
-let projectId: string | undefined;
+let workspaceTemplateId: string | undefined;
 interface Workspace { id: string; phase: { kind: string; status?: string; busy: boolean }; parked?: boolean; error?: string; issues?: unknown[]; }
 interface Container {
   Id: string; Name: string; Image: string; State: { Running: boolean };
@@ -52,7 +52,7 @@ async function ready(id: string) {
     return workspace.phase.kind === "runningPhase" && !workspace.parked;
   }, 900_000);
 }
-async function create(source: { type: "empty" } | { type: "project"; project: string }) {
+async function create(source: { type: "empty" } | { type: "workspace-template"; workspaceTemplate: string }) {
   const { workspace } = await api<{ workspace: Workspace }>("/workspaces", { source, title: marker });
   fixtures.push(workspace.id);
   await ready(workspace.id);
@@ -154,7 +154,7 @@ async function replaceApp() {
 
 try {
   const contract = await api<{ paths: Record<string, { get?: { operationId?: string }; post?: { operationId?: string } }> }>("/openapi.json");
-  for (const path of ["/workspaces", "/projects/{projectId}/preload-images", "/workspaces/{id}/park"]) assert(path in contract.paths, `API advertises ${path}`);
+  for (const path of ["/workspaces", "/workspace-templates/{projectId}/preload-images", "/workspaces/{id}/park"]) assert(path in contract.paths, `API advertises ${path}`);
   console.log("Create projectless workspace; verify networking, mounts and lazy daemons");
   const emptyId = await create({ type: "empty" });
   const empty = await containerFor(emptyId);
@@ -187,11 +187,11 @@ try {
 
   console.log("Create a project with Alpine preload and a test-only egress secret");
   await docker("exec", "--user", "1000", "agents-in-the-cloud", "sh", "-eu", "-c", `mkdir '${repository}'; cd '${repository}'; git init -b main; git config user.name Acceptance; git config user.email acceptance@example.invalid; printf fixture > README; git add README; git commit -m fixture`);
-  projectId = (await api<{ project: { id: string } }>("/projects", { gitUrl: repository })).project.id;
-  await api(`/projects/${projectId}/preload-images`, { preloadImages: ["alpine:3.21"] });
+  workspaceTemplateId = (await api<{ workspaceTemplate: { id: string } }>("/workspace-templates", { gitUrl: repository })).workspaceTemplate.id;
+  await api(`/workspace-templates/${workspaceTemplateId}/preload-images`, { preloadImages: ["alpine:3.21"] });
   const secret = `test-only-${randomUUID()}`;
-  await api(`/projects/${projectId}/secrets`, { envName: "LIFECYCLE_TEST_SECRET", hostPattern: "httpbin.org", secretValue: secret });
-  const loadedId = await create({ type: "project", project: projectId });
+  await api(`/workspace-templates/${workspaceTemplateId}/secrets`, { envName: "LIFECYCLE_TEST_SECRET", hostPattern: "httpbin.org", secretValue: secret });
+  const loadedId = await create({ type: "workspace-template", workspaceTemplate: workspaceTemplateId });
   const loaded = await containerFor(loadedId);
   const loadedIdentity = topology(loaded);
   assert.notEqual(loadedIdentity.networkId, emptyIdentity.networkId);
@@ -229,7 +229,7 @@ try {
   const echoed: { headers: Record<string, string> } = JSON.parse(await exec(loaded.Id, "sh", "-c", 'curl --fail --silent --show-error --max-time 30 -H "X-Agents-In-The-Cloud-Test: $LIFECYCLE_TEST_SECRET" https://httpbin.org/headers'));
   const injected = Object.entries(echoed.headers).find(([name]) => name.toLowerCase() === "x-agents-in-the-cloud-test")?.[1];
   assert.equal(injected, secret, "egress socket injects the project secret");
-  await api(`/projects/${projectId}/preload-images`, { preloadImages: [] });
+  await api(`/workspace-templates/${workspaceTemplateId}/preload-images`, { preloadImages: [] });
   await parkResume(loadedId, loadedIdentity);
   assert.equal(await readFile(preloadPath, "utf8"), pinned, "settings changes do not change existing workspace pins");
 
@@ -251,10 +251,10 @@ try {
   await removeWorkspace(loadedId, loadedIdentity);
   await removeWorkspace(emptyId, emptyIdentity);
   for (const [path, hash] of hashes) assert.equal(await digest(path), hash, "workspace deletion preserves shared cache");
-  await api(`/projects/${projectId}/delete`, {});
+  await api(`/workspace-templates/${workspaceTemplateId}/delete`, {});
   await exec("agents-in-the-cloud", "rm", "-rf", repository);
   console.log("PASS: System workspace lifecycle, lazy daemons, shared EROFS, stable ingress, app replacement and egress injection");
 } catch (error) {
-  console.error("FAILED; fixtures retained for diagnosis:", { workspaces: fixtures, projectId, repository });
+  console.error("FAILED; fixtures retained for diagnosis:", { workspaces: fixtures, projectId: workspaceTemplateId, repository });
   throw error;
 }

@@ -1,4 +1,4 @@
-import { ProjectSecretPathController } from "./project-secret-path-controller.ts";
+import { WorkspaceTemplateSecretPathController } from "./workspace-template-secret-path-controller.ts";
 import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
 import { showTransientFeedback } from "@agents-in-the-cloud/design-system/transient-feedback/client";
 import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
@@ -83,7 +83,7 @@ class SettingsAutosaveController extends Controller<HTMLFormElement> {
   }
 }
 
-class ProjectSettingsController extends Controller<HTMLDialogElement> {
+class WorkspaceTemplateSettingsController extends Controller<HTMLDialogElement> {
   static targets = ["status", "confirm"];
   declare readonly statusTarget: HTMLElement;
   declare readonly confirmTarget: HTMLButtonElement;
@@ -224,8 +224,8 @@ export function registerWorkspaceSettingsControllers(): void {
     "git-identity": GitIdentityController,
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
-    "project-settings": ProjectSettingsController,
-    "project-secret-path": ProjectSecretPathController,
+    "workspace-template-settings": WorkspaceTemplateSettingsController,
+    "workspace-template-secret-path": WorkspaceTemplateSecretPathController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,
   });

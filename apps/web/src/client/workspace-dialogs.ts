@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 import { createHtmlAutocompleteController, PromptHistoryNavigator } from "@agents-in-the-cloud/agent/client";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeProjectSpec } from "@agents-in-the-cloud/shared";
+import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { submitFormWithFirstButton } from "./form-submission.ts";
@@ -147,12 +147,12 @@ class ScrollIntoViewController extends Controller<HTMLElement> {
   }
 }
 
-const ProjectGithubSearchController = createHtmlAutocompleteController(Controller, {
+const WorkspaceTemplateGithubSearchController = createHtmlAutocompleteController(Controller, {
   optionSelector: "[role=\"option\"]",
   loadingHtml: autocompleteHtml({ kind: "message", role: "status", content: { kind: "html", html: '<span class="agent-completion-spinner" aria-hidden="true"></span>Searching GitHub…' } }),
   request(input) {
     const query = input.value.trim();
-    if (query.length < 2 || looksLikeProjectSpec(query)) return undefined;
+    if (query.length < 2 || looksLikeWorkspaceTemplateSpec(query)) return undefined;
     return { query, debounceMs: 700 };
   },
   select(option, input) {
@@ -168,7 +168,7 @@ export function registerWorkspaceDialogControllers(): void {
     "submit-shortcut": SubmitShortcutController,
     "workspace-ssh-trust": WorkspaceSshTrustController,
     "launch-composer-dialog": LaunchComposerDialogController,
-    "project-github-search": ProjectGithubSearchController,
+    "workspace-template-github-search": WorkspaceTemplateGithubSearchController,
     "auto-scroll": AutoScrollController,
     "scroll-into-view": ScrollIntoViewController,
   });

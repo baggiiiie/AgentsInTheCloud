@@ -27,7 +27,7 @@ async function ready() {
 }
 try {
   await writeFile(join(directory, "token"), crypto.randomUUID());
-  await writeFile(join(directory, "docker-support"), "disabled\nhttps://agents-in-the-cloud.example/projects/test/settings?section=privileged\n");
+  await writeFile(join(directory, "docker-support"), "disabled\nhttps://agents-in-the-cloud.example/workspace-templates/test/settings?section=privileged\n");
   await docker(["run", "-d", "--name", sibling, "--entrypoint", "/bin/sleep", image, "infinity"]);
   await docker(["create", "--name", name, "--security-opt", "writable-cgroups=true", "--cgroupns=private", "--memory=512m", "--memory-swap=512m", "--tmpfs", "/run", "--stop-signal", "SIGRTMIN+3", image]);
   await docker(["cp", join(directory, "token"), `${name}:/etc/agents-in-the-cloud-workspace-gateway-token`]);
@@ -70,7 +70,7 @@ else: os.close(fd); raise AssertionError('raw host disk can be opened')
     assert.match(result.stderr, /Docker support is off/);
     assert.match(result.stderr, /On — Docker support/);
     assert.match(result.stderr, /Create a new workspace/);
-    assert.match(result.stderr, /https:\/\/agents-in-the-cloud.example\/projects\/test\/settings\?section=privileged/);
+    assert.match(result.stderr, /https:\/\/agents-in-the-cloud.example\/workspace-templates\/test\/settings\?section=privileged/);
   }
   for (const unit of ["docker.socket", "docker.service", "containerd.service"]) {
     assert.equal(await exec("systemctl", "show", "--property=LoadState", "--value", unit), "masked");

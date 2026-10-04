@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { discoverHostGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { escapeHtml, looksLikeProjectSpec } from "@agents-in-the-cloud/shared";
+import { escapeHtml, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -38,7 +38,7 @@ export interface GitHubRepositorySearchResult {
 
 export function shouldSearchGitHubRepositories(query: string): boolean {
   const trimmed = query.trim();
-  return trimmed.length >= 2 && !looksLikeProjectSpec(trimmed);
+  return trimmed.length >= 2 && !looksLikeWorkspaceTemplateSpec(trimmed);
 }
 
 async function searchGitHubRepositoryPage(query: string, token: string | undefined): Promise<GitHubRepositorySearchResult[]> {

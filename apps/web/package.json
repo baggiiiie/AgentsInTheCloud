@@ -22,7 +22,7 @@
     "@agents-in-the-cloud/keypress-probe": "workspace:*",
     "@agents-in-the-cloud/proxy-egress": "workspace:*",
     "@agents-in-the-cloud/proxy-ingress": "workspace:*",
-    "@agents-in-the-cloud/projects": "workspace:*",
+    "@agents-in-the-cloud/workspace-templates": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@agents-in-the-cloud/transcription": "workspace:*",
     "@agents-in-the-cloud/update": "workspace:*",

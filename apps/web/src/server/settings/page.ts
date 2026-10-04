@@ -8,7 +8,7 @@ import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
-import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/projects";
+import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/workspace-templates";
 import { instanceUrlHtml } from "../instance-url.ts";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";

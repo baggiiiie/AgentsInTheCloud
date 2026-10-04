@@ -31,18 +31,18 @@ async function setup() {
     validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {}, expand: async (_workspace: string, text: string) => text,
   };
-  async function project(id: string, share: string) {
+  async function workspaceTemplate(id: string, share: string) {
     const path = join(directory, "workspaces", id, "metadata");
     await mkdir(path, { recursive: true });
     await writeFile(join(path, "init.json"), JSON.stringify({ type: "project.git", projectId: "p", name: "p", gitUrl: "https://example.com/p.git", branch: null, sessionShareKey: share }));
   }
-  return { faux, load, project };
+  return { faux, load, workspaceTemplate };
 }
 
 test("retained discovery is share-scoped and reads closed/deleted native history without workspace metadata or readiness", async () => {
-  const { faux, load, project } = await setup();
-  await project("viewer", "team");
-  await project("deleted", "team");
+  const { faux, load, workspaceTemplate } = await setup();
+  await workspaceTemplate("viewer", "team");
+  await workspaceTemplate("deleted", "team");
   faux.setResponses([fauxAssistantMessage("Retained answer")]);
   const path = durableJournalDirectory("team", "deleted");
   const owner = await retainedDurableWorkspaceOwner(path, "deleted", {}, load);

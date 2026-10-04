@@ -4,20 +4,24 @@ AgentsInTheCloud is a workspace interface for collaborating with coding agents w
 
 ## Language
 
-**Project**:
-A reusable source and configuration from which multiple workspaces can be created.
-_Avoid_: Workspace folder, repository
+**Workspace template**:
+What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
+_Avoid_: Project, workspace folder, repository
+
+**Template icon**:
+The marker that identifies a workspace's template in the Workspace pane. By default it is a **swatch**: a colored square derived from the template id.
+_Avoid_: Chip, badge, avatar
 
 **Workspace**:
-An isolated environment in which a user collaborates with agents and inspects or operates on their work. A workspace may be created from a Project or without one.
+An isolated environment in which a user collaborates with agents and inspects or operates on their work. A workspace may be created from a Workspace template or with nothing.
 _Avoid_: Task, chat
 
-**Projectless workspace**:
-A workspace created without a Project and therefore without a reusable project source or configuration.
-_Avoid_: Empty project, miscellaneous project
+**Empty workspace**:
+A workspace seeded with nothing, and therefore without a template's repository or configuration.
+_Avoid_: Projectless workspace, empty template
 
 **Parked workspace**:
-A retained Workspace set aside from active use while remaining associated with its Project. Activity requiring user attention automatically unparks it.
+A retained Workspace set aside from active use while remaining associated with its Workspace template. Activity requiring user attention automatically unparks it.
 _Avoid_: Archived workspace, inactive workspace
 
 **Workspace pane**:

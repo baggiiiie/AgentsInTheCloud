@@ -517,12 +517,14 @@ export const entries: CatalogueEntry[] = [
     id: "action-item",
     compareButtonSizes: true,
     title: "Action item",
-    when: "Rows in menus, navigation, trees and action lists. Selected, hovered and keyboard-focused rows have a subtle directional rim reflection; idle rows stay plain. Use compound when a row has separately actionable trailing controls.",
+    when: "Rows in menus, navigation, trees and action lists. Selected, hovered and keyboard-focused rows have a subtle directional rim reflection; idle rows stay plain. Use compound when a row has separately actionable leading or trailing controls.",
     contract:
-      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
+      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound leadingActionsHtml controls are always visible and sit before the primary action, for markers that are their own button. Compound engaged controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
     imports: {
       "action-item": "actionItemHtml",
+      button: "buttonHtml",
       "copy-button": "copyButtonHtml",
+      icons: "Icons",
     },
     examples: [
       {
@@ -563,6 +565,12 @@ export const entries: CatalogueEntry[] = [
               label: "Copy record name",
               copyText: "Long record name",
             }),
+          }) +
+          actionItemHtml({
+            kind: "compound",
+            primary: { tag: "button", attributesHtml: 'type="button"' },
+            label: { kind: "text", text: "Row with a leading control" },
+            leadingActionsHtml: buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Star, label: "Favorite" } }),
           }) +
           "</div>",
       },
@@ -949,7 +957,7 @@ export const entries: CatalogueEntry[] = [
         render: () =>
           panelHtml({
             element: { tag: "section" },
-            headerHtml: `<h3 class="panel__title">${Icons.Projects}Projects</h3>`,
+            headerHtml: `<h3 class="panel__title">${Icons.WorkspaceTemplates}Templates</h3>`,
             bodyHtml: "<p>A flexible content region.</p>",
             bodyLayout: "padded",
             footerHtml: "Optional footer",
@@ -1084,7 +1092,7 @@ export const entries: CatalogueEntry[] = [
     title: "Icons",
     when: "Shared decorative vocabulary. Use icon-only Button for standalone icon actions.",
     contract:
-      "Icons exports trusted decorative SVG strings. Projects uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for app branding. builtinAgentIconHtml is the transparent A robot from the social card, used for Builtin agent tabs and launchers. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
+      "Icons exports trusted decorative SVG strings. WorkspaceTemplates uses a repository/book outline; Files uses a folder; Server uses a single rack for host diagnostics and administration. agentsInTheCloudBrandIconHtml is the compact raster product mark for app branding. builtinAgentIconHtml is the transparent A robot from the social card, used for Builtin agent tabs and launchers. Put the accessible name on the containing control. Never use an unlabeled icon as an action.",
     imports: { icons: "Icons" },
     examples: [
       {

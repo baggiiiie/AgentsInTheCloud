@@ -1,18 +1,15 @@
-import { recentWorkspaceProjectStorageKey, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
+import { launchComposerCommand, recentWorkspaceTemplateStorageKey, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 
 export function registerLaunchComposerCommand(hooks: WorkspaceClientHooks): void {
   hooks.registerCommand({
-    id: "agent.open-launch-composer",
-    label: "New Workspace With Same Project",
-    description: "Open a LaunchComposer using the most recently selected Workspace's Project.",
+    ...launchComposerCommand,
     scope: "global",
-    binding: "Meta+Alt+Quote",
     run() {
-      const projectId = localStorage.getItem(recentWorkspaceProjectStorageKey);
+      const workspaceTemplateId = localStorage.getItem(recentWorkspaceTemplateStorageKey);
       const frame = document.getElementById("launch_composer")!;
       frame.replaceChildren();
       frame.removeAttribute("src");
-      frame.setAttribute("src", projectId ? `/projects/${encodeURIComponent(projectId)}/launch-composer` : "/launch-composer");
+      frame.setAttribute("src", workspaceTemplateId ? `/launch-composer?workspaceTemplate=${encodeURIComponent(workspaceTemplateId)}` : "/launch-composer");
     },
   });
 }
