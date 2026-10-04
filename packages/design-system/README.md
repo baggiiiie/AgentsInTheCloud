@@ -40,6 +40,7 @@ Prefer consistency over feature-specific visual preservation.
 | Focused modal task | `dialog` | [DialogOptions](src/dialog/dialog-html.ts) |
 | Bounded surface with fixed chrome | `panel` | [PanelOptions](src/panel/panel-html.ts) |
 | Search suggestions / empty state | `autocomplete` | [AutocompleteOptions](src/autocomplete/autocomplete-html.ts) |
+| Explain a term on click or tap ("?") | `help-tip` | [helpTipHtml](src/help-tip/help-tip-html.ts) |
 | Brief action acknowledgement | `transient-feedback` | [TransientFeedbackOptions](src/transient-feedback/transient-feedback-html.ts) |
 | Input / textarea | `text-entry` (native HTML) | `.text-field` / `.textarea` in [styles](src/text-entry/text-entry.css) |
 | Non-selectable records | `managed-list` (native HTML) | [anatomy and filtering contract](catalogue/entries.ts) |

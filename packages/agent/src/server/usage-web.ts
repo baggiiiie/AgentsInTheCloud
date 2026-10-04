@@ -4,6 +4,7 @@ import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptio
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { helpTipHtml } from "@agents-in-the-cloud/design-system/help-tip";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml, providerBadgeHtml, turboStream, turboStreamResponse, workspaceModuleModalFrameId, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
 
@@ -65,10 +66,10 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
       </div>`}
     </div>
     <div class="usage-metrics usage-caption" tabindex="0" role="group" aria-label="Limit metrics">
-      <span title="Window start inferred from reset time minus duration">Time ${elapsed === null ? "—" : `${number(elapsed)}%`}</span>
+      <span>Time ${elapsed === null ? "—" : `${number(elapsed)}%`} ${helpTipHtml({ label: "What is time?", text: "How much of this limit's time window has passed. It starts over when the limit resets." })}</span>
       <span>Used ${number(window.usedPercent)}%</span>
-      <span title="Time until this limit fills at the average consumption rate since the window began. Forecast stops at the next reset.">Runway ${runway}</span>
-      <span title="Distance along the linear allowance schedule, not a forecast">Pace ${pace}</span>
+      <span>Runway ${runway} ${helpTipHtml({ label: "What is runway?", text: "How long you can keep going before you hit this limit, if you keep using it as fast as you have so far." })}</span>
+      <span>Pace ${pace} ${helpTipHtml({ label: "What is pace?", text: "How your usage compares to spreading it evenly over the window. Ahead means you're using it faster than that, behind means you have room to spare." })}</span>
       <span>${reset}</span>
     </div>
   </article>`;

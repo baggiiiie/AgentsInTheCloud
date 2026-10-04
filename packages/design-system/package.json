@@ -18,6 +18,7 @@
     "./destructive-confirmation/client": "./src/destructive-confirmation/destructive-confirmation-controller.ts",
     "./dialog": "./src/dialog/dialog-html.ts",
     "./dialog/client": "./src/dialog/dialog-controller.ts",
+    "./help-tip": "./src/help-tip/help-tip-html.ts",
     "./icons": "./src/icons/icons-html.ts",
     "./linear-navigation/client": "./src/linear-navigation/linear-navigation-controller.ts",
     "./panel": "./src/panel/panel-html.ts",

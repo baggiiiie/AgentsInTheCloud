@@ -10,6 +10,7 @@ import { actionItemHtml } from "../src/action-item/action-item-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
 import { progressButtonHtml } from "../src/progress-button/progress-button-html.ts";
 import { copyButtonHtml } from "../src/copy-button/copy-button-html.ts";
+import { helpTipHtml } from "../src/help-tip/help-tip-html.ts";
 import { qrCodeButtonHtml, qrCodeDialogHtml } from "../src/qr-code/qr-code-html.ts";
 import { destructiveConfirmationHtml } from "../src/destructive-confirmation/destructive-confirmation-html.ts";
 import { dialogHtml } from "../src/dialog/dialog-html.ts";
@@ -734,6 +735,13 @@ export const entries: CatalogueEntry[] = [
           }),
       },
     ],
+  },
+  {
+    id: "help-tip", title: "Help tip", when: "Explain a term or metric in a sentence. Works on touch screens, unlike title tooltips.",
+    contract: "Place right after the text it explains. label names the question for screen readers; text is plain. Click or tap toggles; outside click or Escape closes.",
+    imports: { "help-tip": "helpTipHtml" },
+    sources: ["help-tip/help-tip-controller.ts", "help-tip/help-tip.css", "popup/popup-position.ts"],
+    examples: [{ title: "Inline with a metric", render: () => `<span>Runway 2h 10m ${helpTipHtml({ label: "What is runway?", text: "How long you can keep going before you hit this limit, if you keep using it as fast as you have so far." })}</span>` }],
   },
   {
     id: "qr-code", title: "QR code", when: "Let people open a URL on their phone.",

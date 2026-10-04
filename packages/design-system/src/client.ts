@@ -15,6 +15,7 @@ import { ActionItemController } from "./action-item/action-item-controller.ts";
 import { CopyButtonController } from "./copy-button/copy-button-controller.ts";
 import { DestructiveConfirmationController } from "./destructive-confirmation/destructive-confirmation-controller.ts";
 import { DialogController } from "./dialog/dialog-controller.ts";
+import { HelpTipController } from "./help-tip/help-tip-controller.ts";
 import { LinearNavigationController } from "./linear-navigation/linear-navigation-controller.ts";
 import { PopupController, PopupSelectController } from "./popup/popup-controller.ts";
 import { TransientFeedbackController } from "./transient-feedback/transient-feedback-controller.ts";
@@ -28,6 +29,7 @@ const automaticBehaviors = [
   [".copy-button", "copy-button", "click->copy-button#copy"],
   [".destructive-confirmation", "destructive-confirmation"],
   [".dialog", "dialog"],
+  [".help-tip", "help-tip"],
   [".managed-list", "managed-list"],
   [".popup-select", "popup-select"],
 ] as const;
@@ -62,6 +64,7 @@ export function registerDesignSystemControllers(application: Pick<Application, "
   application.register("copy-button", CopyButtonController);
   application.register("destructive-confirmation", DestructiveConfirmationController);
   application.register("dialog", DialogController);
+  application.register("help-tip", HelpTipController);
   application.register("linear-navigation", LinearNavigationController);
   application.register("managed-list", ManagedListController);
   application.register("popup-menu", PopupController);

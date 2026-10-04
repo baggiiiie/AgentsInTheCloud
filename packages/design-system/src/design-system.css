@@ -24,6 +24,7 @@
 @import "/transient-feedback.css";
 @import "/toggle.css";
 @import "/qr-code.css";
+@import "/help-tip.css";
 
 @font-face {
   font-family: "JetBrains Mono";
