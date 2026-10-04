@@ -16,16 +16,13 @@
   min-height: 0; overflow-y: auto; scroll-behavior: auto;
   padding-block: 1.875rem;
   padding-inline: var(--agent-inline-gutter);
-  display: block; scrollbar-gutter: stable;
+  display: block;
 }
 /* The server updates content only. The surface protects the current viewport
    during reflow; navigation releases excess minimum height as it becomes unused. */
 .agent-transcript-surface { display: flow-root; min-height: var(--agent-follow-floor, 0px); }
 .agent-transcript-content { display: flow-root; }
 .agent-transcript[data-following="true"] { overflow-anchor: none; }
-/* Reveal the design-system thumb for manual scrolling, not automatic follow. */
-.agent-transcript:not(.is-scrolling) { scrollbar-color: transparent transparent; }
-.agent-transcript:not(.is-scrolling)::-webkit-scrollbar-thumb { background-color: transparent; }
 /* The scroll region accepts keyboard navigation without outlining the entire pane. */
 .agent-transcript:focus { outline: none; }
 

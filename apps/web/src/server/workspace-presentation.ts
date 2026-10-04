@@ -173,7 +173,7 @@ function renderProjectsPane(presentation: WorkspacePanePresentation): string {
     content: { kind: "icon-only", iconHtml: Icons.Disclosure, label: "Collapse Projects pane" },
     attributesHtml: 'data-action="projects-pane#toggle" data-projects-pane-target="toggle" aria-expanded="true" aria-controls="workspace_projects_list"',
   });
-  return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane" data-action="scroll->projects-pane#scrolled:capture:passive">${panelHtml({
+  return `<div id="${workspaceProjectsPaneDomId}" class="fixed-shell-projects-pane" data-controller="projects-pane">${panelHtml({
     element: { tag: "section", attributesHtml: 'aria-label="Projects"' },
     headerHtml: `<span class="panel__title">${Icons.Projects}Projects</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${collapseProjects}${addProject}` })}`,
     bodyOverflow: "scroll",

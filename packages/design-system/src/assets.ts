@@ -2,6 +2,7 @@ import type { StaticFileContribution } from "@agents-in-the-cloud/shared";
 
 /** Mount these logical URLs; the host may fingerprint them and rewrite CSS imports. */
 export const designSystemStaticFiles = {
+  "/scrollbar.css": { url: new URL("./scrollbar/scrollbar.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   "/builtin-agent.png": { url: new URL("./icons/builtin-agent.png", import.meta.url), contentType: "image/png" },
   "/agents-in-the-cloud-brand.png": { url: new URL("./icons/agents-in-the-cloud-brand.png", import.meta.url), contentType: "image/png" },
   "/tab-strip.css": { url: new URL("./tab-strip/tab-strip.css", import.meta.url), contentType: "text/css; charset=utf-8" },

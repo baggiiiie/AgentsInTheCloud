@@ -1,0 +1,12 @@
+/* Native gutters are disabled before enhancement, so overflow never reflows content. */
+* { scrollbar-width: none; scrollbar-gutter: auto; }
+*::-webkit-scrollbar { display: none; }
+.scrollbar {
+  position: fixed; inset: auto; margin: 0; padding: 0; border: 0;
+  background: transparent; overflow: visible; touch-action: none;
+  cursor: default; user-select: none; box-sizing: border-box;
+}
+.scrollbar > span { position: absolute; background: var(--text-muted); border-radius: var(--radius-round); pointer-events: none; }
+.scrollbar--vertical > span { right: 2px; top: var(--scrollbar-offset); width: 4px; height: var(--scrollbar-size); }
+.scrollbar--horizontal > span { bottom: 2px; left: var(--scrollbar-offset); height: 4px; width: var(--scrollbar-size); }
+.scrollbar:hover > span { background: var(--text-bright); }

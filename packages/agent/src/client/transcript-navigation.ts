@@ -17,7 +17,6 @@ export class TranscriptNavigation {
   private following = true;
   private visible = false;
   private frame = 0;
-  private hideScrollbarTimer?: ReturnType<typeof setTimeout>;
   private pendingPosition: "prompt" | "instant" | "smooth" | undefined;
   private floor = 0;
   private width = 0;
@@ -49,6 +48,7 @@ export class TranscriptNavigation {
     transcript.addEventListener("touchcancel", this.touchEnded, { passive: true });
     transcript.addEventListener("keydown", this.keydown);
     transcript.addEventListener("pointerdown", this.pointerDown);
+    transcript.addEventListener("scrollbar:drag-start", this.scrollbarDrag);
     window.visualViewport?.addEventListener("resize", this.layoutChanged);
     document.addEventListener(layoutBeforeEvent, this.layoutBefore);
     document.addEventListener(layoutAfterEvent, this.layoutAfter);
@@ -80,7 +80,6 @@ export class TranscriptNavigation {
   }
 
   select(busy: boolean): void {
-    this.hideScrollbar();
     this.setStreaming(busy);
     this.stopMotion();
     this.floor = 0;
@@ -108,7 +107,6 @@ export class TranscriptNavigation {
   }
 
   followLatest(): void {
-    this.hideScrollbar();
     this.selectionAwaitingSnapshot = false;
     this.touch = undefined;
     this.following = true;
@@ -290,21 +288,7 @@ export class TranscriptNavigation {
     this.motionTime = 0;
   }
 
-  private readonly hideScrollbar = (): void => {
-    clearTimeout(this.hideScrollbarTimer);
-    this.transcript.classList.remove("is-scrolling");
-  };
-
-  private showScrollbar(): void {
-    this.transcript.classList.add("is-scrolling");
-    clearTimeout(this.hideScrollbarTimer);
-    this.hideScrollbarTimer = setTimeout(this.hideScrollbar, 800);
-  }
-
   private readonly scrolled = (): void => {
-    // Only user input reveals the thumb. Keep it visible through native momentum
-    // and dragging, but never let automatic follow movement reveal or prolong it.
-    if (!this.following && this.transcript.classList.contains("is-scrolling")) this.showScrollbar();
     // Reaching the end by hand resumes following; scroll-to-bottom shows only away from it.
     if (!this.following && !this.motionFrame && this.transcript.scrollTop >= this.geometry().latestTop - 2) {
       this.following = true;
@@ -319,7 +303,6 @@ export class TranscriptNavigation {
   // including nested output. Do not try to predict native scroll chaining.
   private readonly wheel = (event: WheelEvent): void => {
     if (event.ctrlKey || event.deltaY === 0) return;
-    this.showScrollbar();
     if (event.deltaY < 0) this.pause();
   };
 
@@ -333,7 +316,6 @@ export class TranscriptNavigation {
     const delta = this.touch.y - point.clientY;
     if (Math.abs(delta) < 4 || Math.abs(delta) < Math.abs(this.touch.x - point.clientX)) return;
     this.touch = { x: point.clientX, y: point.clientY };
-    this.showScrollbar();
     if (delta < 0) this.pause();
   };
 
@@ -349,24 +331,22 @@ export class TranscriptNavigation {
     }
     const up = ["ArrowUp", "PageUp", "Home"].includes(event.key)
       || (event.key === " " && event.shiftKey);
-    if (up || ["ArrowDown", "PageDown", "End", " "].includes(event.key)) this.showScrollbar();
     if (up) this.pause();
   };
+
+  private readonly scrollbarDrag = (): void => this.pause();
 
   private readonly pointerDown = (event: PointerEvent): void => {
     if (event.pointerType !== "mouse" || event.button !== 0) return;
     if (event.target !== this.transcript && event.target !== this.content && event.target !== this.content.parentElement) return;
-    // Both classic and overlay scrollbars belong to the scroll container.
-    // Also pause on its bare background: this avoids guessing scrollbar width
-    // or tracking a native drag, and leaves ordinary message/control clicks alone.
-    this.showScrollbar();
+    // Bare-background clicks pause follow; shared overlay drags notify us separately.
+    // Ordinary message/control clicks remain untouched.
     this.pause();
   };
 
   disconnect(): void {
     cancelAnimationFrame(this.frame);
     this.stopMotion();
-    this.hideScrollbar();
     this.resizeObserver.disconnect();
     this.transcript.style.removeProperty("--agent-follow-floor");
     delete this.transcript.dataset.following;
@@ -378,6 +358,7 @@ export class TranscriptNavigation {
     this.transcript.removeEventListener("touchcancel", this.touchEnded);
     this.transcript.removeEventListener("keydown", this.keydown);
     this.transcript.removeEventListener("pointerdown", this.pointerDown);
+    this.transcript.removeEventListener("scrollbar:drag-start", this.scrollbarDrag);
     window.visualViewport?.removeEventListener("resize", this.layoutChanged);
     document.removeEventListener(layoutBeforeEvent, this.layoutBefore);
     document.removeEventListener(layoutAfterEvent, this.layoutAfter);

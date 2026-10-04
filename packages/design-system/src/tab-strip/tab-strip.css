@@ -1,6 +1,5 @@
-.tab-strip { position: relative; display: flex; flex: 1; align-self: stretch; align-items: center; min-width: 0; padding-block: 4px; }
-.tab-strip__tabs { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-.tab-strip__tabs::-webkit-scrollbar { display: none; }
+.tab-strip { display: flex; flex: 1; align-self: stretch; align-items: center; min-width: 0; padding-block: 4px; }
+.tab-strip__tabs { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
 /* Content-sized short tabs; longer tabs shrink to 7rem before scrolling. */
 .tab-strip__tabs > .action-item { --tab-content-width: 20rem; flex: 0 1 min(20rem, var(--tab-content-width)); min-width: min(7rem, var(--tab-content-width)); user-select: none; -webkit-user-select: none; }
 .tab-strip__tabs > .action-item > .action-item__primary { padding-inline-end: 0; }
@@ -33,11 +32,3 @@
 .tab-strip__tabs .action-item .action-item__label-text { text-overflow: clip; }
 .tab-strip__tabs .action-item[data-title-cut-left] .action-item__label { --tab-fade-left: 12px; }
 .tab-strip__tabs .action-item[data-title-cut-right] .action-item__label { --tab-fade-right: 16px; }
-/* The transparent hit area stays active so moving from a tab to the thumb cannot
-   break hover. Neither revealing nor dragging the scrollbar reserves layout space. */
-.tab-strip__scrollbar { position: absolute; inset-inline: 0; bottom: 0; height: 12px; opacity: 0; touch-action: none; cursor: default; }
-.tab-strip:is(:hover, :has(:focus-visible)) > .tab-strip__scrollbar,
-.tab-strip__scrollbar:is(:hover, [data-dragging]) { opacity: 1; }
-.tab-strip__scrollbar-thumb { position: absolute; bottom: 1px; left: 0; height: 4px; width: var(--tab-scroll-thumb-width); transform: translateX(var(--tab-scroll-thumb-offset)); background: var(--text-muted); border-radius: var(--radius-round); }
-.tab-strip__scrollbar:focus-visible { outline: none; }
-.tab-strip__scrollbar:focus-visible > .tab-strip__scrollbar-thumb { background: var(--accent); }

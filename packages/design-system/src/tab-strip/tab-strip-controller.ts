@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus";
+import { scrollGeometry } from "../scrollbar/scroll-geometry.ts";
 import type { TabStatus } from "./tab-strip-html.ts";
 
 /** Browser-owned status changes; server-owned states are rendered by tabHtml. */
@@ -10,11 +11,10 @@ export function setTabStatus(tab: HTMLElement, state: Pick<TabStatus, "busy" | "
   status.setAttribute("aria-label", [state.busy && "Busy", state.requestingAttention && "Requesting attention"].filter(Boolean).join("; "));
 }
 
-/** Owns tab geometry, clipping, keyboard navigation and the overlay scrollbar. */
+/** Owns tab geometry, clipping and keyboard navigation. Scrollbars are shared. */
 export class TabStripController extends Controller<HTMLElement> {
-  static targets = ["list", "scrollbar"];
+  static targets = ["list"];
   declare listTarget: HTMLElement;
-  declare scrollbarTarget: HTMLElement;
   private resize = new ResizeObserver(() => this.schedule());
   private mutations = new MutationObserver(records => {
     if (records.some(record => record.type === "childList")) this.observeGeometry();
@@ -23,13 +23,7 @@ export class TabStripController extends Controller<HTMLElement> {
   private frame = 0;
   private animationFrame = 0;
   private selected: HTMLElement | null = null;
-  private drag: { pointerId: number; x: number; position: number } | null = null;
   private get items() { return [...this.listTarget.querySelectorAll<HTMLElement>(":scope > .action-item:not([hidden])")]; }
-  private get maximum() { return Math.max(0, this.listTarget.scrollWidth - this.listTarget.clientWidth); }
-  private get rtl() { return getComputedStyle(this.listTarget).direction === "rtl"; }
-  // A physical left-to-right position, including the negative native RTL scroll range.
-  private get position() { return Math.max(0, Math.min(this.maximum, this.rtl ? this.maximum + this.listTarget.scrollLeft : this.listTarget.scrollLeft)); }
-  private set position(value: number) { this.listTarget.scrollLeft = this.rtl ? value - this.maximum : value; }
 
   connect(): void {
     this.mutations.observe(this.listTarget, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-selected", "hidden", "dir"] });
@@ -42,7 +36,6 @@ export class TabStripController extends Controller<HTMLElement> {
     cancelAnimationFrame(this.frame); cancelAnimationFrame(this.animationFrame);
     document.fonts.removeEventListener("loadingdone", this.schedule);
     this.frame = this.animationFrame = 0;
-    this.drag = null;
   }
   private observeGeometry(): void {
     this.resize.disconnect();
@@ -83,17 +76,9 @@ export class TabStripController extends Controller<HTMLElement> {
     this.syncScroll(); this.updateTitleFades();
   }
   syncScroll(): void {
-    const maximum = this.maximum, position = this.position;
+    const { maximum, position } = scrollGeometry(this.listTarget, 0);
     this.listTarget.toggleAttribute("data-cut-left", position > 1);
     this.listTarget.toggleAttribute("data-cut-right", maximum - position > 1);
-    this.scrollbarTarget.hidden = maximum <= 1;
-    this.scrollbarTarget.tabIndex = maximum > 1 ? 0 : -1;
-    this.scrollbarTarget.setAttribute("aria-valuemax", String(maximum));
-    this.scrollbarTarget.setAttribute("aria-valuenow", String(Math.round(position)));
-    const width = this.scrollbarTarget.clientWidth;
-    const thumb = Math.min(width, Math.max(28, width * this.listTarget.clientWidth / this.listTarget.scrollWidth));
-    this.scrollbarTarget.style.setProperty("--tab-scroll-thumb-width", `${thumb}px`);
-    this.scrollbarTarget.style.setProperty("--tab-scroll-thumb-offset", `${maximum ? position / maximum * (width - thumb) : 0}px`);
   }
   private titleBounds(item: HTMLElement): DOMRect {
     const range = document.createRange();
@@ -121,43 +106,14 @@ export class TabStripController extends Controller<HTMLElement> {
     this.updateTitleFades();
     if (this.listTarget.querySelector(".is-label-scrolling") && !matchMedia("(prefers-reduced-motion: reduce)").matches) this.animationFrame = requestAnimationFrame(this.animateFades);
   };
-  wheel(event: WheelEvent): void {
-    if (event.ctrlKey || (event.deltaX !== 0 && !event.shiftKey) || !this.maximum) return;
-    const amount = event.deltaX || event.deltaY * (this.rtl ? -1 : 1);
-    const delta = amount * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.listTarget.clientWidth : 1);
-    if ((delta > 0 && this.position >= this.maximum - 1) || (delta < 0 && this.position <= 0)) return;
-    event.preventDefault(); this.position += delta;
-  }
-  dragStart(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    const thumb = this.scrollbarTarget.firstElementChild!.getBoundingClientRect();
-    if (event.clientX < thumb.left || event.clientX > thumb.right) this.position = (event.clientX - this.scrollbarTarget.getBoundingClientRect().left - thumb.width / 2) / (this.scrollbarTarget.clientWidth - thumb.width) * this.maximum;
-    this.drag = { pointerId: event.pointerId, x: event.clientX, position: this.position };
-    this.scrollbarTarget.setPointerCapture(event.pointerId);
-    this.scrollbarTarget.setAttribute("data-dragging", "");
-    event.preventDefault();
-  }
-  dragMove(event: PointerEvent): void {
-    if (!this.drag || this.drag.pointerId !== event.pointerId) return;
-    const travel = this.scrollbarTarget.clientWidth - this.scrollbarTarget.firstElementChild!.getBoundingClientRect().width;
-    this.position = this.drag.position + (event.clientX - this.drag.x) * this.maximum / travel;
-  }
-  dragEnd(): void { this.scrollbarTarget.removeAttribute("data-dragging"); this.drag = null; }
   navigate(event: KeyboardEvent): void {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    if (event.target === this.scrollbarTarget) {
-      event.preventDefault();
-      if (event.key === "Home") this.position = this.rtl ? this.maximum : 0;
-      else if (event.key === "End") this.position = this.rtl ? 0 : this.maximum;
-      else this.position += event.key === "ArrowRight" ? 64 : -64;
-      return;
-    }
     const tab = event.target instanceof Element ? event.target.closest<HTMLElement>('[role="tab"]') : null;
     if (!tab) return;
     const tabs = this.items.map(item => item.querySelector<HTMLElement>('[role="tab"]')!).filter(item => !item.matches(':disabled, [aria-disabled="true"]'));
     if (tabs.length < 2) return;
     event.preventDefault();
-    const direction = (event.key === "ArrowRight" ? 1 : -1) * (this.rtl ? -1 : 1);
+    const direction = (event.key === "ArrowRight" ? 1 : -1) * (getComputedStyle(this.listTarget).direction === "rtl" ? -1 : 1);
     const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (tabs.indexOf(tab) + direction + tabs.length) % tabs.length;
     tabs[next]!.click(); tabs[next]!.focus();
   }

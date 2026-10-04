@@ -1,5 +1,7 @@
 /// <reference lib="dom" />
 
+import { ScrollbarController } from "./scrollbar/scrollbar-controller.ts";
+
 import { TabStripController } from "./tab-strip/tab-strip-controller.ts";
 
 import { MarkdownDiffController } from "./markdown/markdown-diff-controller.ts";
@@ -19,6 +21,7 @@ import { TransientFeedbackController } from "./transient-feedback/transient-feed
 import { ToggleController } from "./toggle/toggle-controller.ts";
 
 const automaticBehaviors = [
+  ["body", "scrollbars", "pointermove->scrollbars#hover pointerleave->scrollbars#leave wheel->scrollbars#wheel:!passive"],
   ["body", "action-items"],
   ["body", "warning-banners"],
   [".activity-button, .progress-button", "perimeter-button"],
@@ -49,6 +52,7 @@ function attachAutomaticBehaviors(root: ParentNode): void {
 }
 
 export function registerDesignSystemControllers(application: Pick<Application, "register">): void {
+  application.register("scrollbars", ScrollbarController);
   application.register("tab-strip", TabStripController);
   application.register("markdown-diff", MarkdownDiffController);
   application.register("perimeter-button", PerimeterButtonController);

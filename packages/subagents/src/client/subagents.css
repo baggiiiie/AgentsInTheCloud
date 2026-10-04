@@ -4,7 +4,7 @@
 .subagent-state { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: var(--text-code); color: var(--text-muted); }
 .subagent-branch-body { margin-inline-start: 10px; border-inline-start: 1px solid var(--line-strong); padding: 0 8px 12px 12px; }
 .subagent-branch-body > .subagent-list:empty { display: none; }
-.subagent-branch .agent-transcript { height: auto; overflow: visible; padding: 0; scrollbar-gutter: auto; }
+.subagent-branch .agent-transcript { height: auto; overflow: visible; padding: 0; }
 .subagent-branch .agent-row:has(> .agent-lazy-detail) + .agent-row:has(> .agent-lazy-detail) { margin-top: 0; }
 .subagents-empty { padding: 24px; color: var(--text-muted); }
 .agent-communication > summary { font: inherit; }

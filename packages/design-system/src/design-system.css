@@ -1,3 +1,4 @@
+@import "/scrollbar.css";
 @import "/warning-banner.css";
 @import "/markdown.css";
 @import "/text-entry.css";
@@ -295,13 +296,6 @@
   --diffs-bg-selection-override: var(--accent-soft);
   color-scheme: dark;
 }
-
-/* Scrollable design-system surfaces use the active theme instead of browser chrome. */
-* { scrollbar-color: var(--line-strong) transparent; scrollbar-width: thin; }
-*::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--radius-round); border: 2px solid transparent; background-clip: padding-box; }
-*::-webkit-scrollbar-thumb:hover { background-color: var(--text-muted); }
 
 /* Shared layout modules own spacing where independently implemented surfaces align. */
 .work-view-toolbar {

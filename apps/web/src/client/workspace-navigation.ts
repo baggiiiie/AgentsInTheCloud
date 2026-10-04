@@ -50,29 +50,8 @@ class ProjectsPaneController extends Controller<HTMLElement> {
   static targets = ["toggle", "list"];
   declare readonly toggleTarget: HTMLButtonElement;
   declare readonly listTarget: HTMLElement;
-  private hideScrollbarTimer?: ReturnType<typeof setTimeout>;
-  private scrollbarObserver?: ResizeObserver;
-
   connect(): void {
     this.setCollapsed(localStorage.getItem("agents-in-the-cloud:projects-pane-collapsed") === "true");
-    const scrollBody = this.listTarget.parentElement!;
-    this.scrollbarObserver = new ResizeObserver(() => {
-      const scrollbarWidth = scrollBody.offsetWidth - scrollBody.clientWidth;
-      this.element.style.setProperty("--projects-scrollbar-width", `${scrollbarWidth}px`);
-    });
-    this.scrollbarObserver.observe(scrollBody);
-  }
-
-  disconnect(): void {
-    this.scrollbarObserver?.disconnect();
-    clearTimeout(this.hideScrollbarTimer);
-    this.element.classList.remove("is-scrolling");
-  }
-
-  scrolled(): void {
-    this.element.classList.add("is-scrolling");
-    clearTimeout(this.hideScrollbarTimer);
-    this.hideScrollbarTimer = setTimeout(() => this.element.classList.remove("is-scrolling"), 800);
   }
 
   toggle(): void {

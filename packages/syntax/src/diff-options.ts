@@ -2,7 +2,7 @@ export const agentsInTheCloudPierreTheme = "agents-in-the-cloud";
 
 const changedLineCSS = `[data-line-type="change-addition"], [data-line-type="change-deletion"] { --mix-light: 80%; --mix-dark: 80%; }`;
 export const wordDiffCSS = `[data-line-type="change-addition"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-addition-base) 48%, transparent); } [data-line-type="change-deletion"] [data-diff-span] { background-color: color-mix(in srgb, var(--diffs-deletion-base) 48%, transparent); }`;
-const reviewLayoutCSS = `[data-code] { padding-block: 0; overflow-x: auto; scrollbar-gutter: auto; }`;
+const reviewLayoutCSS = `[data-code] { padding-block: 0; overflow-x: auto; }`;
 const annotationCSS = `[data-line-annotation]:has(slot[name^="annotation-additions-"]), [data-line-annotation]:has(slot[name^="annotation-deletions-"]) { --diffs-annotation-bg: var(--diffs-bg-context); background: var(--diffs-bg-context); } [data-gutter-buffer="annotation"] { --diffs-annotation-bg: var(--diffs-bg-context-gutter); background: var(--diffs-bg-context-gutter); }`;
 
 function diffOptions(presentation: "review" | "tool") {

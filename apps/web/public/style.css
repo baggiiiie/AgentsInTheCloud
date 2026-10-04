@@ -144,7 +144,7 @@ turbo-frame { display: contents; }
   display: grid;
   grid-template-rows: minmax(0, 1fr) min(var(--projects-pane-height), 50%);
   overflow: visible;
-  clip-path: inset(0 -18px 0 0);
+  clip-path: inset(0);
 }
 .fixed-shell-app > .fixed-shell-workspace-pane:has(.fixed-shell-projects-pane.is-collapsed) { grid-template-rows: minmax(0, 1fr) 47px; }
 .fixed-shell-projects-pane {
@@ -161,23 +161,7 @@ turbo-frame { display: contents; }
 .fixed-shell-projects-pane > .panel > .panel__body { transition: opacity 160ms ease-out, visibility 160ms; }
 .fixed-shell-projects-pane.is-collapsed > .panel > .panel__body { opacity: 0; visibility: hidden; pointer-events: none; }
 .fixed-shell-projects-pane.is-collapsed [data-projects-pane-target="toggle"] svg { transform: rotate(180deg); }
-/* Extend only the scroll body into the gap; rows keep the full panel width. */
-.fixed-shell-projects-pane > .panel { overflow: visible; }
-.fixed-shell-projects-pane > .panel > .panel__body {
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
-  scrollbar-width: auto;
-  margin-inline-end: calc(-1 * var(--projects-scrollbar-width, 0px));
-}
-.fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body { scrollbar-color: transparent transparent; }
-.fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body::-webkit-scrollbar-thumb { background-color: transparent; }
-@supports selector(::-webkit-scrollbar) {
-  .fixed-shell-projects-pane > .panel > .panel__body,
-  .fixed-shell-projects-pane:not(.is-scrolling):not(:hover):not(:focus-within) > .panel > .panel__body { scrollbar-color: auto; }
-  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar { width: 16px; }
-  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar-thumb { border-inline-width: 6px; }
-  .fixed-shell-projects-pane > .panel > .panel__body::-webkit-scrollbar-button { display: none; }
-}
+.fixed-shell-projects-pane > .panel > .panel__body { overflow-x: hidden; }
 /* Row actions have their own 2px inset; together these match the header's 8px. */
 .fixed-shell-projects-list { padding: 8px 6px 8px 8px; }
 .fixed-shell-projects-empty { position: relative; margin: 0; padding: 16px 56px 16px 8px; color: var(--text-muted); }
@@ -238,7 +222,7 @@ turbo-frame { display: contents; }
     transform: translateX(0);
     transition: transform 160ms ease-out, opacity 160ms ease-out, visibility 160ms;
   }
-  .fixed-shell-app > .fixed-shell-app-main { margin-left: calc(var(--fixed-workspace-width) + 18px); }
+  .fixed-shell-app > .fixed-shell-app-main { margin-left: calc(var(--fixed-workspace-width) + var(--fixed-shell-gap)); }
   .fixed-shell-app.is-workspace-pane-collapsed > .fixed-shell-app-main { margin-left: 0; }
   .fixed-shell-app.is-workspace-pane-collapsed > .fixed-shell-workspace-pane {
     transform: translateX(calc(-100% - var(--fixed-shell-gap)));
@@ -462,7 +446,7 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .model-provider-groups { display: grid; gap: 4px; min-width: 0; }
 .model-other-providers-body { display: grid; gap: 8px; padding: 8px; min-width: 0; }
 .model-providers { display: grid; gap: 4px; min-width: 0; padding: 8px; max-height: min(520px, 60vh); }
-.model-providers, .model-provider-models { overflow-y: scroll; scrollbar-gutter: stable; }
+.model-providers, .model-provider-models { overflow-y: auto; }
 .model-providers:focus-visible, .model-provider-models:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .model-favorite-row form { margin: 0; }
 .model-provider-results { display: block; }
