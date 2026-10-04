@@ -1,15 +1,15 @@
-#usage_dialog { width: min(600px, calc(100vw - 32px)); }
-.usage-overview { display: grid; gap: 20px; }
+#usage_dialog { width: min(720px, calc(100vw - 32px)); }
+.usage-overview { display: grid; gap: 12px; }
 .usage-caption { margin: 0; color: var(--text-muted); line-height: var(--leading-standard); font-size: var(--text-small); }
-.usage-provider { display: grid; gap: 20px; }
+.usage-provider { display: grid; gap: 12px; }
 .usage-provider-heading, .usage-limit-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
 .usage-provider-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--text-title); }
 .usage-plan { color: var(--text-muted); text-transform: capitalize; }
-.usage-section { display: grid; gap: 12px; }
+.usage-section { display: grid; gap: 8px; }
 .usage-limit h3 { margin: 0; font-size: var(--text-body); }
-.usage-limit { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-surface); background: var(--bg); }
+.usage-limit { display: grid; min-width: 0; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-surface); background: var(--bg); }
 /* Both values grow from the left on one bar, like the button's clockwise ring. */
-.usage-comparison { position: relative; height: 8px; overflow: hidden; border-radius: var(--radius-round); background: color-mix(in srgb, var(--text-muted) 12%, transparent); }
+.usage-comparison { position: relative; height: 6px; overflow: hidden; border-radius: var(--radius-round); background: color-mix(in srgb, var(--text-muted) 12%, transparent); }
 .usage-comparison > span { position: absolute; inset-block: 0; left: 0; }
 .usage-comparison__time { background: var(--success); }
 .usage-comparison__usage { background: var(--danger); }
@@ -18,15 +18,23 @@
 .usage-unused { font-size: var(--text-small); }
 .usage-unused > summary { cursor: pointer; color: var(--text-muted); }
 
-.usage-unused > .usage-section { margin-top: 12px; }
+.usage-unused > .usage-section { margin-top: 8px; }
 
-.usage-provider-icon { width: 34px; height: 34px; border-radius: var(--radius-control); display: grid; place-items: center; background: var(--provider-color); color: #fff; flex-shrink: 0; }
+.usage-provider-icon { width: 28px; height: 28px; border-radius: var(--radius-control); display: grid; place-items: center; background: var(--provider-color); color: #fff; flex-shrink: 0; }
 .usage-provider-icon .brand-icon { width: 18px; height: 18px; }
 .usage-provider-icon .brand-icon-fallback { width: 100%; height: 100%; }
 .usage-error { color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-surface); padding: 8px; }
 
 .usage-account { display: grid; gap: 8px; margin: 0; font-size: var(--text-small); }
 .usage-account dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
-.usage-unused > .usage-account { margin-top: 12px; }
+.usage-unused > .usage-account { margin-top: 8px; }
 
 .usage-rings { display: flex; align-items: center; gap: 4px; }
+
+/* Keep the five metrics on one line; narrow surfaces can scroll the row. */
+.usage-metrics { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; overflow-x: auto; font-variant-numeric: tabular-nums; }
+.usage-metrics > * { flex: 0 0 auto; }
+.usage-metrics > * + *::before { content: "·"; margin-inline-end: 6px; color: var(--text-muted); font-weight: normal; }
+.usage-limit-title { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.usage-limit-title h3 { flex: 0 1 auto; }
+.usage-limit-title .usage-comparison { flex: 1 0 48px; }

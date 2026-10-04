@@ -3,7 +3,7 @@ export { getAgentModelPreference, setAgentModelPreference, getAgentModelThinking
 export { modelRefValue, parseModelRef, type ModelRef } from "./model-reference.ts";
 export { renderModelSetupDialog, handleModelSettingsRequest } from "./settings.ts";
 export { llmWorkspaceModule as agentsInTheCloudServerModule } from "./web.ts";
-export { selectPacingWindow, type PacedUsageWindow } from "./usage-window.ts";
+export { selectPacingWindow, secondsUntilUsageLimit, type PacedUsageWindow } from "./usage-window.ts";
 export { recordSubscriptionInference, providersInLastInferenceWindow, selectSubscriptionLimit } from "./recent-subscription-activity.ts";
 export { connectedUsageProviders, getProviderUsageOverview, providerUsageFrameId, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "./provider-usage.ts";
 

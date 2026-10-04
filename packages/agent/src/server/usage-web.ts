@@ -1,6 +1,6 @@
 import { response } from "@agents-in-the-cloud/shared/http";
 import { requestAcceptsJson } from "@agents-in-the-cloud/core";
-import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@agents-in-the-cloud/llm/server";
+import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, secondsUntilUsageLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview, type UsageProvider } from "@agents-in-the-cloud/llm/server";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
@@ -45,25 +45,32 @@ function usagePace(seconds: number | null): string {
   return `${usageDuration(Math.abs(seconds))} ${seconds > 0 ? "ahead of" : "behind"} pace`;
 }
 
-function renderUsageWindow({ reported: window, timing }: PacedUsageWindow): string {
+function renderUsageWindow(paced: PacedUsageWindow): string {
+  const { reported: window, timing } = paced;
   const label = `${window.limitName} · ${usageDuration(window.durationSeconds)}`;
-  if (timing.state === "unknown" || window.resetsAt === null) {
-    return `<article class="usage-limit"><h3>${escapeHtml(label)}</h3>
-      <div class="usage-limit-heading usage-caption"><span>Reset time unavailable</span><span>Usage <strong>${number(window.usedPercent)}%</strong></span></div>
-      <p class="usage-caption">The provider hasn’t reported a reset time. Pacing is unavailable.</p>
-    </article>`;
-  }
-  const remaining = (new Date(window.resetsAt).getTime() - Date.now()) / 1000;
+  const remaining = window.resetsAt === null ? null : (new Date(window.resetsAt).getTime() - Date.now()) / 1000;
+  const reset = remaining === null ? "Reset time unavailable" : remaining > 0 ? `Resets in ${usageDuration(remaining)}` : "Reset due";
   const difference = timing.paceDifferenceSeconds;
-  const pace = usagePace(difference);
-  return `<article class="usage-limit"><h3>${escapeHtml(label)}</h3>
-    <div class="usage-limit-heading usage-caption"><span title="Window start inferred from reset time minus duration">Time <strong>${number(timing.elapsedPercent)}%</strong></span><span>Usage <strong>${number(window.usedPercent)}%</strong></span></div>
-    <div class="usage-comparison${difference === null ? " usage-comparison--inactive" : ""}" aria-hidden="true">
-      <span class="usage-comparison__time" style="width:${timing.elapsedPercent}%"></span>
-      <span class="usage-comparison__usage" style="width:${window.usedPercent}%"></span>
-      <span class="usage-comparison__shared" style="width:${Math.min(timing.elapsedPercent, window.usedPercent)}%"></span>
+  const pace = difference === null ? "—" : Math.abs(difference) < 1 ? "on pace" : `${usageDuration(Math.abs(difference))} ${difference > 0 ? "ahead" : "behind"}`;
+  const runwaySeconds = secondsUntilUsageLimit(paced);
+  const runway = timing.state !== "active" || (timing.elapsedPercent === 0 && window.usedPercent > 0 && window.usedPercent < 100)
+    ? "—" : runwaySeconds === Infinity ? "to reset" : usageDuration(runwaySeconds);
+  const elapsed = timing.elapsedPercent;
+  return `<article class="usage-limit">
+    <div class="usage-limit-title"><h3>${escapeHtml(label)}</h3>
+      ${elapsed === null ? "" : `<div class="usage-comparison${difference === null ? " usage-comparison--inactive" : ""}" aria-hidden="true">
+        <span class="usage-comparison__time" style="width:${elapsed}%"></span>
+        <span class="usage-comparison__usage" style="width:${window.usedPercent}%"></span>
+        <span class="usage-comparison__shared" style="width:${Math.min(elapsed, window.usedPercent)}%"></span>
+      </div>`}
     </div>
-    <div class="usage-limit-heading usage-caption"><span>${remaining > 0 ? `Resets in ${usageDuration(remaining)}` : "Reset due"}</span>${pace ? `<span title="Distance along the linear allowance schedule, not a forecast">${pace}</span>` : ""}</div>
+    <div class="usage-metrics usage-caption" tabindex="0" role="group" aria-label="Limit metrics">
+      <span title="Window start inferred from reset time minus duration">Time ${elapsed === null ? "—" : `${number(elapsed)}%`}</span>
+      <span>Used ${number(window.usedPercent)}%</span>
+      <span title="Time until this limit fills at the average consumption rate since the window began. Forecast stops at the next reset.">Runway ${runway}</span>
+      <span title="Distance along the linear allowance schedule, not a forecast">Pace ${pace}</span>
+      <span>${reset}</span>
+    </div>
   </article>`;
 }
 
@@ -106,11 +113,15 @@ function renderUsageProvider(overview: ProviderUsageOverview): string {
   </section>`;
 }
 
+function usageWindowCaption(window: PacedUsageWindow["reported"]): string {
+  return window.meteredFeature === null ? usageDuration(window.durationSeconds).split(" ")[0]! : window.limitName.slice(0, 2);
+}
+
 /** Prepaid providers show their balance instead. One small ring per limit: its length for main allowances ("5h"), the first letters of a feature's name ("Op") otherwise. */
 function renderUsageRings({ provider, reported, error, windows }: ProviderUsageOverview, scope: string): string {
   const { used, unused } = shownUsageWindows(windows);
   const rings = reported && !error ? [...used, ...unused].map(({ reported: window, timing }) => comparisonRingHtml({
-    caption: window.meteredFeature === null ? usageDuration(window.durationSeconds).split(" ")[0]! : window.limitName.slice(0, 2),
+    caption: usageWindowCaption(window),
     referencePercent: timing.elapsedPercent ?? 0,
     valuePercent: window.usedPercent,
     label: `${window.limitName} · ${usageDuration(window.durationSeconds)}: ${timing.elapsedPercent === null ? "reset time unavailable" : `Time ${number(timing.elapsedPercent)}%`}, Usage ${number(window.usedPercent)}%`,
@@ -124,8 +135,9 @@ function renderUsageProviderLimits(overview: ProviderUsageOverview, scope: strin
   return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section></turbo-frame>`;
 }
 
-function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: number }, label = "Usage"): string {
-  return actionLinkHtml({ href: "/usage", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Usage, label }, perimeterComparison: comparison, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` });
+function usageButtonHtml(comparison?: { referencePercent: number; valuePercent: number }, label = "Usage", caption?: string): string {
+  const iconHtml = caption === undefined ? Icons.Usage : `<span class="comparison-ring__caption">${escapeHtml(caption)}</span>`;
+  return actionLinkHtml({ href: "/usage", variant: "secondary", content: { kind: "icon-only", iconHtml, label }, perimeterComparison: comparison, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` });
 }
 
 async function renderUsageButton(): Promise<string> {
@@ -137,7 +149,7 @@ async function renderUsageButton(): Promise<string> {
   const { provider, window: { reported, timing } } = selected;
   if (timing.state !== "active") throw new Error("Selected subscription limit must be active");
   const pace = usagePace(timing.paceDifferenceSeconds);
-  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace} · Providers from 30 minutes before last inference`);
+  return usageButtonHtml({ referencePercent: timing.elapsedPercent, valuePercent: reported.usedPercent }, `Usage — ${provider.label} · ${reported.limitName} ${usageDuration(reported.durationSeconds)}: Time ${number(timing.elapsedPercent)}%, Usage ${number(reported.usedPercent)}% · ${pace} · Providers from 30 minutes before last inference`, usageWindowCaption(reported));
 }
 
 function providerPlaceholder(provider: UsageProvider, refresh: boolean): string {

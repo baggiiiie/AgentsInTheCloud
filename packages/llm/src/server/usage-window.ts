@@ -34,14 +34,28 @@ export interface PacedUsageWindow {
   timing: UsageWindowTiming;
 }
 
-/** Surface the most urgent active, used allowance, not an unused feature bucket.
- * Ties prefer the more consumed allowance. When all are unused, show the main allowance. */
+/** Forecast at the average consumption rate since this window began.
+ * Infinity means no projected blockage before the next reset (or no usable rate).
+ * Does not project consumption through resets. */
+export function secondsUntilUsageLimit({ reported, timing }: PacedUsageWindow): number {
+  if (timing.state !== "active") return Infinity;
+  if (reported.usedPercent >= 100) return 0;
+  if (reported.usedPercent === 0 || timing.elapsedPercent === 0) return Infinity;
+  // Usage at or below elapsed time reaches 100% at or after the reset.
+  if (reported.usedPercent <= timing.elapsedPercent) return Infinity;
+  const elapsedSeconds = timing.elapsedPercent / 100 * reported.durationSeconds;
+  return (100 - reported.usedPercent) / reported.usedPercent * elapsedSeconds;
+}
+
+/** Surface the active allowance with the shortest projected time to blockage.
+ * Ties prefer higher usage. When all are unused, show the main allowance. */
 export function selectPacingWindow(windows: readonly PacedUsageWindow[]): PacedUsageWindow | undefined {
   const active = windows.filter((window) => window.timing.state === "active");
   const used = active.filter((window) => window.reported.usedPercent > 0);
   if (!used.length) return active.find((window) => window.reported.meteredFeature === null) ?? active[0];
   return used.reduce((selected, window) => {
-    const difference = window.timing.paceDifferencePoints! - selected.timing.paceDifferencePoints!;
-    return difference > 0 || (difference === 0 && window.reported.usedPercent > selected.reported.usedPercent) ? window : selected;
+    const runway = secondsUntilUsageLimit(window);
+    const selectedRunway = secondsUntilUsageLimit(selected);
+    return runway < selectedRunway || (runway === selectedRunway && window.reported.usedPercent > selected.reported.usedPercent) ? window : selected;
   });
 }

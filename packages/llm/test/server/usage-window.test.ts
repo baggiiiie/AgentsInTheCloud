@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { SubscriptionUsage } from "../../src/server/subscription-usage.ts";
-import { usageWindowTiming, selectPacingWindow } from "../../src/server/usage-window.ts";
+import { usageWindowTiming, selectPacingWindow, secondsUntilUsageLimit } from "../../src/server/usage-window.ts";
 
 const window = {
   limitName: "Codex", meteredFeature: null, kind: "primary", usedPercent: 60,
@@ -36,7 +36,7 @@ test("uses actual durations for weekly and longer windows", () => {
   }
 });
 
-test("prioritizes the greatest lead over the highest raw usage", () => {
+test("prioritizes imminent blockage over higher raw usage", () => {
   const highUsage = pacedWindow("Weekly", 95, 99);
   const ahead = pacedWindow("Five-hour", 60, 30);
   expect(selectPacingWindow([highUsage, ahead])).toBe(ahead);
@@ -50,8 +50,8 @@ test("unused feature buckets cannot hide a used allowance that is behind pace", 
 });
 
 test("ties prefer the more consumed window", () => {
-  const lower = pacedWindow("Lower", 40, 20);
-  const higher = pacedWindow("Higher", 70, 50);
+  const lower = pacedWindow("Lower", 50, 25);
+  const higher = pacedWindow("Higher", 75, 25, 15 * 3600);
   expect(selectPacingWindow([lower, higher])).toBe(higher);
 });
 
@@ -64,9 +64,9 @@ test("does not display pacing for expired or not-started windows", () => {
   expect(selectPacingWindow([expired, future, current])).toBe(current);
 });
 
-function pacedWindow(name: string, usage: number, time: number) {
-  const reported: SubscriptionUsage["windows"][number] = { ...window, limitName: name, usedPercent: usage };
-  const at = new Date(new Date(window.resetsAt).getTime() - window.durationSeconds * 1000 * (1 - time / 100));
+function pacedWindow(name: string, usage: number, time: number, durationSeconds = window.durationSeconds) {
+  const reported: SubscriptionUsage["windows"][number] = { ...window, limitName: name, usedPercent: usage, durationSeconds };
+  const at = new Date(new Date(window.resetsAt).getTime() - durationSeconds * 1000 * (1 - time / 100));
   return { reported, timing: usageWindowTiming(reported, at) };
 }
 
@@ -107,4 +107,35 @@ test("missing reset timestamps preserve unknown timing and never participate in 
     const active = pacedWindow("Active", 20, 10);
     expect(selectPacingWindow([unknown, active])).toBe(active);
   }
+});
+
+
+test("forecasts remaining usage at the average rate since the window began", () => {
+  expect(secondsUntilUsageLimit(pacedWindow("Main", 80, 40))).toBeCloseTo(1800);
+});
+
+test("stops forecasting at the next reset, including exhaustion exactly at reset", () => {
+  for (const [usage, elapsed] of [[60, 90], [60, 60], [0, 50], [40, 0]]) {
+    expect(secondsUntilUsageLimit(pacedWindow("Main", usage!, elapsed!))).toBe(Infinity);
+  }
+});
+
+test("already exhausted allowances have zero runway, even at the window start", () => {
+  for (const elapsed of [0, 50, 99]) {
+    const exhausted = pacedWindow("Exhausted", 100, elapsed);
+    expect(secondsUntilUsageLimit(exhausted)).toBe(0);
+    expect(selectPacingWindow([pacedWindow("Other", 90, 10), exhausted])).toBe(exhausted);
+  }
+});
+
+test("compares time to blockage rather than percentage lead across different durations", () => {
+  const weekly = pacedWindow("Weekly", 90, 40, 7 * 86400);
+  const short = pacedWindow("Five-hour", 60, 30);
+  expect(selectPacingWindow([weekly, short])).toBe(short);
+});
+
+test("infinite-runway ties prefer higher usage", () => {
+  const lower = pacedWindow("Lower", 20, 50);
+  const higher = pacedWindow("Higher", 70, 90);
+  expect(selectPacingWindow([lower, higher])).toBe(higher);
 });
