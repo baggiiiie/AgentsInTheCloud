@@ -10,6 +10,13 @@ interface TranscriptGeometry {
   latestTop: number;
 }
 
+/** The scroll offset that shows the latest prompt in full at the top, with its answer below. */
+export function latestPromptTop(transcript: HTMLElement, content: HTMLElement): number {
+  const prompts = content.querySelectorAll<HTMLElement>(".agent-user");
+  const latest = prompts.item(prompts.length - 1)?.closest<HTMLElement>(".agent-item");
+  return latest ? transcript.scrollTop + latest.getBoundingClientRect().top - transcript.getBoundingClientRect().top : 0;
+}
+
 /** Owns transcript navigation. Geometry is an output of follow intent, never
  * evidence that the user has opted out. In particular, keyboard/viewport resize,
  * scroll anchoring, Turbo updates and programmatic scrolls cannot pause follow. */
@@ -223,11 +230,7 @@ export class TranscriptNavigation {
 
     if (this.pendingPosition === "prompt") {
       this.pendingPosition = undefined;
-      const users = this.content.querySelectorAll<HTMLElement>(".agent-user");
-      const target = users.item(users.length - 1)?.closest<HTMLElement>(".agent-item");
-      this.transcript.scrollTop = target
-        ? this.transcript.scrollTop + target.getBoundingClientRect().top - this.transcript.getBoundingClientRect().top
-        : 0;
+      this.transcript.scrollTop = latestPromptTop(this.transcript, this.content);
     } else if (!this.following && geometry.contentEnd < this.transcript.scrollTop + geometry.threshold) {
       // A wider pane (for example fullscreen) can reflow the entire transcript
       // above a paused viewport. Do not protect an empty viewport with reserve.

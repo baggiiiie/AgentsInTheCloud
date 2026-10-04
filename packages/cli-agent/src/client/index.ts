@@ -1,10 +1,12 @@
 import { createNativeTerminalTextInputController, createTerminalKeyBarController, agentsInTheCloudObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalFrame, type ObservableTerminalViewer } from "@agents-in-the-cloud/observable-terminal/client";
+import { latestPromptTop } from "@agents-in-the-cloud/agent/client/transcript-navigation";
 import { anchorScrollBottom, CableTopics, changeLayout, type CableSubscription, composerSubmitKey, errorMessage, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "cli-agent",
   install({ application, Controller, hooks }) {
-    const terminals = new Set<{ element: HTMLElement; canToggleMode: boolean; toggleMode(): void }>();
+    const terminals = new Set<{ element: HTMLElement; canToggleMode: boolean; toggleMode(): void; becomeVisible(): void }>();
+    hooks.onBecomeVisible(({ pane }) => { for (const terminal of terminals) if (pane.contains(terminal.element)) terminal.becomeVisible(); });
     hooks.registerCommandProvider(() => {
       const terminal = [...terminals].find((controller) => controller.canToggleMode && isWorkspacePaneVisible(controller.element));
       return terminal ? [{
@@ -65,6 +67,9 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
           });
         }
         this.activate();
+      }
+      becomeVisible(): void {
+        requestAnimationFrame(() => this.scrollToLatestPrompt());
       }
       private readonly activate = (): void => {
         if (isWorkspacePaneVisible(this.element)) this.start();
@@ -245,7 +250,12 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       transcriptContentTargetConnected(content: HTMLElement): void {
         this.transcriptAvailable = content.dataset.available === "true";
         this.syncTranscript();
-        requestAnimationFrame(() => { this.transcriptTarget.scrollTop = this.transcriptEndTop(); this.transcriptScrolled(); });
+        requestAnimationFrame(() => this.scrollToLatestPrompt());
+      }
+      /** Like the built-in agent: open on the latest prompt, not the end of its answer. */
+      private scrollToLatestPrompt(): void {
+        this.transcriptTarget.scrollTop = latestPromptTop(this.transcriptTarget, this.transcriptContentTarget);
+        this.transcriptScrolled();
       }
       transcriptScrolled(): void {
         this.transcriptEndTarget.hidden = this.transcriptEndTop() - this.transcriptTarget.scrollTop <= 32;
