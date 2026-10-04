@@ -93,6 +93,7 @@ async function scenario(name: string, description: string, body: (recorder: Scen
 /** Runs an action while tracing, and applies the one-step pass criteria to it. */
 async function transition(recorder: ScenarioRecorder, label: string, action: () => Promise<void>, options: { waitMs?: number; expectChange?: boolean } = {}): Promise<{ before: Frame; after: Frame }> {
   await page.startTrace();
+  await Bun.sleep(80); // Capture the pre-action arrangement before an immediate CDP edit.
   const t = await page.mark(label);
   await action();
   await Bun.sleep(options.waitMs ?? 700);
@@ -403,6 +404,7 @@ await scenario("mobile-D24-long-press", "D24: holding open-composer for about 50
   await page.navigate(builtinUrl, sel.transcript);
   await closeComposer();
   await page.startTrace();
+  await Bun.sleep(80); // Capture the pre-action arrangement before an immediate CDP edit.
   const t = await page.mark("hold open-composer");
   const release = await page.press(sel.opener);
   await Bun.sleep(800);
@@ -514,6 +516,29 @@ await scenario("desktop-D21-D22-floating", "D21/D22 on desktop: the floating-but
   const opened = await transition(recorder, "open composer", () => page.tap(sel.opener));
   recorder.add(...floatingStackChecks(opened.after, true));
 });
+
+// Launch is a dialog host for the same editor, with its own height budget.
+for (const layout of ["mobile", "desktop"] as const) {
+  await page.layout(layout);
+  await page.navigate(`${setup.atelier}/workspaces/new`, ".launch-composer .composer-input");
+  await Bun.sleep(1000); // Navigation/layout resizing is not a launch-editor transition.
+  await scenario(`${layout}-launch-editor`, "Launch opens without a mobile keyboard, grows with text, and keeps launch controls in reach.", async (recorder) => {
+    const focused = await page.evaluate<boolean>('document.activeElement.matches(".launch-composer .composer-input")');
+    recorder.add(check("Intentional initial focus", focused === (layout === "desktop"), `textarea focused: ${focused}`));
+    recorder.add(check("Dictation available before typing", await page.visible(".launch-composer .composer-transcribe button"), "dictation control visible"));
+    await page.tap(".launch-composer .composer-input");
+    await transition(recorder, "large launch prompt", () => page.insertText(Array.from({ length: 80 }, (_, i) => `Launch line ${i}`).join("\n")));
+    const geometry = await page.evaluate<{ fits: boolean; scrolls: boolean; caret: boolean }>(`(() => {
+      const dialog = document.querySelector("dialog[open]").getBoundingClientRect();
+      const input = document.querySelector(".launch-composer .composer-input");
+      const send = document.querySelector(".launch-composer .composer-send button").getBoundingClientRect();
+      return { fits: dialog.top >= 0 && dialog.bottom <= innerHeight && send.bottom <= innerHeight, scrolls: input.scrollHeight > input.clientHeight, caret: input.scrollTop > 0 };
+    })()`);
+    recorder.add(check("Dialog and send stay inside the window", geometry.fits, JSON.stringify(geometry)), check("Long prompt scrolls with caret revealed", geometry.scrolls && geometry.caret, JSON.stringify(geometry)));
+    await page.tap('dialog[open] .dialog__close-form button');
+    recorder.add(check("Cancel closes launch", !await page.visible(".launch-composer"), "launch dismissed"));
+  });
+}
 
 const { passed, index } = await report.write();
 await page.close();

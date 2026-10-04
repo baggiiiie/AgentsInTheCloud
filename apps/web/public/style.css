@@ -546,4 +546,44 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 #launch_composer_provider > .popup-menu-anchor { flex:0 0 auto; }
 #launch_composer_provider > .launch-model-settings { display:flex; flex:1; min-width:0; margin-left:auto; justify-content:flex-end; }
 
+/* Host-owned launch dialog and provider settings. The explicit composer variant
+   overrides shared editor defaults regardless of stylesheet load order. */
+.composer.launch-composer .composer-surface { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0; }
+/* Host launch settings can wrap without hiding provider-specific controls. */
+.composer.launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }
+/* Only LaunchComposer adopts keyboard geometry; other dialogs keep their layout. */
+.dialog:has(.composer.launch-composer) { transition: none; transform: none; max-height: var(--launch-dialog-height); }
+.dialog:has(.composer.launch-composer) > .panel { max-height: inherit; }
+html.software-keyboard-visible .dialog:has(.composer.launch-composer) {
+  position: fixed;
+  top: var(--software-keyboard-top, 0px);
+  bottom: var(--software-keyboard-inset, 0px);
+  height: var(--launch-dialog-height);
+}
+html.software-keyboard-visible .dialog:has(.composer.launch-composer) > .panel { position: relative; flex: 1; }
+/* Fill the body with the editor. Pin send to the panel so attachments and errors
+   can scroll on short screens without taking the send control out of reach. */
+html.software-keyboard-visible .composer.launch-composer,
+html.software-keyboard-visible .composer.launch-composer :is(.composer-surface, form, .composer-input-area) {
+  position: static; display: flex; flex-direction: column; flex: 1; min-height: 0;
+}
+html.software-keyboard-visible .composer.launch-composer { height: 100%; }
+html.software-keyboard-visible .composer.launch-composer .composer-surface { container-type: normal; overflow: visible; }
+html.software-keyboard-visible .composer.launch-composer .composer-input-area { min-height: 1lh; }
+html.software-keyboard-visible .composer.launch-composer .composer-input-area > .composer-input {
+  flex: 1; height: 0; min-height: 1lh; overflow-y: auto;
+}
+html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, [role="status"]) { flex-shrink: 0; }
+@media (max-height: 450px) {
+  html.software-keyboard-visible .composer.launch-composer { --composer-control-size: 32px; }
+  html.software-keyboard-visible .composer.launch-composer .composer-buttons { --composer-control-inset: 3px; }
+  html.software-keyboard-visible .composer.launch-composer .composer-send .button {
+    width: var(--composer-control-size); height: var(--composer-control-size); min-height: var(--composer-control-size);
+  }
+}
+
+.composer.launch-composer .composer-footer > turbo-frame,
+.composer.launch-composer .composer-selections { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.composer.launch-composer .composer-footer > turbo-frame { flex: 1; }
+
 .live-connection-status:not([hidden]) { position: fixed; z-index: 10000; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text); box-shadow: 0 4px 18px #0002; }

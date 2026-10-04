@@ -7,7 +7,7 @@ export function createComposerFocusController(Controller: WorkspaceClientControl
       if (event.button !== 0 || !(event.target instanceof Element)) return;
       const control = event.target.closest("button, a[href]");
       if (!focusLikelyOpensSoftwareKeyboard() && !(control instanceof HTMLButtonElement && control.type === "submit")) return;
-      if (!control?.closest(".composer, .agent-composer-opener")) return;
+      if (!control?.closest(".composer, .agent-composer-opener, .dialog__close-form")) return;
       const input = document.activeElement;
       if (!this.element.contains(control) || !(input instanceof HTMLTextAreaElement) || !this.element.contains(input)) return;
 

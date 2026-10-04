@@ -1,3 +1,4 @@
+import { composerViewportHeight, focusComposerText, sizeComposer } from "./composer-editor.ts";
 import { changeLayout, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, mobileComposerMediaQuery, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 
 /** The composer may grow to this share of the space above the keyboard (or of the window). */
@@ -121,17 +122,8 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       if (this.mobile) this.setOpen(true);
     }
 
-    /**
-     * The text field can be short beside the buttons and quick launches: a tap
-     * anywhere in the composer that isn't a control focuses it, caret at the end.
-     */
     focusText(event: MouseEvent): void {
-      const input = this.input;
-      const target = event.target instanceof Element ? event.target : null;
-      if (!input || input.inert || !target || !this.composer?.contains(target) || target === input) return;
-      if (target.closest("button, a, input, select, textarea, label, summary, .agent-chip, .composer-footer, .agent-completion-menu-host")) return;
-      input.focus({ preventScroll: true });
-      input.setSelectionRange(input.value.length, input.value.length);
+      if (this.composer && this.input) focusComposerText(this.composer, event);
     }
 
     /** A focused terminal takes the space; the composer collapses and keeps its draft. */
@@ -150,56 +142,10 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
       this.autosize();
     }
 
-    /**
-     * Sizes the text field: line by line up to the max, never below the buttons'
-     * height. On a short screen the button column may push the composer past the max.
-     */
     autosize(): void {
-      const input = this.input;
       const composer = this.composer;
-      if (!input || !composer || !this.isOpen || !composer.checkVisibility()) return;
-      const root = document.documentElement;
-      const style = getComputedStyle(root);
-      const keyboard = Number.parseFloat(style.getPropertyValue("--software-keyboard-inset") || "0")
-        + Number.parseFloat(style.getPropertyValue("--software-keyboard-top") || "0");
-      const maxComposer = Math.floor((root.clientHeight - keyboard) * composerMaxShare);
-      const area = input.parentElement!;
-      const buttons = area.querySelector<HTMLElement>(":scope > .composer-buttons")!;
-      const launches = area.querySelector<HTMLElement>(":scope > .composer-quick-launches");
-      const height = (element: HTMLElement | null): number => element?.checkVisibility() ? element.getBoundingClientRect().height : 0;
-      // Everything but the input area: thumbnails, status, footer.
-      const chrome = composer.getBoundingClientRect().height - area.getBoundingClientRect().height;
-      // Quick launches make way as soon as there is something written.
-      const hadText = composer.classList.contains("composer-has-text");
-      const hasText = /\S/.test(input.value);
-      // Measure without letting the pane reflow: the input area keeps its size,
-      // so the transcript above cannot clamp its scroll offset.
-      const areaHeight = area.style.height;
-      area.style.height = `${area.getBoundingClientRect().height}px`;
-      const inline = input.style.height;
-      composer.classList.toggle("composer-has-text", hasText);
-      input.style.height = "0px";
-      const content = Math.ceil(input.scrollHeight);
-      const below = height(launches);
-      // Buttons beside the text set its minimum; send floating over it (while typing) doesn't.
-      const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
-      const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);
-      const limit = Math.max(minimum, maxComposer - chrome - below);
-      composer.classList.toggle("composer-has-text", hadText);
-      input.style.height = inline;
-      area.style.height = areaHeight;
-      const next = Math.max(minimum, Math.min(content, limit));
-      const overflow = content > limit ? "auto" : "hidden";
-      const current = input.getBoundingClientRect().height;
-      if (hasText !== hadText || Math.abs(next - current) >= 0.5 || input.style.overflowY !== overflow) {
-        changeLayout(() => {
-          composer.classList.toggle("composer-has-text", hasText);
-          input.style.height = `${next}px`;
-          input.style.overflowY = overflow;
-        });
-      }
-      // A large paste or transcription lands with the caret in view.
-      if (overflow === "auto" && document.activeElement === input && input.selectionEnd === input.value.length) input.scrollTop = input.scrollHeight;
+      if (!composer || !this.input || !this.isOpen) return;
+      sizeComposer(composer, Math.floor(composerViewportHeight() * composerMaxShare));
     }
 
     private updateDraftIndicator(): void {

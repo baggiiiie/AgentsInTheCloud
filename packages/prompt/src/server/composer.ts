@@ -5,7 +5,7 @@ import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
 
-export const agentComposerActions = "agents-in-the-cloud:workspace-pane-visible@document->agent-composer#selected agents-in-the-cloud:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sending->agent-composer#sending agent-composer:sent->agent-composer#sent agent-composer:failed->agent-composer#failed input->agent-composer#draftChanged focusin->agent-composer#focused click->agent-composer#focusText agents-in-the-cloud:software-keyboard@document->agent-composer#layout resize@window->agent-composer#autosize agent-composer:resize->agent-composer#autosize";
+export const agentComposerActions = "mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:workspace-pane-visible@document->agent-composer#selected agents-in-the-cloud:workspace-pane-hidden@document->agent-composer#hidden agent-attachments:files->agent-composer#reveal agent-composer:sending->agent-composer#sending agent-composer:sent->agent-composer#sent agent-composer:failed->agent-composer#failed input->agent-composer#draftChanged focusin->agent-composer#focused click->agent-composer#focusText agents-in-the-cloud:software-keyboard@document->agent-composer#layout resize@window->agent-composer#autosize agent-composer:resize->agent-composer#autosize";
 
 const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg>';
 
@@ -68,5 +68,5 @@ export function renderOpenComposerButton(): string {
 
 export function composerAttachmentAttributes(draftId: string, rowId: string, actions = ""): string {
   const uploadUrl = `/agent-attachment-drafts/${encodeURIComponent(draftId)}/attachments?row=${encodeURIComponent(rowId)}`;
-  return `data-agent-attachments-upload-url-value="${escapeHtml(uploadUrl)}" data-action="${actions} mousedown->composer-focus#preserveInputFocus dragover->agent-attachments#dragOver dragleave->agent-attachments#dragLeave drop->agent-attachments#drop"`;
+  return `data-agent-attachments-upload-url-value="${escapeHtml(uploadUrl)}" data-action="${actions} dragover->agent-attachments#dragOver dragleave->agent-attachments#dragLeave drop->agent-attachments#drop"`;
 }

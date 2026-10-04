@@ -25,7 +25,7 @@ import { join } from "node:path";
 import { Report, type ScenarioRecorder } from "./lib/report.ts";
 import { Simulator, WebKitPage } from "./lib/simulator.ts";
 import { stage, tmuxSizes, type Stage } from "./lib/stage.ts";
-import { analyseTransition, check, close, oneStepChecks, settled, type Box, type Frame } from "./lib/trace.ts";
+import { analyseTransition, check, close, oneStepChecks, settled, type Box, type Frame, type Trace } from "./lib/trace.ts";
 import { analyseKeyboardVideo } from "./lib/video.ts";
 
 const { values: args } = parseArgs({
@@ -106,7 +106,7 @@ async function point(selector: string, offset: { x?: number; y?: number } = {}):
     if (!element) return null;
     const r = element.getBoundingClientRect();
     // The status bar sits above the standalone page.
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 + ${sim.screen.height} - innerHeight };
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 + ${sim.screen.height} - document.documentElement.clientHeight };
   })()`);
   if (!result) throw new Error(`No visible element for ${selector}`);
   return { x: result.x + (offset.x ?? 0), y: result.y + (offset.y ?? 0) };
@@ -122,9 +122,9 @@ async function tapTranscriptText(): Promise<void> {
   const target = await page.evaluate<{ x: number; y: number }>(`(() => {
     const t = [...document.querySelectorAll(".agent-pane .agent-transcript")].find((e) => e.checkVisibility());
     const tr = t.getBoundingClientRect();
-    const p = [...t.querySelectorAll(".agent-final p, .agent-final li")].reverse().find((e) => { const r = e.getBoundingClientRect(); return r.top > tr.top + 10 && r.bottom < tr.bottom - 10; });
+    const p = [...t.querySelectorAll(".agent-final p, .agent-final li")].reverse().find((e) => { const r = e.getBoundingClientRect(); return r.bottom > tr.top + 20 && r.top < tr.bottom - 20; });
     const r = p.getBoundingClientRect();
-    return { x: r.left + 24, y: r.top + r.height / 2 + (${sim.screen.height} - innerHeight) };
+    return { x: r.left + 24, y: (Math.max(r.top, tr.top) + Math.min(r.bottom, tr.bottom)) / 2 + (${sim.screen.height} - document.documentElement.clientHeight) };
   })()`);
   await sim.tap(target.x, target.y);
 }
@@ -151,7 +151,7 @@ async function scenario(name: string, description: string, body: (recorder: Scen
   const recorder = await report.scenario(name, description);
   const resizesBefore = page.resizes.length;
   const tmuxBefore = await tmuxSizes(setup.workspaceId);
-  const counted = name !== "ios-D20-rotation";
+  const counted = name !== "ios-D20-rotation" && name !== "ios-launch-keyboard";
   try {
     await body(recorder);
   } catch (error) {
@@ -172,24 +172,31 @@ async function scenario(name: string, description: string, body: (recorder: Scen
  */
 async function transition(recorder: ScenarioRecorder, label: string, action: () => Promise<void>, options: { waitMs?: number; video?: boolean; correctionAllowed?: boolean; expectChange?: boolean; oneStep?: boolean; maskTerminal?: boolean } = {}): Promise<{ before: Frame; after: Frame }> {
   const stopVideo = options.video === false ? undefined : await sim.recordVideo();
-  await page.startTrace();
-  const t = await page.mark(label);
-  await action();
-  await Bun.sleep(options.waitMs ?? 1600);
-  const trace = await page.takeTrace();
+  let trace: Trace;
+  let t: number;
+  let movie: Uint8Array | undefined;
+  try {
+    await page.startTrace();
+    await Bun.sleep(80); // Capture the pre-action arrangement before an immediate edit.
+    t = await page.mark(label);
+    await action();
+    await Bun.sleep(options.waitMs ?? 1600);
+    trace = await page.takeTrace();
+  } finally {
+    movie = await stopVideo?.();
+  }
   const analysis = analyseTransition(trace, t);
   await recorder.trace(trace, label);
   // Native scrolling moves content continuously; it is not a layout transition.
   const checks = options.oneStep === false ? [] : oneStepChecks(analysis, { correctionAllowed: options.correctionAllowed, expectChange: options.expectChange });
   recorder.add(...checks.map((result) => ({ ...result, name: `${label} — ${result.name}` })));
-  if (stopVideo) {
-    const movie = await stopVideo();
+  if (movie) {
     const file = `video-${label.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.mp4`;
     await recorder.file(file, movie);
     const path = join(recorder.directory, file);
     // A terminal printing output is content, not layout: its settled box is left out.
     const terminal = options.maskTerminal ? settled(analysis).terminal : null;
-    const offset = sim.screen.height - await page.evaluate<number>("innerHeight");
+    const offset = sim.screen.height - await page.evaluate<number>("document.documentElement.clientHeight");
     const video = await analyseKeyboardVideo(path, { masks: terminal ? [[terminal[0] * 3, (terminal[1] + offset) * 3, terminal[2] * 3, terminal[3] * 3]] : [] });
     await recorder.file(`${file}.json`, JSON.stringify(video, null, 2));
     const worst = video.worst;
@@ -309,7 +316,7 @@ await scenario("ios-composer-tap-and-column", "On the phone itself: a tap anywhe
     const buttons = [...row.querySelectorAll("button")];
     if (!buttons.length || !row.checkVisibility()) return null;
     const last = buttons[buttons.length - 1].getBoundingClientRect();
-    return { x: last.right + 20, y: last.top + last.height / 2 + ${sim.screen.height} - innerHeight };
+    return { x: last.right + 20, y: last.top + last.height / 2 + ${sim.screen.height} - document.documentElement.clientHeight };
   })()`);
   if (beside) {
     const { after } = await transition(recorder, "tap beside the quick launches", () => sim.tap(beside.x, beside.y));
@@ -521,6 +528,39 @@ await scenario("ios-D20-rotation", "D20: rotating with the keyboard down resizes
   await sim.rotate("portrait");
   await Bun.sleep(3500);
   recorder.add(check("Back to portrait: each terminal resizes once", oncePerTerminal(since(start)) && await piSize() === portrait, `${describe(since(start))}; Pi tmux → ${await piSize()}`));
+});
+
+await scenario("ios-launch-keyboard", "Launch starts ready for dictation, fills the space above the keyboard, and restores settings after dismissal.", async (recorder) => {
+  await page.evaluate<boolean>('(localStorage.removeItem("agents-in-the-cloud:software-keyboard"), true)');
+  await navigate("/workspaces/new", ".launch-composer .composer-input");
+  recorder.add(check("Opening launch leaves keyboard down", await page.evaluate<boolean>("!document.documentElement.classList.contains('software-keyboard-visible') && document.activeElement.tagName !== 'TEXTAREA'"), "no textarea focus on open"), check("Dictation available", await visible(".launch-composer .composer-transcribe button"), "dictation visible"));
+  await tap(".launch-composer .composer-input");
+  await Bun.sleep(1600);
+  const geometry = await page.evaluate<{ keyboard: boolean; fits: boolean; controls: boolean; fills: boolean; gap: number; inputHeight: number }>(`(() => {
+    const d = document.querySelector("dialog[open]").getBoundingClientRect();
+    const send = document.querySelector(".launch-composer .composer-send button").getBoundingClientRect();
+    const input = document.querySelector(".launch-composer .composer-input").getBoundingClientRect();
+    const top = visualViewport.offsetTop, bottom = top + visualViewport.height;
+    return { keyboard: document.documentElement.classList.contains("software-keyboard-visible"), fits: d.top >= top - 1 && d.bottom <= bottom + 1 && send.bottom <= bottom, fills: d.top <= top + 10 && d.bottom >= bottom - 10, gap: bottom - input.bottom, inputHeight: input.height, controls: !document.querySelector(".launch-composer .composer-footer").checkVisibility() && !document.querySelector(".launch-composer .composer-transcribe").checkVisibility() };
+  })()`);
+  recorder.add(check("Keyboard arranged with launch and send above it", geometry.keyboard && geometry.fits, JSON.stringify(geometry)), check("Typing mode removes settings and auxiliary controls", geometry.controls, JSON.stringify(geometry)));
+  recorder.add(check("Empty launch editor fills the space above the keyboard", geometry.fills && geometry.gap >= 0 && geometry.gap <= 10, JSON.stringify(geometry)));
+  await recorder.file("typing.png", await sim.screenshot());
+  await blur();
+  recorder.add(check("Keyboard dismissal returns to content-sized editing", await page.evaluate<number>('document.querySelector(".launch-composer .composer-input").getBoundingClientRect().height') < geometry.inputHeight, `typing height ${geometry.inputHeight}`));
+  recorder.add(check("Dismissal restores settings and dictation", await visible(".launch-composer .composer-footer") && await visible(".launch-composer .composer-transcribe"), "settings and dictation restored"));
+  await transition(recorder, "remembered launch focus", () => tap(".launch-composer .composer-input"), { waitMs: 1600 });
+  await page.evaluate<boolean>('(() => { const i = document.querySelector(".launch-composer .composer-input"); i.value = "Long launch prompt\\n".repeat(80); i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()');
+  recorder.add(check("Long prompt leaves the end caret visible", await page.evaluate<boolean>('(() => { const i = document.querySelector(".launch-composer .composer-input"); return i.scrollTop + i.clientHeight >= i.scrollHeight - 1; })()'), "long prompt scrolled to its end"));
+  await sim.rotate("landscape_left");
+  await Bun.sleep(3000);
+  recorder.add(check("Landscape keeps launch and send above the keyboard", await page.evaluate<boolean>('(() => { const d = document.querySelector("dialog[open]:has(.launch-composer)").getBoundingClientRect(); const s = document.querySelector(".launch-composer .composer-send button").getBoundingClientRect(); return d.top >= visualViewport.offsetTop && d.bottom <= visualViewport.offsetTop + visualViewport.height + 1 && s.top >= d.top && s.bottom <= d.bottom; })()'), "long prompt, landscape keyboard"));
+  await recorder.file("landscape-typing.png", await sim.screenshot());
+  await sim.rotate("portrait");
+  await Bun.sleep(3000);
+  await tap('dialog[open] .dialog__close-form button');
+  await Bun.sleep(1000);
+  recorder.add(check("Closing while typing dismisses launch and keyboard", !await visible(".launch-composer") && await page.evaluate<boolean>("!document.documentElement.classList.contains('software-keyboard-visible')"), "closed"));
 });
 
 await navigate(builtinPath, sel.transcript);

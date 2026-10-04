@@ -1,7 +1,8 @@
 import { Controller } from "@hotwired/stimulus";
 import { createHtmlAutocompleteController, PromptHistoryNavigator } from "@agents-in-the-cloud/agent/client";
+import { composerViewportHeight, focusComposerText, revealComposerCaret, sizeComposer } from "@agents-in-the-cloud/prompt/client";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
-import { composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
+import { changeLayout, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeWorkspaceTemplateSpec, softwareKeyboardArranged } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { submitFormWithFirstButton } from "./form-submission.ts";
@@ -64,21 +65,29 @@ class LaunchComposerDialogController extends Controller<HTMLDialogElement> {
   declare readonly discardUrlValue: string;
   private submissionAccepted = false;
   private readonly promptHistoryNavigator = new PromptHistoryNavigator();
+  private observer!: ResizeObserver;
 
   connect(): void {
     this.element.addEventListener("close", this.closed);
     this.input.addEventListener("keydown", this.inputKeydown);
     this.input.addEventListener("input", this.inputChanged);
+    // Exclude the editor from native dialog autofocus on touch devices: opening
+    // should offer dictation and attachments without briefly raising a keyboard.
+    const touch = focusLikelyOpensSoftwareKeyboard();
+    this.input.inert = touch;
     this.element.showModal();
-    if (focusLikelyOpensSoftwareKeyboard()) {
-      if (document.activeElement === this.input) this.input.blur();
-    } else {
-      this.input.focus();
+    this.input.inert = false;
+    if (!touch) {
+      this.input.focus({ preventScroll: true });
       this.input.setSelectionRange(this.input.value.length, this.input.value.length);
     }
+    this.observer = new ResizeObserver(() => this.layout());
+    for (const chrome of this.element.querySelectorAll(".panel__header, .composer-footer, .agent-attach-row, [role='status']")) this.observer.observe(chrome);
+    this.layout();
   }
 
   disconnect(): void {
+    this.observer.disconnect();
     this.element.removeEventListener("close", this.closed);
     this.input.removeEventListener("keydown", this.inputKeydown);
     this.input.removeEventListener("input", this.inputChanged);
@@ -86,6 +95,35 @@ class LaunchComposerDialogController extends Controller<HTMLDialogElement> {
 
   private get input(): HTMLTextAreaElement {
     return this.element.querySelector<HTMLTextAreaElement>('textarea[name="text"]')!;
+  }
+
+  private get composer(): HTMLElement {
+    return this.element.querySelector<HTMLElement>(".launch-composer")!;
+  }
+
+  focusText(event: MouseEvent): void {
+    focusComposerText(this.composer, event);
+  }
+
+  layout(): void {
+    if (!this.element.open) return;
+    changeLayout(() => {
+      const typing = softwareKeyboardArranged();
+      const available = composerViewportHeight();
+      const maxHeight = typing ? available - 16 : Math.min(available - 32, 860);
+      this.element.style.setProperty("--launch-dialog-height", `${maxHeight}px`);
+      if (typing) {
+        // Flex layout owns full-height typing; discard content-sizing overrides.
+        this.input.style.removeProperty("height");
+        this.input.style.removeProperty("overflow-y");
+        revealComposerCaret(this.input);
+      } else {
+        const header = this.element.querySelector<HTMLElement>(".panel__header")!;
+        const panel = this.element.querySelector<HTMLElement>(".panel")!;
+        const border = panel.getBoundingClientRect().height - panel.clientHeight;
+        sizeComposer(this.composer, maxHeight - header.getBoundingClientRect().height - border);
+      }
+    });
   }
 
   private promptHistory(): string[] {
@@ -99,6 +137,7 @@ class LaunchComposerDialogController extends Controller<HTMLDialogElement> {
 
   private readonly inputChanged = (): void => {
     this.promptHistoryNavigator.inputChanged();
+    this.layout();
   };
 
   submitted(event: CustomEvent<{ success: boolean }>): void {

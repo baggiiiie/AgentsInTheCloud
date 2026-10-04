@@ -29,3 +29,5 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
     application.register("agent-attachments", createAgentAttachmentsController(Controller));
   },
 };
+
+export { composerViewportHeight, focusComposerText, revealComposerCaret, sizeComposer } from "./composer-editor.ts";

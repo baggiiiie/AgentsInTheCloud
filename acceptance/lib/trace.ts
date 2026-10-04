@@ -53,7 +53,7 @@ export const samplerSource = String.raw`(() => {
   const sample = (t) => {
     const transcript = first(".agent-pane .agent-transcript, .cli-transcript-view");
     const pane = first(".agent-composer-pane");
-    const composer = pane ? pane.querySelector(":scope > .composer") : null;
+    const composer = first(".launch-composer") || (pane ? pane.querySelector(":scope > .composer") : null);
     const floating = {};
     const stack = first(".floating-stack");
     if (stack) for (const button of stack.querySelectorAll("button, a")) if (shown(button)) floating[label(button)] = layoutBox(button);

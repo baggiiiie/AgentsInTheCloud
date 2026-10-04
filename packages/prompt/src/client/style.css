@@ -1,7 +1,7 @@
 .composer-surface { --composer-footer-height: 32px; position: relative; background: var(--panel); border: 1.5px solid var(--line-strong); border-radius: var(--radius-overlay); box-shadow: var(--shadow); overflow: hidden; padding-bottom: var(--composer-footer-height); pointer-events: auto; container-type: inline-size; font: var(--text-body)/var(--leading-standard) var(--font-sans); }
 .composer-surface:focus-within { border-color: var(--accent); }
 .composer-surface:not(:has(> .composer-footer)) { --composer-footer-height: 0px; padding-bottom: 0; }
-.agent-attach-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 8px; }
+.agent-attach-row { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; padding: 0 8px; }
 .agent-attach-row:not(:empty) { padding-top: 8px; }
 .agent-chip {
   display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--bg);
@@ -20,7 +20,6 @@
 .composer-surface form { cursor: text; position: relative; }
 .composer-surface .composer-buttons, .composer-surface .agent-attach-row, .composer-surface .composer-quick-launches { cursor: default; }
 /* Thumbnails take one row that scrolls sideways; the text field gets the rest of the height. */
-.agent-attach-row { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; }
 .agent-attach-row > .agent-chip { flex: 0 0 auto; }
 .composer {
   --composer-control-inset: 10px;
@@ -31,7 +30,7 @@
 }
 /* The text field, with quick launches wrapping under it, beside the buttons
    pinned to the bottom right. The field grows line by line (sized by the
-   agent-composer controller, which also fills the buttons' height) and
+   shared editor, which also fills the buttons' height) and
    scrolls past its maximum. */
 .composer-input-area { display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) auto; }
 .composer-input {
@@ -59,8 +58,6 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 .composer-footer { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: var(--composer-footer-height); display: flex; align-items: center; gap: 8px; overflow: hidden; padding: 0 12px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 72%, transparent); font: inherit; }
 .composer-selections { min-width: 0; flex: 1 1 0; display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; margin-left: auto; }
 .composer-selection-field { flex-shrink: 0; min-width: 0; display: inline-flex; align-items: center; }
-.launch-composer .composer-surface { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0; }
-.launch-composer .composer-input { height: 260px; overflow-y: auto; }
 @media (max-width: 700px), (pointer: coarse) {
   .composer { --composer-control-size: 62.5px; }
   .composer-surface { --composer-footer-height: 52px; }
@@ -99,22 +96,20 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 
 /* Typing mode: while the soft keyboard is up, only typing-related UI shows.
    The composer collapses to the text field with send beside it. */
-html.software-keyboard-visible :is(.floating-stack, .agent-composer-pane .composer-attach, .agent-composer-pane .composer-close,
-  .agent-composer-pane .composer-transcribe, .agent-composer-pane .composer-quick-launches, .agent-composer-pane .composer-footer) { display: none; }
-html.software-keyboard-visible .agent-composer-pane .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
+html.software-keyboard-visible .floating-stack,
+html.software-keyboard-visible .composer :is(.composer-attach, .composer-close, .composer-transcribe, .composer-quick-launches, .composer-footer) { display: none; }
+html.software-keyboard-visible .composer .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
 /* The text takes the full width and runs underneath send, which sits in the bottom-right corner. */
-html.software-keyboard-visible .agent-composer-pane .composer-input-area { position: relative; }
-html.software-keyboard-visible .agent-composer-pane .composer-buttons {
+html.software-keyboard-visible .composer .composer-input-area { position: relative; }
+html.software-keyboard-visible .composer .composer-buttons {
   position: absolute; z-index: 1; bottom: var(--composer-control-inset); right: var(--composer-control-inset); padding: 0;
 }
-html.software-keyboard-visible .agent-composer-pane .composer-input-area > .composer-input {
+html.software-keyboard-visible .composer .composer-input-area > .composer-input {
   grid-column: 1 / -1; padding: 12px 16px;
   /* Two controls tall: room for a few lines of text above the keyboard. */
   min-height: max(calc(1lh + 24px), calc(2 * (var(--composer-control-size) + 2 * var(--composer-control-inset))));
 }
-html.software-keyboard-visible .agent-composer-pane .composer-surface > form > [role="status"] { margin: 0; max-height: 2lh; overflow-y: auto; }
-/* Host launch settings can wrap without hiding provider-specific controls. */
-.launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }
+html.software-keyboard-visible .composer .composer-surface > form > [role="status"] { margin: 0; max-height: 2lh; overflow-y: auto; }
 
 .agent-dropping .composer-surface::after {
   content: "Drop files to attach";
