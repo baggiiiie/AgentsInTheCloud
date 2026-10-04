@@ -323,7 +323,7 @@ function renderWorkPane(presentation: WorkspacePresentation): string {
   }) : "";
   return `<div class="fixed-shell-work-pane">${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="work" data-workspace-presentation-target="workPane" aria-label="Work"' },
-    headerHtml: `${presentation.workViews.length ? "" : '<span class="panel__title">Views</span>'}${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
+    headerHtml: `${presentation.workViews.length ? "" : '<span class="panel__title">Work views</span>'}${tabStripHtml({ id: workViewDomId(presentation.workspace.id, "selectors"), label: "Work views", tabsHtml: selectors })}<span id="${workViewDomId(presentation.workspace.id, "launchers")}">${addMenu}</span>${barButton("Collapse Work pane", "click->workspace-presentation#toggleWorkPane", Icons.Panel, "data-collapse-work-pane")}`,
     bodyHtml: `<div id="${workViewDomId(presentation.workspace.id, "bodies")}" class="fixed-shell-work-bodies">${panes || renderEmptyWorkPane(presentation.workspace.id, presentation.commands ?? [])}</div><div class="fixed-shell-work-resizer" role="separator" aria-label="Resize Work pane" aria-orientation="vertical" tabindex="0" data-action="pointerdown->workspace-presentation#beginWorkResize keydown->workspace-presentation#resizeWorkWithKeyboard"></div>`,
   })}</div>`;
 }
