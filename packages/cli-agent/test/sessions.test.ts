@@ -14,6 +14,7 @@ async function scenario(script: string): Promise<void> {
       const launches = [];
       const preparations = [];
       let setupError;
+      let turnSettled = async () => true;
       let preparationError;
       let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
@@ -33,6 +34,7 @@ async function scenario(script: string): Promise<void> {
         },
         prepareWorkspace: async (workspaceId) => { preparations.push(workspaceId); if (preparationError) throw preparationError; },
         launchScript: (input, images, settings) => { launches.push({ input, images, settings }); return "printf 'CLI started'"; },
+        turnSettled: (...args) => turnSettled(...args),
       };
       const module = createCliAgentModule(adapter);
       const titleEvents = [];
@@ -40,6 +42,14 @@ async function scenario(script: string): Promise<void> {
       const provider = module.agentProvider;
       const saved = (workspaceId, providerId = "example") => Bun.file(process.env.ATELIER_DATA_DIR + "/workspaces/" + workspaceId + "/metadata/" + providerId + "-agents.json").json();
       const list = (workspaceId) => provider.tabs.list({ workspaceId });
+      // Creates a session in a fresh workspace and reports its turn boundaries the way its CLI does.
+      async function turnSignals(workspaceId) {
+        const { configureAgentMcp, handleAgentMcpRequest } = await import("@agents-in-the-cloud/agent/server");
+        configureAgentMcp({ on() {}, emit: async () => {} });
+        const id = await provider.create({ workspaceId });
+        const token = calls.findLast((call) => call[2]?.stdin?.includes("Authorization: Bearer"))[2].stdin.match(/Authorization: Bearer ([\\w.-]+)/)[1];
+        return { id, signal: (boundary) => handleAgentMcpRequest(new Request("http://localhost/agent-turn-" + boundary, { method: "POST", headers: { authorization: "Bearer " + token } }), workspaceId) };
+      }
       ${script}
     `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
@@ -300,6 +310,8 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
   expect(finished).toEqual([]);
   expect(attention).toEqual([]);
   expect((await handleAgentMcpRequest(request(), "completion")).status).toBe(204);
+  // The turn ends just after the response, once the adapter finds its history settled.
+  await new Promise((resolve) => setTimeout(resolve, 0));
   expect(busy).toEqual([
     { workspaceId: "completion", agentKey: "agent:" + id, busy: true },
     { workspaceId: "completion", agentKey: "agent:" + id, busy: false },
@@ -367,4 +379,45 @@ test("one restoration failure preserves its tab and does not block other agents"
   expect(resumed).toEqual([first, second]);
   expect((await saved("failure")).sessions[0]).toMatchObject({ id: first, error: "native history could not be loaded" });
   expect((await saved("failure")).sessions[1].error).toBeUndefined();
+`));
+
+test("a CLI turn ends only once the adapter finds its native history settled", () => scenario(`
+  const { subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  const busy = [];
+  subscribeWorkspaceAgentBusy((event) => busy.push(event.busy));
+  let settled = false;
+  const checked = [];
+  turnSettled = async (workspaceId, id) => { checked.push([workspaceId, id]); return settled; };
+  const { id, signal } = await turnSignals("settling");
+  await signal("started");
+  expect((await signal("finished")).status).toBe(204);
+  await Bun.sleep(250);
+  expect(busy).toEqual([true]);
+  expect(checked.length).toBeGreaterThan(1);
+  expect(checked[0]).toEqual(["settling", id]);
+  settled = true;
+  await Bun.sleep(150);
+  expect(busy).toEqual([true, false]);
+`));
+
+test("a CLI turn whose native history never settles ends after ten seconds", () => scenario(`
+  const { subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  const busy = [];
+  const errors = [];
+  console.error = (...args) => errors.push(args.join(" "));
+  subscribeWorkspaceAgentBusy((event) => busy.push(event.busy));
+  const realNow = Date.now;
+  let elapsed = 0;
+  Date.now = () => realNow() + elapsed;
+  turnSettled = async () => false;
+  const { id, signal } = await turnSignals("unsettled");
+  await signal("started");
+  await signal("finished");
+  elapsed = 9_000;
+  await Bun.sleep(250);
+  expect(busy).toEqual([true]);
+  elapsed = 10_000;
+  await Bun.sleep(250);
+  expect(busy).toEqual([true, false]);
+  expect(errors).toEqual(["Example CLI history for " + id + " did not settle within 10s of its finished turn"]);
 `));

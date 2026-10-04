@@ -3,7 +3,7 @@ import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscripti
 import { providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { claudeLaunchScript } from "./launch-command.ts";
 import { prepareClaudeMcp } from "./mcp.ts";
-import { loadClaudeTranscript, loadClaudeTranscriptImage, hasClaudeSession, claudeHistoryFiles } from "./transcript.ts";
+import { loadClaudeTranscript, loadClaudeTranscriptImage, hasClaudeSession, hasClaudeTurnSettled, claudeHistoryFiles } from "./transcript.ts";
 
 export const claudeModelSettings = createCliModelSettings({
   agentProvider: "claude", provider: "anthropic", label: "Claude",
@@ -20,5 +20,6 @@ export const agentsInTheCloudServerModule = createCliAgentModule({
   resumeScript: async (_workspaceId, settings, session) => claudeLaunchScript(emptyAgentInput(), [], settings, session, await hasClaudeSession(session.id)),
   loadTranscript: loadClaudeTranscript,
   loadTranscriptImage: loadClaudeTranscriptImage,
+  turnSettled: hasClaudeTurnSettled,
   historyFiles: claudeHistoryFiles,
 });

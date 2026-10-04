@@ -1,4 +1,4 @@
-import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
+import { registerAgentTurnSettler, renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
@@ -30,6 +30,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
     initialize(context) {
       events = context.events;
       context.registerSocketHandler(cliSocketHandler(adapter.id, sessions));
+      if (adapter.turnSettled) registerAgentTurnSettler(sessions.settleTurn);
       context.events.on("workspace_agent_turn_finished", ({ workspaceId, conversationId }) => {
         if (sessions.list(workspaceId).some((session) => session.id === conversationId)) {
           context.registry.requestAttention(workspaceId);

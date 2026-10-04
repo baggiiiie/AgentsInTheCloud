@@ -32,6 +32,8 @@ export interface CliAgentAdapter {
   resumeScript?(workspaceId: string, settings: AgentWorkspaceParameters, session: CliAgentSession): Promise<string>;
   /** Optional native-history adapter. CLI providers without one remain terminal-only. */
   loadTranscript?(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined>;
+  /** Whether native history holds all of the last finished turn; turn signals can precede the CLI's final writes. */
+  turnSettled?(workspaceId: string, sessionId: string): Promise<boolean>;
   /** Native conversation files to publish to the session share; never config or credentials. */
   historyFiles?(workspaceId: string, sessionId: string): Promise<string[]>;
   loadTranscriptImage?(workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response>;

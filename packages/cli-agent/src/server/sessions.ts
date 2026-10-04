@@ -21,6 +21,7 @@ const sessionSchema = Type.Object({
 });
 const stateSchema = Type.Object({ sessions: Type.Array(sessionSchema) });
 type CliSession = Static<typeof sessionSchema>;
+const turnSettleTimeoutMs = 10_000;
 
 export async function checkedWorkspaceShell(workspaceId: string, command: string, stdin?: string): Promise<void> {
   const result = await execWorkspaceShell(workspaceId, command, { stdin });
@@ -94,6 +95,20 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
     } finally {
       starting.delete(id);
       ready.resolve();
+    }
+  }
+
+  // The turn ends once its native history is complete, not when the CLI signals it,
+  // and no later than the timeout so a CLI that never completes it cannot stay busy.
+  async function settleTurn(workspaceId: string, id: string, signal: AbortSignal): Promise<void> {
+    if (!list(workspaceId).some((session) => session.id === id)) return;
+    const deadline = Date.now() + turnSettleTimeoutMs;
+    while (!signal.aborted && !await adapter.turnSettled!(workspaceId, id)) {
+      if (Date.now() >= deadline) {
+        console.error(`${adapter.label} history for ${id} did not settle within ${turnSettleTimeoutMs / 1000}s of its finished turn`);
+        return;
+      }
+      await Bun.sleep(100);
     }
   }
 
@@ -201,7 +216,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
     for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
   }
-  return { list, get, ready, create, prepareWorkspace, restoreWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
+  return { list, get, ready, settleTurn, create, prepareWorkspace, restoreWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
 }
 
 export type CliSessions = ReturnType<typeof createCliSessions>;

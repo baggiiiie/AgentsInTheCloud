@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { claudeTranscriptRecords, loadClaudeTranscriptImage } from "../src/server/transcript.ts";
+import { claudeTranscriptRecords, claudeTurnSettled, loadClaudeTranscriptImage } from "../src/server/transcript.ts";
 
 type Image = { type: "image"; source: { type: "base64"; media_type: string; data: string } };
 type Content = string | Array<{ type: string; thinking?: string; text?: string; id?: string; name?: string; input?: { command: string } | { file_path: string; old_string: string; new_string: string; replace_all?: boolean }; tool_use_id?: string; content?: string | Array<Image>; is_error?: boolean; source?: Image["source"] }>;
@@ -70,4 +70,19 @@ test("adapts Claude Edit replacements for the existing diff visualization withou
 test("follows the current branch, ignores sidechains and incomplete final JSONL writes", () => {
   const text = [row("u", null, "user", "Hello"), row("old", "u", "assistant", [{ type: "text", text: "Discarded" }]), row("new", "u", "assistant", [{ type: "text", text: "Current" }]), row("side", "new", "assistant", [{ type: "text", text: "Sidechain" }], { isSidechain: true }), '{"type":"assistant"'].join("\n");
   expect(claudeTranscriptRecords(text).map((record) => record.kind === "assistant" ? record.parts[0] : record.kind)).toEqual(["user", { type: "text", text: "Current" }]);
+});
+
+test("a turn has settled once Claude's stop hook summary follows its last message", () => {
+  const system = (uuid: string, parentUuid: string, subtype: string) => JSON.stringify({ uuid, parentUuid, type: "system", subtype });
+  const prompt = row("u", null, "user", "Write a poem");
+  const thinking = row("t", "u", "assistant", [{ type: "thinking", thinking: "Rhymes" }]);
+  const answer = row("a", "t", "assistant", [{ type: "text", text: "Fish glide free" }]);
+  const summary = system("s", "a", "stop_hook_summary");
+  // As written when the Stop hook fires: the answer is still in Claude's write queue.
+  expect(claudeTurnSettled([prompt, thinking].join("\n"))).toBe(false);
+  expect(claudeTurnSettled([prompt, thinking, answer].join("\n"))).toBe(false);
+  expect(claudeTurnSettled([prompt, thinking, answer, summary, system("d", "s", "turn_duration")].join("\n") + "\n")).toBe(true);
+  expect(claudeTurnSettled([prompt, thinking, answer, summary, row("n", "s", "user", "Another")].join("\n"))).toBe(false);
+  expect(claudeTurnSettled([prompt, answer, summary, row("x", "s", "assistant", [{ type: "text", text: "Subagent" }], { isSidechain: true })].join("\n"))).toBe(true);
+  expect(claudeTurnSettled([prompt, answer, `${summary.slice(0, 20)}`].join("\n"))).toBe(false);
 });

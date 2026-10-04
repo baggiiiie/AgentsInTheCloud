@@ -97,12 +97,32 @@ export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
   return records;
 }
 
+/**
+ * Claude's Stop hook fires before the turn's final messages leave its batched write queue.
+ * After the Stop hooks finish it queues a stop_hook_summary behind them, so the turn is
+ * complete on disk once that summary follows the last message.
+ */
+export function claudeTurnSettled(jsonl: string): boolean {
+  let settled = false;
+  for (const row of nativeJsonlRows(jsonl, rowSchema)) {
+    if (row.isSidechain === true) continue;
+    if (row.type === "user" || row.type === "assistant") settled = false;
+    else if (row.type === "system" && row.subtype === "stop_hook_summary") settled = true;
+  }
+  return settled;
+}
+
 function nativeSessionPath(sessionId: string): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "home", ".claude", "projects", workspaceRoot.replaceAll("/", "-"), `${sessionId}.jsonl`);
 }
 export async function loadClaudeTranscript(_workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined> {
   const text = await readTextIfExists(nativeSessionPath(sessionId));
   return text === undefined ? undefined : claudeTranscriptRecords(text);
+}
+
+export async function hasClaudeTurnSettled(_workspaceId: string, sessionId: string): Promise<boolean> {
+  const text = await readTextIfExists(nativeSessionPath(sessionId));
+  return text !== undefined && claudeTurnSettled(text);
 }
 
 export async function loadClaudeTranscriptImage(_workspaceId: string, sessionId: string, entryId: string, contentIndex: number): Promise<Response> {
