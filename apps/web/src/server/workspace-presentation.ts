@@ -169,7 +169,6 @@ function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspac
     kind: "compound",
     leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
     label: { kind: "text", text: title },
-    trailingHtml: `<span class="workspace-template-check">${Icons.Check}</span>`,
     primary: { tag: "button", attributesHtml: `type="button" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose dblclick->workspace-pane#create keydown->workspace-pane#optionKeydown"` },
     engagedActionsHtml: settings,
   });
