@@ -7,6 +7,7 @@
     "./autocomplete": "./src/autocomplete/autocomplete-html.ts",
     "./action-item": "./src/action-item/action-item-html.ts",
     "./action-item/client": "./src/action-item/action-item-controller.ts",
+    "./add-badge": "./src/add-badge/add-badge-html.ts",
     "./activity-button": "./src/activity-button/activity-button-html.ts",
     "./activity-button/client": "./src/activity-button/activity-button-client.ts",
     "./button": "./src/button/button-html.ts",

@@ -109,6 +109,10 @@ export const designSystemStaticFiles = {
     url: new URL("./qr-code/qr-code.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/add-badge.css": {
+    url: new URL("./add-badge/add-badge.css", import.meta.url),
+    contentType: "text/css; charset=utf-8",
+  },
   "/help-tip.css": {
     url: new URL("./help-tip/help-tip.css", import.meta.url),
     contentType: "text/css; charset=utf-8",

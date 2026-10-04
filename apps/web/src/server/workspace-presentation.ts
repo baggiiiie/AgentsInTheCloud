@@ -1,4 +1,5 @@
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { addBadgeHtml } from "@agents-in-the-cloud/design-system/add-badge";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml, type ButtonVariant } from "@agents-in-the-cloud/design-system/button";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
@@ -150,7 +151,7 @@ function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string 
   const onboarding = workspacePaneOnboardingState(presentation) === "first-workspace" ? ' data-empty-workspace-onboarding-destination="first-workspace"' : "";
   return actionItemHtml({
     kind: "single",
-    leadingHtml: Icons.Plus,
+    leadingHtml: `<span class="workspace-pane-new-workspace-icon">${addBadgeHtml()}</span>`,
     label: { kind: "text", text: "New workspace" },
     element: { tag: "button", attributesHtml: `type="button" data-workspace-pane-target="newWorkspace" data-action="workspace-pane#openPicker"${onboarding}` },
   });
@@ -180,11 +181,11 @@ function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation)
   const addWorkspaceTemplate = ordered.length
     ? actionItemHtml({
       kind: "single",
-      leadingHtml: Icons.Plus,
+      leadingHtml: addBadgeHtml(),
       label: { kind: "text", text: "A repo I haven’t added yet…" },
       element: { tag: "a", attributesHtml: `href="/workspace-templates/new" ${workspaceTemplateDialogTarget}` },
     })
-    : `<a class="workspace-template-first" href="/workspace-templates/new" ${workspaceTemplateDialogTarget} data-workspace-pane-target="addFirst"><span class="workspace-template-first-icon">${Icons.Plus}</span><span><strong>Add your first template</strong><span>Point us at a git repo once. Every new workspace can start as a fresh clone of it.</span></span></a>`;
+    : `<a class="workspace-template-first" href="/workspace-templates/new" ${workspaceTemplateDialogTarget} data-workspace-pane-target="addFirst">${addBadgeHtml()}<span><strong>Add your first template</strong><span>Point us at a git repo once. Every new workspace can start as a fresh clone of it.</span></span></a>`;
   return `<div id="${workspaceTemplateOptionsDomId}" class="workspace-template-options action-list" role="radiogroup" aria-labelledby="workspace_template_question">
     <p class="workspace-template-question" id="workspace_template_question">What should we put in your new workspace?</p>
     ${addWorkspaceTemplate}

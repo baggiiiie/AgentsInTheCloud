@@ -7,6 +7,7 @@ import { actionLinkHtml } from "../src/action-link/action-link-html.ts";
 import { comparisonRingHtml } from "../src/comparison-ring/comparison-ring-html.ts";
 import { buttonGroupHtml } from "../src/button-group/button-group-html.ts";
 import { actionItemHtml } from "../src/action-item/action-item-html.ts";
+import { addBadgeHtml } from "../src/add-badge/add-badge-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
 import { progressButtonHtml } from "../src/progress-button/progress-button-html.ts";
 import { copyButtonHtml } from "../src/copy-button/copy-button-html.ts";
@@ -576,6 +577,19 @@ export const entries: CatalogueEntry[] = [
           "</div>",
       },
     ],
+  },
+  {
+    id: "add-badge", title: "Add badge", when: "Lead a row that creates something new, so it stands apart from rows for existing things.",
+    contract: "Usually an action item's leadingHtml. Decorative: the row's label names the action. Grows slightly while its action item is hovered. --add-badge-size exposes its size for aligning it with neighbouring icons or text.",
+    imports: { "add-badge": "addBadgeHtml", "action-item": "actionItemHtml", icons: "Icons" },
+    sources: ["add-badge/add-badge.css"],
+    examples: [{
+      title: "Leading a create row",
+      render: () => '<div class="action-list">'
+        + actionItemHtml({ kind: "single", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: addBadgeHtml(), label: { kind: "text", text: "New workspace" } })
+        + actionItemHtml({ kind: "single", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: Icons.Cloud, label: { kind: "text", text: "Existing workspace" } })
+        + "</div>",
+    }],
   },
   {
     id: "activity-button",

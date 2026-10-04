@@ -29,6 +29,7 @@ Prefer consistency over feature-specific visual preservation.
 | Glanceable gauge, not interactive | `comparison-ring` | [ComparisonRingOptions](src/comparison-ring/comparison-ring-html.ts) |
 | Related actions, not selection | `button-group` | [ButtonGroupOptions](src/button-group/button-group-html.ts) |
 | Actionable row / compound row | `action-item` | [ActionItemOptions](src/action-item/action-item-html.ts) |
+| Leading mark for a row that creates something | `add-badge` | [addBadgeHtml](src/add-badge/add-badge-html.ts) |
 | Running, still cancellable | `activity-button` | [ActivityButtonOptions](src/activity-button/activity-button-html.ts) |
 | Running, cannot invoke again | `progress-button` | [ProgressButtonOptions](src/progress-button/progress-button-html.ts) |
 | Clipboard + acknowledgement | `copy-button` | [CopyButtonOptions](src/copy-button/copy-button-html.ts) |

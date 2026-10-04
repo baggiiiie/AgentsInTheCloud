@@ -127,7 +127,7 @@ turbo-frame { display: contents; }
 .fixed-workspace-presentation:not(.is-work-pane-open) [data-collapse-work-pane],
 .fixed-shell-app:not(.is-workspace-pane-collapsed) [data-show-workspace-pane],
 .fixed-shell-app.is-workspace-pane-collapsed [data-collapse-workspace-pane] { display: none; }
-.fixed-shell-workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 1px; }
+.fixed-shell-workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 1px 8px 8px; display: flex; flex-direction: column; gap: 1px; }
 .fixed-shell-workspace-scroll > * { flex: 0 0 auto; }
 [data-workspace-parked] .action-item__label { color: var(--text-muted); }
 [data-empty-workspace-onboarding-destination] { color: var(--accent); background: color-mix(in srgb, var(--accent) 26%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -143,13 +143,17 @@ turbo-frame { display: contents; }
 .fixed-shell-workspace-pane.is-picking-template .workspace-pane-slides { transform: translateX(-100%); }
 .fixed-shell-workspace-pane.is-picking-template .workspace-pane-slides:dir(rtl) { transform: translateX(100%); }
 .workspace-pane-slide { flex: 0 0 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* "New workspace" heads the workspace list: its badge takes the slot of a row's template swatch, so icons and titles line up. */
+.fixed-shell-workspace-pane { --workspace-swatch-slot: 26px; }
 .workspace-pane-new-workspace { padding: 8px 8px 0; }
+.workspace-pane-new-workspace > .action-item { padding-inline-start: 2px; gap: 2px; }
+.workspace-pane-new-workspace-icon { width: var(--workspace-swatch-slot); display: grid; place-items: center; }
 .workspace-pane-slide > .fixed-shell-pane-collections { flex: 1; height: auto; }
 
 /* Template icons: a deterministic swatch per template; workspaces without one get an outline. */
 .workspace-template-icon { width: 14px; height: 14px; flex: 0 0 auto; display: block; border-radius: var(--radius-indicator); background: var(--workspace-template-swatch); }
 .workspace-template-icon.is-empty { background: transparent; border: 1.5px dashed var(--text-muted); }
-.workspace-template-icon-button { width: 26px; height: 26px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
+.workspace-template-icon-button { width: var(--workspace-swatch-slot); height: 26px; flex: 0 0 auto; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
 .workspace-template-icon-button:hover, .workspace-template-icon-button:focus-visible { outline: none; background: var(--accent-soft); }
 .workspace-template-icon-button > .workspace-template-icon { transition: transform 120ms var(--motion-ease-out); }
 .workspace-template-icon-button:hover > .workspace-template-icon { transform: scale(1.15); }
@@ -157,12 +161,14 @@ turbo-frame { display: contents; }
 .workspace-template-picker { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .workspace-template-picker-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .workspace-template-options { display: flex; flex-direction: column; gap: 1px; }
+/* The add badge is a little wider than the template swatches; keep the labels lined up. */
+.workspace-template-options .add-badge { margin-inline: -1px; }
 .workspace-template-question { margin: 4px 8px 6px; color: var(--text-bright); }
 .workspace-template-first { display: flex; gap: 12px; align-items: flex-start; margin-top: 2px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius-surface); color: var(--text); line-height: var(--leading-standard); text-decoration: none; }
 .workspace-template-first:hover, .workspace-template-first:focus-visible { outline: none; border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: var(--accent-soft); }
+.workspace-template-first > .add-badge { margin-top: calc((1lh - var(--add-badge-size)) / 2); }
 .workspace-template-first strong { display: block; color: var(--text-bright); font-weight: var(--weight-medium); }
 .workspace-template-first > span:last-child > span { display: block; font-size: 13px; }
-.workspace-template-first-icon { flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--radius-control); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .workspace-template-check { display: flex; color: var(--accent); visibility: hidden; }
 [aria-checked="true"] .workspace-template-check { visibility: visible; }
 /* Actions follow the list; a long list scrolls beneath them instead of pushing them away. */
@@ -172,7 +178,8 @@ turbo-frame { display: contents; }
 .workspace-template-picker-tip kbd { font-family: var(--font-mono); color: var(--text-bright); }
 @media (max-width: 700px), (pointer: coarse) {
   .workspace-template-picker-tip { display: none; }
-  .workspace-template-icon-button { width: 44px; height: 50px; }
+  .fixed-shell-workspace-pane { --workspace-swatch-slot: 44px; }
+  .workspace-template-icon-button { height: 50px; }
   .workspace-template-icon { width: 18px; height: 18px; }
 }
 .fixed-shell-workspace-status { position: relative; display: inline-grid; width: 16px; height: 16px; place-items: center; overflow: visible; }

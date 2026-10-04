@@ -25,6 +25,7 @@
 @import "/toggle.css";
 @import "/qr-code.css";
 @import "/help-tip.css";
+@import "/add-badge.css";
 
 @font-face {
   font-family: "JetBrains Mono";
