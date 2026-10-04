@@ -13,6 +13,7 @@ import { installWorkspaceFirewall } from "./firewall.ts";
 import { filesystemFailure } from "./filesystems.ts";
 import { initializeResources } from "./resources.ts";
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { chmod, chown, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { uninstallManagedResources, uninstallPlan, uninstallSocketPath, type UninstallState } from "./uninstall.ts";
 import { parseArgs } from "node:util";
@@ -671,6 +672,9 @@ async function initialize() {
   await startHostService({ root: dirname(dirname(resources.commandsCgroup)), effectiveMemory: resources.effectiveMemory });
   await chown(hostSocketPath, 1000, 1000);
   await installWorkspaceFirewall();
+  // Privileged containers only copy device nodes the host /dev already has; some
+  // VMs lack loop-control until first use. Opening it autoloads the loop driver.
+  if (!existsSync("/dev/loop-control")) await command(["mknod", "-m", "0660", "/dev/loop-control", "c", "10", "237"]);
   daemon(["containerd", "--config", "/etc/containerd/config.toml"]);
   await waitFor(
     async () => {
