@@ -112,7 +112,13 @@ export async function initializeResources() {
   // Throttling this ancestor stalls gateways and workspace initialization too.
   // Keep the hard bound; terminal workloads carry a higher OOM score.
   await writeFile(join(workloads, "memory.high"), "max");
-  await writeFile(join(workloads, "memory.swap.max"), "0");
+  // Kernels built without swap support (e.g. smolvm) omit the swap controls;
+  // there is nothing to prohibit there.
+  if (existsSync(join(workloads, "memory.swap.max"))) {
+    await writeFile(join(workloads, "memory.swap.max"), "0");
+  } else {
+    console.info("Swap controls unavailable; this kernel has no swap to limit");
+  }
   await writeFile(join(workloads, "pids.max"), String(policy.pids));
   await mkdir(join(workloads, "commands"), { recursive: true });
   // The app runs as uid 1000. cgroup v2 migration requires destination and
