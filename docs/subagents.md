@@ -1,6 +1,8 @@
-# Codex-compatible, observable subagents
+# Subagents
 
 Implementation: `@agents-in-the-cloud/subagents`. See [Agent delegation integration](agent-delegation.md) for assembly, lifecycle, and disabling the module.
+
+A **Subagent** is a collaborator created by an Agent for delegated work in the same Workspace. **Subagents** is the feature for inspecting their activity and messages.
 
 The Subagents module contributes system-prompt instructions for root agents and subagents to delegate only
 when the user explicitly requests subagents or delegation to other agents. This
@@ -62,13 +64,13 @@ On Codex Responses, this is not a `user` message with a decorative prefix. Per-c
 
 ## Presentation is separate from model delivery
 
-Open **Subagents** from the Work-view launcher. It follows the selected root Agent. There is no root selector, repeated header, or separate communication dashboard. Children form a divider-free action-item list with normal body typography, canonical paths and lifecycle state; each opens its native AgentsInTheCloud transcript. Nested children appear beneath their parent. Multiple transcripts can stay open, with browser-local expansion state retained per root.
+Open **Subagents** from the Work-view launcher. It follows the selected root Agent. There is no root selector, repeated header, or separate communication dashboard. Subagents form a divider-free action-item list with normal body typography, canonical paths and lifecycle state; each opens its native AgentsInTheCloud transcript. Nested Subagents appear beneath their parent. Multiple transcripts can stay open, with browser-local expansion state retained per root.
 
 Incoming messages appear in the recipient transcript from the durable routing ledger, immediately after receipt is persisted—not only when Pi incorporates them into model context. They are foldable action-items with a green incoming-message dot and labels such as “Incoming message from: /root/review type: update”. Message, completion and task traffic display as update, completed and task. Expanding the row reveals the body and delivery state, without transport IDs. A subtle **Pending context** label distinguishes queued traffic; failure remains visible. Updating delivery changes the same identified entry, rather than inserting a second copy. Arrival order is a presentation timeline; it is not a claim about provider message ordering or that a model read/acted on a message.
 
-Outgoing messages remain visible as their actual tool calls. Automatic outgoing completion is correlated with the child's final response. The “Open subagent” action inside an expanded incoming entry opens the Subagents Work view (including if it was closed), expands the corresponding child and its containing Working section when necessary, and reveals the related tool call or final response. UUIDs are carried internally for reliable navigation, not shown as prose.
+Outgoing messages remain visible as their actual tool calls. Automatic outgoing completion is correlated with the Subagent’s final response. The “Open subagent” action inside an expanded incoming entry opens the Subagents Work view (including if it was closed), expands the corresponding Subagent and its containing Working section when necessary, and reveals the related tool call or final response. UUIDs are carried internally for reliable navigation, not shown as prose.
 
-All HTML is server-rendered. The selected root has a Cable tree subscription: an authoritative initial snapshot followed by inserted/removed branches and changed status summaries. Expanded children use the existing Agent live-presentation streams, including streamed text and tool activity. Collapsed descendants, hidden views and background browser tabs release subscriptions; opening and reconnecting obtain fresh snapshots. There is no polling timer and historical inspection or text selection does not pause other updates. Status updates never replace child transcript DOM. Turbo Frames remain available for explicit historical details and source-navigation requests.
+All HTML is server-rendered. The selected root has a Cable tree subscription: an authoritative initial snapshot followed by inserted/removed branches and changed status summaries. Expanded Subagents use the existing Agent live-presentation streams, including streamed text and tool activity. Collapsed descendants, hidden views and background browser tabs release subscriptions; opening and reconnecting obtain fresh snapshots. There is no polling timer and historical inspection or text selection does not pause other updates. Status updates never replace child transcript DOM. Turbo Frames remain available for explicit historical details and source-navigation requests.
 
 ## Persistence and lifecycle
 

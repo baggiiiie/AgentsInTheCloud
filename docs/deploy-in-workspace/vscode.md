@@ -1,6 +1,6 @@
 # VS Code in AgentsInTheCloud workspaces
 
-AgentsInTheCloud includes browser-based VS Code in each workspace. The default workspace image already contains the VS Code server and AgentsInTheCloud's default VS Code extensions.
+AgentsInTheCloud includes browser-based **VS Code** in each Workspace. Open **VS Code** from the Work-view launcher to display it in a **VS Code view**. The default workspace image already contains the VS Code server and AgentsInTheCloud's default VS Code extensions.
 
 ## Add extensions permanently for a repository
 

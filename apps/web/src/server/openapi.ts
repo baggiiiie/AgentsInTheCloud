@@ -76,7 +76,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       },
       "/workspace-templates/new": { get: { summary: "Present the add-template screen", responses: htmlSurfaceResponses("AgentsInTheCloud with the add-template screen open") } },
       "/workspaces/new": { get: { summary: "Present the launch composer for an empty workspace", responses: htmlSurfaceResponses("AgentsInTheCloud with the workspace composer open") } },
-      "/settings": { get: { summary: "Present AgentsInTheCloud settings", parameters: [settingsSection], responses: htmlSurfaceResponses("AgentsInTheCloud with settings open") } },
+      "/settings": { get: { summary: "Present Settings", description: "App-level preferences and shared configuration, separate from Workspace template configuration and per-Agent choices.", parameters: [settingsSection], responses: htmlSurfaceResponses("AgentsInTheCloud with Settings open") } },
       "/workspace-templates/{workspaceTemplateId}": {
         get: { summary: "Inspect workspace template configuration", parameters: [workspaceTemplateId], responses: jsonResponse("Workspace template configuration", { $ref: "#/components/schemas/WorkspaceTemplateConfigurationEnvelope" }) },
         post: { summary: "Update a workspace template", parameters: [workspaceTemplateId], requestBody: jsonBody({ type: "object", required: ["name", "gitUrl"], properties: { name: { type: "string" }, gitUrl: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace template updated", { $ref: "#/components/schemas/WorkspaceTemplateEnvelope" }) },

@@ -76,7 +76,7 @@ type EditorRefreshDetail = { workspaceId: string };
 export function createFileEditorController(Controller: WorkspaceClientControllerConstructor): WorkspaceClientControllerConstructor {
   return class FileEditorController extends Controller {
     static values = { workspaceId: String, path: String, contentUrl: String, line: Number, column: Number, positionRequest: String };
-    static targets = ["host", "loading", "status", "conflict", "conflictMine", "conflictTheirs", "preview", "previewOptions", "copyButton"];
+    static targets = ["host", "loading", "status", "conflict", "conflictMine", "conflictTheirs", "renderedMarkdown", "markdownDisplayOptions", "copyButton"];
 
     declare readonly element: HTMLElement;
     declare readonly workspaceIdValue: string;
@@ -90,14 +90,14 @@ export function createFileEditorController(Controller: WorkspaceClientController
     declare readonly conflictTarget: HTMLDialogElement;
     declare readonly conflictMineTarget: HTMLTextAreaElement;
     declare readonly conflictTheirsTarget: HTMLTextAreaElement;
-    declare readonly previewTarget: HTMLElement;
-    declare readonly previewOptionsTarget: HTMLElement;
+    declare readonly renderedMarkdownTarget: HTMLElement;
+    declare readonly markdownDisplayOptionsTarget: HTMLElement;
     declare readonly copyButtonTarget: HTMLButtonElement;
-    declare readonly hasPreviewTarget: boolean;
+    declare readonly hasRenderedMarkdownTarget: boolean;
 
     private view?: EditorView;
     private connection!: AbortController;
-    private previewSequence = 0;
+    private markdownRenderSequence = 0;
     private draft?: FileDraft;
     private saveTimer?: ReturnType<typeof setTimeout>;
     private applyingDisk = false;
@@ -113,7 +113,7 @@ export function createFileEditorController(Controller: WorkspaceClientController
       this.copyButtonTarget.disabled = true;
       this.copyButtonTarget.dataset.copyText = "";
       this.setStatus("Loading…", "");
-      this.showRaw();
+      this.showSource();
       window.addEventListener("beforeunload", (event) => {
         if ([...drafts.values()].some((draft) => draft.dirty)) {
           event.preventDefault();
@@ -131,7 +131,7 @@ export function createFileEditorController(Controller: WorkspaceClientController
     disconnect(): void {
       this.connection.abort();
       if (this.saveTimer) clearTimeout(this.saveTimer);
-      this.previewSequence++;
+      this.markdownRenderSequence++;
       this.draft?.listeners.delete(this.renderDraft);
       const draft = this.draft;
       if (draft) void draft.flush().then(() => {
@@ -147,11 +147,11 @@ export function createFileEditorController(Controller: WorkspaceClientController
       return this.save(true);
     }
 
-    async selectPreviewMode(event: ToggleChangeEvent): Promise<void> {
-      if (event.detail.value === "preview") {
-        if (this.previewTarget.hidden) await this.showPreview();
+    async selectMarkdownDisplayMode(event: ToggleChangeEvent): Promise<void> {
+      if (event.detail.value === "rendered") {
+        if (this.renderedMarkdownTarget.hidden) await this.showRenderedMarkdown();
       } else {
-        this.showRaw();
+        this.showSource();
       }
     }
 
@@ -187,16 +187,16 @@ export function createFileEditorController(Controller: WorkspaceClientController
             EditorState.readOnly.of(!file.writable),
             EditorView.editable.of(file.writable),
             EditorView.domEventHandlers({
-              focus: () => { this.showRaw(); },
+              focus: () => { this.showSource(); },
             }),
             EditorView.updateListener.of((update) => {
               if (!update.docChanged) return;
               // A response belongs to the document and editing choice that requested it.
               if (this.applyingDisk) {
-                this.invalidatePreview();
+                this.invalidateMarkdownRender();
                 return;
               }
-              this.showRaw();
+              this.showSource();
               const changes: FileTextChange[] = [];
               update.changes.iterChanges((from, to, _fromB, _toB, inserted) => {
                 changes.push({ from, to, insert: inserted.toString() });
@@ -215,7 +215,7 @@ export function createFileEditorController(Controller: WorkspaceClientController
       this.copyButtonTarget.disabled = false;
       if (!file.writable) this.setStatus("Read only", "");
       this.jumpTo(this.lineValue, this.columnValue);
-      if (this.hasPreviewTarget && this.lineValue < 1) await this.showPreview();
+      if (this.hasRenderedMarkdownTarget && this.lineValue < 1) await this.showRenderedMarkdown();
     }
 
     private readonly refreshRequested = (event: CustomEvent<EditorRefreshDetail>): void => {
@@ -260,7 +260,7 @@ export function createFileEditorController(Controller: WorkspaceClientController
         this.applyingDisk = true;
         this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: content } });
         this.applyingDisk = false;
-        if (this.hasPreviewTarget && !this.previewTarget.hidden) void this.showPreview();
+        if (this.hasRenderedMarkdownTarget && !this.renderedMarkdownTarget.hidden) void this.showRenderedMarkdown();
       }
       this.copyButtonTarget.dataset.copyText = draft.content;
       if (draft.conflict) {
@@ -286,54 +286,54 @@ export function createFileEditorController(Controller: WorkspaceClientController
       return parseEditableFileResponse(await response.json());
     }
 
-    private async showPreview(): Promise<void> {
-      const sequence = ++this.previewSequence;
+    private async showRenderedMarkdown(): Promise<void> {
+      const sequence = ++this.markdownRenderSequence;
       const { signal } = this.connection;
-      this.setPreviewBusy(true);
+      this.setMarkdownRenderBusy(true);
       try {
-        const previewUrl = `/workspaces/${encodeURIComponent(this.workspaceIdValue)}/files-view/markdown-preview?${new URLSearchParams({ path: this.pathValue })}`;
-        const response = await fetch(previewUrl, {
+        const renderMarkdownUrl = `/workspaces/${encodeURIComponent(this.workspaceIdValue)}/files-view/render-markdown?${new URLSearchParams({ path: this.pathValue })}`;
+        const response = await fetch(renderMarkdownUrl, {
           method: "POST",
           signal,
           headers: { "content-type": "text/plain; charset=utf-8", "accept": "text/html" },
           body: this.view!.state.doc.toString(),
         });
-        if (sequence !== this.previewSequence || !this.isCurrentConnection(signal)) return;
+        if (sequence !== this.markdownRenderSequence || !this.isCurrentConnection(signal)) return;
         if (!response.ok) throw new Error(await response.text());
         const html = await response.text();
-        if (sequence !== this.previewSequence || !this.isCurrentConnection(signal)) return;
-        this.previewTarget.innerHTML = html;
-        this.setPreviewVisible(true);
+        if (sequence !== this.markdownRenderSequence || !this.isCurrentConnection(signal)) return;
+        this.renderedMarkdownTarget.innerHTML = html;
+        this.setRenderedMarkdownVisible(true);
       } catch (error) {
-        if (sequence !== this.previewSequence || !this.isCurrentConnection(signal)) return;
-        this.setPreviewVisible(false);
+        if (sequence !== this.markdownRenderSequence || !this.isCurrentConnection(signal)) return;
+        this.setRenderedMarkdownVisible(false);
         this.setStatus("Unable to render", "error");
         throw error;
       } finally {
-        if (sequence === this.previewSequence) this.setPreviewBusy(false);
+        if (sequence === this.markdownRenderSequence) this.setMarkdownRenderBusy(false);
       }
     }
 
-    private showRaw(): void {
-      if (!this.hasPreviewTarget) return;
-      this.invalidatePreview();
-      this.setPreviewVisible(false);
+    private showSource(): void {
+      if (!this.hasRenderedMarkdownTarget) return;
+      this.invalidateMarkdownRender();
+      this.setRenderedMarkdownVisible(false);
     }
 
-    private invalidatePreview(): void {
-      if (!this.hasPreviewTarget) return;
-      this.previewSequence++;
-      this.setPreviewBusy(false);
+    private invalidateMarkdownRender(): void {
+      if (!this.hasRenderedMarkdownTarget) return;
+      this.markdownRenderSequence++;
+      this.setMarkdownRenderBusy(false);
     }
 
-    private setPreviewBusy(busy: boolean): void {
-      this.previewOptionsTarget.setAttribute("aria-busy", String(busy));
+    private setMarkdownRenderBusy(busy: boolean): void {
+      this.markdownDisplayOptionsTarget.setAttribute("aria-busy", String(busy));
     }
 
-    private setPreviewVisible(visible: boolean): void {
-      this.previewTarget.hidden = !visible;
+    private setRenderedMarkdownVisible(visible: boolean): void {
+      this.renderedMarkdownTarget.hidden = !visible;
       this.hostTarget.hidden = visible;
-      setToggleValue(this.previewOptionsTarget, visible ? "preview" : "edit");
+      setToggleValue(this.markdownDisplayOptionsTarget, visible ? "rendered" : "source");
     }
 
     positionRequestValueChanged(): void {
@@ -342,7 +342,7 @@ export function createFileEditorController(Controller: WorkspaceClientController
 
     private jumpTo(line: number, column = 1): void {
       if (!this.view || line < 1) return;
-      this.showRaw();
+      this.showSource();
       const targetLine = this.view.state.doc.line(Math.min(line, this.view.state.doc.lines));
       const position = Math.min(targetLine.to, targetLine.from + Math.max(0, column - 1));
       this.view.dispatch({ selection: { anchor: position }, effects: EditorView.scrollIntoView(position, { y: "center" }) });

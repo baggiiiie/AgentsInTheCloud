@@ -32,7 +32,7 @@ afterEach(async () => {
   dir = undefined;
 });
 
-test("a delegated agent finishing while its parent works does not request workspace attention", async () => {
+test("a Subagent finishing while its parent works does not request workspace attention", async () => {
   await dataDir();
   const root = await ensureDefaultWorkspaceAgent("workspace-1");
   const childId = crypto.randomUUID();

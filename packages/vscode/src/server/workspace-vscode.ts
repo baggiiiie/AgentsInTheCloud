@@ -18,7 +18,7 @@ function defaultViews(): WorkspaceVSCodeView[] {
 }
 
 function parseVSCodeViews(value: JsonValue): WorkspaceVSCodeView[] {
-  if (!Value.Check(workspaceVSCodeViewsSchema, value)) throw new Error("invalid persisted VS Code Work views");
+  if (!Value.Check(workspaceVSCodeViewsSchema, value)) throw new Error("invalid persisted VS Code views");
   return value.map(({ title }) => ({ title }));
 }
 

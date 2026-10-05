@@ -4,6 +4,14 @@ AgentsInTheCloud is a workspace interface for collaborating with coding agents w
 
 ## Language
 
+**Settings**:
+The app-level surface for AgentsInTheCloud preferences and shared configuration, such as access, theme, Git identity, GitHub, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
+_Avoid_: Preferences, app settings, global settings (as feature names), workspace settings (for this surface)
+
+**Host**:
+The feature for inspecting AgentsInTheCloud System diagnostics and using privileged terminals outside individual Workspaces. Host access targets the System environment, not necessarily the physical machine running Docker.
+_Avoid_: System panel (as the feature name), Workspace terminal (for Host access), physical host (as an implicit access boundary)
+
 **Workspace template**:
 What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
 _Avoid_: Project, workspace folder, repository
@@ -29,8 +37,16 @@ The collapsible navigation region for finding and switching between workspaces.
 _Avoid_: Left sidebar, workspace tab
 
 **Agent**:
-An independently named coding collaborator within a Workspace, with its own AgentPaneComposer and Agent session. A Workspace may contain one or more Agents, with one active at a time; starting a fresh session does not create another Agent.
+A named coding collaborator within a Workspace, with its own Agent session. Agents added directly by the user have an AgentPaneComposer, with one active in the Agent pane at a time; starting a fresh session does not create another Agent.
 _Avoid_: Agent conversation, Agent view, agent tab, chat, thread
+
+**Subagent**:
+A coding collaborator created by an Agent to carry out delegated work within the same Workspace. A Subagent may delegate further work to its own Subagents; it is distinct from an Agent added directly by the user.
+_Avoid_: Sub-agent, child agent, delegated agent (as the name)
+
+**Subagents**:
+The feature for inspecting the active Agent’s Subagents, their activity, and their messages in a contextual Work view.
+_Avoid_: Delegation dashboard, child-agent view
 
 **Agent type**:
 The coding-agent implementation an Agent uses: Builtin, Claude Code, Codex, or Pi. An Agent type is distinct from the Model provider supplying its models.
@@ -113,6 +129,14 @@ _Avoid_: VNC view (as a feature name)
 **Desktop view**:
 A Resource Work view for viewing and controlling a Workspace’s Desktop. A Workspace has at most one Desktop view; closing it does not stop Desktop.
 _Avoid_: Desktop tab, VNC view
+
+**VS Code**:
+The feature for using browser-based Visual Studio Code inside a Workspace, including its editor tools and extensions.
+_Avoid_: Code server (as the feature name)
+
+**VS Code view**:
+A Resource Work view displaying a Workspace’s VS Code editor. The view is an app destination, distinct from the underlying VS Code server or native window.
+_Avoid_: VS Code pane, VS Code session (for the app destination), VS Code tab, VS Code Work view
 
 **Review**:
 A contextual Work view for inspecting a Workspace’s uncommitted Git changes and drafting Review comments for an Agent. It includes staged, unstaged, and untracked changes; it is not a pull-request approval workflow.
@@ -209,6 +233,20 @@ _Avoid_: File browser, file explorer
 **Files view**:
 A Work view combining file navigation with viewing or editing its selected file. A Workspace may have multiple Files views with independent selections, including multiple views of the same file.
 _Avoid_: File view, file tab, Files Work view
+
+**File draft**:
+A file’s working text and save state, shared by Files views showing that file in the same browser page. Changes are saved automatically, while unsaved edits are retained when saving fails or encounters a conflict.
+
+**Markdown display mode**:
+The choice of how a Markdown file is displayed within a Files view: Source or Rendered. The mode does not determine whether the file is writable.
+
+**Source**:
+The Markdown display mode showing the file’s Markdown text, editable when the file is writable.
+_Avoid_: Edit mode, raw mode
+
+**Rendered**:
+The Markdown display mode showing the formatted presentation of the file’s current text.
+_Avoid_: Preview mode
 
 **Files navigator**:
 The collapsible file-navigation region within a Files view, containing its file tree, filter, and upload controls. It is part of that Files view, not a separate Work view or the surrounding Work pane.

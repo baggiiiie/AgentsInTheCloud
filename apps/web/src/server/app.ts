@@ -951,7 +951,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const force = new URL(request.url).searchParams.get("force") === "1";
     const result = await requestWorkspaceParkedState(id, parked, force);
     if (result.kind === "confirmation") {
-      if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal and VS Code sessions cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
+      if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal sessions and VS Code views cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
       const confirmation = renderWorkspaceParkConfirmation(id, workspaceTitle(entry), result.workViews);
       return wantsStream(request)
         ? turboStreamResponse(update(workspaceModuleModalFrameId, confirmation))

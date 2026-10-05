@@ -182,7 +182,7 @@ describe("projects", () => {
     expect(await listWorkspaceTemplates(file)).toEqual({ workspaceTemplates: [second] });
   });
 
-  test("git identity settings are stored by the projects module", async () => {
+  test("Settings Git identity is stored by the workspace-templates module", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-")), "project-settings.json");
 
     expect(await hasGitIdentity(file)).toBe(false);
@@ -192,7 +192,7 @@ describe("projects", () => {
     expect(await getGitIdentity(file)).toEqual({ name: "Ada Lovelace", email: "ada@example.com" });
   });
 
-  test("git identity adopts the host global git config when app settings are empty", async () => {
+  test("Git identity adopts the host global git config when Settings has no saved Git identity", async () => {
     const previousDataDir = process.env.ATELIER_DATA_DIR;
     const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
     const dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-"));

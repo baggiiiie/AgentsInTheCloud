@@ -21,8 +21,8 @@ describe("Files view integration", () => {
     deleteFilesViewState("workspace-progressive");
   });
 
-  test("Markdown previews omit frontmatter", async () => {
-    const request = new Request("http://test.local/workspaces/workspace-frontmatter/files-view/markdown-preview?path=%2Fwork%2Fguide.md", {
+  test("Rendered Markdown omits frontmatter", async () => {
+    const request = new Request("http://test.local/workspaces/workspace-frontmatter/files-view/render-markdown?path=%2Fwork%2Fguide.md", {
       method: "POST",
       body: "---\ntitle: Internal title\ndraft: true\n---\n# Public guide",
     });

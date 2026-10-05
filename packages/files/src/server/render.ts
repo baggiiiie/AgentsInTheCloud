@@ -202,17 +202,17 @@ function fileConflictDialog(): string {
 function markdownDisplayToggle(): string {
   return toggleHtml({
     variant: "text",
-    label: "Markdown display",
-    name: "preview-mode",
-    value: "edit",
+    label: "Markdown display mode",
+    name: "markdown-display-mode",
+    value: "source",
     element: {
       tag: "span",
-      dataAction: "change->file-editor#selectPreviewMode",
-      data: { "file-editor-target": "previewOptions" },
+      dataAction: "change->file-editor#selectMarkdownDisplayMode",
+      data: { "file-editor-target": "markdownDisplayOptions" },
     },
     options: [
-      { label: "Edit", value: "edit" },
-      { label: "Rendered", value: "preview" },
+      { label: "Source", value: "source" },
+      { label: "Rendered", value: "rendered" },
     ],
   });
 }
@@ -235,7 +235,7 @@ export function renderFilesEditorFrame(workspaceId: string, view: FilesView): st
   return `<turbo-frame id="${frameId}" class="files-editor-frame" data-controller="file-editor-navigation" data-file-editor-navigation-editor-value="${escapeHtml(editorId)}" data-file-editor-navigation-request-value="${filesNavigationRequest(workspaceId, view.id)}" data-file-editor-navigation-line-value="${view.line ?? 0}" data-file-editor-navigation-column-value="${view.column ?? 0}"><section class="file-editor-pane" id="${escapeHtml(editorId)}" data-turbo-permanent data-controller="file-editor" data-file-editor-workspace-id-value="${escapeHtml(workspaceId)}" data-file-editor-path-value="${escapeHtml(view.path)}" data-file-editor-content-url-value="${escapeHtml(contentUrl)}" data-file-editor-line-value="${view.line ?? 0}" data-file-editor-column-value="${view.column ?? 0}">
     <header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path" title="${escapeHtml(view.path)}">${escapeHtml(view.path)}</span><span class="file-editor-toolbar-actions">${markdown ? markdownDisplayToggle() : ""}<span class="file-editor-status" data-file-editor-target="status">Loading…</span>${refreshButton()}${selectedFileActions(workspaceId, view)}${filesNavigatorToggle("expand")}</span></header>
     <div class="file-editor-host" data-file-editor-target="host"><div class="file-editor-loading" data-file-editor-target="loading" role="status"><i class="status-spinner sm" aria-hidden="true"></i><span>Loading file…</span></div></div>
-    ${markdown ? `<div class="file-editor-preview markdown" data-file-editor-target="preview" hidden></div>` : ""}
+    ${markdown ? `<div class="file-editor-rendered-markdown markdown" data-file-editor-target="renderedMarkdown" hidden></div>` : ""}
     ${fileConflictDialog()}
   </section></turbo-frame>`;
 }

@@ -57,7 +57,7 @@ function renderTerminals(terminals: HostTerminal[], selected?: string): string {
     closeHtml: closeTerminalForm(t),
   })).join("");
   return `<turbo-frame id="${terminalFrame}"><section class="host-terminals"><header class="host-terminal-heading">${terminals.length ? tabStripHtml({ id: "host_terminal_tabs", label: "Host terminals", tabsHtml: tabs }) : ""}<form method="post" action="/host/terminals" data-turbo-frame="${terminalFrame}">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "+ New host terminal" } })}</form></header>
-  ${active ? `<section id="host_terminal_panel" role="tabpanel" aria-labelledby="host_tab_${active.id}" data-controller="host-terminal" data-host-terminal-url-value="/host/terminals/${active.id}/ws">${renderTerminalConnectionStatus("host-terminal")}<div class="host-terminal-screen observable-terminal-host" data-host-terminal-target="host"></div></section>` : `<p class="host-empty">You can use a terminal into your host here. This has full permission to the entire AgentsInTheCloud system. If you run an agent here it has access to everything, including secrets.</p>`}</section></turbo-frame>`;
+  ${active ? `<section id="host_terminal_panel" role="tabpanel" aria-labelledby="host_tab_${active.id}" data-controller="host-terminal" data-host-terminal-url-value="/host/terminals/${active.id}/ws">${renderTerminalConnectionStatus("host-terminal")}<div class="host-terminal-screen observable-terminal-host" data-host-terminal-target="host"></div></section>` : `<p class="host-empty">Host terminals run as root in AgentsInTheCloud System, outside your Workspaces. Commands can affect the app and every Workspace, and can access secrets.</p>`}</section></turbo-frame>`;
 }
 async function handle(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
   if (url.pathname !== "/host" && !url.pathname.startsWith("/host/")) return;
@@ -65,7 +65,7 @@ async function handle(request: Request, url: URL, context: WorkspaceModuleRouteC
   const json = requestAcceptsJson(request);
   if (url.pathname === "/host" && request.method === "GET") {
     if (json) return Response.json({ available: hostAvailable(), url: "/host", boundary: "AgentsInTheCloud System", shellUser: "root" });
-    const body = hostAvailable() ? `<div class="host-content"><turbo-frame id="${statsFrame}" src="/host/sample"><p role="status">Sampling host…</p></turbo-frame><turbo-frame id="${terminalFrame}" src="/host/terminals"><p role="status">Loading terminals…</p></turbo-frame></div>` : `<p>Host access requires an AgentsInTheCloud System image with the host service. This instance has no System host connection.</p>`;
+    const body = hostAvailable() ? `<div class="host-content"><turbo-frame id="${statsFrame}" src="/host/sample"><p role="status">Sampling host…</p></turbo-frame><turbo-frame id="${terminalFrame}" src="/host/terminals"><p role="status">Loading terminals…</p></turbo-frame></div>` : `<p>Host access requires an AgentsInTheCloud System image with the host service. This instance has no Host connection.</p>`;
     const dialog = dialogHtml({ element: { id: "host_dialog", attributesHtml: 'data-dialog-auto-show data-controller="host-panel" data-action="close->host-panel#closed"' }, titleCaption: "Host", iconHtml: Icons.Server, bodyHtml: body });
     return request.headers.has("turbo-frame") ? response(`<turbo-frame id="${workspaceModuleModalFrameId}">${dialog}</turbo-frame>`) : context.renderModalPage(dialog);
   }
@@ -96,6 +96,7 @@ async function handle(request: Request, url: URL, context: WorkspaceModuleRouteC
     return response(`<turbo-frame id="${terminalFrame}">${failure(message)}${retry}</turbo-frame>`);
   }
 }
+/** Host targets AgentsInTheCloud System, not a Workspace or necessarily the physical Docker host. */
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "host",
   renderWorkspacePaneActions: () => actionLinkHtml({ href: "/host", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Server, label: "Host" }, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` }),

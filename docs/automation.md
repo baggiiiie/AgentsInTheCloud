@@ -60,13 +60,16 @@ Other browser-navigable surfaces are:
 /workspace-templates/:workspaceTemplateId/workspaces/new  # Launch composer for a workspace from a template
 /workspace-templates/new                                  # Add a template
 /models                                 # Models: Model providers, their usage, and enabled models
-/settings                               # AgentsInTheCloud settings
+/settings                               # Settings: app-level preferences and shared configuration
 /settings?section=models                # A specific settings section
 /settings/development                   # Development settings
+/host                                   # Host: System diagnostics and privileged terminals
 /design-system-catalogue.html           # Live component catalogue (HTML)
 ```
 
-The settings section is a registered settings contribution ID, such as `theme`, `git-identity`, `github`, `models`, `transcription`, or `update`.
+Host targets AgentsInTheCloud System, outside individual Workspaces, rather than necessarily the physical machine running Docker. `GET /host` with `Accept: application/json` reports availability and the access boundary; it does not create a terminal.
+
+Settings is app-level, not configuration for the selected Workspace, a Workspace template, or an individual Agent. The settings section is a registered settings contribution ID, such as `theme`, `git-identity`, `github`, `models`, `transcription`, or `update`.
 
 ## Create and wait for a workspace
 
