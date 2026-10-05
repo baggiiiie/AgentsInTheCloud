@@ -38,3 +38,6 @@ export function parseObservableTerminalMessage(text: string): ObservableTerminal
   }
   return undefined;
 }
+
+/** A reachable workspace confirmed the execution no longer exists. */
+export const terminalSessionMissingCloseCode = 4404;

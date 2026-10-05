@@ -36,7 +36,10 @@ export async function listTmuxSessions(workspaceId: string): Promise<TmuxSession
   const separator = "\u001f";
   const format = ["#{session_name}", "#{session_created}", "#{session_activity}", "#{pane_current_command}"].join(separator);
   const result = await execWorkspaceShell(workspaceId, buildListSessionsCommand(format));
-  if (result.exitCode !== 0) return [];
+  if (result.exitCode !== 0) {
+    if (/no server running|no sessions|error connecting to .*\(No such file or directory\)/.test(result.stderr)) return [];
+    throw new AgentsInTheCloudCoreError("terminal_sessions_failed", result.stderr.trim() || "Could not list tmux sessions");
+  }
 
   return result.stdout.trim().split("\n").filter(Boolean).map((line) => {
     const [name, createdAt, lastActivityAt, command] = line.split(separator);

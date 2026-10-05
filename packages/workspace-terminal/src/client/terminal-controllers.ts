@@ -31,7 +31,8 @@ function createTerminalSessionPickerController(Controller: WorkspaceClientContro
 function createTerminalPaneController(Controller: WorkspaceClientControllerConstructor) {
   return class TerminalPaneController extends createTerminalKeyBarController(Controller) {
     static values = { workspaceId: String, id: String };
-    static targets = ["connectionStatus", "host", "stage"];
+    static targets = ["connectionStatus", "host", "stage", "ended"];
+    declare readonly endedTarget: HTMLElement;
     declare readonly hostTarget: HTMLElement;
     declare readonly stageTarget: HTMLElement;
     declare readonly connectionStatusTarget: HTMLElement;
@@ -67,6 +68,14 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
           fontSize: Number.parseFloat(style.getPropertyValue("--text-code")),
           theme: agentsInTheCloudObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
+          onConnectionStateChange: (state) => {
+            this.endedTarget.hidden = state !== "ended";
+            this.element.classList.toggle("terminal-is-ended", state === "ended");
+            if (state === "ended") {
+              this.connectionStatusTarget.hidden = true;
+              this.resetAccessoryKeys();
+            }
+          },
           transformInput: (data) => this.transformAccessoryInput(data),
         });
       } else {

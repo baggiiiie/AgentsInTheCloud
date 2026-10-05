@@ -2,7 +2,7 @@
 
 import type { TerminalBufferRow, TerminalTheme } from "@gespenst/core";
 import { copyTextToClipboard, errorMessage } from "@agents-in-the-cloud/shared";
-import { encodeObservableTerminalMessage } from "../shared/index.ts";
+import { encodeObservableTerminalMessage, terminalSessionMissingCloseCode } from "../shared/index.ts";
 import { terminalLinkAt, type TerminalLink } from "./links.ts";
 
 declare const ATELIER_GHOSTTY_WASM_URL: string;
@@ -118,7 +118,7 @@ export interface ObservableTerminalViewer {
   setTheme(theme: ObservableTerminalTheme): void;
 }
 
-export type TerminalConnectionState = "connecting" | "connected" | "reconnecting" | "unavailable";
+export type TerminalConnectionState = "connecting" | "connected" | "reconnecting" | "unavailable" | "ended";
 
 /** Update the server-rendered status for any interactive terminal pane. */
 export function setTerminalConnectionStatus(status: HTMLElement, state: TerminalConnectionState): void {
@@ -374,6 +374,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     const retryDelays = [100, 250, 500, 1000, 2000, 5000, 5000, 5000];
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
     let retryAttempts = 0;
+    let ended = false;
     const interactive = options.mode === "interactive";
     let suspended = interactive && document.hidden;
     let hasConnected = false;
@@ -381,7 +382,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     const status = (state: TerminalConnectionState): void => options.onConnectionStateChange?.(state);
     const cancelRetry = (): void => { clearTimeout(retryTimer); retryTimer = undefined; };
     const connect = (force = false): void => {
-      if (disposed || (interactive && (suspended || document.hidden))) return;
+      if (disposed || ended || (interactive && (suspended || document.hidden))) return;
       if (!force && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
       cancelRetry();
       disconnect();
@@ -407,9 +408,18 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
         options.onOutput?.(data instanceof Uint8Array ? outputDecoder.decode(data, { stream: true }) : data);
         writeOutput(data);
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (ws !== socket || disposed) return;
         ws = undefined;
+        if (event.code === terminalSessionMissingCloseCode) {
+          ended = true;
+          cancelRetry();
+          if (terminalInput) { terminalInput.readOnly = true; terminalInput.blur(); }
+          historyCursorHidden = true;
+          updateCursorVisibility();
+          status("ended");
+          return;
+        }
         if (interactive) {
           if (suspended || document.hidden) return;
           // A failed attach can open and immediately close; do not count it as recovery.
@@ -428,7 +438,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
       };
     };
     const suspend = (): void => {
-      if (!interactive || disposed) return;
+      if (!interactive || disposed || ended) return;
       suspended = true;
       cancelRetry();
       disconnect();
@@ -546,7 +556,7 @@ async function initializeTerminalViewer(options: ObservableTerminalViewerOptions
     connect();
     return {
       reconnect: () => { retryAttempts = 0; connect(true); },
-      focus: () => term.focus(),
+      focus: () => { if (!ended) term.focus(); },
       refresh: () => {
         term.fit();
         if (options.mode === "interactive") sendSize();

@@ -15,3 +15,10 @@ html.software-keyboard-visible .terminal-pane:has(.gespenst__input:focus:not([re
 .terminal-session-list { max-height: min(480px, 60vh); padding: 8px; overflow: auto; }
 .terminal-session-activity { flex: 0 0 auto; color: var(--text); white-space: nowrap; }
 .terminal-session-empty { min-height: 120px; }
+
+.terminal-ended[hidden] { display: none; }
+.terminal-ended { flex: 0 0 auto; padding: 12px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.terminal-ended p { margin: 6px 0 12px; color: var(--text-muted); }
+.terminal-ended-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-is-ended > .terminal-key-bar { display: none !important; }
+.terminal-is-ended .terminal-loading { display: none; }
