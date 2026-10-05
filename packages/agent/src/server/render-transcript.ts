@@ -85,11 +85,16 @@ function renderWorkingItems(ctx: AgentRenderContext, section: WorkingTranscriptI
   return `<div class="agent-working-items" id="${ids.workingItems(ctx, section.key)}">${items}</div>`;
 }
 
+export function workingCommentaryItems(section: WorkingTranscriptItem): TranscriptItem[] {
+  if (section.completedAt !== undefined && section.hasFinalAnswer) return [];
+  return section.items.filter((item) => item.type === "text");
+}
+
 function renderWorkingSection(ctx: AgentRenderContext, section: WorkingTranscriptItem): string {
   if (section.completedAt !== undefined && section.items.length === 0 && !section.timing) return "";
   const summary = renderWorkingSummary(ctx, section);
   const commentary = commentaryContext(ctx);
-  const commentaryHtml = section.items.filter((item) => item.type === "text").map((item) => renderTranscriptItem(commentary, item)).join("");
+  const commentaryHtml = workingCommentaryItems(section).map((item) => renderTranscriptItem(commentary, item)).join("");
   const revealing = Boolean(ctx.revealTarget && section.items.some((item) => item.anchor === ctx.revealTarget || item.key === ctx.revealTarget));
   const attributes = ctx.readOnly ? "" : ` data-controller="agent-turn" data-agent-turn-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-turn-conversation-id-value="${escapeHtml(ctx.conversationId)}" data-agent-turn-turn-id-value="${escapeHtml(section.key)}" data-agent-turn-branch-id-value="${escapeHtml(ctx.branchId ?? "")}"${revealing ? ` open data-agent-turn-reveal-value="${escapeHtml(ctx.revealTarget!)}"` : ""} data-action="toggle->agent-turn#toggle"`;
   const items = ctx.readOnly ? renderWorkingItems(ctx, section) : `<div class="agent-working-items" id="${ids.workingItems(ctx, section.key)}" data-agent-turn-target="items" data-turbo-permanent></div>`;

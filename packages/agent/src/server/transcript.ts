@@ -101,6 +101,7 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
   inputEntryIds?: string[];
   startedAt: number;
   completedAt?: number;
+  hasFinalAnswer?: boolean;
   stoppedAt?: number;
   timing?: TurnTimingSummary;
   /** Native message timestamps do not measure execution duration. */
@@ -247,6 +248,7 @@ export function buildTranscript(records: TranscriptRecord[], options: { openEnde
         }
       });
       if (final) {
+        if (working) working.hasFinalAnswer = true;
         if (!runScoped) {
           if (working) working.completedAt = Math.max(working.startedAt, record.timestamp);
           working = undefined;

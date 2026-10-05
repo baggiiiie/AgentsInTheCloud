@@ -1,6 +1,6 @@
 import { escapeHtml, liveCollection, type LiveRegion } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
-import { renderModelContextEntries, renderTranscriptItem, type AgentModelContextView } from "@agents-in-the-cloud/agent/server/render-transcript";
+import { renderModelContextEntries, renderTranscriptItem, workingCommentaryItems, type AgentModelContextView } from "@agents-in-the-cloud/agent/server/render-transcript";
 import type { TranscriptItem, WorkingTranscriptItem } from "@agents-in-the-cloud/agent/server/transcript";
 
 export class LiveTranscriptRenderer {
@@ -14,7 +14,7 @@ export class LiveTranscriptRenderer {
       if (item.type === "working" && !initial) {
         view = { ...item, items: item.items.filter(child => child.type !== "text") };
         const commentary = commentaryContext(ctx);
-        children.push(liveCollection(ids.workingItems(commentary, item.key), this.rows(commentary, item.items.filter(child => child.type === "text"))));
+        children.push(liveCollection(ids.workingItems(commentary, item.key), this.rows(commentary, workingCommentaryItems(item))));
       }
       const rendering = !initial && item.type === "text" && item.live ? ctx.streamingText!(item.key, item.text) : undefined;
       const key = ids.item(ctx, item.key);

@@ -18,6 +18,7 @@ describe("transcript", () => {
     expect(tool?.type === "tool" && tool.tool.resultText).toBe("file.txt");
     expect(tool?.type === "tool" && tool.tool.durationMs).toBe(1000);
     expect(working?.type === "working" && working.completedAt).toBe(4000);
+    expect(working?.type === "working" && working.hasFinalAnswer).toBe(true);
     const text = items.at(-1);
     expect(text?.type === "text" && text.final).toBe(true);
   });
@@ -51,6 +52,8 @@ describe("transcript", () => {
     expect(sections).toHaveLength(2);
     expect(sections[0]?.completedAt).toBe(4000);
     expect(sections[0]?.items.map((item) => item.type)).toEqual(["thinking"]);
+    expect(sections[0]?.hasFinalAnswer).toBe(true);
+    expect(sections[1]?.hasFinalAnswer).toBeUndefined();
     expect(sections[1]?.completedAt).toBeUndefined();
     expect(sections[1]?.stoppedAt).toBe(7000);
     expect(sections[1]?.items.map((item) => item.type)).toEqual(["text"]);
