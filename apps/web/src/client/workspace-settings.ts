@@ -1,7 +1,7 @@
 import { TemplateSettingsController } from "./template-settings-controller.ts";
 import { WorkspaceTemplateSecretPathController } from "./workspace-template-secret-path-controller.ts";
 import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
-import { showTransientFeedback } from "@agents-in-the-cloud/design-system/transient-feedback/client";
+import { showButtonConfirmation } from "@agents-in-the-cloud/design-system/button-confirmation/client";
 import { copyTextToClipboard } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers } from "./workspace-controller-registry.ts";
@@ -179,7 +179,7 @@ class SshPublicKeyCopyController extends Controller<HTMLElement> {
       const response = await fetch(this.urlValue);
       if (!response.ok) throw new Error(`Could not derive public key: HTTP ${response.status}`);
       await copyTextToClipboard(await response.text());
-      showTransientFeedback(button);
+      showButtonConfirmation(button);
     } catch (error) {
       this.errorTarget.hidden = false;
       throw error;

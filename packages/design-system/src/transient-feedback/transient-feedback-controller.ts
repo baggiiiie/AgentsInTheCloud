@@ -10,27 +10,21 @@ export function showTransientFeedback(element: HTMLElement): void {
 }
 
 export class TransientFeedbackController extends Controller<HTMLElement> {
-  static values = { state: { type: String, default: "initial" }, duration: { type: Number, default: feedbackDurationMs } };
+  static values = { state: { type: String, default: "initial" } };
 
   declare stateValue: "initial" | "feedback";
-  declare durationValue: number;
   private timer?: ReturnType<typeof setTimeout>;
 
   connect(): void {
     this.element.addEventListener(showEvent, this.show);
-    this.element.addEventListener("animationend", this.returned);
-    this.element.addEventListener("animationcancel", this.returned);
   }
 
   disconnect(): void {
     this.element.removeEventListener(showEvent, this.show);
-    this.element.removeEventListener("animationend", this.returned);
-    this.element.removeEventListener("animationcancel", this.returned);
     if (this.timer) clearTimeout(this.timer);
   }
 
-  stateValueChanged(_state: string, previousState: string): void {
-    this.element.toggleAttribute("data-transient-feedback-returning", this.stateValue === "initial" && previousState === "feedback" && this.element.classList.contains("transient-feedback--overlay") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  stateValueChanged(): void {
     this.render();
     if (this.stateValue !== "feedback") return;
     const disableDuringFeedback = this.element instanceof HTMLButtonElement && !this.element.hasAttribute("data-transient-feedback-keep-enabled");
@@ -40,12 +34,8 @@ export class TransientFeedbackController extends Controller<HTMLElement> {
       if (disableDuringFeedback) this.element.disabled = false;
       this.stateValue = "initial";
       this.timer = undefined;
-    }, this.durationValue);
+    }, feedbackDurationMs);
   }
-
-  private readonly returned = (event: AnimationEvent): void => {
-    if (event.target === this.element && event.animationName === "transient-feedback-settle") this.element.removeAttribute("data-transient-feedback-returning");
-  };
 
   private readonly show = (): void => {
     this.stateValue = "feedback";

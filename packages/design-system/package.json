@@ -11,6 +11,8 @@
     "./activity-button": "./src/activity-button/activity-button-html.ts",
     "./activity-button/client": "./src/activity-button/activity-button-client.ts",
     "./button": "./src/button/button-html.ts",
+    "./button-confirmation": "./src/button-confirmation/button-confirmation-html.ts",
+    "./button-confirmation/client": "./src/button-confirmation/button-confirmation-controller.ts",
     "./button-group": "./src/button-group/button-group-html.ts",
     "./comparison-ring": "./src/comparison-ring/comparison-ring-html.ts",
     "./copy-button": "./src/copy-button/copy-button-html.ts",

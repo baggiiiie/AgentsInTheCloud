@@ -1,27 +1,28 @@
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import { visit } from "@hotwired/turbo";
 import { slidePageChange } from "@agents-in-the-cloud/design-system/page-slide/client";
-import { showTransientFeedback } from "@agents-in-the-cloud/design-system/transient-feedback/client";
+import { resetButtonConfirmation } from "@agents-in-the-cloud/design-system/button-confirmation/client";
 import { Controller } from "@hotwired/stimulus";
 import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
 import type { WorkspaceSelectionEvent } from "./workspace-residency.ts";
 import { residencyController } from "./workspace-controller-registry.ts";
 
+const templateSettingsPath = /^\/workspace-templates\/[^/]+\/settings$/;
+
 /** Reopen a settings destination when browser history reaches it after the panel was closed. */
 export function restoreTemplateSettingsDestination(): boolean {
-  if (!location.pathname.match(/^\/workspace-templates\/[^/]+\/settings$/)) return false;
+  if (!templateSettingsPath.test(location.pathname)) return false;
   if (!document.querySelector('[data-controller~="template-settings"]')) visit(location.href, { action: "replace" });
   return true;
 }
 
 /** Browser-owned draft, focus and navigation behavior; all settings markup comes from the server. */
 export class TemplateSettingsController extends Controller<HTMLElement> {
-  static targets = ["form", "discard", "frame"];
-  static values = { url: String };
+  static targets = ["form", "discard", "frame", "content"];
   declare readonly formTargets: HTMLFormElement[];
   declare readonly discardTarget: HTMLDialogElement;
   declare readonly frameTarget: HTMLElement;
-  declare readonly urlValue: string;
+  declare readonly contentTarget: HTMLElement;
   private readonly originals = new Map<HTMLFormElement, string>();
   private returnUrl = "/";
   private currentUrl = "";
@@ -30,18 +31,16 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
   private bypass = false;
   private submissions = 0;
   private focusRecord?: string;
-  private connected = false;
   private restoring = false;
   private renders = 0;
 
   connect(): void {
-    this.connected = true;
     this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     const workspaceId = residencyController()?.visibleWorkspaceId();
     this.returnUrl = location.pathname.includes("/workspace-templates/") ? workspaceId ? `/workspaces/${encodeURIComponent(workspaceId)}` : "/" : location.href;
-    this.currentUrl = new URL(this.urlValue, location.href).href;
-    if (!location.pathname.match(/^\/workspace-templates\/[^/]+\/settings$/)) history.pushState({}, "", this.currentUrl);
-    else history.replaceState({}, "", location.href);
+    this.currentUrl = this.pageUrl();
+    if (!templateSettingsPath.test(location.pathname)) history.pushState({}, "", this.currentUrl);
+    else history.replaceState({}, "", this.currentUrl);
     const workspace = document.getElementById("workspace_detail")!;
     workspace.inert = true;
     workspace.setAttribute("aria-hidden", "true");
@@ -60,7 +59,6 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
   }
 
   disconnect(): void {
-    this.connected = false;
     document.removeEventListener("click", this.navigate, true);
     document.removeEventListener("turbo:before-visit", this.beforeVisit);
     document.removeEventListener("turbo:before-render", this.beforeRender);
@@ -75,7 +73,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       workspace.inert = false;
       workspace.removeAttribute("aria-hidden");
       document.dispatchEvent(new Event("agents-in-the-cloud:workspace-pane-visible"));
-      if (location.pathname.match(/^\/workspace-templates\/[^/]+\/settings$/)) history.replaceState(history.state, "", this.returnUrl);
+      if (templateSettingsPath.test(location.pathname)) history.replaceState(history.state, "", this.returnUrl);
       if (this.opener?.isConnected) this.opener.focus({ preventScroll: true });
     }
   }
@@ -89,7 +87,6 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     });
   }
   formTargetDisconnected(form: HTMLFormElement): void { this.originals.delete(form); }
-  frameTargetConnected(): void { if (this.connected) requestAnimationFrame(() => this.loaded()); }
 
   private values(form: HTMLFormElement): string { return JSON.stringify([...new FormData(form).entries()]); }
   private dirty(): boolean { return this.formTargets.some(form => this.originals.has(form) && this.originals.get(form) !== this.values(form)); }
@@ -100,7 +97,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     const unchanged = original === undefined || original === this.values(form);
     button.disabled = this.submissions > 0 || unchanged;
     // New edits restore the action immediately; the shared feedback timer never owns disabled state.
-    if (!unchanged && !this.submissions) button.dataset.transientFeedbackStateValue = "initial";
+    if (!unchanged && !this.submissions) resetButtonConfirmation(button);
   }
   changed(event: Event): void {
     // SAFETY: These actions are bound only to inputs/toggles inside server-rendered forms.
@@ -122,22 +119,17 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     const form = event.target as HTMLFormElement;
     form.inert = true;
     form.querySelector("[data-template-settings-save]")?.setAttribute("aria-busy", "true");
-    this.focusRecord = new URL(this.currentUrl).searchParams.get("editor") ?? undefined;
     this.formTargets.forEach(item => this.updateSave(item));
   }
-  submitted(event: CustomEvent<{ success: boolean }>): void {
+  submitted(event: CustomEvent<{ success: boolean; fetchResponse?: { response: Response } }>): void {
     this.submissions--;
     // SAFETY: Turbo submit events target the submitting form.
     const form = event.target as HTMLFormElement;
     form.inert = false;
     form.querySelector("[data-template-settings-save]")?.removeAttribute("aria-busy");
     this.formTargets.forEach(form => this.updateSave(form));
-    if (!event.detail.success) {
-      const error = this.element.querySelector<HTMLElement>("#template_settings_error");
-      error?.scrollIntoView({ block: "nearest" });
-      error?.querySelector<HTMLButtonElement>("button")?.focus();
-      if (!error?.textContent?.trim()) this.showRequestError();
-    }
+    // Validation streams own their error rendering and focus. Transport failures have no stream.
+    if (!event.detail.success && !event.detail.fetchResponse?.response.headers.get("Content-Type")?.startsWith("text/vnd.turbo-stream.html")) this.showRequestError();
   }
   dismissError(): void {
     this.element.querySelector("#template_settings_error")!.replaceChildren();
@@ -147,23 +139,26 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     event.preventDefault();
     this.showRequestError();
   }
-  private showRequestError(focus = true): void {
+  private focusError(error: HTMLElement): void {
+    error.scrollIntoView({ block: "nearest" });
+    error.querySelector<HTMLButtonElement>("button")!.focus();
+  }
+  private showRequestError(): void {
     const error = this.element.querySelector<HTMLElement>("#template_settings_request_error")!;
     error.hidden = false;
-    if (focus) {
-      error.scrollIntoView({ block: "nearest" });
-      error.querySelector<HTMLButtonElement>("button")!.focus();
-    }
+    this.focusError(error);
   }
+  private pageUrl(): string { return new URL(this.contentTarget.dataset.templateSettingsLocation!, location.href).href; }
+  private markClean(): void { this.formTargets.forEach(form => this.originals.set(form, this.values(form))); }
 
-  loaded(): void {
+  private loaded(): void {
     if (this.renders) return;
-    const content = this.frameTarget.querySelector<HTMLElement>("[data-template-settings-location]")!;
-    this.currentUrl = new URL(content.dataset.templateSettingsLocation!, location.href).href;
+    const content = this.contentTarget;
+    this.currentUrl = this.pageUrl();
     if (content.hasAttribute("data-template-settings-saved") || this.restoring) history.replaceState({}, "", this.currentUrl);
     else if (location.href !== this.currentUrl) history.pushState({}, "", this.currentUrl);
     this.restoring = false;
-    const focusRecord = content.dataset.templateSettingsFocusRecord ?? this.focusRecord;
+    const focusRecord = this.focusRecord;
     const record = focusRecord ? this.frameTarget.querySelector<HTMLElement>(`[data-template-settings-record="${CSS.escape(focusRecord)}"]`) : null;
     this.focusRecord = undefined;
     const saved = content.hasAttribute("data-template-settings-saved");
@@ -173,7 +168,6 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       if (focus?.isConnected) focus.focus({ preventScroll: true });
       if (actions?.isConnected) {
         actions.scrollIntoView({ block: "nearest" });
-        showTransientFeedback(actions.querySelector<HTMLElement>("[data-template-settings-save]")!);
         content.removeAttribute("data-template-settings-saved");
       }
     });
@@ -194,7 +188,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     const action = this.pending!;
     this.pending = undefined;
     this.discardTarget.close();
-    this.formTargets.forEach(form => this.originals.set(form, this.values(form)));
+    this.markClean();
     action();
   }
   close(): void { this.guard(() => this.leave()); }
@@ -219,7 +213,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     if (target instanceof HTMLAnchorElement && target.target === "_blank") return;
     if (inside) this.focusRecord = target.dataset.templateSettingsFocus;
     if (inside && target.hasAttribute("data-template-settings-cancel") && !this.submissions) {
-      this.formTargets.forEach(form => this.originals.set(form, this.values(form)));
+      this.markClean();
       return;
     }
     const action = (): void => {
@@ -262,12 +256,9 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       visit(destination, { action: "replace" });
     }
   }
-  private depth(frame: HTMLElement): number {
-    return Number(frame.querySelector<HTMLElement>("[data-template-settings-depth]")!.dataset.templateSettingsDepth);
-  }
   private async renderPage(nextFrame: HTMLElement, render: () => void | Promise<void>): Promise<void> {
-    const previousDepth = this.depth(this.frameTarget);
-    const nextDepth = this.depth(nextFrame);
+    const previousDepth = Number(this.contentTarget.dataset.templateSettingsDepth);
+    const nextDepth = Number(nextFrame.querySelector<HTMLElement>("[data-template-settings-depth]")!.dataset.templateSettingsDepth);
     const saved = nextFrame.querySelector("[data-template-settings-saved]") !== null;
     const scrollTop = this.frameTarget.querySelector<HTMLElement>(".panel__body")!.scrollTop;
     this.renders++;
@@ -279,11 +270,11 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       }
       else await slidePageChange(
         () => this.frameTarget.querySelector<HTMLElement>(".panel__body")!,
-        async () => { await render(); return this.element.querySelector<HTMLElement>(".panel__body")!; },
+        async () => { await render(); return this.frameTarget.querySelector<HTMLElement>(".panel__body")!; },
         nextDepth > previousDepth ? "forward" : "back",
       );
     } finally { this.renders--; }
-    this.loaded();
+    if (this.element.isConnected) this.loaded();
   }
   private readonly beforeFrameRender = (event: Event): void => {
     if (event.target !== this.frameTarget) return;
@@ -302,6 +293,14 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       render(stream: HTMLElement): Promise<void>;
     }>;
     const stream = detail.newStream;
+    if (stream.getAttribute("target") === "template_settings_error") {
+      const render = detail.render;
+      detail.render = async stream => {
+        await render(stream);
+        if (this.element.isConnected) this.focusError(this.element.querySelector<HTMLElement>("#template_settings_error")!);
+      };
+      return;
+    }
     if (stream.getAttribute("action") !== "replace" || stream.getAttribute("target") !== this.frameTarget.id) return;
     const nextFrame = stream.templateElement.content.querySelector<HTMLElement>("turbo-frame")!;
     const render = detail.render;

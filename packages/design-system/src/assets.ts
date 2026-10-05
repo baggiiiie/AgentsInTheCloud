@@ -55,6 +55,7 @@ export const designSystemStaticFiles = {
     url: new URL("./button-group/button-group.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/button-confirmation.css": { url: new URL("./button-confirmation/button-confirmation.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   "/copy-button.css": {
     url: new URL("./copy-button/copy-button.css", import.meta.url),
     contentType: "text/css; charset=utf-8",

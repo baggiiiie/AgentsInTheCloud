@@ -12,6 +12,7 @@ import { ManagedListController } from "./managed-list/managed-list-controller.ts
 import type { Application } from "@hotwired/stimulus";
 import { ActionItemActionsController } from "./action-item/action-item-actions-controller.ts";
 import { ActionItemController } from "./action-item/action-item-controller.ts";
+import { ButtonConfirmationController } from "./button-confirmation/button-confirmation-controller.ts";
 import { CopyButtonController } from "./copy-button/copy-button-controller.ts";
 import { DestructiveConfirmationController } from "./destructive-confirmation/destructive-confirmation-controller.ts";
 import { DialogController } from "./dialog/dialog-controller.ts";
@@ -61,6 +62,7 @@ export function registerDesignSystemControllers(application: Pick<Application, "
   application.register("warning-banners", WarningBannersController);
   application.register("action-items", ActionItemController);
   application.register("action-item-actions", ActionItemActionsController);
+  application.register("button-confirmation", ButtonConfirmationController);
   application.register("copy-button", CopyButtonController);
   application.register("destructive-confirmation", DestructiveConfirmationController);
   application.register("dialog", DialogController);

@@ -2,6 +2,7 @@
  * page.ts renders these functions AND displays their source: no parallel demo markup.
  * Native CSS primitives intentionally do not have pass-through renderers. */
 import { tabHtml, tabStripHtml } from "../src/tab-strip/tab-strip-html.ts";
+import { buttonConfirmationHtml } from "../src/button-confirmation/button-confirmation-html.ts";
 import { buttonHtml } from "../src/button/button-html.ts";
 import { actionLinkHtml } from "../src/action-link/action-link-html.ts";
 import { comparisonRingHtml } from "../src/comparison-ring/comparison-ring-html.ts";
@@ -322,7 +323,7 @@ export const entries: CatalogueEntry[] = [
   {
     id: "warning-banner", title: "Warning banner",
     when: "Persistent, non-blocking problems or configuration notices that need user attention.",
-    contract: "Title and message are escaped text. Optional actionsHtml composes server-rendered actions. Supplying dismiss adds an × that submits immediately without confirmation; the feature owns the POST action and opaque state token, persistence, and Turbo replacement. Dismissal does not resolve the condition.",
+    contract: "Title and message are escaped text. Optional actionsHtml composes server-rendered actions. Supplying dismiss adds an ×: action/state posts immediately without confirmation; buttonAttributesHtml binds a local browser dismissal. The feature owns persistence or local removal. role defaults to status; use alert for errors needing immediate attention. Dismissal does not resolve the condition.",
     imports: { "warning-banner": "warningBannerHtml" },
     sources: ["warning-banner/warning-banner-html.ts", "warning-banner/warning-banner.css"],
     examples: [{ title: "Missing configuration", render: () => `<div data-action="submit->catalogue#submit">${warningBannerHtml({ title: "Required secrets need values", message: "Your workspace can run, but features needing these secrets may not work.", dismiss: { action: "/catalogue/warnings/dismiss", state: "example" } })}<output aria-live="polite"></output></div>` }],
@@ -734,12 +735,26 @@ export const entries: CatalogueEntry[] = [
     ],
   },
   {
+    id: "button-confirmation",
+    compareButtonSizes: true,
+    title: "Button confirmation",
+    when: "A completed action acknowledged in place: Save, Add or Copy. Not a permission prompt; use Destructive confirmation for that.",
+    contract: "Uses canonical Button content and variants. Initial content lifts/fades out, a centered success check pops in for 1200 ms, then content returns; both layers reserve a fixed hit target. Reduced motion swaps directly. Native disabled and busy state belong to the caller, never the confirmation timer. Render confirmed after a server-side success, or call showButtonConfirmation only after browser-side success. Repeated successes refresh the hold without flashing; resetButtonConfirmation clears stale feedback on new edits. confirmationLabel is the accessible acknowledgement; label optionally provides a more descriptive accessible name for captioned controls. Copy button uses this same module after a successful clipboard write.",
+    imports: { "button-confirmation": "buttonConfirmationHtml", "button-confirmation/client": "showButtonConfirmation, resetButtonConfirmation", icons: "Icons" },
+    sources: ["button-confirmation/button-confirmation-html.ts", "button-confirmation/button-confirmation-markup.ts", "button-confirmation/button-confirmation-controller.ts", "button-confirmation/button-confirmation.css"],
+    examples: [
+      { title: "Caption → centered check → caption", render: () => buttonConfirmationHtml({ type: "button", variant: "primary", content: { kind: "caption", caption: "Save changes" }, confirmationLabel: "Changes saved", attributesHtml: 'data-action="catalogue#confirmButton"' }) },
+      { title: "Icon-only · keyboard and repeated confirmations", render: () => buttonConfirmationHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Copy, label: "Confirm example action" }, confirmationLabel: "Action completed", attributesHtml: 'data-action="catalogue#confirmButton"' }) },
+      { title: "Long caption · wrapping without resizing", render: () => buttonConfirmationHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Save the complete workspace configuration", iconHtml: Icons.Cloud }, confirmationLabel: "Configuration saved", attributesHtml: 'data-action="catalogue#confirmButton"' }) },
+    ],
+  },
+  {
     id: "copy-button",
     compareButtonSizes: true,
     title: "Copy button",
     when: "Copy a known value, with automatic transient success feedback.",
     contract:
-      "Provide label and copyText; caption is optional. Clipboard needs a secure context and permission. Errors are not presented as success. Try copying, then paste into Text entry.",
+      "Provide label and copyText; caption is optional. Clipboard needs a secure context and permission. Errors are not presented as success. Uses Button confirmation: the whole caption/icon is replaced by a centered check for 1200 ms without changing size. Repeated copies refresh confirmation. Try copying, then paste into Text entry.",
     imports: { "copy-button": "copyButtonHtml" },
     examples: [
       {
@@ -1048,18 +1063,10 @@ export const entries: CatalogueEntry[] = [
     title: "Transient feedback",
     when: "Brief acknowledgement of a completed action. Prefer Copy button for clipboard actions.",
     contract:
-      "Only current content affects layout. Feedback resets automatically. Use transient-feedback/client helpers for browser operations; server renders initial or feedback. Buttons disable during feedback unless explicitly kept enabled; acknowledgement remains full contrast while disabled. Supply caption for icon feedback: the caption stays visible and a fixed icon slot prevents layout shifts through initial, feedback and busy states. Use layout: overlay to animate between a caption and centered feedback at a fixed size; durationMs controls its hold time (default 2000 ms). Reduced motion swaps directly.",
+      "Only current content affects layout. Feedback resets automatically. Use transient-feedback/client helpers for browser operations; server renders initial or feedback. Buttons disable during feedback unless explicitly kept enabled; acknowledgement remains full contrast while disabled. Prefer Button confirmation for completed button actions.",
     imports: { "transient-feedback": "transientFeedbackHtml" },
     sources: ["transient-feedback/transient-feedback-html.ts", "transient-feedback/transient-feedback-controller.ts", "transient-feedback/transient-feedback.css"],
     examples: [
-      {
-        title: "Caption → centered check → caption · fixed size",
-        render: () => transientFeedbackHtml({
-          element: { tag: "button", variant: "primary", attributesHtml: 'type="button" data-action="catalogue#feedback" data-transient-feedback-initial-label="Save changes" data-transient-feedback-feedback-label="Changes saved"' },
-          layout: "overlay", durationMs: 1200, state: "initial", initialContent: { kind: "text", text: "Save changes" },
-          feedbackContent: { kind: "html", html: Icons.Check },
-        }),
-      },
       {
         title: "Activate feedback",
         render: () =>

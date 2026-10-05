@@ -1,4 +1,4 @@
-import { renderTemplateSettings, renderTemplateSettingsFrame, templateSettingsErrorHtml, templateSettingsFrameId, templateSettingsHostId, type TemplateSettingsLocation, type TemplateSettingsSection } from "./template-settings.ts";
+import { renderTemplateSettings, renderTemplateSettingsFrame, templateSettingsErrorHtml, templateSettingsFrameId, templateSettingsHostId, templateSettingsUrl, type TemplateSettingsLocation, type TemplateSettingsSection, type TemplateSettingsReference } from "./template-settings.ts";
 import { AgentsInTheCloudCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@agents-in-the-cloud/core";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
@@ -37,20 +37,15 @@ export interface WorkspaceTemplateRoutes {
   editorHtml(options: WorkspaceTemplateEditorOptions): Promise<string>;
 }
 
-interface WorkspaceTemplateWorkspaceReference {
-  workspaceId: string;
-  title: string;
-}
-
 export function createWorkspaceTemplateRoutes(deps: {
-  referencingWorkspaces(workspaceTemplateId: string): WorkspaceTemplateWorkspaceReference[];
+  referencingWorkspaces(workspaceTemplateId: string): TemplateSettingsReference[];
   invalidatePresentation(): void;
   createAgentWorkspace(workspaceTemplate: WorkspaceTemplateSummary, request: Request): Promise<Response>;
 }): WorkspaceTemplateRoutes {
   function newWorkspaceTemplateEditorBody(): string {
     const cancelButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Cancel" }, attributesHtml: 'data-action="dialog#close"' });
     const addButton = buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Add template" }, attributesHtml: 'data-turbo-submits-with="Adding…"' });
-    return `<div id="workspace_template_editor_body" class="workspace-template-editor-body"><div class="workspace-template-editor-page workspace-template-editor-detail-page"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input"><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div></div>`;
+    return `<div class="workspace-template-editor-body"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input"><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div>`;
   }
 
   async function workspaceTemplateEditorHtml(options: WorkspaceTemplateEditorOptions): Promise<string> {
@@ -130,7 +125,6 @@ export function createWorkspaceTemplateRoutes(deps: {
       spec = String(formData.get("gitUrl") ?? "");
     }
     const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec });
-    deps.invalidatePresentation();
     return workspaceTemplateSettingsResponse(request, { workspaceTemplate });
   }
 
@@ -149,12 +143,8 @@ export function createWorkspaceTemplateRoutes(deps: {
     // Save/create remains in the editor, using the persisted record ID and fresh credential fields.
     // Deletion returns to the list because that editor no longer exists.
     const location: TemplateSettingsLocation = { section, editor: deleted ? undefined : record };
-    const destination = new URL(`/workspace-templates/${encodeURIComponent(workspaceTemplateId)}/settings`, request.url);
-    destination.searchParams.set("section", section);
-    if (location.editor) destination.searchParams.set("editor", location.editor);
-    if (!wantsStream(request)) return Response.redirect(destination.toString(), 303);
-    const focusRecord = concern === "ssh-known-hosts" ? "known-hosts" : deleted ? record : undefined;
-    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted, focusRecord);
+    if (!wantsStream(request)) return Response.redirect(new URL(templateSettingsUrl(workspaceTemplateId, section, location.editor), request.url).toString(), 303);
+    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted);
     return turboStreamResponse(replace(templateSettingsFrameId, frame));
   }
 
