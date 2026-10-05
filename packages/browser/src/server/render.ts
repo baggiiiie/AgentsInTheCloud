@@ -19,7 +19,7 @@ export function renderBrowserWorkViewBody(workspaceId: string, view: WorkspaceBr
   return `<section class="work-view-pane" data-work-view-source="${escapeHtml(view.key)}"><div class="browser-pane">${renderBrowserFrame(workspaceId, view, previewUrl)}</div></section>`;
 }
 
-const workspacePreviewPermissions = [
+const browserFramePermissions = [
   "clipboard-write",
   "camera",
   "microphone",
@@ -45,14 +45,14 @@ const workspacePreviewPermissions = [
 export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserView, previewUrl: string): string {
   const navigationKey = domId("browser_navigation", workspaceId, view.key, Bun.hash(`${previewUrl}#${browserNavigationCount(workspaceId, view.key)}`).toString(16));
   const target = view.targetUrl ? new URL(view.targetUrl) : undefined;
-  const appKey = view.key;
+  const browserId = view.key;
   const frameControllerAttributes = previewUrl
-    ? ` src="${escapeHtml(previewUrl)}"${target && isWorkspaceLoopbackHost(target.hostname) ? ` allow="${workspacePreviewPermissions}" allowfullscreen` : ""}`
+    ? ` src="${escapeHtml(previewUrl)}"${target && isWorkspaceLoopbackHost(target.hostname) ? ` allow="${browserFramePermissions}" allowfullscreen` : ""}`
     : "";
   const externalLinkContent = {
     kind: "icon-only" as const,
     iconHtml: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8M18 13v6H5V6h6"/></svg>',
-    label: "Open preview in a new view",
+    label: "Open page in a new tab",
   };
   const externalLink = target
     ? actionLinkHtml({
@@ -63,7 +63,7 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
     })
     : buttonHtml({ type: "button", variant: "secondary", content: externalLinkContent, disabled: true });
   const qrDialogId = `${navigationKey}_qr`;
-  const qrButton = qrCodeButtonHtml(qrDialogId, "Open preview on your phone", !target);
+  const qrButton = qrCodeButtonHtml(qrDialogId, "Open page on your phone", !target);
   const qrDialog = target ? qrCodeDialogHtml(qrDialogId, previewUrl) : "";
   const reloadButton = buttonHtml({
     type: "button",
@@ -71,9 +71,9 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
     content: { kind: "icon-only", iconHtml: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.5-2.6L20 9M4 15l2.4 2.6A7 7 0 0 0 17.9 15"/></svg>', label: "Reload" },
     attributesHtml: 'data-action="browser-address#reload"',
   });
-  return `<turbo-frame id="${browserFrameId(workspaceId, appKey)}" class="browser-frame">
+  return `<turbo-frame id="${browserFrameId(workspaceId, browserId)}" class="browser-frame">
     <div class="browser-shell">
-      <form class="browser-toolbar work-view-toolbar" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/browser/${encodeURIComponent(appKey)}/navigate" data-turbo-frame="${browserFrameId(workspaceId, appKey)}" data-controller="browser-address" data-action="submit->browser-address#submit">
+      <form class="browser-toolbar work-view-toolbar" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/browser/${encodeURIComponent(browserId)}/navigate" data-turbo-frame="${browserFrameId(workspaceId, browserId)}" data-controller="browser-address" data-action="submit->browser-address#submit">
         ${reloadButton}
         <input id="${navigationKey}_address" data-turbo-permanent class="browser-address-input text-field" name="url" value="${escapeHtml(view.targetUrl)}" placeholder="http://localhost:3000" spellcheck="false" autocomplete="off" aria-label="Browser URL" data-action="click->browser-address#initializeAddress">
         ${externalLink}
@@ -81,7 +81,7 @@ export function renderBrowserFrame(workspaceId: string, view: WorkspaceBrowserVi
       </form>
       ${qrDialog}
       <div class="browser-viewport">
-        <iframe id="${navigationKey}_viewport" data-turbo-permanent${frameControllerAttributes} title="Workspace browser preview" loading="lazy" referrerpolicy="no-referrer"></iframe>
+        <iframe id="${navigationKey}_viewport" data-turbo-permanent${frameControllerAttributes} title="Browser view" loading="lazy" referrerpolicy="no-referrer"></iframe>
       </div>
     </div>
   </turbo-frame>`;

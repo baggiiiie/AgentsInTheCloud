@@ -78,7 +78,7 @@ export const browserWorkspaceModule: WorkspaceModule = {
     identity: (reference: { type: "browser"; browserId: string }) => reference.browserId,
     render: async ({ workspaceId, reference }: { workspaceId: string; reference: BrowserWorkViewReference }) => {
       const view = getWorkspaceBrowserView(workspaceId, reference.browserId);
-      if (!view) throw new Error(`Browser Work view not found: ${reference.browserId}`);
+      if (!view) throw new Error(`Browser view not found: ${reference.browserId}`);
       return renderBrowserWorkViewBody(workspaceId, view, await previewUrl(workspaceId, view));
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "browser"; browserId: string } }) => deleteWorkspaceBrowserView(workspaceId, reference.browserId),
@@ -110,16 +110,16 @@ export const browserWorkspaceModule: WorkspaceModule = {
   },
 };
 
-async function browserNavigateEndpoint(workspaceId: string, appKey: string, request: Request): Promise<Response> {
+async function browserNavigateEndpoint(workspaceId: string, browserId: string, request: Request): Promise<Response> {
   const wantsJson = requestAcceptsJson(request);
   const url = wantsJson
     ? browserNavigateJsonUrl(await readJsonObject(request))
     : String((await request.formData()).get("url") ?? "");
 
-  const view = setWorkspaceBrowserTarget(workspaceId, appKey, url);
+  const view = setWorkspaceBrowserTarget(workspaceId, browserId, url);
   if (!view) return wantsJson
-    ? Response.json({ error: { code: "view_not_found", message: `browser view not found: ${appKey}` } }, { status: 404 })
-    : textResponse("browser view not found", { status: 404 });
+    ? Response.json({ error: { code: "view_not_found", message: `Browser view not found: ${browserId}` } }, { status: 404 })
+    : textResponse("Browser view not found", { status: 404 });
   return wantsJson
     ? Response.json({ view: { key: view.key, label: view.label, url: view.targetUrl } })
     : turboStreamResponse("");

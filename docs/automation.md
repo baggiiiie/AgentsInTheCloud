@@ -132,7 +132,7 @@ curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/agent.create" \
   -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{}'
 ```
 
-Navigate an existing Browser Work view with `POST /workspaces/:id/browser/:browserId/navigate` and `{ "url": "..." }`.
+Navigate an existing Browser view with `POST /workspaces/:id/browser/:browserId/navigate` and `{ "url": "..." }`.
 
 ## Arrange Work views
 

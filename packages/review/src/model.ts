@@ -1,5 +1,5 @@
 export type ReviewSide = "deletions" | "additions";
-export type ReviewDiffLayout = "unified" | "split";
+export type ReviewDiffLayout = "unified" | "side-by-side";
 export type ReviewDiffHighlighting = "line" | "word";
 export type ReviewDiffOverflow = "scroll" | "wrap";
 export type ReviewViewport = "mobile" | "desktop";

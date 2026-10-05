@@ -19,27 +19,27 @@ function parseBrowserViews(value: JsonValue): WorkspaceBrowserView[] {
 }
 
 const browserViews = createWorkspaceMetadataState("browser-work-views.json", parseBrowserViews, () => []);
-// Bumped on every navigation so re-navigating to the same URL still reloads the preview iframe.
+// Bumped on every navigation so re-navigating to the same URL still reloads the Browser iframe.
 const browserNavigationCounts = new Map<string, number>();
 
-function navigationCountKey(workspaceId: string, appKey: string): string {
-  return `${workspaceId}/${appKey}`;
+function navigationCountKey(workspaceId: string, browserId: string): string {
+  return `${workspaceId}/${browserId}`;
 }
 
-export function browserNavigationCount(workspaceId: string, appKey: string): number {
-  return browserNavigationCounts.get(navigationCountKey(workspaceId, appKey)) ?? 0;
+export function browserNavigationCount(workspaceId: string, browserId: string): number {
+  return browserNavigationCounts.get(navigationCountKey(workspaceId, browserId)) ?? 0;
 }
 
-export function browserFrameId(workspaceId: string, appKey: string): string {
-  return domId("browser_frame", workspaceId, appKey);
+export function browserFrameId(workspaceId: string, browserId: string): string {
+  return domId("browser_frame", workspaceId, browserId);
 }
 
 export function listWorkspaceBrowserViews(workspaceId: string): WorkspaceBrowserView[] {
   return browserViews.read(workspaceId);
 }
 
-export function getWorkspaceBrowserView(workspaceId: string, appKey: string): WorkspaceBrowserView | undefined {
-  return browserViews.read(workspaceId).find((view) => view.key === appKey);
+export function getWorkspaceBrowserView(workspaceId: string, browserId: string): WorkspaceBrowserView | undefined {
+  return browserViews.read(workspaceId).find((view) => view.key === browserId);
 }
 
 export function createWorkspaceBrowserView(workspaceId: string): WorkspaceBrowserView {
@@ -51,17 +51,17 @@ export function createWorkspaceBrowserView(workspaceId: string): WorkspaceBrowse
   return view;
 }
 
-export function deleteWorkspaceBrowserView(workspaceId: string, appKey: string): void {
-  browserViews.write(workspaceId, browserViews.read(workspaceId).filter((view) => view.key !== appKey));
-  browserNavigationCounts.delete(navigationCountKey(workspaceId, appKey));
+export function deleteWorkspaceBrowserView(workspaceId: string, browserId: string): void {
+  browserViews.write(workspaceId, browserViews.read(workspaceId).filter((view) => view.key !== browserId));
+  browserNavigationCounts.delete(navigationCountKey(workspaceId, browserId));
 }
 
-export function setWorkspaceBrowserTarget(workspaceId: string, appKey: string, input: string): WorkspaceBrowserView | undefined {
-  const view = getWorkspaceBrowserView(workspaceId, appKey);
+export function setWorkspaceBrowserTarget(workspaceId: string, browserId: string, input: string): WorkspaceBrowserView | undefined {
+  const view = getWorkspaceBrowserView(workspaceId, browserId);
   if (!view) return undefined;
   view.targetUrl = normalizeBrowserUrl(input);
   browserViews.write(workspaceId, browserViews.read(workspaceId));
-  browserNavigationCounts.set(navigationCountKey(workspaceId, appKey), browserNavigationCount(workspaceId, appKey) + 1);
+  browserNavigationCounts.set(navigationCountKey(workspaceId, browserId), browserNavigationCount(workspaceId, browserId) + 1);
   return view;
 }
 

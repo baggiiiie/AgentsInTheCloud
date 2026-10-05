@@ -14,7 +14,7 @@ describe("slash commands", () => {
       description: `Prompt ${index}`,
       prompt: `Do ${index}`,
       quickLaunch: index === 2,
-      hotkey: index === 2 ? "p" : undefined,
+      shortcut: index === 2 ? "p" : undefined,
     }));
 
     const html = renderSlashCommandCatalog(templates, [skill]);
@@ -28,7 +28,7 @@ describe("slash commands", () => {
     expect(html).toContain('data-command-trigger="/skill:careful-review"');
     expect(html).toContain("Review changes carefully");
     expect(html).toContain('role="group" aria-label="Quick launch"');
-    expect(html).toContain('data-completion-kind="prompt-template" data-command-trigger="/prompt-2" data-prompt-template-hotkey="p"');
+    expect(html).toContain('data-completion-kind="prompt-template" data-command-trigger="/prompt-2" data-prompt-template-shortcut="p"');
     expect(html.match(/data-completion-kind="quick-launch"/g)).toHaveLength(1);
   });
 });

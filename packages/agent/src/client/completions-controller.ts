@@ -26,13 +26,13 @@ function runApplicationCommand(option: HTMLElement, input: HTMLInputElement | HT
 
 type ShortcutCommand = Pick<WorkspaceClientCommand, "label" | "binding">;
 
-// Prompt-template hotkeys are ⌘⌥Letter on Apple platforms and Ctrl+Alt+Letter elsewhere.
-function promptTemplateBinding(hotkey: string, apple: boolean): string {
-  return `${apple ? "Meta" : "Control"}+Alt+Key${hotkey.toUpperCase()}`;
+// Prompt-template shortcuts are ⌘⌥Letter on Apple platforms and Ctrl+Alt+Letter elsewhere.
+function promptTemplateBinding(shortcut: string, apple: boolean): string {
+  return `${apple ? "Meta" : "Control"}+Alt+Key${shortcut.toUpperCase()}`;
 }
 
-export function promptTemplateHotkeyConflict(hotkey: string, commands: readonly ShortcutCommand[], apple: boolean): ShortcutCommand | undefined {
-  const binding = promptTemplateBinding(hotkey, apple);
+export function promptTemplateShortcutConflict(shortcut: string, commands: readonly ShortcutCommand[], apple: boolean): ShortcutCommand | undefined {
+  const binding = promptTemplateBinding(shortcut, apple);
   return commands.find((command) => command.binding === binding);
 }
 
@@ -44,8 +44,8 @@ function visibleWorkspaceCommands(): ShortcutCommand[] {
   return JSON.parse(presentation.dataset.workspaceCommands!) as ShortcutCommand[];
 }
 
-function promptTemplateShortcutConflict(hooks: WorkspaceClientHooks, hotkey: string): ShortcutCommand | undefined {
-  return promptTemplateHotkeyConflict(hotkey, [...hooks.registeredCommands(), ...visibleWorkspaceCommands()], isApplePlatform());
+function workspacePromptTemplateShortcutConflict(hooks: WorkspaceClientHooks, shortcut: string): ShortcutCommand | undefined {
+  return promptTemplateShortcutConflict(shortcut, [...hooks.registeredCommands(), ...visibleWorkspaceCommands()], isApplePlatform());
 }
 
 function activeAgentComposer(): HTMLElement | undefined {
@@ -53,22 +53,22 @@ function activeAgentComposer(): HTMLElement | undefined {
     .find((composer) => composer.closest(".workspace-detail-resident")?.classList.contains("visible") ?? true);
 }
 
-// Hotkeyed prompt templates are workspace shortcuts aimed at the active Agent,
+// Prompt templates with shortcuts are workspace shortcuts aimed at the active Agent,
 // independent of focus and of whether its composer is shown.
 export function registerPromptTemplateCommands(hooks: WorkspaceClientHooks): void {
   hooks.registerCommandProvider(() => {
     const composer = activeAgentComposer();
     if (!composer) return [];
-    const templates = composer.querySelectorAll<HTMLElement>('[data-agent-completions-target="catalog"] [role="option"][data-prompt-template-hotkey]');
+    const templates = composer.querySelectorAll<HTMLElement>('[data-agent-completions-target="catalog"] [role="option"][data-prompt-template-shortcut]');
     return [...templates].flatMap((template): WorkspaceClientCommand[] => {
-      const hotkey = template.dataset.promptTemplateHotkey!;
-      if (promptTemplateShortcutConflict(hooks, hotkey)) return [];
+      const shortcut = template.dataset.promptTemplateShortcut!;
+      if (workspacePromptTemplateShortcutConflict(hooks, shortcut)) return [];
       const trigger = template.dataset.commandTrigger!;
       return [{
         id: `prompt-template.${trigger.slice(1)}`,
         label: `Send ${trigger}`,
         scope: "agent",
-        binding: promptTemplateBinding(hotkey, isApplePlatform()),
+        binding: promptTemplateBinding(shortcut, isApplePlatform()),
         run: () => { composer.dispatchEvent(new CustomEvent<AgentComposerSendPromptDetail>(agentComposerSendPromptEvent, { detail: { text: trigger } })); },
       }];
     });
@@ -78,18 +78,18 @@ export function registerPromptTemplateCommands(hooks: WorkspaceClientHooks): voi
 function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks): string {
   const container = document.createElement("template");
   container.innerHTML = html.trim();
-  for (const option of container.content.querySelectorAll<HTMLElement>("[data-prompt-template-hotkey]")) {
-    const hotkey = option.dataset.promptTemplateHotkey!;
-    const key = hotkey.toUpperCase();
+  for (const option of container.content.querySelectorAll<HTMLElement>("[data-prompt-template-shortcut]")) {
+    const shortcut = option.dataset.promptTemplateShortcut!;
+    const key = shortcut.toUpperCase();
     const apple = isApplePlatform();
     const label = apple ? `⌘⌥${key}` : `Ctrl+Alt+${key}`;
-    const conflict = promptTemplateShortcutConflict(hooks, hotkey);
+    const conflict = workspacePromptTemplateShortcutConflict(hooks, shortcut);
     if (!conflict) {
       option.dataset.agentQuickLaunchShortcut = label;
       option.setAttribute("aria-keyshortcuts", `${apple ? "Meta" : "Control"}+Alt+${key}`);
       continue;
     }
-    option.removeAttribute("data-prompt-template-hotkey");
+    option.removeAttribute("data-prompt-template-shortcut");
     const message = `Shortcut unavailable: ${label} is used by ${conflict.label}.`;
     option.title = message;
     option.setAttribute("aria-label", `${option.getAttribute("aria-label") ?? option.dataset.commandTrigger}. ${message}`);

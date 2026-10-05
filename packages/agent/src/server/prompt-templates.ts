@@ -10,7 +10,7 @@ export interface PromptTemplate {
   argumentHint?: string;
   prompt: string;
   quickLaunch?: boolean;
-  hotkey?: string;
+  shortcut?: string;
   preserveArguments?: boolean;
 }
 
@@ -18,7 +18,7 @@ interface PromptFrontmatter {
   description?: string;
   argumentHint?: string;
   quickLaunch?: boolean;
-  hotkey?: string;
+  shortcut?: string;
 }
 
 interface ParsedPromptFrontmatter {
@@ -71,7 +71,8 @@ function parseFrontmatter(markdown: string): ParsedPromptFrontmatter {
     if (key === "description") frontmatter.description = value;
     if (key === "argument-hint") frontmatter.argumentHint = value;
     if (key === "quick-launch" && (value === "true" || value === "false")) frontmatter.quickLaunch = value === "true";
-    if (key === "hotkey" && /^[A-Za-z]$/.test(value)) frontmatter.hotkey = value.toLowerCase();
+    // Older prompt files named this setting "hotkey".
+    if ((key === "shortcut" || key === "hotkey") && /^[A-Za-z]$/.test(value)) frontmatter.shortcut = value.toLowerCase();
   }
   return { frontmatter, body };
 }
@@ -153,7 +154,7 @@ export async function loadPromptTemplatesFromRoot(root: string): Promise<PromptT
         argumentHint: frontmatter.argumentHint,
         prompt: body,
         quickLaunch: frontmatter.quickLaunch,
-        hotkey: frontmatter.hotkey,
+        shortcut: frontmatter.shortcut,
       });
     }
   }

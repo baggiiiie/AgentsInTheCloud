@@ -7,7 +7,7 @@ AgentsInTheCloud is a self-hosted browser app for working with coding agents in 
 - A **workspace** is an isolated development environment. Its project files live under `/work` inside the workspace.
 - An **Agent** is a coding collaborator running inside a Workspace, with its own replaceable **Agent session**. A Workspace can have more than one Agent.
 - A **Workspace template** ("template" in the app) is a saved Git source and configuration that new Workspaces are seeded with. A Workspace can also start with nothing.
-- A **Work view** is a file, terminal, browser preview, VS Code session, or other working surface shown in the Work pane.
+- A **Work view** is a file, terminal, Browser view, VS Code session, or other working surface shown in the Work pane.
 
 ## 2. Getting Set Up
 
@@ -97,7 +97,7 @@ Each `*.md` file becomes a slash command named after the file. For example, `.ag
 To add a new prompt template:
 
 1. Create `.agents-in-the-cloud/prompts/<name>.md` in the repository.
-2. Optionally add frontmatter with `description`, `argument-hint`, `quick-launch`, and `hotkey`.
+2. Optionally add frontmatter with `description`, `argument-hint`, `quick-launch`, and `shortcut`.
 3. Write the prompt body, using argument placeholders if needed.
 
 Example `.agents-in-the-cloud/prompts/land.md`:
@@ -107,14 +107,14 @@ Example `.agents-in-the-cloud/prompts/land.md`:
 description: Land the workspace
 argument-hint: "[branch]"
 quick-launch: true
-hotkey: l
+shortcut: l
 ---
 Review the current changes, run the relevant checks, commit them, and prepare to push to ${1:-main}.
 ```
 
 Set `quick-launch: true` to show a compact command button whenever the Agent pane composer is empty, whether or not it has focus. Selecting it expands the template into the composer for review and editing without submitting it. AgentsInTheCloud focuses the composer when doing so will not open a software keyboard; on software-keyboard devices it leaves the composer unfocused. Quick launches do not appear in the new-workspace launch composer and disappear as soon as the user types or starts transcription.
 
-Set `hotkey` to one letter to expand and immediately send that template to the workspace's active Agent with Command-Option-letter, or Ctrl+Alt+letter off Apple platforms (for example, `hotkey: l` uses ⌘⌥L). AgentsInTheCloud supplies the modifiers; other shortcut forms are not accepted. If the template is also a quick launch, its button shows the shortcut. Existing AgentsInTheCloud commands take precedence when a letter conflicts.
+Set `shortcut` to one letter to expand and immediately send that template to the workspace's active Agent with Command-Option-letter, or Ctrl+Alt+letter off Apple platforms (for example, `shortcut: l` uses ⌘⌥L). AgentsInTheCloud supplies the modifiers; other shortcut forms are not accepted. If the template is also a quick launch, its button shows the shortcut. Existing AgentsInTheCloud commands take precedence when a letter conflicts.
 
 Supported placeholders in the body:
 

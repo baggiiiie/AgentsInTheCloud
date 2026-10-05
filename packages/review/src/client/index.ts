@@ -24,6 +24,11 @@ type AnnotationMetadata = ({ kind: "comment" } & ReviewCommentModel) | DraftMode
 type DiffModel = { fileDiff: FileDiffMetadata; comments: ReviewCommentModel[] };
 type FileDiffConstructor = typeof import("@pierre/diffs")["FileDiff"];
 
+/** Translate the app layout name only at the diff-library boundary. */
+function pierreDiffStyle(layout: ReviewDiffLayout): "unified" | "split" {
+  return layout === "side-by-side" ? "split" : "unified";
+}
+
 function annotation(comment: ReviewCommentModel): DiffLineAnnotation<AnnotationMetadata> {
   return { side: comment.side, lineNumber: comment.startLine, metadata: { kind: "comment", ...comment } };
 }
@@ -105,7 +110,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
     private hydratedHosts = new WeakSet<HTMLElement>();
     private draft?: DraftModel;
     private hydrated = false;
-    private diffStyle!: ReviewDiffLayout;
+    private diffLayout!: ReviewDiffLayout;
     private diffHighlighting!: ReviewDiffHighlighting;
     private diffOverflow!: ReviewDiffOverflow;
     private pane!: HTMLElement;
@@ -139,7 +144,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
     };
     private readonly viewportChanged = (): void => {
       const layout = this.syncViewportLayout();
-      if (this.diffStyle !== layout) void this.renderDiffLayout(layout);
+      if (this.diffLayout !== layout) void this.renderDiffLayout(layout);
     };
 
     connect(): void {
@@ -148,7 +153,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       this.element.addEventListener("turbo:morph-element", this.afterMorphElement);
       this.viewportMedia = window.matchMedia(phoneLayoutMediaQuery);
       this.viewportMedia.addEventListener("change", this.viewportChanged);
-      this.diffStyle = this.syncViewportLayout();
+      this.diffLayout = this.syncViewportLayout();
       const { diffHighlighting, diffOverflow } = this.element.dataset;
       if (!isReviewDiffHighlighting(diffHighlighting) || !isReviewDiffOverflow(diffOverflow)) throw new Error("Review diff settings are invalid");
       this.diffHighlighting = diffHighlighting;
@@ -284,7 +289,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
 
     private syncViewportLayout(): ReviewDiffLayout {
       const viewport = this.viewport;
-      const layout = this.element.dataset[`${viewport}DiffLayout`] === "split" ? "split" : "unified";
+      const layout = this.element.dataset[`${viewport}DiffLayout`] === "side-by-side" ? "side-by-side" : "unified";
       const toggle = this.element.querySelector<HTMLFormElement>('[role="group"][aria-label="Diff layout"]');
       if (toggle) {
         toggle.action = `/review/settings/diff-layout?viewport=${viewport}`;
@@ -294,16 +299,16 @@ function createReviewController(Controller: StimulusControllerConstructor) {
     }
 
     async setDiffLayout(event: ToggleChangeEvent): Promise<void> {
-      const layout = event.detail.value === "split" ? "split" : "unified";
+      const layout = event.detail.value === "side-by-side" ? "side-by-side" : "unified";
       this.element.dataset[`${this.viewport}DiffLayout`] = layout;
       await this.renderDiffLayout(layout);
     }
 
     private async renderDiffLayout(layout: ReviewDiffLayout): Promise<void> {
-      this.diffStyle = layout;
+      this.diffLayout = layout;
       await this.updateDiffPresentation(
-        `Switching to ${this.diffStyle === "split" ? "side by side" : "unified"}…`,
-        (instance) => instance.setOptions({ ...instance.options, diffStyle: this.diffStyle }),
+        `Switching to ${this.diffLayout === "side-by-side" ? "side-by-side" : "unified"}…`,
+        (instance) => instance.setOptions({ ...instance.options, diffStyle: pierreDiffStyle(this.diffLayout) }),
       );
     }
 
@@ -371,7 +376,7 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       let instance: FileDiff<AnnotationMetadata>;
       instance = new FileDiffClass<AnnotationMetadata>({
         ...reviewDiffOptions,
-        diffStyle: this.diffStyle,
+        diffStyle: pierreDiffStyle(this.diffLayout),
         lineDiffType: this.diffHighlighting === "word" ? "word-alt" : reviewDiffOptions.lineDiffType,
         overflow: this.diffOverflow,
         renderAnnotation: (item) => this.renderAnnotation(item.metadata!, instance),
@@ -383,8 +388,8 @@ function createReviewController(Controller: StimulusControllerConstructor) {
       const lineAnnotations = this.annotations(path);
       instance.hydrate({ fileContainer: container, fileDiff: model.fileDiff, lineAnnotations, prerenderedHTML });
       if (draft) instance.render({ fileDiff: model.fileDiff, lineAnnotations: [...lineAnnotations] });
-      if (this.diffStyle !== reviewDiffOptions.diffStyle) {
-        instance.setOptions({ ...instance.options, diffStyle: this.diffStyle });
+      if (pierreDiffStyle(this.diffLayout) !== reviewDiffOptions.diffStyle) {
+        instance.setOptions({ ...instance.options, diffStyle: pierreDiffStyle(this.diffLayout) });
         instance.rerender();
       }
       this.instances.push(instance);

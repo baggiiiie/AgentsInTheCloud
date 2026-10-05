@@ -63,7 +63,7 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
   private readonly keydown = (event: KeyboardEvent): void => {
     if (event.repeat || event.isComposing || !event.altKey) return;
     const metaAlt = event.metaKey && !event.ctrlKey;
-    // Prompt-template hotkeys use Ctrl+Alt off Apple platforms. Windows reports
+    // Prompt-template shortcuts use Ctrl+Alt off Apple platforms. Windows reports
     // AltGr as Ctrl+Alt; those presses type characters.
     const controlAlt = event.ctrlKey && !event.metaKey && !isApplePlatform() && !event.getModifierState("AltGraph");
     if (!metaAlt && !controlAlt) return;

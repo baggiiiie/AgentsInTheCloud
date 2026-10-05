@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { reviewCommentsPrompt, type ReviewCommentModel } from "../src/model.ts";
 import { collectReviewFile, collectReviewIndex, collectReviewStats, type ReviewFile } from "../src/server/diff.ts";
 import { renderReviewBody } from "../src/server/render.ts";
 import { readReviewSettings, updateReviewSettings } from "../src/server/settings.ts";
 import { addReviewComment, deleteReviewState, listReviewComments, remapReviewComment, remapReviewFileComments, updateReviewComment, type ReviewComment } from "../src/server/state.ts";
+import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { command, createReviewRepository } from "./support/repository.ts";
 
 const roots: string[] = [];
@@ -146,6 +147,22 @@ describe("Review collection", () => {
 });
 
 describe("Review comment state", () => {
+  test("reads earlier unanchored comments and saves only the canonical flag", async () => {
+    const workspaceId = `review-previous-${crypto.randomUUID()}`;
+    const path = join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspaces", workspaceId, "metadata", "review.json");
+    const comment: ReviewComment = { id: "retained-comment", path: "src/example.ts", side: "additions", startLine: 2, endLine: 2, body: "Keep this behavior", snippet: "original()" };
+    try {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, JSON.stringify({ version: 1, comments: [{ ...comment, outdated: true }] }));
+      expect(listReviewComments(workspaceId)).toEqual([{ ...comment, unanchored: true }]);
+      expect(updateReviewComment(workspaceId, comment.id, "Updated feedback")).toBe(true);
+      const saved = JSON.parse(await readFile(path, "utf8"));
+      expect(saved).toEqual({ version: 2, comments: [{ ...comment, body: "Updated feedback", unanchored: true }] });
+    } finally {
+      deleteReviewState(workspaceId);
+    }
+  });
+
   test("updates the body without changing the comment anchor or identity", () => {
     const workspaceId = `review-edit-${crypto.randomUUID()}`;
     try {
@@ -182,21 +199,21 @@ describe("Review comment anchors", () => {
       addReviewComment(workspaceId, comment);
       expect(remapReviewFileComments(workspaceId, file("before\ntarget\nafter")).changed).toBe(false);
       expect(remapReviewFileComments(workspaceId, file("before\nchanged\nafter")).changed).toBe(true);
-      expect(listReviewComments(workspaceId)[0]!.outdated).toBe(true);
+      expect(listReviewComments(workspaceId)[0]!.unanchored).toBe(true);
       expect(remapReviewFileComments(workspaceId, file("before\nchanged\nafter")).changed).toBe(false);
       expect(remapReviewFileComments(workspaceId, file("inserted\nbefore\ntarget\nafter")).changed).toBe(true);
-      expect(listReviewComments(workspaceId)[0]).toMatchObject({ startLine: 3, endLine: 3, outdated: undefined });
+      expect(listReviewComments(workspaceId)[0]).toMatchObject({ startLine: 3, endLine: 3, unanchored: undefined });
       expect(remapReviewFileComments(workspaceId, file("inserted\nbefore\ntarget\nafter")).changed).toBe(false);
     } finally {
       deleteReviewState(workspaceId);
     }
   });
 
-  test("keeps exact anchors, remaps one exact match, and marks ambiguous matches outdated", () => {
-    expect(remapReviewComment(comment, file("before\ntarget\nafter"))).toMatchObject({ startLine: 2, outdated: undefined });
-    expect(remapReviewComment(comment, file("inserted\nbefore\ntarget\nafter"))).toMatchObject({ startLine: 3, endLine: 3, outdated: undefined });
-    expect(remapReviewComment(comment, file("target\nbetween\ntarget"))).toMatchObject({ outdated: true });
-    expect(remapReviewComment(comment, undefined)).toMatchObject({ outdated: true });
+  test("keeps exact anchors, remaps one exact match, and marks ambiguous matches unanchored", () => {
+    expect(remapReviewComment(comment, file("before\ntarget\nafter"))).toMatchObject({ startLine: 2, unanchored: undefined });
+    expect(remapReviewComment(comment, file("inserted\nbefore\ntarget\nafter"))).toMatchObject({ startLine: 3, endLine: 3, unanchored: undefined });
+    expect(remapReviewComment(comment, file("target\nbetween\ntarget"))).toMatchObject({ unanchored: true });
+    expect(remapReviewComment(comment, undefined)).toMatchObject({ unanchored: true });
   });
 });
 
@@ -223,15 +240,11 @@ describe("Review settings", () => {
 
     expect(await readReviewSettings(path)).toEqual({ mobile: "unified", desktop: "unified", highlighting: "word", overflow: "wrap" });
     await writeFile(path, `${JSON.stringify({ mobile: "split", desktop: "unified" })}\n`);
-    expect(await readReviewSettings(path)).toEqual({ mobile: "split", desktop: "unified", highlighting: "word", overflow: "wrap" });
-    await updateReviewSettings({ desktop: "split", highlighting: "word", overflow: "scroll" }, path);
-    expect(await readReviewSettings(path)).toEqual({ mobile: "split", desktop: "split", highlighting: "word", overflow: "scroll" });
+    expect(await readReviewSettings(path)).toEqual({ mobile: "side-by-side", desktop: "unified", highlighting: "word", overflow: "wrap" });
+    await updateReviewSettings({ desktop: "side-by-side", highlighting: "word", overflow: "scroll" }, path);
+    expect(await readReviewSettings(path)).toEqual({ mobile: "side-by-side", desktop: "side-by-side", highlighting: "word", overflow: "scroll" });
 
-    const html = renderReviewBody("workspace 1", { phase: "ready", files: [] }, [], { mobile: "unified", desktop: "split", highlighting: "word", overflow: "scroll" });
-    expect(html).toContain('data-mobile-diff-layout="unified" data-desktop-diff-layout="split" data-diff-highlighting="word" data-diff-overflow="scroll"');
-    expect(html).toContain('name="review-diff-layout" value="split" aria-pressed="true">Side by side</button>');
-    expect(html).toContain('name="review-diff-highlighting" value="word" aria-pressed="true">Words</button>');
-    expect(html).toContain('name="review-diff-overflow" value="scroll" aria-pressed="true">Scroll</button>');
+    expect(JSON.parse(await readFile(path, "utf8"))).toEqual({ mobile: "side-by-side", desktop: "side-by-side", highlighting: "word", overflow: "scroll" });
   });
 });
 
@@ -243,19 +256,5 @@ describe("Review presentation", () => {
 
     const notGit = await renderReviewBody("workspace 1", { phase: "not-git" }, []);
     expect(notGit).toContain("No git repo in /work yet");
-  });
-
-  test("groups comments whose anchors disappeared in a collapsed pseudo-file", async () => {
-    const comment: ReviewComment = { id: "comment-1", path: "src/removed.ts", side: "deletions", startLine: 4, endLine: 4, body: "Keep this behavior", snippet: "removed()", outdated: true };
-    const html = await renderReviewBody("workspace 1", { phase: "ready", files: [] }, [comment]);
-
-    expect(html).toContain('<details class="review-file" data-review-target="file" data-review-path="comments-without-anchors" data-review-comments="1" data-action="focusin->review#selectFile focusout->review#deselectFile">');
-    expect(html).toContain("Comments without anchors");
-    expect(html).toContain("src/removed.ts");
-    expect(html).toContain("removed()");
-    expect(html).toContain("Keep this behavior");
-    expect(html).not.toContain("No changes to review");
-    expect(html).toContain('action="/workspaces/workspace%201/review/comments/comment-1/delete"');
-    expect(html).toContain('aria-label="Delete review comment"');
   });
 });

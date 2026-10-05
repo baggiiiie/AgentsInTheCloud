@@ -12,7 +12,7 @@ import { createAgentLazyDetailController, createAgentTailFrameController } from 
 
 export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator, type PromptHistoryState } from "./composer-state.ts";
 export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
-export { promptTemplateHotkeyConflict } from "./completions-controller.ts";
+export { promptTemplateShortcutConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 
 export const agentClientModule: WorkspaceClientModule = {

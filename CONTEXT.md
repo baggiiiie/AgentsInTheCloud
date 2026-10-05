@@ -60,6 +60,10 @@ _Avoid_: Agent composer, in-pane composer, prompt box, chat input
 The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model and thinking level with which the Workspace starts.
 _Avoid_: Launch form, launch prompt, new-workspace composer
 
+**Keyboard shortcut**:
+A key combination that invokes an AgentsInTheCloud command, shortened to “Shortcut” when the context is clear. A Prompt template’s shortcut sends it directly to the active Agent rather than inserting it into a draft.
+_Avoid_: Hotkey
+
 **Agent session**:
 An Agent's replaceable interaction history. Starting a fresh Agent session resets the active context while keeping the same Agent, its settings, and its searchable history.
 _Avoid_: Agent, Agent conversation
@@ -77,8 +81,32 @@ A Work view representing an independently open resource or running session, such
 _Avoid_: Document view, permanent view
 
 **Contextual Work view**:
-A workspace-level utility Work view, such as Files.
+A workspace-level utility Work view, such as Files or Review.
 _Avoid_: Permanent view, special view
+
+**Browser**:
+The feature for opening webpages in a Workspace, including apps running in that Workspace. It is distinct from the remote graphical environment shown by Desktop.
+_Avoid_: Preview browser, browser preview
+
+**Browser view**:
+A Resource Work view displaying a webpage through Browser, with its own address and navigation. A Workspace may contain multiple Browser views.
+_Avoid_: Browser tab, preview view, Browser Work view
+
+**Review**:
+A contextual Work view for inspecting a Workspace’s uncommitted Git changes and drafting Review comments for an Agent. It includes staged, unstaged, and untracked changes; it is not a pull-request approval workflow.
+_Avoid_: Review view, change review, pull-request review
+
+**Review comment**:
+Feedback drafted in Review about changed lines in a Workspace file, which can be copied into an Agent’s composer. It is retained even if later file changes prevent matching its original lines.
+_Avoid_: Review note, feedback note, repository comment
+
+**Unanchored Review comment**:
+A Review comment that can no longer be matched unambiguously to its original lines in the Workspace’s current changes. Its feedback and original snippet are retained; being unanchored does not necessarily mean the feedback is obsolete.
+_Avoid_: Outdated comment, stale comment, comment without an anchor
+
+**Side-by-side**:
+The Review diff layout that places deletions and additions in separate columns next to each other.
+_Avoid_: Split diff, split layout
 
 **Mobile destination**:
 A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.

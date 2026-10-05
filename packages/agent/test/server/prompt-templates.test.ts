@@ -9,13 +9,13 @@ describe("prompt templates", () => {
     const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
     await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
     await mkdir(join(root, ".pi/prompts"), { recursive: true });
-    await writeFile(join(root, ".agents-in-the-cloud/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\nquick-launch: true\nhotkey: L\n---\ncommit to ${"$"}{1:-main}`);
-    await writeFile(join(root, ".pi/prompts/review.md"), "---\nhotkey: command-r\n---\nReview $ARGUMENTS");
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\nquick-launch: true\nshortcut: L\n---\ncommit to ${"$"}{1:-main}`);
+    await writeFile(join(root, ".pi/prompts/review.md"), "---\nshortcut: command-r\n---\nReview $ARGUMENTS");
 
     const templates = await loadPromptTemplatesFromRoot(root);
     expect(templates.map((template) => template.trigger)).toEqual(["/compact", "/land", "/name", "/new", "/park", "/review"]);
-    expect(templates.find((template) => template.name === "land")).toMatchObject({ argumentHint: "[branch]", quickLaunch: true, hotkey: "l" });
-    expect(templates.find((template) => template.name === "review")?.hotkey).toBeUndefined();
+    expect(templates.find((template) => template.name === "land")).toMatchObject({ argumentHint: "[branch]", quickLaunch: true, shortcut: "l" });
+    expect(templates.find((template) => template.name === "review")?.shortcut).toBeUndefined();
     const nameCommand = templates.find((template) => template.name === "name");
     expect(nameCommand).toMatchObject({
       trigger: "/name",
@@ -23,6 +23,17 @@ describe("prompt templates", () => {
       prompt: "/name",
     });
     expect(expandPromptTemplateText("/name my-custom-name", templates)).toBe("/name my-custom-name");
+  });
+
+  test("reads shortcuts from older prompt files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
+    await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/legacy.md"), "---\nhotkey: L\n---\nLegacy prompt");
+
+    const templates = await loadPromptTemplatesFromRoot(root);
+    const template = templates.find((template) => template.name === "legacy");
+    expect(template?.shortcut).toBe("l");
+    expect(template).not.toHaveProperty("hotkey");
   });
 
   test("includes builtin land template when repository does not provide one", async () => {
