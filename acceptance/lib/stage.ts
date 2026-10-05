@@ -25,7 +25,7 @@ interface WorkspaceJson {
 async function json<T>(atelier: string, path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const response = await fetch(new URL(path, atelier), {
     method: init.method ?? "GET",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: { Accept: "application/json", "Content-Type": "application/json", Origin: new URL(atelier).origin },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
   const text = await response.text();

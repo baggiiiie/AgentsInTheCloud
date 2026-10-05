@@ -85,6 +85,7 @@ when AgentsInTheCloud runs behind a TLS-terminating proxy:
 
 ```sh
 created=$(curl -sS -X POST http://localhost:3000/workspaces \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"source":{"type":"empty"},"title":"Evaluation"}')
 id=$(jq -r '.workspace.id' <<<"$created")
@@ -129,14 +130,17 @@ Execute commands using their advertised schema:
 
 ```sh
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/terminal.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"title":"Tests","cwd":"/work","command":"bun test"}'
 
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/browser.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"url":"http://localhost:3000/"}'
 
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/agent.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{}'
 ```
 
@@ -151,10 +155,10 @@ Navigate an existing Browser view with `POST /workspaces/:id/browser/:browserId/
 Open Work-view identity and order are server-persistent. Workspace, agent, and view `requestingAttention` states are independent and server-persistent; each clears only when that destination becomes visible. Workspace `phase` is an object with `kind` and `busy`, plus phase-specific substates. Agent summaries include `busy` and `requestingAttention`. Active destinations, pane visibility, and Work-pane width are browser-local.
 
 The Agent `/park` message responds with a `307` redirect to the workspace park operation.
-Follow redirects while preserving the POST method and Accept header (for example, `curl -L`).
+Follow same-origin redirects while preserving the POST method, Accept, and Origin headers (for example, `curl -L`).
 Confirmation is returned only to that requester; JSON clients receive `409` when confirmation is needed.
 
-Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park, unpark, and delete use the corresponding existing workspace UI routes with `Accept: application/json`.
+Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park, unpark, and delete use the corresponding existing workspace UI routes with `Accept: application/json` and a matching `Origin` header.
 
 ## Control an agent
 
