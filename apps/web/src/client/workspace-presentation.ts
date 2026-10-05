@@ -105,6 +105,7 @@ export function createWorkspacePresentationController(
       this.element.addEventListener("agents-in-the-cloud:workspace-residency-visible", this.residencyVisible);
       this.element.addEventListener("live:structure", this.structureChanged);
       this.element.addEventListener("agents-in-the-cloud:workspace-residency-hidden", this.residencyHidden);
+      this.element.addEventListener("turbo:before-morph-attribute", this.preserveAgentWidth);
       document.addEventListener("visibilitychange", this.documentVisibilityChanged);
       this.restorePreferences();
       this.sizeObserver = new ResizeObserver(() => {
@@ -123,6 +124,7 @@ export function createWorkspacePresentationController(
       this.element.removeEventListener("agents-in-the-cloud:workspace-residency-visible", this.residencyVisible);
       this.element.removeEventListener("live:structure", this.structureChanged);
       this.element.removeEventListener("agents-in-the-cloud:workspace-residency-hidden", this.residencyHidden);
+      this.element.removeEventListener("turbo:before-morph-attribute", this.preserveAgentWidth);
       document.removeEventListener("visibilitychange", this.documentVisibilityChanged);
       this.sizeObserver?.disconnect();
       if (this.mobileNavigationLayoutFrame !== undefined) cancelAnimationFrame(this.mobileNavigationLayoutFrame);
@@ -590,6 +592,13 @@ export function createWorkspacePresentationController(
       this.resize = undefined;
     };
 
+    // The agent width lives in this element's inline style, which the server never
+    // renders. Keep live morphs from stripping it.
+    private preserveAgentWidth = (event: Event): void => {
+      // SAFETY: Turbo emits this event with its attribute mutation descriptor.
+      const detail = (event as CustomEvent<{ attributeName: string }>).detail;
+      if (event.target === this.element && detail.attributeName === "style") event.preventDefault();
+    };
     private structureChanged = (): void => { this.presentationChanged(); };
     private viewportChanged = (): void => { this.applyState({ emit: true }); };
     private residencyVisible = (event: Event): void => {
