@@ -32,7 +32,7 @@ for (const id of ["codex", "claude", "pi"]) {
         expect(agentType.id).toBe(${JSON.stringify(id)});
         const form = new FormData();
         form.set("model", "${model}");
-        form.set("level", "high");
+        form.set("thinkingLevel", "high");
         const submitted = await agentType.launch.submit(form);
         const context = await submitted.prepare();
         expect(context.agent).toEqual({ model: form.get("model"), thinkingLevel: "high" });

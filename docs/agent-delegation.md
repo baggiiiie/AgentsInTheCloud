@@ -15,7 +15,7 @@ Work views, commands, icons, controllers, and assets.
 ## The small set of supported interactions
 
 - **Prepare a session:** one conversation-scoped preparation supplies delegation
-  instructions, tools, optional inherited model/thinking settings, and history
+  instructions, tools, optional inherited model and Thinking level settings, and history
   seeding. Explicit initial settings take precedence over inherited settings.
 - **Attach a session:** the integration binds its peer and lifecycle listener.
   Session replacement releases the previous attachment without unbinding its

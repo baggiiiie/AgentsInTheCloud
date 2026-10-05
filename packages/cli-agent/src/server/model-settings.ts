@@ -13,7 +13,7 @@ export function createCliModelSettings(options: {
   /** Omit provider to share enabled models across all connected providers. */
   provider?: string;
   unavailableReason?(runtime: Awaited<ReturnType<typeof createPiModelRuntime>>, model: ModelRef): Promise<string | undefined>;
-  effort(level: string, mapped: string | null | undefined): string | undefined;
+  mapThinkingLevel(level: string, mapped: string | null | undefined): string | undefined;
 }) {
   async function choices(requestedModel?: string, requestedLevel?: string) {
     const remembered = await getAgentModelPreference(options.agentTypeId);
@@ -34,8 +34,8 @@ export function createCliModelSettings(options: {
     // Adapters translate Pi thinking levels when their CLI uses provider-native efforts.
     const thinkingLevels = selected && selectedModel ? [...new Set((await modelThinkingLevels(selected)).flatMap((level) => {
       const mapped = selectedModel.thinkingLevelMap?.[level];
-      const effort = options.effort(level, mapped);
-      return effort === undefined ? [] : [effort];
+      const thinkingLevel = options.mapThinkingLevel(level, mapped);
+      return thinkingLevel === undefined ? [] : [thinkingLevel];
     }))] : [];
     const preferredLevel = requestedLevel || (selected ? await getAgentModelThinkingLevel(options.agentTypeId, selected) : undefined);
     const selectedThinkingLevel = preferredLevel && thinkingLevels.includes(preferredLevel) ? preferredLevel
@@ -44,7 +44,7 @@ export function createCliModelSettings(options: {
   }
 
   async function renderFooter(context: AgentLaunchFooterContext): Promise<string> {
-    return renderLaunchModelSettings({ ...context, agentTypeId: options.agentTypeId, ...await choices(context.query.get("model") ?? undefined, context.query.get("level") ?? undefined) });
+    return renderLaunchModelSettings({ ...context, agentTypeId: options.agentTypeId, ...await choices(context.query.get("model") ?? undefined, context.query.get("thinkingLevel") ?? undefined) });
   }
 
   /** Only available enabled models and supported thinking levels may reach the CLI. */

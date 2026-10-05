@@ -8,11 +8,11 @@ export function createLaunchModelRefreshController(Controller: WorkspaceClientCo
       const modelInput = frame.querySelector<HTMLInputElement>('input[name="model"]');
       if (!modelInput) { this.element.remove(); return; }
       const model = modelInput.value;
-      const level = frame.querySelector<HTMLSelectElement>('select[name="level"]')?.value;
+      const thinkingLevel = frame.querySelector<HTMLSelectElement>('select[name="thinkingLevel"]')?.value;
       const url = new URL("/launch-composer/settings", window.location.href);
-      url.searchParams.set("provider", frame.dataset.agentType!);
+      url.searchParams.set("agentTypeId", frame.dataset.agentType!);
       if (model) url.searchParams.set("model", model);
-      if (level) url.searchParams.set("level", level);
+      if (thinkingLevel) url.searchParams.set("thinkingLevel", thinkingLevel);
       const source = url.pathname + url.search;
       if (frame.getAttribute("src") === source) frame.reload();
       else frame.setAttribute("src", source);

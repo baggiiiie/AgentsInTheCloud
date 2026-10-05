@@ -151,7 +151,7 @@ Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park,
 ## Control an agent
 
 - `POST /workspaces/:id/agents/:agentId/model` with `{ "model": "provider::model" }`
-- `POST /workspaces/:id/agents/:agentId/thinking` with `{ "level": "medium" }`
+- `POST /workspaces/:id/agents/:agentId/thinking-level` with `{ "thinkingLevel": "medium" }`
 - `POST /workspaces/:id/agents/:agentId/messages` with `{ "text": "...", "mode": "send" }`
 - `POST /workspaces/:id/agents/:agentId/abort`
 

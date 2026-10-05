@@ -141,7 +141,7 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
     }
     if (entry.type === "model_change" || entry.type === "thinking_level_change") {
       if (records.length === 0) continue;
-      const text = entry.type === "model_change" ? `model → ${entry.provider}/${entry.modelId}` : `Thinking → ${entry.thinkingLevel}`;
+      const text = entry.type === "model_change" ? `model → ${entry.provider}/${entry.modelId}` : `Thinking level → ${entry.thinkingLevel}`;
       const record: TranscriptRecord = { kind: "note", id: entry.id, text, tone: "system", timestamp: entryTimestamp(entry) };
       if (lastSettingChange && lastSettingChange.type === entry.type && records.at(-1) === lastSettingChange.record) records[records.length - 1] = record;
       else records.push(record);

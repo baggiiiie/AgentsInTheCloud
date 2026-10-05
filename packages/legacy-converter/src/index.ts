@@ -96,7 +96,7 @@ async function transcript(path: string): Promise<EntryDraft[]> {
     else if (entry.type === "message" && entry.message.role === "branchSummary") text = entry.message.summary;
     else if (entry.type === "message" && entry.message.role === "custom" && entry.message.display) text = contentText(entry.message.content);
     else if (entry.type === "model_change") text = `Model → ${entry.provider}/${entry.modelId}`;
-    else if (entry.type === "thinking_level_change") text = `Thinking → ${entry.thinkingLevel}`;
+    else if (entry.type === "thinking_level_change") text = `Thinking level → ${entry.thinkingLevel}`;
     if (text !== undefined) {
       Value.Assert(Type.String(), text);
       result.push({ kind: historyNote.kind, data: { text, tone: "summary" } });

@@ -44,6 +44,10 @@ _Avoid_: Agent provider
 A model included in the saved list used for an Agent’s composer model choices. Models may be enabled automatically when connecting a Model provider or by the user; being enabled does not guarantee availability through the Agent type, account access, or current credentials.
 _Avoid_: Favorite model, configured model, your models, model shortlist
 
+**Thinking level**:
+A model-specific setting requesting how much reasoning effort an Agent’s model uses for subsequent work. Supported levels depend on the model and Agent type; a Thinking level is a configuration choice, not the reasoning text produced by the model.
+_Avoid_: Reasoning effort, effort, thinking mode
+
 **Agent pane**:
 The primary region for collaborating with the active Agent in a Workspace.
 _Avoid_: Left tab, chat tab

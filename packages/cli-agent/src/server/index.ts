@@ -95,7 +95,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
         async prepare(parameters) { await adapter.requireSetup(); return { agent: await adapter.settings.prepare(parameters) }; },
         async submit(form) {
           await adapter.requireSetup();
-          const settings = await adapter.settings.prepare({ model: String(form.get("model") ?? ""), thinkingLevel: String(form.get("level") ?? "") });
+          const settings = await adapter.settings.prepare({ model: String(form.get("model") ?? ""), thinkingLevel: String(form.get("thinkingLevel") ?? "") });
           return { async prepare() { return { agent: settings }; } };
         },
         prepareWorkspace: (workspaceId, context) => agents.prepareWorkspace(workspaceId, context?.agent),

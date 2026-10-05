@@ -44,7 +44,7 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
 
 export const nativeAgentLaunch: WorkspaceAgentLaunch = {
   renderFooter({ query, ...context }) {
-    return renderLaunchComposerSettings({ ...context, selectedModel: query.get("model") ?? undefined, selectedThinkingLevel: query.get("level") ?? undefined });
+    return renderLaunchComposerSettings({ ...context, selectedModel: query.get("model") ?? undefined, selectedThinkingLevel: query.get("thinkingLevel") ?? undefined });
   },
   prepare: prepareAgentLaunch,
   async submit(form) {
@@ -52,7 +52,7 @@ export const nativeAgentLaunch: WorkspaceAgentLaunch = {
       || (await listStagedAttachments(String(form.get("attachmentDraft") ?? ""))).length > 0;
     if (hasPrompt && !await hasAvailableBuiltinAgentModel()) return { response: turboStreamResponse(turboStream("update", "settings_modal_host", await renderModelsDialog({ focus: "models" })), { status: 422 }) };
     const model = String(form.get("model") ?? "");
-    const thinkingLevel = String(form.get("level") ?? "");
+    const thinkingLevel = String(form.get("thinkingLevel") ?? "");
     return {
       async prepare() {
         const ref = parseModelRef(model);

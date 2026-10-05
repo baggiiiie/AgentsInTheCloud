@@ -142,3 +142,34 @@ test("offline HTTP Stop bypasses model/UI preparation and commits intent before 
   } finally { await workspace.close(); }
   expect(faux.state.callCount).toBe(1);
 });
+
+test("thinking level HTTP configuration uses canonical fields and validates native model support", async () => {
+  directory = await mkdtemp(join(tmpdir(), "durable-thinking-level-http-"));
+  process.env.ATELIER_DATA_DIR = directory;
+  const agent = await ensureDefaultWorkspaceAgent("thinking-level-workspace");
+  const models = createModels();
+  const faux = fauxProvider({ models: [{ id: "test" }] });
+  models.setProvider(faux.provider);
+  const model = { provider: "faux", modelId: "test" };
+  owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, {
+    harness: async () => ({ models, registry: createRegistry() }),
+    prepare: async () => ({ model }),
+    expand: async (_workspace, text) => text,
+    validateModel: async () => {},
+    ready: async () => {},
+  });
+  const controller = await owner.agent(agent, { model });
+  const configure = (thinkingLevel?: string) => {
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.agentId}/thinking-level`, {
+      method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ thinkingLevel }),
+    });
+    return handleAgentRequest(request, new URL(request.url), { getController: async () => controller });
+  };
+  const response = await configure("off");
+  expect(response?.status).toBe(200);
+  expect(await response!.json()).toEqual({ agent: { agentId: agent.agentId, thinkingLevel: "off" } });
+  expect((await controller.settings()).thinkingLevel).toBe("off");
+  await expect(configure()).rejects.toMatchObject({ code: "invalid_arguments" });
+  await expect(configure("unsupported")).rejects.toMatchObject({ code: "invalid_arguments" });
+  expect((await controller.settings()).thinkingLevel).toBe("off");
+});

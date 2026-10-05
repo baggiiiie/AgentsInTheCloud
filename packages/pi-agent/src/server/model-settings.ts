@@ -6,7 +6,7 @@ import { piModelSetupRequired } from "./auth.ts";
 const sharedSettings = createCliModelSettings({
   agentTypeId: "pi", label: "Pi",
   // Pi uses its own abstract thinking levels, not the provider-native efforts.
-  effort: (level) => level,
+  mapThinkingLevel: (level) => level,
   unavailableReason: piCliModelUnavailableReason,
 });
 

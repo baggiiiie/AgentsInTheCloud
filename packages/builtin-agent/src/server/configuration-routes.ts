@@ -19,20 +19,20 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     await invalidateAgentView(options, params[0], params[1]);
     return json ? Response.json({ agent: { agentId: params[1], model: `${model.provider}::${model.id}` } }) : turboStreamResponse("");
   }
-  if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/thinking$/)) && request.method === "POST") {
+  if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/thinking-level$/)) && request.method === "POST") {
     const json = requestAcceptsJson(request);
-    const value = json ? (await readJsonObject(request)).level : (await request.formData()).get("level");
-    const level = String(value ?? "");
-    if (!level) {
-      if (json) throw new AgentsInTheCloudCoreError("invalid_arguments", "level is required");
+    const value = json ? (await readJsonObject(request)).thinkingLevel : (await request.formData()).get("thinkingLevel");
+    const thinkingLevel = String(value ?? "");
+    if (!thinkingLevel) {
+      if (json) throw new AgentsInTheCloudCoreError("invalid_arguments", "thinkingLevel is required");
       return turboStreamResponse("");
     }
     const runtime = await requireAgentController(params[0], params[1], options);
-    await runtime.configure({ thinkingLevel: level });
+    await runtime.configure({ thinkingLevel });
     const model = (await runtime.settings()).model;
-    if (model) await setAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.modelId }, level);
+    if (model) await setAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.modelId }, thinkingLevel);
     await invalidateAgentView(options, params[0], params[1]);
-    return json ? Response.json({ agent: { agentId: params[1], thinkingLevel: level } }) : turboStreamResponse("");
+    return json ? Response.json({ agent: { agentId: params[1], thinkingLevel } }) : turboStreamResponse("");
   }
   return undefined;
 };

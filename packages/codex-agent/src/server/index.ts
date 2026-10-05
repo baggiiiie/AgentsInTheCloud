@@ -7,7 +7,7 @@ import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId, codexHist
 
 export const codexModelSettings = createCliModelSettings({
   agentTypeId: "codex", provider: "openai-codex", label: "Codex",
-  effort: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level),
+  mapThinkingLevel: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level),
 });
 
 export const agentsInTheCloudServerModule = createCliAgentModule({

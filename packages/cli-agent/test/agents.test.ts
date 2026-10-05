@@ -231,7 +231,7 @@ test("launch settings are prepared by the adapter for both form and programmatic
   expect(await agentType.launch.prepare(settings)).toEqual({ agent: settings });
   const form = new FormData();
   form.set("model", "local::other");
-  form.set("level", "high");
+  form.set("thinkingLevel", "high");
   const submitted = await agentType.launch.submit(form);
   expect(await submitted.prepare()).toEqual({ agent: { model: "local::other", thinkingLevel: "high" } });
   const minimal = createCliAgentModule({ ...adapter, id: "minimal", prepareWorkspace: undefined }).agentType;

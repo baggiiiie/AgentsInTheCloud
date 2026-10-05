@@ -17,7 +17,7 @@ export interface ComposerModelOption {
 
 interface SharedComposerSelectionsOptions {
   modelFormId: string;
-  thinkingFormId: string;
+  thinkingLevelFormId: string;
   models: ComposerModelOption[];
   thinkingLevels: string[];
   selectedThinkingLevel: string;
@@ -49,10 +49,10 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
 
 export function renderSharedComposerSelections(options: SharedComposerSelectionsOptions): string {
   const autosubmit = options.autosubmitThinking
-    ? ` data-controller="composer-selection-autosubmit" data-composer-selection-autosubmit-form-id-value="${escapeHtml(options.thinkingFormId)}" data-action="change->composer-selection-autosubmit#submit"`
+    ? ` data-controller="composer-selection-autosubmit" data-composer-selection-autosubmit-form-id-value="${escapeHtml(options.thinkingLevelFormId)}" data-action="change->composer-selection-autosubmit#submit"`
     : "";
   const thinkingSelection = options.thinkingLevels.length > 0
-    ? `<span class="composer-selection-field"${autosubmit}><select class="composer-selection popup-select" data-controller="popup-select" data-popup-placement="above" name="level" form="${escapeHtml(options.thinkingFormId)}" title="Thinking level">${options.thinkingLevels.map((level) => `<option value="${escapeHtml(level)}"${level === options.selectedThinkingLevel ? " selected" : ""}>${escapeHtml(level)}</option>`).join("")}</select></span>`
+    ? `<span class="composer-selection-field"${autosubmit}><select class="composer-selection popup-select" data-controller="popup-select" data-popup-placement="above" name="thinkingLevel" form="${escapeHtml(options.thinkingLevelFormId)}" title="Thinking level">${options.thinkingLevels.map((level) => `<option value="${escapeHtml(level)}"${level === options.selectedThinkingLevel ? " selected" : ""}>${escapeHtml(level)}</option>`).join("")}</select></span>`
     : "";
   const ready = options.models.some((model) => model.selected && model.available !== false);
   return `<span class="composer-selections" data-model-ready="${ready}">
@@ -70,7 +70,7 @@ export function renderLaunchModelSettings(options: {
 <form id="${escapeHtml(modelFormId)}" method="get" action="${escapeHtml(options.url)}" data-turbo-frame="${escapeHtml(options.frameId)}" hidden></form>
 <input type="hidden" name="agentTypeId" value="${escapeHtml(options.agentTypeId)}" form="${escapeHtml(modelFormId)}">
 <input type="hidden" name="model" value="${escapeHtml(options.selectedValue)}" form="${escapeHtml(options.formId)}">
-${renderSharedComposerSelections({ ...options, modelFormId, thinkingFormId: options.formId })}</turbo-frame>`;
+${renderSharedComposerSelections({ ...options, modelFormId, thinkingLevelFormId: options.formId })}</turbo-frame>`;
 }
 
 export async function modelThinkingLevels(ref: ModelRef) {

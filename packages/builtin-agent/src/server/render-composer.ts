@@ -162,9 +162,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
   const models = stats.models.length > 0 ? stats.models : [{ provider: "", id: "", name: stats.modelName ?? "no model", selected: true, available: false }];
   const formPrefix = `${ids.stats(ctx)}_selection`;
   const modelFormId = `${formPrefix}_model`;
-  const thinkingFormId = `${formPrefix}_thinking`;
+  const thinkingLevelFormId = `${formPrefix}_thinking_level`;
   const selectionForms = `<form id="${modelFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/model"))}" hidden></form>
-${stats.thinkingLevels.length > 0 ? `<form id="${thinkingFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking"))}" hidden></form>` : ""}`;
+${stats.thinkingLevels.length > 0 ? `<form id="${thinkingLevelFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking-level"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
 <span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
@@ -173,7 +173,7 @@ ${meter}
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,
-    thinkingFormId,
+    thinkingLevelFormId,
     models,
     thinkingLevels: stats.thinkingLevels,
     selectedThinkingLevel: stats.thinkingLevel,

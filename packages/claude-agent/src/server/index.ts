@@ -7,7 +7,7 @@ import { loadClaudeTranscript, loadClaudeTranscriptImage, hasClaudeSession, hasC
 
 export const claudeModelSettings = createCliModelSettings({
   agentTypeId: "claude", provider: "anthropic", label: "Claude",
-  effort: (level, mapped) => mapped !== null && ["low", "medium", "high", "xhigh", "max"].includes(mapped ?? level) ? mapped ?? level : undefined,
+  mapThinkingLevel: (level, mapped) => mapped !== null && ["low", "medium", "high", "xhigh", "max"].includes(mapped ?? level) ? mapped ?? level : undefined,
 });
 
 export const agentsInTheCloudServerModule = createCliAgentModule({

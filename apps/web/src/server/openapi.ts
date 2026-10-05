@@ -126,7 +126,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       "/workspaces/{id}/delete": { post: { summary: "Delete a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", properties: { force: { type: "boolean" } }, additionalProperties: false }), responses: jsonResponse("Workspace deletion scheduled or blocked", { type: "object" }) } },
       "/workspaces/{id}/agents/{agentId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,128}$", description: "Caller-generated message identity. Reuse on retries to return the original admission without submitting another message." }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
       "/workspaces/{id}/agents/{agentId}/model": { post: { summary: "Select an agent model", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["model"], properties: { model: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Model selected", { $ref: "#/components/schemas/AgentModelEnvelope" }) } },
-      "/workspaces/{id}/agents/{agentId}/thinking": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["level"], properties: { level: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingEnvelope" }) } },
+      "/workspaces/{id}/agents/{agentId}/thinking-level": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["thinkingLevel"], properties: { thinkingLevel: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingLevelEnvelope" }) } },
       "/workspaces/{id}/agents/{agentId}/abort": { post: { summary: "Abort the active agent turn", parameters: [workspaceId, agentId], responses: jsonResponse("Agent aborted", { $ref: "#/components/schemas/AgentStateEnvelope" }) } },
     },
     components: {
@@ -232,7 +232,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
           properties: { agent: { type: "object", required: ["agentId", "model"], properties: { agentId: { type: "string", format: "uuid" }, model: { type: "string" } }, additionalProperties: false } },
           additionalProperties: false,
         },
-        AgentThinkingEnvelope: {
+        AgentThinkingLevelEnvelope: {
           type: "object",
           required: ["agent"],
           properties: { agent: { type: "object", required: ["agentId", "thinkingLevel"], properties: { agentId: { type: "string", format: "uuid" }, thinkingLevel: { type: "string" } }, additionalProperties: false } },

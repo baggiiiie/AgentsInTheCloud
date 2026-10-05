@@ -21,7 +21,7 @@ test("CLI model preferences persist across processes, remain Agent-type-specific
         hasConnectedModelProvider: () => true,
       }));
       const { createCliModelSettings } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/model-settings.ts"))});
-      const settings = (agentTypeId = "pi") => createCliModelSettings({ agentTypeId, label: agentTypeId, effort: level => level });
+      const settings = (agentTypeId = "pi") => createCliModelSettings({ agentTypeId, label: agentTypeId, mapThinkingLevel: level => level });
       ${script}
     `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);

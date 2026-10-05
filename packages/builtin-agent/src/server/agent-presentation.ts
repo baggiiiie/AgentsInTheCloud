@@ -30,7 +30,7 @@ export class AgentPresentation {
   private unsubscribeStatus!: () => void;
   private unsubscribeSelection!: () => void;
   model?: { provider: string; id: string };
-  private thinking = "off";
+  private thinkingLevel = "off";
   private models: AgentStatsView["models"] = [];
   private catalog = "";
   private busy = false;
@@ -110,7 +110,7 @@ export class AgentPresentation {
     if (this.readOnly) return;
     const { agent } = this.presentation.state;
     this.model = agent.model ? { provider: agent.model.provider, id: agent.model.modelId } : undefined;
-    this.thinking = agent.thinkingLevel ?? "off";
+    this.thinkingLevel = agent.thinkingLevel ?? "off";
     this.publishBusy(this.presentation.busy);
     this.contextTokens = durableContextTokens(await this.controller.context(BACKGROUND_CONTEXT));
     this.chrome.invalidate();
@@ -132,7 +132,7 @@ export class AgentPresentation {
     return { nativeBranchUsage: true, descendantCost: this.descendantCost, isSubagent: this.controller.isSubagent, contextPercent: model?.contextWindow ? this.contextTokens / model.contextWindow * 100 : null, compactAvailable: !this.isStreaming && Boolean(this.model),
       inputTokens: buckets.reduce((sum, item) => sum + item.input, 0), outputTokens: buckets.reduce((sum, item) => sum + item.output, 0),
       cost: buckets.reduce((sum, item) => sum + item.cost.total, 0), modelName: this.model?.id,
-      thinkingLevel: this.thinking, thinkingLevels: this.availableThinkingLevels(), models: this.models.map(model => ({ ...model, selected: model.provider === this.model?.provider && model.id === this.model.id })) };
+      thinkingLevel: this.thinkingLevel, thinkingLevels: this.availableThinkingLevels(), models: this.models.map(model => ({ ...model, selected: model.provider === this.model?.provider && model.id === this.model.id })) };
   }
   subscribeLivePresentation(listener: AgentLivePresentationListener) {
     this.assertOpen();
@@ -149,7 +149,7 @@ export class AgentPresentation {
     if (defaultModel) await this.controller.configureDefaultModel({ provider: defaultModel.provider, modelId: defaultModel.id });
     const settings = await this.controller.settings();
     this.model = settings.model ? { provider: settings.model.provider, id: settings.model.modelId } : undefined;
-    this.thinking = settings.thinkingLevel ?? "off";
+    this.thinkingLevel = settings.thinkingLevel ?? "off";
     this.models = await enabledModelOptionViews(this.currentModel() ?? null, this.modelRuntime);
     this.chrome.invalidate();
   }
