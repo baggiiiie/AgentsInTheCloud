@@ -112,7 +112,13 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.formTarget.addEventListener("formdata", this.identifySubmission);
       this.formTarget.addEventListener("submit", this.submitting);
       this.composerMutationObserver = new MutationObserver(() => this.updateSendStopButton());
-      this.composerMutationObserver.observe(this.formTarget, { childList: true, subtree: true });
+      // Live morphs update the existing button's state attributes without replacing it.
+      this.composerMutationObserver.observe(this.formTarget, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-agent-busy", "data-agent-stoppable", "data-agent-abort-form-id"],
+      });
       const promptDraft = localStorage.getItem(this.composerTextStorageKey);
       if (promptDraft !== null) this.inputTarget.value = promptDraft;
       this.updateSendStopButton();

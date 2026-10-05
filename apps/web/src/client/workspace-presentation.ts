@@ -602,6 +602,8 @@ export function createWorkspacePresentationController(
     private structureChanged = (): void => { this.presentationChanged(); };
     private viewportChanged = (): void => { this.applyState({ emit: true }); };
     private residencyVisible = (event: Event): void => {
+      // Restore the visible pane's width before transcript navigation measures it.
+      this.restorePreferences();
       if (event instanceof CustomEvent && event.detail.selectedFromList) this.selectDestinationOnWorkspaceEntry();
       else this.applyDeepLink();
       this.persist();

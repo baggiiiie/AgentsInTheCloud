@@ -10,11 +10,13 @@ interface TranscriptGeometry {
   latestTop: number;
 }
 
-/** The scroll offset that shows the latest prompt in full at the top, with its answer below. */
-export function latestPromptTop(transcript: HTMLElement, content: HTMLElement): number {
+/** Show the end of the answer, scrolling back only as far as its prompt requires.
+ * A prompt taller than the viewport opens at its beginning instead. */
+export function latestExchangeTop(transcript: HTMLElement, content: HTMLElement, bottomTop: number): number {
   const prompts = content.querySelectorAll<HTMLElement>(".agent-user");
   const latest = prompts.item(prompts.length - 1)?.closest<HTMLElement>(".agent-item");
-  return latest ? transcript.scrollTop + latest.getBoundingClientRect().top - transcript.getBoundingClientRect().top : 0;
+  const promptTop = latest ? transcript.scrollTop + latest.getBoundingClientRect().top - transcript.getBoundingClientRect().top : bottomTop;
+  return Math.max(0, Math.min(bottomTop, promptTop));
 }
 
 /** Owns transcript navigation. Geometry is an output of follow intent, never
@@ -230,7 +232,7 @@ export class TranscriptNavigation {
 
     if (this.pendingPosition === "prompt") {
       this.pendingPosition = undefined;
-      this.transcript.scrollTop = latestPromptTop(this.transcript, this.content);
+      this.transcript.scrollTop = latestExchangeTop(this.transcript, this.content, geometry.latestTop);
     } else if (!this.following && geometry.contentEnd < this.transcript.scrollTop + geometry.threshold) {
       // A wider pane (for example fullscreen) can reflow the entire transcript
       // above a paused viewport. Do not protect an empty viewport with reserve.
@@ -293,7 +295,8 @@ export class TranscriptNavigation {
 
   private readonly scrolled = (): void => {
     // Reaching the end by hand resumes following; scroll-to-bottom shows only away from it.
-    if (!this.following && !this.motionFrame && this.transcript.scrollTop >= this.geometry().latestTop - 2) {
+    // A scroll event from showing the pane must not override its pending selection position.
+    if (!this.following && !this.pendingPosition && !this.motionFrame && this.transcript.scrollTop >= this.geometry().latestTop - 2) {
       this.following = true;
       this.renderMode();
     }

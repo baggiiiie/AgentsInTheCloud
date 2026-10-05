@@ -1,5 +1,5 @@
 import { createNativeTerminalTextInputController, createTerminalKeyBarController, agentsInTheCloudObservableTerminalTheme, createObservableTerminalViewer, observableWebSocketUrl, TerminalFrame, type ObservableTerminalViewer } from "@agents-in-the-cloud/observable-terminal/client";
-import { latestPromptTop } from "@agents-in-the-cloud/agent/client/transcript-navigation";
+import { latestExchangeTop } from "@agents-in-the-cloud/agent/client/transcript-navigation";
 import { anchorScrollBottom, CableTopics, changeLayout, type CableSubscription, composerSubmitKey, errorMessage, type AgentComposerSendPromptDetail, isWorkspacePaneVisible, setTextInputValue, workspaceFileOpenUrl, type WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
@@ -69,7 +69,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         this.activate();
       }
       becomeVisible(): void {
-        requestAnimationFrame(() => this.scrollToLatestPrompt());
+        requestAnimationFrame(() => this.scrollToLatestExchange());
       }
       private readonly activate = (): void => {
         if (isWorkspacePaneVisible(this.element)) this.start();
@@ -250,11 +250,11 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       transcriptContentTargetConnected(content: HTMLElement): void {
         this.transcriptAvailable = content.dataset.available === "true";
         this.syncTranscript();
-        requestAnimationFrame(() => this.scrollToLatestPrompt());
+        requestAnimationFrame(() => this.scrollToLatestExchange());
       }
-      /** Like the built-in agent: open on the latest prompt, not the end of its answer. */
-      private scrollToLatestPrompt(): void {
-        this.transcriptTarget.scrollTop = latestPromptTop(this.transcriptTarget, this.transcriptContentTarget);
+      /** Show the end of the answer unless that would hide its prompt. */
+      private scrollToLatestExchange(): void {
+        this.transcriptTarget.scrollTop = latestExchangeTop(this.transcriptTarget, this.transcriptContentTarget, this.transcriptEndTop());
         this.transcriptScrolled();
       }
       transcriptScrolled(): void {
