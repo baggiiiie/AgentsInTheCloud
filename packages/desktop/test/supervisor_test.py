@@ -50,6 +50,20 @@ class SupervisorTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "Chromium exited with code 7"):
             desktop.assert_children([("Chromium", child)])
 
+    def test_chromium_launch_disables_namespace_sandbox_in_workspace(self):
+        read_fd, write_fd = desktop.os.pipe()
+        with desktop.os.fdopen(read_fd) as result, \
+                patch.object(subprocess, "run"), \
+                patch.object(subprocess, "Popen") as spawn, \
+                patch.object(desktop, "wait_ready", side_effect=[None, None, RuntimeError("probe stopped")]), \
+                patch.object(desktop, "stop_children"):
+            desktop.supervise(write_fd)
+            chromium = spawn.call_args_list[2].args[0]
+            self.assertEqual(chromium[:3], ["dbus-run-session", "--", "/opt/agents-in-the-cloud/bin/chromium"])
+            self.assertIn("--no-sandbox", chromium)
+            self.assertIn("--remote-debugging-address=127.0.0.1", chromium)
+            self.assertIn('"phase": "failed"', result.read())
+
     def test_cleanup_terminates_all_owned_groups_in_reverse_order(self):
         children = [("Xvfb", Mock(pid=100)), ("Chromium", Mock(pid=200))]
         with patch.object(desktop.os, "killpg") as kill:
