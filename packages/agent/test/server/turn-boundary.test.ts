@@ -11,7 +11,8 @@ async function scenario(script: string): Promise<void> {
       import { expect, mock } from "bun:test";
       const workspace = await import("@agents-in-the-cloud/workspace");
       mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async () => ({ stdout: "", stderr: "", exitCode: 0, durationMs: 0 }) }));
-      const { configureAgentMcp, handleAgentMcpRequest, prepareAgentMcp, registerAgentTurnSettler, revokeAgentMcp } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/mcp.ts"))});
+      const { configureAgentMcp, handleAgentMcpRequest, prepareAgentMcp, revokeAgentMcp } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/mcp.ts"))});
+      const { registerAgentTurnSettler } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/turn-lifecycle.ts"))});
       const { subscribeWorkspaceAgentBusy } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/workspace-agent-busy.ts"))});
       const log = [];
       configureAgentMcp({ on() {}, emit: async (name, payload) => { log.push(name + ":" + payload.conversationId); } });
