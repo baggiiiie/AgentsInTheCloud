@@ -1,4 +1,4 @@
-export { subscribeWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
+export { publishWorkspaceAgentBusy, subscribeWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 export { suggestAgentSlug } from "./slug-suggestion.ts";
 export { workspaceFileEndpoint } from "./workspace-files.ts";
 export { agentKey } from "./render-context.ts";

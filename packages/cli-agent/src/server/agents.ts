@@ -1,4 +1,4 @@
-import { prepareAgentMcp, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
+import { agentKey, publishWorkspaceAgentBusy, prepareAgentMcp, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";
@@ -67,6 +67,10 @@ export function createCliAgents(adapter: CliAgentAdapter, onTitleChanged: (works
     const { id } = agent;
     const ready = Promise.withResolvers<void>();
     starting.set(id, ready.promise);
+    // A claimed prompt is already work, even while the CLI is installing. Native
+    // turn hooks take over this same busy state once the first turn begins.
+    const pendingPrompt = !!input && !!(input.text.trim() || input.images.length || input.attachmentNotes.length);
+    if (pendingPrompt) publishWorkspaceAgentBusy({ workspaceId, agentKey: agentKey(id), busy: true });
     try {
       await adapter.prepareWorkspace?.(workspaceId);
       const directory = `/tmp/agents-in-the-cloud-attachments/${adapter.id}-${id}`;
@@ -90,7 +94,13 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       const script = input
         ? adapter.launchScript(input, imagePaths, settings, launchSession)
         : await adapter.resumeScript!(workspaceId, settings, launchSession);
-      const command = `/bin/bash -c ${shellQuote(script)}`;
+      // The launch script has its own diagnostic traps. Keep the lifecycle trap
+      // in an outer shell so installation failures (before any native hook) also
+      // finish the pending work. Normal turns still finish through native hooks.
+      const exitSignal = `code=$?; if [ "$code" -eq 0 ]; then sh ${shellQuote(turnSignalCommand)} finished; else sh ${shellQuote(turnSignalCommand)} failed; fi`;
+      const command = pendingPrompt
+        ? `/bin/bash -c ${shellQuote(`trap ${shellQuote(exitSignal)} EXIT\n/bin/bash -c ${shellQuote(script)}`)}`
+        : `/bin/bash -c ${shellQuote(script)}`;
       await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: agent.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
       delete agent.error;
       store().write(workspaceId, { agents: list(workspaceId) });
@@ -99,6 +109,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       agent.error = errorMessage(error);
       store().write(workspaceId, { agents: list(workspaceId) });
       await revokeAgentMcp(workspaceId, id);
+      if (pendingPrompt) publishWorkspaceAgentBusy({ workspaceId, agentKey: agentKey(id), busy: false });
     } finally {
       starting.delete(id);
       ready.resolve();
