@@ -10,11 +10,15 @@ function workspaceTemplateSecretsKeyFile(dataDir = getAgentsInTheCloudRuntimeCon
   return join(dataDir, "project-secrets.key");
 }
 
+async function readMasterKey(file: string): Promise<Buffer> {
+  const key = Buffer.from((await readFile(file, "utf8")).trim(), "base64url");
+  if (key.byteLength !== keyBytes) throw new AgentsInTheCloudCoreError("invalid_workspace_template_secret_key", `template secrets key must be ${keyBytes} bytes`);
+  return key;
+}
+
 async function readOrCreateMasterKey(file: string): Promise<Buffer> {
   try {
-    const key = Buffer.from((await readFile(file, "utf8")).trim(), "base64url");
-    if (key.byteLength !== keyBytes) throw new AgentsInTheCloudCoreError("invalid_workspace_template_secret_key", `template secrets key must be ${keyBytes} bytes`);
-    return key;
+    return await readMasterKey(file);
   } catch (error) {
     if (!isNotFoundError(error)) throw error;
     const key = randomBytes(keyBytes);
@@ -43,8 +47,19 @@ export async function decryptWorkspaceTemplateValue(workspaceTemplateId: string,
   if (version !== "v1" || !encodedIv || !encodedPayload) throw new AgentsInTheCloudCoreError("invalid_workspace_template_secret_ciphertext", `invalid template secret ciphertext: ${secretId}`);
   const payload = Buffer.from(encodedPayload, "base64url");
   if (payload.byteLength < 16) throw new AgentsInTheCloudCoreError("invalid_workspace_template_secret_ciphertext", `invalid template secret ciphertext: ${secretId}`);
-  const decipher = createDecipheriv("aes-256-gcm", await readOrCreateMasterKey(keyFile), Buffer.from(encodedIv, "base64url"));
+  let key: Buffer;
+  try {
+    key = await readMasterKey(keyFile);
+  } catch (error) {
+    if (!isNotFoundError(error)) throw error;
+    throw new AgentsInTheCloudCoreError("workspace_template_secret_key_missing", `Cannot decrypt secrets or SSH keys for template ${workspaceTemplateId}: ${keyFile} is missing. Restore the original key alongside projects.json; generating a new key won’t unlock saved values.`);
+  }
+  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(encodedIv, "base64url"));
   decipher.setAAD(aad(workspaceTemplateId, secretId));
   decipher.setAuthTag(payload.subarray(-16));
-  return Buffer.concat([decipher.update(payload.subarray(0, -16)), decipher.final()]).toString("utf8");
+  try {
+    return Buffer.concat([decipher.update(payload.subarray(0, -16)), decipher.final()]).toString("utf8");
+  } catch {
+    throw new AgentsInTheCloudCoreError("workspace_template_secret_decryption_failed", `Cannot decrypt saved value ${secretId} for template ${workspaceTemplateId}. The key in ${keyFile} does not match the saved data, or the data is damaged. Restore projects.json and project-secrets.key from the same source.`);
+  }
 }
