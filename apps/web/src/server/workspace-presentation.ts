@@ -169,7 +169,7 @@ function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspac
     kind: "compound",
     leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
     label: { kind: "text", text: title },
-    primary: { tag: "button", attributesHtml: `type="button" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose dblclick->workspace-pane#create keydown->workspace-pane#optionKeydown"` },
+    primary: { tag: "button", attributesHtml: `type="submit" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose keydown->workspace-pane#optionKeydown"` },
     engagedActionsHtml: settings,
   });
 }
@@ -194,15 +194,12 @@ function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation)
 }
 
 function renderWorkspaceTemplatePicker(presentation: WorkspacePanePresentation, launchComposerBinding: string | undefined): string {
-  const actions = buttonGroupHtml({ orientation: "vertical", semantics: "layout", itemsHtml:
-    buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Create" }, attributesHtml: 'data-workspace-pane-target="create"' })
-    + buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Create with prompt", iconHtml: Icons.Agent }, attributesHtml: 'formmethod="get" formaction="/launch-composer" data-turbo-frame="launch_composer" data-workspace-pane-target="createWithPrompt"' }) });
   const tip = launchComposerBinding
     ? `<p class="workspace-template-picker-tip">Tip: <kbd>${escapeHtml(formatShortcutBinding(launchComposerBinding))}</kbd> starts one from the current workspace’s template, with a prompt.</p>`
     : "";
-  return `<form class="workspace-template-picker" method="post" action="/workspaces" data-turbo="true" data-action="submit->workspace-pane#submitted keydown.esc->workspace-pane#back">
+  return `<form class="workspace-template-picker" method="get" action="/launch-composer" data-turbo-frame="launch_composer" data-turbo="true" data-action="submit->workspace-pane#submitted keydown.esc->workspace-pane#back">
     <input type="hidden" name="workspaceTemplate" value="" data-workspace-pane-target="value">
-    <div class="workspace-template-picker-scroll">${renderWorkspaceTemplateOptions(presentation)}<div class="workspace-template-picker-actions">${actions}</div></div>
+    <div class="workspace-template-picker-scroll">${renderWorkspaceTemplateOptions(presentation)}</div>
   </form>${tip}`;
 }
 

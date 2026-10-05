@@ -169,9 +169,6 @@ turbo-frame { display: contents; }
 .workspace-template-first > .add-badge { margin-top: calc((1lh - var(--add-badge-size)) / 2); }
 .workspace-template-first strong { display: block; color: var(--text-bright); font-weight: var(--weight-medium); }
 .workspace-template-first > span:last-child > span { display: block; font-size: 13px; }
-/* Actions follow the list; a long list scrolls beneath them instead of pushing them away. */
-.workspace-template-picker-actions { position: sticky; bottom: -8px; margin: 12px -8px -8px; padding: 12px; background: var(--panel); }
-.workspace-template-picker-actions > .button-group { display: grid; }
 .workspace-template-picker-tip { margin: 0; padding: 10px 16px 12px; border-top: 1px solid var(--line); color: var(--text-muted); font-size: 12px; }
 .workspace-template-picker-tip kbd { font-family: var(--font-mono); color: var(--text-bright); }
 @media (max-width: 700px), (pointer: coarse) {

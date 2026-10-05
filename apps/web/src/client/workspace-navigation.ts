@@ -55,7 +55,7 @@ class EmptyWorkspaceOnboardingController extends Controller<HTMLElement> {
 
 /** Slides the workspace pane between the workspace list and the "New workspace" template picker. */
 class WorkspacePaneController extends Controller<HTMLElement> {
-  static targets = ["workspacesHeader", "pickerHeader", "workspaces", "picker", "newWorkspace", "option", "value", "create", "createWithPrompt", "addFirst"];
+  static targets = ["workspacesHeader", "pickerHeader", "workspaces", "picker", "newWorkspace", "option", "value", "addFirst"];
   declare readonly workspacesHeaderTarget: HTMLElement;
   declare readonly pickerHeaderTarget: HTMLElement;
   declare readonly workspacesTarget: HTMLElement;
@@ -63,8 +63,6 @@ class WorkspacePaneController extends Controller<HTMLElement> {
   declare readonly newWorkspaceTarget: HTMLElement;
   declare readonly optionTargets: HTMLElement[];
   declare readonly valueTarget: HTMLInputElement;
-  declare readonly createTarget: HTMLButtonElement;
-  declare readonly createWithPromptTarget: HTMLButtonElement;
   declare readonly addFirstTarget: HTMLElement;
   declare readonly hasAddFirstTarget: boolean;
   /** Undefined until a choice exists: with no templates yet, nothing is preselected. */
@@ -104,10 +102,6 @@ class WorkspacePaneController extends Controller<HTMLElement> {
   choose(event: Event): void {
     // SAFETY: This action is attached only to server-rendered template options.
     this.select((event.currentTarget as HTMLElement).dataset.workspaceTemplateId!);
-  }
-
-  create(): void {
-    this.createTarget.closest("form")!.requestSubmit(this.createTarget);
   }
 
   optionKeydown(event: KeyboardEvent): void {
@@ -153,8 +147,6 @@ class WorkspacePaneController extends Controller<HTMLElement> {
     const available = this.optionTargets.some((option) => option.dataset.workspaceTemplateId === workspaceTemplateId);
     this.selected = workspaceTemplateId === undefined ? undefined : available ? workspaceTemplateId : "";
     this.valueTarget.value = this.selected ?? "";
-    this.createTarget.disabled = this.selected === undefined;
-    this.createWithPromptTarget.disabled = this.selected === undefined;
     for (const option of this.optionTargets) {
       const checked = option.dataset.workspaceTemplateId === this.selected;
       // Only write real changes: the options observer watches this attribute.
