@@ -145,8 +145,8 @@ async function expandedSlashCommand(url: string, text: string): Promise<string> 
   return await response.text();
 }
 
-function composerIsTranscribing(element: Element): boolean {
-  return Boolean(element.closest(".composer")?.hasAttribute("data-transcribing"));
+function composerIsDictating(element: Element): boolean {
+  return Boolean(element.closest(".composer")?.hasAttribute("data-dictating"));
 }
 
 export function createAgentCompletionsController(Controller: StimulusControllerConstructor, hooks: WorkspaceClientHooks) {
@@ -157,7 +157,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
     fullscreenShortcut: (option) => option.hasAttribute("data-agents-in-the-cloud-fullscreen-title"),
     menuEvent: handleAgentTreeMenuEvent,
     request(input, force) {
-      if (composerIsTranscribing(input)) return undefined;
+      if (composerIsDictating(input)) return undefined;
       const completion = agentCompletionRequest(input, force);
       if (!completion) return completion;
       interface CompletionRequestParams {
@@ -261,7 +261,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
       const input = this.inputTarget;
       const initialValue = input.value;
       void expandedSlashCommand(this.urlValue, option.dataset.commandTrigger!).then((expanded) => {
-        if (input.value !== initialValue || composerIsTranscribing(input)) return;
+        if (input.value !== initialValue || composerIsDictating(input)) return;
         // A draft is never discarded: the template follows it.
         setTextInputValue(input, initialValue.trim() ? `${initialValue.trimEnd()}\n\n${expanded}` : expanded);
         if (!focusLikelyOpensSoftwareKeyboard()) input.focus({ preventScroll: true });

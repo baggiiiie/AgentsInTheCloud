@@ -97,7 +97,7 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 /* Typing mode: while the soft keyboard is up, only typing-related UI shows.
    The composer collapses to the text field with send beside it. */
 html.software-keyboard-visible .floating-stack,
-html.software-keyboard-visible .composer :is(.composer-attach, .composer-close, .composer-transcribe, .composer-prompt-template-buttons, .composer-footer) { display: none; }
+html.software-keyboard-visible .composer :is(.composer-attach, .composer-close, .composer-dictation, .composer-prompt-template-buttons, .composer-footer) { display: none; }
 html.software-keyboard-visible .composer .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
 /* The text takes the full width and runs underneath send, which sits in the bottom-right corner. */
 html.software-keyboard-visible .composer .composer-input-area { position: relative; }

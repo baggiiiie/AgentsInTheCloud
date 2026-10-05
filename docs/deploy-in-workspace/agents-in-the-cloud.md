@@ -11,7 +11,9 @@ AgentsInTheCloud is a self-hosted browser app for working with coding agents in 
 
 ## 2. Getting Set Up
 
-On first use, AgentsInTheCloud guides you through setup:
+**Onboarding** is the guided getting-started flow for connecting GitHub and Model providers. Its opening dialog is titled **Set up AgentsInTheCloud**. GitHub is optional; you can continue without connecting it.
+
+The app-level configuration for getting started includes:
 
 - **Git identity**: the name and email used for commits created in workspaces.
 - **GitHub**: a token AgentsInTheCloud can use to clone and push private GitHub repositories.
@@ -45,6 +47,10 @@ Use an Agent to ask for code changes, explanations, reviews, or debugging help.
 - Use **Rewind** on an earlier user message to continue from that point in the conversation.
 
 Agents run inside the workspace and can read and edit files under `/work`.
+
+### Dictation
+
+Use **Dictate with microphone** in the AgentPaneComposer or LaunchComposer to add spoken text to the draft. Stop Dictation to review and edit the text before sending it. Choose its local speech-to-text model in **Settings**. A repository can provide phrase hints in `.agents-in-the-cloud/dictation-context`, one phrase per line; blank lines and `#` comments are ignored. Older `transcription-context` files are still read when the new file is absent.
 
 ### Subagents
 
@@ -136,7 +142,7 @@ Supported placeholders in the body:
 Use the Work pane `+` menu or mobile More sheet to open Work views:
 
 - **Files**: navigate Workspace files and view or edit a selected file.
-- **Terminal**: shell access inside the workspace.
+- **Terminal**: command-line access inside the Workspace through a Terminal view, separate from Host’s system-level terminals.
 - **Browser**: preview web apps running in the workspace.
 - **Desktop**: view and control the Workspace’s remote graphical environment, including its visible Chromium browser.
 - **VS Code**: open the Workspace’s browser-based Visual Studio Code editor in a VS Code view.
@@ -222,3 +228,8 @@ Use this to install packages, add image files, set environment variables, or run
 AgentsInTheCloud reuses repository images based on the default workspace image plus `.agents-in-the-cloud/Dockerfile` contents only. Regular source changes do not rebuild the image. If your Dockerfile copies another file from the repo, bump a version comment in `.agents-in-the-cloud/Dockerfile` when that copied file changes.
 
 For repository-specific VS Code extensions, see [VS Code extensions](./vscode.md).
+
+
+## 9. Updates
+
+Open **Settings** to check **Updates** for AgentsInTheCloud. In a System-managed installation, download an available Update, then use **Restart to update** to apply it. Downloading alone does not apply the Update. Updates is separate from updating packages or agent CLIs inside a Workspace.

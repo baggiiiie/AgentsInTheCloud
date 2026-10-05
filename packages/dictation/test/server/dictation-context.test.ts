@@ -2,17 +2,17 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addTranscriptionContext, readTranscriptionContext } from "../../src/server/transcription-context.ts";
+import { addTranscriptionContext, readDictationContext } from "../../src/server/dictation-context.ts";
 
 let root: string;
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); });
 
 test("reads one phrase per line, ignoring comments and blank lines", async () => {
   root = await mkdtemp(join(tmpdir(), "transcription-context-"));
-  expect(await readTranscriptionContext(root)).toEqual([]);
+  expect(await readDictationContext(root)).toEqual([]);
   await mkdir(join(root, ".agents-in-the-cloud"));
-  await writeFile(join(root, ".agents-in-the-cloud", "transcription-context"), "# Terms\r\nClaude Code # product\r\n\r\n  Nemotron  \r\n");
-  expect(await readTranscriptionContext(root)).toEqual(["Claude Code", "Nemotron"]);
+  await writeFile(join(root, ".agents-in-the-cloud", "dictation-context"), "# Terms\r\nClaude Code # product\r\n\r\n  Nemotron  \r\n");
+  expect(await readDictationContext(root)).toEqual(["Claude Code", "Nemotron"]);
 });
 
 test("adds the words to the realtime session update without changing other messages", () => {
@@ -23,4 +23,16 @@ test("adds the words to the realtime session update without changing other messa
   expect(addTranscriptionContext(message, [])).toBe(message);
   const commit = JSON.stringify({ type: "input_audio_buffer.commit" });
   expect(addTranscriptionContext(commit, ["AgentsInTheCloud"])).toBe(commit);
+});
+
+
+test("reads older phrase hints and prefers the canonical Dictation file, including an empty file", async () => {
+  root = await mkdtemp(join(tmpdir(), "dictation-context-"));
+  await mkdir(join(root, ".agents-in-the-cloud"));
+  await writeFile(join(root, ".agents-in-the-cloud", "transcription-context"), "Older term\n");
+  expect(await readDictationContext(root)).toEqual(["Older term"]);
+  await writeFile(join(root, ".agents-in-the-cloud", "dictation-context"), "Current term\n");
+  expect(await readDictationContext(root)).toEqual(["Current term"]);
+  await writeFile(join(root, ".agents-in-the-cloud", "dictation-context"), "");
+  expect(await readDictationContext(root)).toEqual([]);
 });

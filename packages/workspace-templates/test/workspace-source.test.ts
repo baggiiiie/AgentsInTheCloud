@@ -157,11 +157,11 @@ describe("workspace source preparation", () => {
     await expect(prepareWorkspaceSource({ workspaceId: "unavailable", gitUrl: join(dataDir, "missing.git"), branch: "main" })).rejects.toMatchObject({ code: "git_error" });
   });
 
-  test("provides the cached project checkout for pre-workspace transcription", async () => {
+  test("provides the cached project checkout for LaunchComposer Dictation", async () => {
     const fixture = await createRemote();
     tempRoots.push(fixture.root);
     const workspaceTemplate = (await addWorkspaceTemplate(`${fixture.remote}#main`)).workspaceTemplate;
-    const contextPath = join(".agents-in-the-cloud", "transcription-context");
+    const contextPath = join(".agents-in-the-cloud", "dictation-context");
     const cachedPath = join(await cachedWorkspaceTemplateSourcePath(workspaceTemplate.id), contextPath);
     expect(await Bun.file(cachedPath).exists()).toBe(false);
 

@@ -42,7 +42,7 @@ const log = (message: string): void => console.log(`[composer-layout] ${message}
 const setup: Stage = await stage({ atelier: args.atelier, workspaceId: args.workspace, model: args.model, log });
 log(`workspace ${setup.workspaceId}: built-in ${setup.builtinId}, Pi ${setup.piId}, terminal ${setup.terminalKey}`);
 const report = new Report(out, "Composer layout acceptance (Tier 1, Chrome)", {
-  atelier: args.atelier, workspace: setup.workspaceId, "built-in agent": setup.builtinId, "Pi agent": setup.piId, "terminal tab": setup.terminalKey, started: new Date().toISOString(),
+  atelier: args.atelier, workspace: setup.workspaceId, "built-in agent": setup.builtinId, "Pi agent": setup.piId, "Terminal view": setup.terminalKey, started: new Date().toISOString(),
 });
 
 const page = await ChromePage.open(args.cdp);
@@ -385,15 +385,15 @@ await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcri
   await Bun.sleep(800);
 });
 
-// A terminal tab gets its size the first time it is shown; the scenario starts after that.
-await page.navigate(terminalUrl, ".terminal-pane .observable-terminal-host");
+// A Terminal view gets its size the first time it is shown; the scenario starts after that.
+await page.navigate(terminalUrl, ".terminal-view .observable-terminal-host");
 await Bun.sleep(2000);
 
-await scenario("mobile-terminal-tab", "D19: focusing a terminal tab and switching views never resizes it.", async (recorder) => {
-  const { before, after } = await transition(recorder, "tap terminal tab", () => page.tap(".terminal-pane .terminal-stage"), { expectChange: false });
+await scenario("mobile-terminal-tab", "D19: focusing a Terminal view and switching views never resizes it.", async (recorder) => {
+  const { before, after } = await transition(recorder, "tap Terminal view", () => page.tap(".terminal-view .terminal-stage"), { expectChange: false });
   recorder.add(check("D19: terminal box unchanged", JSON.stringify(before.terminal) === JSON.stringify(after.terminal), `${JSON.stringify(before.terminal)} → ${JSON.stringify(after.terminal)}`));
   await page.navigate(builtinUrl, sel.transcript);
-  await page.navigate(terminalUrl, ".terminal-pane .observable-terminal-host");
+  await page.navigate(terminalUrl, ".terminal-view .observable-terminal-host");
   await Bun.sleep(1500);
 });
 
@@ -410,7 +410,7 @@ await scenario("mobile-D24-long-press", "D24: holding open-composer for about 50
   await Bun.sleep(800);
   const holding = await page.evaluate<{ open: boolean; state: string; label: string }>(`(() => {
     const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
-    const button = pane.querySelector('[data-transcription-composer-target="button"]');
+    const button = pane.querySelector('[data-dictation-composer-target="button"]');
     return { open: pane.classList.contains("agent-composer-open"), state: button.dataset.state, label: button.title };
   })()`);
   await release();
@@ -428,7 +428,7 @@ await scenario("mobile-D24-long-press", "D24: holding open-composer for about 50
   recorder.add(...oneStepChecks(analyseTransition(trace, t, Number.POSITIVE_INFINITY, { endAtContentChange: false })).map((result) => ({ ...result, name: `hold open-composer — ${result.name}` })));
   await recorder.file("holding.png", await page.screenshot());
   // Stop dictation without sending.
-  await page.tap('.agent-composer-pane [data-transcription-composer-target="button"]');
+  await page.tap('.agent-composer-pane [data-dictation-composer-target="button"]');
   await Bun.sleep(1500);
   await resetComposerText();
   await closeComposer();
@@ -525,7 +525,7 @@ for (const layout of ["mobile", "desktop"] as const) {
   await scenario(`${layout}-launch-editor`, "Launch opens without a mobile keyboard, grows with text, and keeps launch controls in reach.", async (recorder) => {
     const focused = await page.evaluate<boolean>('document.activeElement.matches(".launch-composer .composer-input")');
     recorder.add(check("Intentional initial focus", focused === (layout === "desktop"), `textarea focused: ${focused}`));
-    recorder.add(check("Dictation available before typing", await page.visible(".launch-composer .composer-transcribe button"), "dictation control visible"));
+    recorder.add(check("Dictation available before typing", await page.visible(".launch-composer .composer-dictation button"), "dictation control visible"));
     await page.tap(".launch-composer .composer-input");
     await transition(recorder, "large launch prompt", () => page.insertText(Array.from({ length: 80 }, (_, i) => `Launch line ${i}`).join("\n")));
     const geometry = await page.evaluate<{ fits: boolean; scrolls: boolean; caret: boolean }>(`(() => {

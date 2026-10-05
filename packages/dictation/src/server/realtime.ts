@@ -5,12 +5,13 @@ import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { cachedWorkspaceTemplateSourcePath } from "@agents-in-the-cloud/workspace-templates";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
-import { readTranscriptionModel, transcriptionModel, type TranscriptionModelId } from "./models.ts";
+import { readDictationModel, dictationModel, type DictationModelId } from "./models.ts";
 import { captureProcessStderr, processExitMessage } from "./process-diagnostics.ts";
-import { addTranscriptionContext, readTranscriptionContext } from "./transcription-context.ts";
+import { addTranscriptionContext, readDictationContext } from "./dictation-context.ts";
 import { ensureTranscriptionRuntime } from "./runtime.ts";
 import { spawnTranscriptionProcess } from "./process.ts";
 
+// The NeMo Speech transcription runtime and native realtime protocol keep their processing vocabulary.
 const transcriptionPort = 8098;
 const transcriptionReadyUrl = `http://127.0.0.1:${transcriptionPort}/ready`;
 const transcriptionSocketUrl = `ws://127.0.0.1:${transcriptionPort}/v1/realtime`;
@@ -29,8 +30,8 @@ function transcriptionCacheDir(): string {
   return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "transcription-cache");
 }
 
-async function artifactProgress(modelId: TranscriptionModelId): Promise<number> {
-  const { artifact } = transcriptionModel(modelId);
+async function artifactProgress(modelId: DictationModelId): Promise<number> {
+  const { artifact } = dictationModel(modelId);
   const path = join(transcriptionCacheDir(), "nemo-speech", "models", artifact.repository, artifact.revision, artifact.filename);
   const size = await stat(path).then((file) => file.size).catch(async (error) => {
     if (!isNotFoundError(error)) throw error;
@@ -42,7 +43,7 @@ async function artifactProgress(modelId: TranscriptionModelId): Promise<number> 
   return Math.min(100, Math.floor(size / artifact.size * 100));
 }
 
-async function startTranscriptionServer(model: TranscriptionModelId): Promise<void> {
+async function startTranscriptionServer(model: DictationModelId): Promise<void> {
   if (await isTranscriptionServerReady()) return;
 
   const cacheDir = transcriptionCacheDir();
@@ -78,7 +79,7 @@ export async function stopTranscriptionServer(): Promise<void> {
   await process.exited;
 }
 
-function ensureTranscriptionServer(model: TranscriptionModelId): Promise<void> {
+function ensureTranscriptionServer(model: DictationModelId): Promise<void> {
   transcriptionServer ??= startTranscriptionServer(model).catch((error) => {
     transcriptionServer = undefined;
     throw error;
@@ -87,11 +88,11 @@ function ensureTranscriptionServer(model: TranscriptionModelId): Promise<void> {
 }
 
 function status(socket: WorkspaceSocketConnection, state: "loading" | "error", message: string, progress?: number): void {
-  socket.send(JSON.stringify({ type: "agents-in-the-cloud.transcription.status", status: state, message, progress }));
+  socket.send(JSON.stringify({ type: "agents-in-the-cloud.dictation.status", status: state, message, progress }));
 }
 
-export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (url) => {
-  if (url.pathname !== "/transcription/realtime") return undefined;
+export const createDictationSocketSession: WorkspaceServerSocketHandler = (url) => {
+  if (url.pathname !== "/dictation/realtime") return undefined;
 
   let browser: WorkspaceSocketConnection | undefined;
   let upstream: WebSocket | undefined;
@@ -100,13 +101,13 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
   async function connect(): Promise<void> {
     let progressTimer: ReturnType<typeof setInterval> | undefined;
     try {
-      const modelId = await readTranscriptionModel();
+      const modelId = await readDictationModel();
       const workspaceId = url.searchParams.get("workspaceId");
       const workspaceTemplateId = url.searchParams.get("workspaceTemplateId");
       const source = workspaceId ? workspaceWorkHostPath(workspaceId)
         : workspaceTemplateId ? await cachedWorkspaceTemplateSourcePath(workspaceTemplateId) : undefined;
-      phrases = source ? await readTranscriptionContext(source) : [];
-      const model = transcriptionModel(modelId);
+      phrases = source ? await readDictationContext(source) : [];
+      const model = dictationModel(modelId);
       let reportedProgress = -1;
       const reportProgress = async () => {
         if (!browser) return;
@@ -116,7 +117,7 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
         const message = progress < 100 ? `Downloading ${model.name} · ${progress}%` : `Loading ${model.name}…`;
         status(browser, "loading", message, progress);
       };
-      if (browser) status(browser, "loading", "Preparing the CPU transcription runtime…", 0);
+      if (browser) status(browser, "loading", "Preparing the CPU dictation runtime…", 0);
       await ensureTranscriptionRuntime(transcriptionCacheDir());
       if (!browser) return;
       await reportProgress();
@@ -126,13 +127,13 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
       upstream = new WebSocket(transcriptionSocketUrl);
       upstream.addEventListener("message", (event) => browser?.send(String(event.data)));
       upstream.addEventListener("error", () => {
-        if (browser) status(browser, "error", "The CPU transcription service disconnected");
+        if (browser) status(browser, "error", "The dictation service disconnected");
       });
       upstream.addEventListener("close", () => browser?.close());
     } catch (error) {
       if (!browser) return;
       status(browser, "error", errorMessage(error));
-      browser.close(1011, "transcription service unavailable");
+      browser.close(1011, "dictation service unavailable");
     } finally {
       if (progressTimer) clearInterval(progressTimer);
     }
@@ -141,7 +142,7 @@ export const createTranscriptionSocketSession: WorkspaceServerSocketHandler = (u
   return {
     open(socket) {
       browser = socket;
-      status(socket, "loading", "Preparing the CPU transcription model…", 0);
+      status(socket, "loading", "Preparing the CPU dictation model…", 0);
       void connect();
     },
     message(_socket, message) {

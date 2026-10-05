@@ -7,7 +7,7 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { domId, escapeHtml, turboStream, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { terminalViewKey } from "../shared.ts";
 import { createTmuxPresenter } from "./agent-tool.ts";
-import { renderTerminalPane } from "./render.ts";
+import { renderTerminalView } from "./render.ts";
 import { createTerminalSocketHandler } from "./sockets.ts";
 import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
 import { attachWorkspaceTerminal, createWorkspaceTerminal, deleteWorkspaceTerminal, listTmuxSessions, listWorkspaceTerminals, type WorkspaceTerminal } from "./workspace-terminals.ts";
@@ -117,8 +117,8 @@ export const terminalWorkspaceModule: WorkspaceModule = {
     identity: (reference: { type: "terminal"; terminalId: string }) => reference.terminalId,
     render: async ({ workspaceId, reference }: { workspaceId: string; reference: TerminalWorkViewReference }) => {
       const terminal = (await listWorkspaceTerminals(workspaceId)).find((candidate) => candidate.id === reference.terminalId);
-      if (!terminal) throw new Error(`Terminal Work view not found: ${reference.terminalId}`);
-      return renderTerminalPane(workspaceId, terminal);
+      if (!terminal) throw new Error(`Terminal view not found: ${reference.terminalId}`);
+      return renderTerminalView(workspaceId, terminal);
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "terminal"; terminalId: string } }) => deleteWorkspaceTerminal(workspaceId, reference.terminalId),
   }],

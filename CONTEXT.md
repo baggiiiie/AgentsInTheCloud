@@ -4,6 +4,10 @@ AgentsInTheCloud is a workspace interface for collaborating with coding agents w
 
 ## Language
 
+**Onboarding**:
+The guided flow for getting started with AgentsInTheCloud by connecting GitHub and Model providers. Onboarding is app-level, distinct from preparing an individual Workspace.
+_Avoid_: Initial setup (as the feature name), Workspace setup
+
 **Settings**:
 The app-level surface for AgentsInTheCloud preferences and shared configuration, such as access, theme, Git identity, GitHub, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
 _Avoid_: Preferences, app settings, global settings (as feature names), workspace settings (for this surface)
@@ -11,6 +15,14 @@ _Avoid_: Preferences, app settings, global settings (as feature names), workspac
 **Host**:
 The feature for inspecting AgentsInTheCloud System diagnostics and using privileged terminals outside individual Workspaces. Host access targets the System environment, not necessarily the physical machine running Docker.
 _Avoid_: System panel (as the feature name), Workspace terminal (for Host access), physical host (as an implicit access boundary)
+
+**Updates**:
+The feature for checking for AgentsInTheCloud releases and managing Update operations. Updates is separate from managing packages or agent CLIs inside a Workspace.
+_Avoid_: Upgrades, software updater (as feature names)
+
+**Update**:
+An installation operation that prepares an AgentsInTheCloud release and applies it by restarting the System-managed installation.
+_Avoid_: Upgrade (as the operation name), Workspace package update
 
 **Workspace template**:
 What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
@@ -75,6 +87,13 @@ _Avoid_: Agent composer, in-pane composer, prompt box, chat input
 **LaunchComposer**:
 The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model and thinking level with which the Workspace starts.
 _Avoid_: Launch form, launch prompt, new-workspace composer
+
+**Inline content**:
+HTML-based explanatory content shown as part of an Agent’s answer using AgentsInTheCloud’s supplied styling and controls. Inline content is distinct from independently styled, standalone outputs.
+
+**Dictation**:
+The feature for turning microphone speech into editable text in an AgentPaneComposer or LaunchComposer. Dictation inserts text into the draft without sending it; it is not a voice conversation with an Agent.
+_Avoid_: Transcription (as the app feature name), voice chat
 
 **Slash command**:
 An invocation beginning with `/` in an Agent’s composer. Slash commands may perform a built-in action, expand a Prompt template, or explicitly invoke a Skill; not every Slash command is a Prompt template.
@@ -186,9 +205,13 @@ _Avoid_: Tab key, untyped view ID
 A persistent Work view whose referenced resource cannot currently be loaded. It remains visible as an explicit unavailable state until its resource returns or the user closes it.
 _Avoid_: Broken tab, missing tab
 
+**Terminal**:
+The feature for command-line access inside a Workspace. Terminal is distinct from Host’s privileged terminals in AgentsInTheCloud System.
+_Avoid_: Shell (as the feature name), Host terminal (for Workspace command-line access)
+
 **Terminal view**:
-A Work view connected to a terminal session. It either owns a session created specifically for it or attaches to an independently existing session.
-_Avoid_: Terminal tab
+A Resource Work view connected to a terminal session through Terminal. It either owns a session created specifically for it or attaches to an independently existing session.
+_Avoid_: Terminal tab, Terminal pane, Terminal Work view
 
 **Owned terminal session**:
 A terminal session created specifically for one Terminal view and governed by that view's lifecycle.

@@ -6,9 +6,9 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { type MicrophoneLease, SharedMicrophone } from "./microphone.ts";
 
-type TranscriptionState = "idle" | "loading" | "recording" | "finishing" | "error";
+type DictationState = "idle" | "loading" | "recording" | "finishing" | "error";
 type AudioCapture = { microphone: MicrophoneLease; context: AudioContext; processor: ScriptProcessorNode; analyser: AnalyserNode };
-const transcriptionEventSchema = Type.Object({
+const dictationEventSchema = Type.Object({
   type: Type.String(),
   status: Type.Optional(Type.Union([Type.Literal("loading"), Type.Literal("error")])),
   message: Type.Optional(Type.String()),
@@ -17,7 +17,7 @@ const transcriptionEventSchema = Type.Object({
   error: Type.Optional(Type.Object({ message: Type.String() })),
   progress: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
 });
-type TranscriptionEvent = Static<typeof transcriptionEventSchema>;
+type DictationEvent = Static<typeof dictationEventSchema>;
 
 function composeTranscript(prefix: string, spoken: string, suffix: string) {
   const left = prefix && spoken && !/\s$/.test(prefix) && !/^\s/.test(spoken) ? " " : "";
@@ -26,8 +26,8 @@ function composeTranscript(prefix: string, spoken: string, suffix: string) {
   return { text: `${insertion}${right}${suffix}`, caret: insertion.length };
 }
 
-export function createTranscriptionComposerController(Controller: WorkspaceClientControllerConstructor, microphoneSource: SharedMicrophone) {
-  return class TranscriptionComposerController extends Controller {
+export function createDictationComposerController(Controller: WorkspaceClientControllerConstructor, microphoneSource: SharedMicrophone) {
+  return class DictationComposerController extends Controller {
     static targets = ["button", "waveform", "status"];
     static values = { workspaceId: String, workspaceTemplateId: String };
 
@@ -41,7 +41,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       return this.element.querySelector("textarea")!;
     }
 
-    private state: TranscriptionState = "idle";
+    private state: DictationState = "idle";
     private socket?: WebSocket;
     private capture?: AudioCapture;
     private waveformFrame?: number;
@@ -103,7 +103,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       if (this.state === "loading") {
         this.closeSession();
         this.setState("idle", "Dictate");
-        this.focusAfterTranscription();
+        this.focusAfterDictation();
         return;
       }
       if (this.state === "finishing") return;
@@ -117,19 +117,19 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       this.suffix = this.input.value.slice(selectionEnd);
       this.committed = "";
       this.partial = "";
-      this.setState("loading", "Preparing transcription model…");
+      this.setState("loading", "Preparing dictation model…");
       this.input.blur();
       this.setProgress(0);
       const query = this.workspaceIdValue ? `?workspaceId=${encodeURIComponent(this.workspaceIdValue)}`
         : this.workspaceTemplateIdValue ? `?workspaceTemplateId=${encodeURIComponent(this.workspaceTemplateIdValue)}` : "";
-      const socket = new WebSocket(observableWebSocketUrl(`/transcription/realtime${query}`));
+      const socket = new WebSocket(observableWebSocketUrl(`/dictation/realtime${query}`));
       this.socket = socket;
       socket.addEventListener("message", (event) => {
         if (this.socket !== socket) return;
-        this.received(Value.Parse(transcriptionEventSchema, JSON.parse(String(event.data))));
+        this.received(Value.Parse(dictationEventSchema, JSON.parse(String(event.data))));
       });
       socket.addEventListener("error", () => {
-        if (this.socket === socket) this.fail("Could not connect to transcription");
+        if (this.socket === socket) this.fail("Could not connect to dictation");
       });
       socket.addEventListener("close", () => {
         if (this.socket !== socket) return;
@@ -138,13 +138,13 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       });
     }
 
-    private received(event: TranscriptionEvent): void {
-      if (event.type === "agents-in-the-cloud.transcription.status") {
+    private received(event: DictationEvent): void {
+      if (event.type === "agents-in-the-cloud.dictation.status") {
         if (event.status === "loading") {
-          this.setState("loading", event.message ?? "Preparing transcription model…");
+          this.setState("loading", event.message ?? "Preparing dictation model…");
           this.setProgress(event.progress ?? 0);
         }
-        else if (event.status === "error") this.fail(event.message ?? "Transcription failed");
+        else if (event.status === "error") this.fail(event.message ?? "Dictation failed");
         return;
       }
       if (event.type === "session.created") {
@@ -159,9 +159,9 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
         this.committed += segment;
         this.partial = "";
         this.renderTranscript();
-        if (this.state === "finishing") this.transcriptionFinished();
+        if (this.state === "finishing") this.dictationFinished();
       } else if (event.type === "error") {
-        this.fail(event.error?.message ?? "Transcription failed");
+        this.fail(event.error?.message ?? "Dictation failed");
       }
     }
 
@@ -222,11 +222,11 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       this.socket!.send(JSON.stringify({ type: "input_audio_buffer.commit" }));
     }
 
-    private transcriptionFinished(): void {
+    private dictationFinished(): void {
       this.closeSession();
       this.setState("idle", "Dictate");
       if (!this.submitPending) {
-        this.focusAfterTranscription();
+        this.focusAfterDictation();
         return;
       }
       this.submitPending = false;
@@ -236,7 +236,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       else this.element.querySelector<HTMLFormElement>("form")!.requestSubmit();
     }
 
-    private focusAfterTranscription(): void {
+    private focusAfterDictation(): void {
       if (focusLikelyOpensSoftwareKeyboard()) return;
       this.input.focus({ preventScroll: true });
       const { caret } = this.transcript();
@@ -317,7 +317,7 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       this.buttonTarget.style.setProperty("--button-progress", String(progress));
     }
 
-    private setState(state: TranscriptionState, label: string): void {
+    private setState(state: DictationState, label: string): void {
       const working = state === "loading" || state === "finishing";
       this.state = state;
       this.buttonTarget.dataset.state = state;
@@ -328,13 +328,13 @@ export function createTranscriptionComposerController(Controller: WorkspaceClien
       this.buttonTarget.title = label;
       this.buttonTarget.setAttribute("aria-label", label);
       this.statusTarget.textContent = label;
-      const transcribing = state === "loading" || state === "recording" || state === "finishing";
-      const transcriptionStateChanged = this.element.hasAttribute("data-transcribing") !== transcribing;
-      this.element.toggleAttribute("data-transcribing", transcribing);
-      this.input.readOnly = transcribing;
+      const dictating = state === "loading" || state === "recording" || state === "finishing";
+      const dictationStateChanged = this.element.hasAttribute("data-dictating") !== dictating;
+      this.element.toggleAttribute("data-dictating", dictating);
+      this.input.readOnly = dictating;
       // Recognised words stream into the field; it can't take focus until dictation stops.
-      this.input.inert = transcribing;
-      if (transcriptionStateChanged) notifyInputListeners(this.input);
+      this.input.inert = dictating;
+      if (dictationStateChanged) notifyInputListeners(this.input);
       if (state === "finishing") this.setProgress(100);
       else if (!working) this.setProgress(0);
     }

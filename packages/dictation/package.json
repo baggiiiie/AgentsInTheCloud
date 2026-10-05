@@ -1,5 +1,5 @@
 {
-  "name": "@agents-in-the-cloud/transcription",
+  "name": "@agents-in-the-cloud/dictation",
   "private": true,
   "type": "module",
   "exports": {

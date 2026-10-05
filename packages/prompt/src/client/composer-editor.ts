@@ -50,7 +50,7 @@ export function sizeComposer(composer: HTMLElement, maxComposer: number): void {
   revealComposerCaret(input);
 }
 
-/** Large pastes, history recall and transcription should leave the end caret visible. */
+/** Large pastes, history recall and dictation should leave the end caret visible. */
 export function revealComposerCaret(input: HTMLTextAreaElement): void {
   if (document.activeElement === input && input.selectionEnd === input.value.length) input.scrollTop = input.scrollHeight;
 }

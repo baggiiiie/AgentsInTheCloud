@@ -1,6 +1,6 @@
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { renderTranscriptionComposerControl } from "@agents-in-the-cloud/transcription/server";
+import { renderDictationComposerControl } from "@agents-in-the-cloud/dictation/server";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
@@ -11,7 +11,7 @@ const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m
 
 /**
  * The shared form body; each host owns its form, supplementary UI, and optional footer.
- * Buttons form one column on the right, top to bottom: close (collapsible composers only), attach, transcribe, send.
+ * Buttons form one column on the right, top to bottom: close (collapsible composers only), attach, dictate, send.
  * Prompt template buttons wrap under the text field, beside the buttons.
  */
 export function renderComposerBody(options: {
@@ -32,7 +32,7 @@ export function renderComposerBody(options: {
     <div class="composer-input-area">${options.inputHtml}${options.promptTemplateButtons ? '<div class="composer-prompt-template-buttons" data-agent-completions-target="promptTemplateButtons"></div>' : ""}<div class="composer-buttons">
       ${close}
       <span class="composer-button composer-attach">${renderAttachmentPicker("icon-only")}</span>
-      <span class="composer-button composer-transcribe">${renderTranscriptionComposerControl()}</span>
+      <span class="composer-button composer-dictation">${renderDictationComposerControl()}</span>
       <span class="composer-button composer-send">${send}</span>
     </div></div>
     <p role="status" data-agent-attachments-target="status" hidden></p>`;

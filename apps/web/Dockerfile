@@ -4,7 +4,7 @@ FROM oven/bun:1.4.0 AS bun-dist
 FROM ubuntu:26.04 AS transcription-runtime
 ARG TARGETARCH
 ARG NEMO_SPEECH_VERSION=0.1.0
-COPY packages/transcription/install-runtime.sh /tmp/install-transcription-runtime.sh
+COPY packages/dictation/install-runtime.sh /tmp/install-transcription-runtime.sh
 RUN sh /tmp/install-transcription-runtime.sh "$TARGETARCH" "$NEMO_SPEECH_VERSION"
 
 FROM ubuntu:26.04 AS deps

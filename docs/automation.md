@@ -74,7 +74,9 @@ Other browser-navigable surfaces are:
 
 Host targets AgentsInTheCloud System, outside individual Workspaces, rather than necessarily the physical machine running Docker. `GET /host` with `Accept: application/json` reports availability and the access boundary; it does not create a terminal.
 
-Settings is app-level, not configuration for the selected Workspace, a Workspace template, or an individual Agent. The settings section is a registered settings contribution ID, such as `theme`, `git-identity`, `github`, `models`, `transcription`, or `update`.
+The `update` section is **Updates**, the feature for managing AgentsInTheCloud installation Updates. It is separate from Workspace package and agent CLI updates.
+
+Settings is app-level, not configuration for the selected Workspace, a Workspace template, or an individual Agent. The settings section is a registered settings contribution ID, such as `theme`, `git-identity`, `github`, `models`, `dictation`, or `update`.
 
 ## Create and wait for a workspace
 
