@@ -8,6 +8,8 @@ import { stripHopByHopHeaders } from "@agents-in-the-cloud/shared";
 import { HttpRequestBlockedError } from "../secrets/errors.ts";
 
 // Match the HTTP fetch path's environment proxy routing, including nested AgentsInTheCloud.
+// An environment proxy is a trusted egress boundary: CONNECT keeps the logical
+// hostname, and that proxy owns destination policy, resolution and pinning.
 export type UpgradeRequest = (url: URL, options: RequestOptions) => ClientRequest;
 export const requestWebSocketUpgrade: UpgradeRequest = (url, options) => {
   const proxy = getProxyForUrl(url.href);

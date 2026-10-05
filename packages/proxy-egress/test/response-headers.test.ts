@@ -26,7 +26,11 @@ test("HTTP redirect reflection is scrubbed at the wire boundary, after response 
     getContext: async () => ({ workspaceId: "test", hooks: hooks.httpHooks, env: hooks.env, secrets: hooks.secrets }),
     upstreamFetch: async (url, init) => {
       calls++;
-      expect(url).toBe(`http://localhost/${secret}`);
+      // The proxy resolves once and connects to the checked address, so the URL
+      // carries the resolved IP while the Host header keeps the routed hostname.
+      expect(["127.0.0.1", "[::1]"]).toContain(new URL(url).host);
+      expect(url).toContain(`/${secret}`);
+      expect(new Headers(init.headers).get("host")).toBe("localhost");
       expect(init.redirect).toBe("manual");
       const authorization = new Headers(init.headers).get("authorization")!;
       expect(Buffer.from(authorization.slice(6), "base64").toString()).toBe(`user:${secret}`);

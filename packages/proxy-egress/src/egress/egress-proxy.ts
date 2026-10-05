@@ -1,9 +1,10 @@
 import { bridgeWebSocket, requestWebSocketUpgrade, validateWebSocketRequest, type UpgradeRequest } from "./websocket.ts";
+import { getProxyForUrl } from "proxy-from-env";
 import dns from "node:dns/promises";
 import { readFileSync } from "node:fs";
 import { chmod, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type RequestOptions, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import net, { type AddressInfo } from "node:net";
 import { Readable, type Duplex } from "node:stream";
@@ -22,11 +23,15 @@ const workspaceMitmCaPath = "/run/agents-in-the-cloud-mitm-ca.crt";
 
 const workspaceProxies = new Map<string, Promise<WorkspaceEgressProxy>>();
 type SecretContext = () => Promise<WorkspaceSecretContext>;
-type FetchUpstream = (url: string, init: RequestInit) => Promise<Response>;
-type ConnectUpstream = (port: number, hostname: string) => net.Socket;
-type ProxyContext = { secrets: SecretContext; fetch: FetchUpstream; connect: ConnectUpstream; upgrade: UpgradeRequest };
+type FetchUpstream = (url: string, init: RequestInit & { tls?: { serverName?: string }; proxy?: string }) => Promise<Response>;
+type ConnectUpstream = (port: number, address: string) => net.Socket;
+type DnsLookup = (hostname: string) => Promise<Array<{ address: string; family: number }>>;
+type ProxyContext = { secrets: SecretContext; fetch: FetchUpstream; connect: ConnectUpstream; upgrade: UpgradeRequest; dnsLookup: DnsLookup; proxyForUrl: typeof getProxyForUrl };
 export type WorkspaceEgressProxy = { close(): Promise<void> };
 const mitmTargetServers = new Map<string, Promise<MitmTargetServer>>();
+
+/** A policy-checked destination for direct connections; trusted upstream proxies check their own. */
+type ResolvedDestination = { address: string; family: 4 | 6 };
 
 type MitmConnectionContext = { context: ProxyContext; hostname: string };
 type MitmTargetServer = { server: ReturnType<typeof createHttpsServer>; port: number; connections: Map<number, MitmConnectionContext>; renewAt: number };
@@ -100,10 +105,10 @@ export async function ensureWorkspaceEgressProxy(workspaceId: string): Promise<v
 
 // The listener's closure supplies identity. Nothing in HTTP headers, CONNECT,
 // or the requested URL can select another workspace's secrets.
-export async function startWorkspaceEgressProxy({ socketPath, ca, getContext, upstreamFetch = fetch, upstreamConnect = (port, hostname) => net.connect(port, hostname), upstreamUpgrade = requestWebSocketUpgrade }: {
-  socketPath: string; ca: MitmCa; getContext: SecretContext; upstreamFetch?: FetchUpstream; upstreamConnect?: ConnectUpstream; upstreamUpgrade?: UpgradeRequest;
+export async function startWorkspaceEgressProxy({ socketPath, ca, getContext, upstreamFetch = fetch, upstreamConnect = (port, address) => net.connect(port, address), upstreamUpgrade = requestWebSocketUpgrade, upstreamDnsLookup = (hostname) => dns.lookup(hostname, { all: true, verbatim: false }), upstreamProxyForUrl = getProxyForUrl }: {
+  socketPath: string; ca: MitmCa; getContext: SecretContext; upstreamFetch?: FetchUpstream; upstreamConnect?: ConnectUpstream; upstreamUpgrade?: UpgradeRequest; upstreamDnsLookup?: DnsLookup; upstreamProxyForUrl?: typeof getProxyForUrl;
 }): Promise<WorkspaceEgressProxy> {
-  const context: ProxyContext = { secrets: getContext, fetch: upstreamFetch, connect: upstreamConnect, upgrade: upstreamUpgrade };
+  const context: ProxyContext = { secrets: getContext, fetch: upstreamFetch, connect: upstreamConnect, upgrade: upstreamUpgrade, dnsLookup: upstreamDnsLookup, proxyForUrl: upstreamProxyForUrl };
   const connections = new Set<net.Socket>();
   const server = createServer((req, res) => void handleProxyHttp(context, req, res).catch((thrown) => {
     const error = thrown instanceof Error ? thrown : new Error(String(thrown));
@@ -134,7 +139,9 @@ export async function startWorkspaceEgressProxy({ socketPath, ca, getContext, up
 
 async function handleConnect(ca: MitmCa, context: ProxyContext, req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
   const { hostname, port } = parseConnectTarget(req.url || "");
-  await assertDestinationAllowed(context, hostname, port, port === 443 ? "https" : "http");
+  // Resolve and check once; the tunnel connects to this exact address, so a
+  // hostname cannot re-resolve to something the policy never approved.
+  const destination = await resolveAllowedDestination(context, hostname, port, port === 443 ? "https" : "http");
   // Zig std.http HTTPS proxy compatibility (verified with 0.15.2 and 0.16.0):
   // CONNECT normally establishes a byte tunnel, after which the client must start
   // TLS before sending HTTP. Zig's connectProxied() instead returns the plain
@@ -167,7 +174,7 @@ async function handleConnect(ca: MitmCa, context: ProxyContext, req: IncomingMes
     socket.end("HTTP/1.1 405 Method Not Allowed\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
     return;
   }
-  if (!(await shouldMitmConnectTarget(context, hostname))) return tunnelConnect(context.connect, hostname, port, socket, head);
+  if (!(await shouldMitmConnectTarget(context, hostname))) return tunnelConnect(context.connect, destination.address, port, socket, head);
   if (port !== 443) throw new HttpRequestBlockedError("MITM CONNECT only allowed to port 443");
   const targetServer = await ensureMitmTargetServer(ca, hostname);
   socket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -193,9 +200,9 @@ async function shouldMitmConnectTarget(context: ProxyContext, hostname: string):
     || await workspaceRequestTransformMatchesHost(hostname);
 }
 
-async function tunnelConnect(connect: ConnectUpstream, hostname: string, port: number, socket: Duplex, head: Buffer): Promise<void> {
+async function tunnelConnect(connect: ConnectUpstream, address: string, port: number, socket: Duplex, head: Buffer): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const upstream = connect(port, hostname);
+    const upstream = connect(port, address);
     const onError = (error: Error) => {
       socket.destroy();
       reject(error);
@@ -289,7 +296,7 @@ async function handleProxyHttp(context: ProxyContext, req: IncomingMessage, res:
   const parsed = new URL(targetUrl);
   const protocol = parsed.protocol === "https:" ? "https" : "http";
   const port = parsed.port ? Number(parsed.port) : protocol === "https" ? 443 : 80;
-  await assertDestinationAllowed(context, parsed.hostname, port, protocol);
+  const destination = await resolveAllowedDestination(context, parsed.hostname, port, protocol);
 
   const method = (req.method || "GET").toUpperCase();
   const canHaveBody = !["GET", "HEAD"].includes(method);
@@ -310,14 +317,33 @@ async function handleProxyHttp(context: ProxyContext, req: IncomingMessage, res:
   if (hooks.isRequestAllowed && !(await hooks.isRequestAllowed(new Request(next.url, { method: next.method, headers: next.headers })))) throw new HttpRequestBlockedError("request blocked by policy");
 
   const upstreamHeaders = filteredForwardHeaders(next.headers);
-  const upstreamInit: RequestInit & { duplex?: "half" } = {
+  // For direct egress, connect to the checked address: the request URL carries the
+  // pinned IP, the Host header and TLS serverName keep the routed hostname for
+  // virtual hosting, SNI and certificate verification. A hostname that answers
+  // DNS differently on a second lookup cannot redirect the connection.
+  const nextUrl = new URL(next.url);
+  const nextProtocol = nextUrl.protocol === "https:" ? "https" : "http";
+  const nextPort = nextUrl.port ? Number(nextUrl.port) : nextProtocol === "https" ? 443 : 80;
+  const finalDestination = nextUrl.hostname !== parsed.hostname || nextPort !== port || nextProtocol !== protocol
+    ? await resolveAllowedDestination(context, nextUrl.hostname, nextPort, nextProtocol)
+    : destination;
+  const pinnedUrl = new URL(next.url);
+  pinnedUrl.hostname = finalDestination.family === 6 ? `[${finalDestination.address}]` : finalDestination.address;
+  upstreamHeaders.set("host", nextUrl.host);
+  // Environment proxies are trusted egress boundaries (including the parent in
+  // nested installations). Preserve the logical hostname so that boundary can
+  // enforce policy, pin its own outbound socket, and apply hostname-bound secrets.
+  const proxy = context.proxyForUrl(next.url);
+  const upstreamInit: RequestInit & { duplex?: "half"; tls?: { serverName: string }; proxy: string } = {
+    proxy,
     method: next.method,
     headers: upstreamHeaders,
     body: ["GET", "HEAD"].includes(next.method.toUpperCase()) ? undefined : next.body,
     redirect: "manual",
   };
+  if (nextProtocol === "https") upstreamInit.tls = { serverName: nextUrl.hostname };
   if (!["GET", "HEAD"].includes(next.method.toUpperCase())) upstreamInit.duplex = "half";
-  const upstream = await context.fetch(next.url, upstreamInit);
+  const upstream = await context.fetch(proxy ? next.url : pinnedUrl.toString(), upstreamInit);
   const finalResponse = hooks.onResponse ? await hooks.onResponse(upstream, next) ?? upstream : upstream;
   await writeFetchResponse(res, finalResponse, scrubHeader);
 }
@@ -328,34 +354,52 @@ async function handleProxyUpgrade(context: ProxyContext, req: IncomingMessage, s
   const target = new URL(requestTargetUrl(req));
   if (target.protocol === "ws:") target.protocol = "http:";
   if (target.protocol === "wss:") target.protocol = "https:";
-  const checkDestination = async (url: URL) => {
+  const checkDestination = async (url: URL): Promise<ResolvedDestination> => {
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash) {
       throw new HttpRequestBlockedError("Invalid WebSocket destination", 400, "Bad Request");
     }
-    await assertDestinationAllowed(context, url.hostname, Number(url.port || (url.protocol === "https:" ? 443 : 80)), url.protocol === "https:" ? "https" : "http");
+    return await resolveAllowedDestination(context, url.hostname, Number(url.port || (url.protocol === "https:" ? 443 : 80)), url.protocol === "https:" ? "https" : "http");
   };
+  const destination = await checkDestination(target);
   const request = new Request(target, { method: req.method, headers: incomingHeaders(req) });
   validateWebSocketRequest(request);
-  await checkDestination(target);
   const { hooks } = await context.secrets();
   const next = await hooks.onRequest(request);
   validateWebSocketRequest(next);
-  if (next.url !== request.url) await checkDestination(new URL(next.url));
+  // Direct upgrades use the checked address. An environment proxy owns its
+  // outbound resolution and policy instead; CONNECT must keep the hostname for
+  // its credential hooks. A lookup callback cannot pin a proxy CONNECT target.
+  const finalDestination = next.url !== request.url ? await checkDestination(new URL(next.url)) : destination;
   if (hooks.isRequestAllowed && !await hooks.isRequestAllowed(next)) throw new HttpRequestBlockedError("request blocked by policy");
   if (socket.destroyed) return;
-  await bridgeWebSocket(next, socket, head, context.upgrade, value => hooks.scrubResponseHeader(value, next));
+  const open = (url: URL, options: RequestOptions) => context.upgrade(url, context.proxyForUrl(url.href)
+    ? options
+    : { ...options, lookup: pinnedLookup(finalDestination) });
+  await bridgeWebSocket(next, socket, head, open, value => hooks.scrubResponseHeader(value, next));
 }
 
-async function assertDestinationAllowed(context: ProxyContext, hostname: string, port: number, protocol: "http" | "https"): Promise<void> {
+/** Resolve a hostname once and require every address to pass the egress policy.
+ * Returns the first allowed address for direct connections; a trusted upstream
+ * proxy owns resolution and pinning when a request is delegated to it. */
+async function resolveAllowedDestination(context: ProxyContext, hostname: string, port: number, protocol: "http" | "https"): Promise<ResolvedDestination> {
   const secrets = await context.secrets();
   const hooks = secrets.hooks;
-  if (!hooks.isIpAllowed) return;
-  const addresses = await dns.lookup(hostname, { all: true, verbatim: false });
+  const addresses = await context.dnsLookup(hostname);
   if (addresses.length === 0) throw new HttpRequestBlockedError(`could not resolve host: ${hostname}`);
   for (const address of addresses) {
     const family = address.family === 6 ? 6 : 4;
-    if (!(await hooks.isIpAllowed({ hostname, ip: address.address, family, port, protocol }))) throw new HttpRequestBlockedError(`destination not allowed: ${hostname}`);
+    if (!(await hooks.isIpAllowed?.({ hostname, ip: address.address, family, port, protocol }))) throw new HttpRequestBlockedError(`destination not allowed: ${hostname}`);
   }
+  const first = addresses[0]!;
+  return { address: first.address, family: first.family === 6 ? 6 : 4 };
+}
+
+/** A DNS lookup that always answers with the policy-checked address. */
+function pinnedLookup(destination: ResolvedDestination): NonNullable<import("node:net").TcpSocketConnectOpts["lookup"]> {
+  return (_hostname: string, options: { all?: boolean }, callback: (error: Error | null, address: string | Array<{ address: string; family: number }>, family?: number) => void) => {
+    if (options?.all) callback(null, [{ address: destination.address, family: destination.family }]);
+    else callback(null, destination.address, destination.family);
+  };
 }
 
 function requestTargetUrl(req: IncomingMessage): string {

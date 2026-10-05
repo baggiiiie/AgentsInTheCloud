@@ -87,7 +87,7 @@ test("workspace socket controls HTTP and HTTPS identity, policy and reconnection
   const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-egress-"));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const ca = await ensureMitmCa({ agentsInTheCloudDataDir: directory, dockerHostAgentsInTheCloudDataDir: directory, dockerBridgeHost: "127.0.0.1" });
-  const leaf = await ensureLeafCertificate(ca, "127.0.0.1");
+  const leaf = await ensureLeafCertificate(ca, ["127.0.0.1", "localhost", "::1"]);
   const caPem = await readFile(ca.certPath, "utf8");
   const received: { key?: string | string[]; authorization?: string; proxyAuthorization?: string | string[]; body: string }[] = [];
   const handler: RequestListener = (req, res) => {
@@ -111,10 +111,13 @@ test("workspace socket controls HTTP and HTTPS identity, policy and reconnection
   }
   // Route logical TLS port443 to an ephemeral local fixture, trusting its test CA.
   // Requests still use the real upstream fetch and the proxy's real HTTP hooks.
-  const upstreamFetch = (url: string, init: RequestInit) => {
+  // The proxy pins the policy-checked address into the URL and keeps the routed
+  // hostname in Host and TLS serverName; merge the proxy's serverName with the
+  // fixture's trust so certificate verification keeps running against the name.
+  const upstreamFetch = (url: string, init: RequestInit & { tls?: { serverName?: string } }) => {
     const target = new URL(url);
     if (target.protocol === "https:" && !target.port) { target.hostname = "127.0.0.1"; target.port = String(httpsPort); }
-    return fetch(target, { ...init, proxy: "", tls: { ca: caPem } });
+    return fetch(target, { ...init, proxy: "", tls: { ...init.tls, ca: caPem } });
   };
   const start = (id: string) => startWorkspaceEgressProxy({ socketPath: join(directory, id, "egress.sock"), ca, getContext: async () => contexts.get(id)!, upstreamFetch,
     // Like upstreamFetch, map logical HTTPS port 443 to the local TLS fixture.

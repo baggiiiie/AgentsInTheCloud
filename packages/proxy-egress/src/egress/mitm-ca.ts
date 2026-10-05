@@ -32,8 +32,10 @@ export async function ensureMitmCa(context?: AgentsInTheCloudRuntimeContext): Pr
   return { dir, certPath, keyPath, leafDir };
 }
 
-export async function ensureLeafCertificate(ca: MitmCa, hostname: string): Promise<LeafCertificate> {
-  const safeName = hostname.toLowerCase().replace(/[^a-z0-9_.-]/g, "_");
+export async function ensureLeafCertificate(ca: MitmCa, hostnames: string | readonly string[]): Promise<LeafCertificate> {
+  const names = (Array.isArray(hostnames) ? [...hostnames] : [hostnames]).map(hostname => hostname.toLowerCase());
+  if (!names.length) throw new Error("leaf certificate needs at least one hostname");
+  const safeName = names[0]!.replace(/[^a-z0-9_.-]/g, "_");
   const certPath = join(ca.leafDir, `${safeName}.pem`);
   const keyPath = join(ca.leafDir, `${safeName}-key.pem`);
   const release = await acquireFileLock(join(ca.leafDir, `${safeName}.lock`), "certificate");
@@ -49,9 +51,9 @@ export async function ensureLeafCertificate(ca: MitmCa, hostname: string): Promi
     const ext = join(tmp, "leaf.ext");
     const temporaryCertPath = join(tmp, "leaf.pem");
     const temporaryKeyPath = join(tmp, "leaf-key.pem");
-    const subjectAltName = net.isIP(hostname) ? `IP:${hostname}` : `DNS:${hostname}`;
+    const subjectAltName = names.map(name => net.isIP(name) ? `IP:${name}` : `DNS:${name}`).join(", ");
     await writeFile(ext, `basicConstraints=CA:FALSE\nkeyUsage=digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=${subjectAltName}\n`);
-    await runOpenSsl(["req", "-newkey", "rsa:2048", "-nodes", "-subj", `/CN=${hostname}`, "-keyout", temporaryKeyPath, "-out", csr]);
+    await runOpenSsl(["req", "-newkey", "rsa:2048", "-nodes", "-subj", `/CN=${names[0]}`, "-keyout", temporaryKeyPath, "-out", csr]);
     await runOpenSsl(["x509", "-req", "-in", csr, "-CA", ca.certPath, "-CAkey", ca.keyPath, "-CAcreateserial", "-days", String(leafCertificateLifetimeDays), "-sha256", "-extfile", ext, "-out", temporaryCertPath]);
     await chmod(temporaryKeyPath, 0o600);
     await rename(temporaryKeyPath, keyPath);
