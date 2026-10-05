@@ -2,11 +2,19 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CliAgentSession, CliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
+import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { codexLaunchScript } from "../src/server/launch-command.ts";
 
 let home: string;
-beforeEach(async () => { home = await mkdtemp(join(tmpdir(), "codex-launch-")); });
+let defaultSession: CliAgentSession;
+let baseArgs: string[];
+beforeEach(async () => {
+  home = await mkdtemp(join(tmpdir(), "codex-launch-"));
+  defaultSession = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
+  baseArgs = expectedBaseArgs(defaultSession);
+});
 afterEach(async () => { await rm(home, { recursive: true, force: true }); });
 
 async function executable(path: string, script: string) {
@@ -14,20 +22,29 @@ async function executable(path: string, script: string) {
   await writeFile(path, `#!/bin/bash\n${script}`);
   await chmod(path, 0o755);
 }
+function launch(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session = defaultSession, resumeId?: string) {
+  return codexLaunchScript(input, imagePaths, settings, session, resumeId);
+}
+
 function run(script: string) {
   const child = Bun.spawn(["/bin/bash", "-c", script], { env: { ...process.env, HOME: home, PATH: `${home}/.local/bin:${home}/tools:/usr/bin:/bin` }, stdout: "pipe", stderr: "pipe" });
   return Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
 }
 const empty = { text: "", images: [], attachmentNotes: [] };
 const sessionId = "1f2e3d4c-0000-4000-8000-000000000001";
-const baseArgs = ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}', "-c", 'tui.theme="agents-in-the-cloud"', "-c", "notice.hide_full_access_warning=true", "-c", 'cli_auth_credentials_store="file"'];
+function expectedBaseArgs(session: CliAgentSession): string[] {
+  return ["--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust", "--no-alt-screen", "--cd", "/work", "-c", 'projects={"/work"={trust_level="trusted"}}',
+    "-c", `notify=${JSON.stringify(["sh", session.turnSignalCommand, "finished"])}`,
+    "-c", `hooks={UserPromptSubmit=[{hooks=[{type="command",command=${JSON.stringify(`sh ${shellQuote(session.turnSignalCommand)} started`)}}]}]}`,
+    "-c", 'tui.theme="agents-in-the-cloud"', "-c", "notice.hide_full_access_warning=true", "-c", 'cli_auth_credentials_store="file"'];
+}
 
 test("reuses home Codex and passes initial prompt, image paths and file notes as literal arguments", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const text = `--help 'quoted' $(touch ${home}/injected)\nsecond line`;
   const notes = "[Attached file copied into the workspace at /tmp/agents-in-the-cloud-attachments/my file.txt]";
   const image = "/tmp/agents-in-the-cloud-attachments/image 1.png";
-  const [code, output] = await run(codexLaunchScript({ ...empty, text, attachmentNotes: [notes] }, [image]));
+  const [code, output] = await run(launch({ ...empty, text, attachmentNotes: [notes] }, [image]));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--image", image, "--", `${text}\n\n${notes}`]);
   expect(await Bun.file(`${home}/injected`).exists()).toBe(false);
@@ -35,7 +52,7 @@ test("reuses home Codex and passes initial prompt, image paths and file notes as
 
 test("empty launch has no initial prompt argument", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
-  const [code, output] = await run(codexLaunchScript(empty, []));
+  const [code, output] = await run(launch(empty, []));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual(baseArgs);
 });
@@ -46,7 +63,7 @@ sleep .1
 mkdir -p "$3/node_modules/.bin"
 printf '#!/bin/sh\\nprintf "CODEX_STARTED\\\\n"\\n' > "$3/node_modules/.bin/codex"
 chmod +x "$3/node_modules/.bin/codex"`);
-  const results = await Promise.all([run(codexLaunchScript(empty, [])), run(codexLaunchScript(empty, []))]);
+  const results = await Promise.all([run(launch(empty, [])), run(launch(empty, []))]);
   for (const [code, output] of results) { expect(code).toBe(0); expect(output).toContain("CODEX_STARTED"); }
   const installs = (await readFile(`${home}/installs`, "utf8")).trim().split("\n");
   expect(installs).toHaveLength(1);
@@ -56,7 +73,7 @@ chmod +x "$3/node_modules/.bin/codex"`);
 
 test("installation failure exits visibly without running a fallback shell", async () => {
   await executable(`${home}/tools/npm`, "echo registry-unavailable >&2; exit 42");
-  const [code, output, error] = await run(codexLaunchScript(empty, []));
+  const [code, output, error] = await run(launch(empty, []));
   expect(code).toBe(42);
   expect(error).toContain("registry-unavailable");
   expect(output).toContain("Codex failed (exit 42)");
@@ -65,7 +82,7 @@ test("installation failure exits visibly without running a fallback shell", asyn
 
 test("Codex startup failure retains its exit code and diagnostics", async () => {
   await executable(`${home}/.local/bin/codex`, "echo invalid-configuration >&2; exit 7");
-  const [code, output, error] = await run(codexLaunchScript(empty, []));
+  const [code, output, error] = await run(launch(empty, []));
   expect(code).toBe(7);
   expect(error).toContain("invalid-configuration");
   expect(output).toContain("Codex failed (exit 7)");
@@ -73,7 +90,7 @@ test("Codex startup failure retains its exit code and diagnostics", async () => 
 
 test("passes the chosen Codex model and thinking level to the CLI", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
-  const [code, output] = await run(codexLaunchScript(empty, [], { model: "openai-codex::gpt-5.4", thinkingLevel: "high" }));
+  const [code, output] = await run(launch(empty, [], { model: "openai-codex::gpt-5.4", thinkingLevel: "high" }));
   expect(code).toBe(0);
   expect(output.split("\0").slice(0, -1)).toEqual([...baseArgs, "--model", "gpt-5.4", "-c", 'model_reasoning_effort="high"']);
 });
@@ -81,7 +98,7 @@ test("passes the chosen Codex model and thinking level to the CLI", async () => 
 test("registers session-local turn boundary notifications", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const command = `${home}/turn signal.sh`;
-  const [code, output] = await run(codexLaunchScript(empty, [], {}, { id: sessionId, directory: `${home}/session`, turnSignalCommand: command }));
+  const [code, output] = await run(launch(empty, [], {}, { id: sessionId, directory: `${home}/session`, turnSignalCommand: command }));
   expect(code).toBe(0);
   const args = output.split("\0");
   expect(args).toContain(`notify=${JSON.stringify(["sh", command, "finished"])}`);
@@ -90,7 +107,7 @@ test("registers session-local turn boundary notifications", async () => {
 
 test("installs the AgentsInTheCloud syntax theme in CODEX_HOME with terminal palette colors", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
-  const [code] = await run(`CODEX_HOME=${shellQuote(`${home}/session-codex`)}\n${codexLaunchScript(empty, [])}`);
+  const [code] = await run(`CODEX_HOME=${shellQuote(`${home}/session-codex`)}\n${launch(empty, [])}`);
   expect(code).toBe(0);
   const theme = await readFile(`${home}/session-codex/themes/agents-in-the-cloud.tmTheme`, "utf8");
   // Inline code uses palette slot 12 (bright blue), AgentsInTheCloud's accent.
@@ -101,7 +118,7 @@ test("installs the AgentsInTheCloud syntax theme in CODEX_HOME with terminal pal
 test("native resume restores the exact conversation with no submitted prompt", async () => {
   await executable(`${home}/.local/bin/codex`, 'printf "%s\\0" "$@"');
   const session = { id: sessionId, directory: `${home}/session`, turnSignalCommand: `${home}/turn-signal.sh` };
-  const [code, output] = await run(codexLaunchScript(empty, [], {}, session, "native-session-id"));
+  const [code, output] = await run(launch(empty, [], {}, session, "native-session-id"));
   expect(code).toBe(0);
   const args = output.split("\0").slice(0, -1);
   expect(args.join(" ")).toContain(["resume", "native-session-id"].join(" "));

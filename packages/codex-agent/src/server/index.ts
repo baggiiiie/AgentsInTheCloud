@@ -1,4 +1,4 @@
-import { prepareCodexMcp } from "./mcp.ts";
+import { prepareCodexSession } from "./session.ts";
 import { createCliAgentModule, emptyAgentInput, createCliModelSettings } from "@agents-in-the-cloud/cli-agent/server";
 import { createPiModelRuntime, installSubscriptionCli, requireProviderSubscription } from "@agents-in-the-cloud/llm/server";
 import { providerBrandIconHtml } from "@agents-in-the-cloud/shared";
@@ -15,7 +15,7 @@ export const agentsInTheCloudServerModule = createCliAgentModule({
   requireSetup: async () => requireProviderSubscription(await createPiModelRuntime(), "openai-codex", "Codex"),
   settings: codexModelSettings,
   prepareWorkspace: async (workspaceId) => installSubscriptionCli(workspaceId, await createPiModelRuntime()),
-  prepareSession: prepareCodexMcp,
+  prepareSession: prepareCodexSession,
   launchScript: codexLaunchScript,
   resumeScript: async (workspaceId, settings, session) => codexLaunchScript(emptyAgentInput(), [], settings, session, await codexResumeId(workspaceId, session.id)),
   loadTranscript: loadCodexTranscript,

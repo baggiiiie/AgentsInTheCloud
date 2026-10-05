@@ -23,6 +23,7 @@ test("each adapter exposes its own interactive terminal protocol", async () => {
         const module = createCliAgentModule({
           id: providerId, label: providerId, iconHtml: "", requireSetup: async () => {},
           settings: { renderFooter: async () => "", prepare: async () => ({}) },
+          prepareSession: async () => ({}),
           launchScript: () => "true",
         });
         let handler;

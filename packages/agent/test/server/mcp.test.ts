@@ -19,9 +19,10 @@ async function fixture() {
   const token = credentials.issue(identity);
   const invocations: string[] = [];
   let cancelled = false;
+  let instructionPreparations = 0;
   const endpoint = createAgentMcpServer({
     authenticate: credentials.authenticate,
-    instructions: (agent) => `Instructions for ${agent.workspaceId}`,
+    instructions: (agent) => { instructionPreparations++; return `Instructions for ${agent.workspaceId}`; },
     tools: (agent) => [defineWorkspaceTool({
       name: "present", label: "Present", description: "Present work",
       parameters: Type.Object({ kind: Type.Literal("browser") }, { additionalProperties: false }),
@@ -48,7 +49,7 @@ async function fixture() {
     cleanup.push(() => client.close());
     return { client, transport };
   }
-  return { directory, credentials, identity, token, invocations, endpoint, url, connect, cancelled: () => cancelled };
+  return { directory, credentials, identity, token, invocations, endpoint, url, connect, cancelled: () => cancelled, instructionPreparations: () => instructionPreparations };
 }
 
 test("credentials persist only hashes, resume after restart, and are revocable per agent", async () => {
@@ -103,4 +104,18 @@ test("progress and cancellation cross the HTTP transport", async () => {
   for (let attempt = 0; attempt < 50 && !f.cancelled(); attempt++) await Bun.sleep(10);
   expect(progress).toEqual(["Waiting"]);
   expect(f.cancelled()).toBe(true);
+});
+
+test("native-prompt credentials omit MCP guidance while preserving tools and surviving credential-store reload", async () => {
+  const f = await fixture();
+  const identity = { ...f.identity, agentId: crypto.randomUUID(), instructionDelivery: "system-prompt" as const };
+  const token = f.credentials.issue(identity);
+  expect(createAgentMcpCredentials(f.directory).authenticate(token)).toEqual(identity);
+  const { client } = await f.connect(token);
+  expect(client.getInstructions()).toBeUndefined();
+  expect(f.instructionPreparations()).toBe(0);
+  expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(["present", "wait_for_user"]);
+  expect(await client.callTool({ name: "present", arguments: { kind: "browser" } })).toMatchObject({ content: [{ type: "text", text: "workspace-a" }] });
+  const forged = `${Buffer.from(JSON.stringify({ ...identity, instructionDelivery: undefined })).toString("base64url")}.${token.split(".")[1]}`;
+  expect(f.credentials.authenticate(forged)).toBeUndefined();
 });

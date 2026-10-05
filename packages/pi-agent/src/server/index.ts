@@ -6,7 +6,7 @@ import { installPiCliConfiguration } from "./pi-cli.ts";
 import { createPiCliCredentialTransform, piCliCredentialHosts } from "./pi-cli-bridge.ts";
 import { requirePiModels } from "./auth.ts";
 import { piLaunchScript } from "./launch-command.ts";
-import { preparePiMcp } from "./mcp.ts";
+import { preparePiSession } from "./session.ts";
 import { piModelSettings } from "./model-settings.ts";
 import { loadPiTranscript, loadPiTranscriptImage, piResumePath, piHistoryFiles } from "./transcript.ts";
 
@@ -15,7 +15,7 @@ const cliModule = createCliAgentModule({
   requireSetup: requirePiModels,
   settings: piModelSettings,
   prepareWorkspace: installPiCliConfiguration,
-  prepareSession: preparePiMcp,
+  prepareSession: preparePiSession,
   launchScript: piLaunchScript,
   resumeScript: async (workspaceId, settings, session) => piLaunchScript(emptyAgentInput(), [], settings, session, await piResumePath(workspaceId, session.id)),
   loadTranscript: loadPiTranscript,

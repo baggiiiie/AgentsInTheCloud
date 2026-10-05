@@ -39,6 +39,7 @@ async function scenario(script: string): Promise<void> {
           prepare: async (settings = {}) => settings,
         },
         prepareWorkspace: async (workspaceId) => { preparations.push(workspaceId); await preparationDelay?.promise; if (preparationError) throw preparationError; },
+        prepareSession: async () => ({}),
         launchScript: (input, images, settings) => { launches.push({ input, images, settings }); return launchScript; },
         turnSettled: (...args) => turnSettled(...args),
       };
@@ -501,4 +502,32 @@ test("the terminal reports installation failure even when the CLI script owns it
   expect(code).toBe(7);
   expect(stderr).toBe("installation-failed");
   expect(await Bun.file(signalFile).text()).toBe("failed");
+`));
+
+test("native prompt preparation includes shared and plugin guidance once per launch and refreshes it on resume", () => scenario(`
+  const { configureAgentMcp } = await import("@agents-in-the-cloud/agent/server");
+  const { createAgentsInTheCloudEventBus } = await import("@agents-in-the-cloud/core");
+  const events = createAgentsInTheCloudEventBus();
+  let prepared = 0;
+  events.on("agent_system_prompt_prepare", ({ lines, agentId }) => {
+    lines.push("Plugin guidance " + agentId + " revision " + ++prepared + " " + "x".repeat(12000));
+  });
+  configureAgentMcp(events);
+  const prompts = [];
+  adapter.prepareSession = async (_workspaceId, session, mcp) => {
+    prompts.push(mcp.instructions);
+    expect(JSON.parse(Buffer.from(mcp.token.split(".")[0], "base64url").toString())).toMatchObject({ agentId: session.id, instructionDelivery: "system-prompt" });
+    return {};
+  };
+  const id = await agentType.create({ workspaceId: "native-prompt" });
+  expect(prepared).toBe(1);
+  expect(prompts[0]).toContain("You are running inside of an online coding tool called AgentsInTheCloud.");
+  expect(prompts[0]).toContain("Plugin guidance " + id + " revision 1");
+  adapter.resumeScript = async () => "true";
+  inspectionResult = { ...result, exitCode: 1 };
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
+  await createCliAgents(adapter, async () => {}).restoreWorkspace("native-prompt");
+  expect(prepared).toBe(2);
+  expect(prompts[1]).toContain("Plugin guidance " + id + " revision 2");
+  expect(prompts[1]).not.toContain("revision 1");
 `));

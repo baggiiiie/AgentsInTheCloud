@@ -10,6 +10,7 @@ import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
 import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
+export type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
 function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string {
@@ -105,7 +106,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
 }
 
 export { createCliModelSettings, type CliModelSettings } from "./model-settings.ts";
-export { checkedWorkspaceShell } from "./agents.ts";
+export { checkedWorkspaceShell, writeCliSessionFiles } from "./agents.ts";
 export { cliLaunchScript, cliPromptText, emptyAgentInput, writeFileScript } from "./launch-script.ts";
 export { turnSignalArgv, turnSignalShell, type TurnBoundary } from "./turn-signal.ts";
 export { syntaxSlot, transcriptSlot } from "./transcript-palette.ts";
