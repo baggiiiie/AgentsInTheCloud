@@ -150,6 +150,49 @@ test("automatic retries keep their recoverable errors and subsequent tools insid
   expect(findTranscriptItem(items, "tool:tool")).toMatchObject({ tool: { status: "error" } });
 });
 
+test("a restart-interrupted attempt folds into the run that recovered it, without a Run aborted error", () => {
+  const items = buildTranscript([
+    { kind: "user", id: "u", text: "go", images: [], timestamp: 1000 },
+    { kind: "runStart", turnEntryId: "u", startedAt: 1000, timestamp: 1001 },
+    { kind: "assistant", id: "a1", parts: [{ type: "toolCall", callId: "c1", name: "bash", args: {} }], stopReason: "toolUse", timestamp: 2000 },
+    { kind: "toolResult", callId: "c1", text: "ok", images: [], isError: false, timestamp: 3000 },
+    { kind: "assistant", id: "a2", parts: [{ type: "text", text: "partial" }], stopReason: "aborted", timestamp: 4000 },
+    { kind: "assistant", id: "a3", parts: [{ type: "toolCall", callId: "c2", name: "bash", args: {} }], stopReason: "toolUse", timestamp: 5000 },
+    { kind: "toolResult", callId: "c2", text: "recovered", images: [], isError: false, timestamp: 6000 },
+    { kind: "assistant", id: "a4", parts: [{ type: "text", text: "Done" }], stopReason: "stop", timestamp: 7000 },
+    { kind: "timing", turnEntryId: "u", outcome: "completed", timestamp: 7001,
+      timing: { elapsedMs: 6001, toolMs: 3000, inferenceMs: 3001, outputTokens: 2, usageComplete: true } },
+  ]);
+  expect(items.map((item) => item.type)).toEqual(["user", "working", "text"]);
+  const block = items[1];
+  if (block?.type !== "working") throw new Error("Missing turn");
+  expect(block.completedAt).toBe(7001);
+  expect(block.stoppedAt).toBeUndefined();
+  expect(block.items.map((item) => item.type)).toEqual(["tool", "text", "note", "tool"]);
+  expect(findTranscriptItem(items, "a2:interrupted")).toMatchObject({
+    type: "note", tone: "system", text: "Interrupted by a restart — continued automatically", timestamp: 4000,
+  });
+  expect(items.some((item) => item.type === "error")).toBe(false);
+});
+
+test("a stopped run keeps its Run aborted error and closes the turn", () => {
+  const items = buildTranscript([
+    { kind: "user", id: "u1", text: "go", images: [], timestamp: 1000 },
+    { kind: "runStart", turnEntryId: "u1", startedAt: 1000, timestamp: 1001 },
+    { kind: "assistant", id: "a1", parts: [{ type: "text", text: "partial" }], stopReason: "aborted", timestamp: 2000 },
+    { kind: "user", id: "u2", text: "again", images: [], timestamp: 3000 },
+    { kind: "runStart", turnEntryId: "u2", startedAt: 3000, timestamp: 3001 },
+    { kind: "assistant", id: "a2", parts: [{ type: "text", text: "Done" }], stopReason: "stop", timestamp: 4000 },
+    { kind: "timing", turnEntryId: "u2", outcome: "completed", timestamp: 4001,
+      timing: { elapsedMs: 1001, toolMs: 0, inferenceMs: 1001, outputTokens: 2, usageComplete: true } },
+  ]);
+  expect(items.map((item) => item.type)).toEqual(["user", "working", "error", "user", "working", "text"]);
+  expect(items[2]).toMatchObject({ type: "error", key: "a1:aborted", text: "Run aborted", timestamp: 2000 });
+  const blocks = items.filter((item) => item.type === "working");
+  expect(blocks[0]).toMatchObject({ key: "u1:working", stoppedAt: 2000 });
+  expect(blocks[1]).toMatchObject({ key: "u2:working", completedAt: 4001 });
+});
+
 test("selected branch paths retain the start identity without mixing continuations", () => {
   const start: TranscriptRecord = { kind: "user", id: "shared", text: "go", images: [], timestamp: 100 };
   const branch = (id: string) => buildTranscript([start,
