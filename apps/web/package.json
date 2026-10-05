@@ -41,6 +41,7 @@
     "@agents-in-the-cloud/pi-agent": "workspace:*",
     "@agents-in-the-cloud/inline-content": "workspace:*",
     "@agents-in-the-cloud/artifact-preview": "workspace:*",
-    "@agents-in-the-cloud/builtin-agent": "workspace:*"
+    "@agents-in-the-cloud/builtin-agent": "workspace:*",
+    "@agents-in-the-cloud/changes": "workspace:*"
   }
 }
