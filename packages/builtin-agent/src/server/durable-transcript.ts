@@ -100,7 +100,10 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       continue;
     }
     if (CompactionEntry.is(entry) || ResetEntry.is(entry)) {
-      records.push({ kind: "note", id: String(entry.id), text: entry.model?.map(message => contentText(message.content)).join("\n") || "New session", tone: CompactionEntry.is(entry) ? "summary" : "system" });
+      const text = entry.model?.map(message => contentText(message.content)).join("\n") || "New session";
+      // The native compaction envelope is model-facing, not part of the summary.
+      const summary = text.replace(/^The conversation history before this point was compacted into the following summary:\n\n<summary>\n([\s\S]*)\n<\/summary>$/, "$1");
+      records.push({ kind: "note", id: String(entry.id), text: CompactionEntry.is(entry) ? summary : text, tone: CompactionEntry.is(entry) ? "summary" : "system" });
       pendingBoundary = true;
       continue;
     }

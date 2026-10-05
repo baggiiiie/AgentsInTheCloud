@@ -45,7 +45,15 @@
 
 /* notes (steer / rewind summaries / system) */
 .agent-note { color: var(--text); background: var(--warning-soft); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 6px 8px; }
-.agent-note.summary { background: var(--panel); border: 1px dashed var(--line-strong); border-radius: var(--radius-control); padding: 8px 8px; }
+/* Compaction is a quiet context boundary, not a warning or assistant reply. */
+.agent-context-summary { min-width: 0; }
+.agent-context-summary-body {
+  margin: 8px 0 16px 12px;
+  padding: 8px 16px;
+  border-left: 2px solid var(--line-strong);
+  overflow-wrap: anywhere;
+}
+.agent-context-summary-body > :first-child { margin-top: 0; }
 .agent-note.warning { color: var(--text-bright); border-color: color-mix(in srgb, #d89b24 45%, var(--line)); }
 .agent-note.error { color: var(--danger); background: var(--danger-soft); border-color: #f1c7c7; }
 .agent-note p { margin: 0 0 4px; }

@@ -69,7 +69,11 @@ export function renderTranscriptItem(ctx: AgentRenderContext, item: TranscriptIt
       : renderMarkdownRow(ctx, item.text, className);
   } else if (item.type === "tool") body = transcriptRow(renderToolCard(ctx, item.key, item.tool, { ...options, open: options.open || Boolean(ctx.revealTarget && (item.anchor === ctx.revealTarget || item.key === ctx.revealTarget)) }));
   else if (item.type === "extension") body = item.render(ctx);
-  else if (item.type === "note") body = renderMarkdownRow(ctx, item.text, `agent-note ${escapeHtml(item.tone)}`);
+  else if (item.type === "note") {
+    body = item.tone === "summary"
+      ? transcriptRow(`<details class="agent-context-summary">${transcriptActionItemHtml({ kind: "text", text: "Compaction summary" }, { disclosure: true })}<div class="agent-context-summary-body markdown">${markdown(ctx, item.text)}</div></details>`)
+      : renderMarkdownRow(ctx, item.text, `agent-note ${escapeHtml(item.tone)}`);
+  }
   else body = transcriptRow(`<div class="agent-error">${escapeHtml(item.text)}</div>`);
   return `<div class="agent-item" id="${id}" data-transcript-key="${escapeHtml(item.key)}"${item.anchor ? ` data-transcript-anchor="${escapeHtml(item.anchor)}"` : ""}>${body}</div>`;
 }
