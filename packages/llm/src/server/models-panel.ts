@@ -204,8 +204,10 @@ function renderCatalogue(entries: CatalogueEntry[], host: ModelsHost, query: str
 
 async function renderYourModels(runtime: Runtime, accounts: Account[], host: ModelsHost, focus: boolean): Promise<string> {
   return `<section class="models-panel__section" aria-labelledby="${domId("models_your_models", host)}">
-    <h3 class="models-panel__heading" id="${domId("models_your_models", host)}">Your models</h3>
-    <p class="models-panel__hint">These are the models you can pick in the composer.</p>
+    <header class="models-panel__header">
+      <h3 class="models-panel__heading" id="${domId("models_your_models", host)}">Your models</h3>
+      <p class="models-panel__hint">These are the models you can pick in the composer.</p>
+    </header>
     ${await renderFavorites(runtime, host)}
     <div class="managed-list" data-managed-list-server-filter="true"><form class="managed-list__filter" method="get" action="/models/catalogue" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.catalogue(host)}">
       <input type="hidden" name="host" value="${host}">

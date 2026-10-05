@@ -4,6 +4,7 @@ import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { installSubscriptionCli, registerSubscriptionCli } from "./subscription-cli.ts";
 export const llmWorkspaceModule: WorkspaceModule = {
   id: "llm",
+  staticFiles: { "/llm.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   settingsContributions: [modelSettingsContribution],
   initialize(context) {
     registerSubscriptionCli(createPiModelRuntime);

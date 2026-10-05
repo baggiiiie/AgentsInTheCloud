@@ -1,0 +1,76 @@
+/* Models panel: providers with their usage, then your models. Same markup in its dialog, Settings, and onboarding. */
+#models_dialog, #onboarding_dialog:has(.models-panel) { width: min(640px, calc(100vw - 32px)); }
+.models-panel { display: grid; gap: 28px; min-width: 0; padding-block: 4px 8px; }
+.models-panel p { margin: 0; font: inherit; }
+.models-panel__section { display: grid; gap: 16px; min-width: 0; }
+.models-panel__section + .models-panel__section { padding-top: 28px; border-top: 1px solid var(--line); }
+.models-panel__header { display: grid; gap: 2px; min-width: 0; }
+.models-panel__heading { margin: 0; color: var(--text-bright); font-size: var(--text-body); font-weight: var(--weight-bold); }
+.models-panel__hint, .model-connect__hint { color: var(--text-muted); }
+.models-panel > .settings-error { margin-bottom: -12px; }
+.models-panel__actions { justify-content: flex-end; }
+.model-setup-heading, .model-setup-actions, .model-setup-choices { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.model-setup-heading { min-height: 40px; }
+.model-setup-actions { margin-top: 8px; }
+.model-setup-actions > :last-child:not(:first-child) { margin-inline-start: auto; }
+.model-setup-actions > form { margin: 0; }
+.model-provider-choice { margin: 0; }
+.model-popular-providers { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.model-popular-providers > form { flex: 0 1 auto; max-width: 100%; }
+.model-popular-providers .action-item { min-height: 56px; border: 1px solid var(--line); border-radius: var(--radius-control); }
+.model-accounts { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-surface); background: var(--bg); min-width: 0; }
+.model-account { min-width: 0; }
+.model-account + .model-account { border-top: 1px solid var(--line); }
+.model-account > summary.action-item { min-height: 56px; cursor: pointer; }
+.model-account__body { display: grid; gap: 12px; padding: 4px 12px 16px 52px; min-width: 0; }
+.model-account__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.model-account__actions > form { margin: 0; }
+.model-connect { display: block; min-width: 0; }
+.model-provider-usage { display: block; }
+.model-provider-usage .usage-limit { padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; }
+.model-provider-usage .usage-limit:first-child { padding-top: 0; border-top: 0; }
+.model-provider-groups { display: grid; gap: 12px; min-width: 0; }
+.model-provider-groups form, .model-provider-models form { margin: 0; }
+.model-provider-groups .action-item, .model-provider-models .action-item { width: 100%; }
+.model-other-providers-body { display: grid; gap: 8px; padding: 8px; min-width: 0; }
+.model-providers { display: grid; gap: 4px; min-width: 0; padding: 8px; max-height: min(520px, 60vh); }
+.model-providers, .model-provider-models { overflow-y: auto; }
+.model-providers:focus-visible, .model-provider-models:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.model-provider-connection { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-surface); }
+.model-provider-connection > .model-setup-heading { overflow-wrap: anywhere; }
+.model-connection-content { display: grid; gap: 16px; min-width: 0; overflow-wrap: anywhere; }
+.model-connection-content .settings-oauth-card { min-width: 0; }
+.model-provider-connection > .model-setup-actions { margin-top: 0; }
+.model-provider-results { display: block; }
+.model-provider-models { max-height: min(280px, 30vh); padding-block: 4px; }
+/* Line catalogue rows up with Your models above: same inset, icon box and label column. */
+.model-provider-models .action-item { padding-inline: 12px; gap: 8px; }
+.model-provider-models .action-item .brand-icon { width: 18px; height: 18px; margin-inline: 1px; }
+.model-favorites .managed-list__items { max-height: min(260px, 32vh); }
+.model-favorites .managed-list__visual { display: grid; place-items: center; width: 20px; }
+.model-favorites .managed-list__visual .brand-icon { width: 18px; height: 18px; }
+@media (max-width: 700px) {
+  .model-account__body { padding-inline: 12px; }
+}
+.custom-models-settings { margin-top: 4px; padding-top: 4px; }
+.custom-models-settings > summary { width: fit-content; padding: 8px 0; color: var(--text-muted); font-size: var(--text-small); cursor: pointer; }
+.custom-models-settings > summary:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.custom-models-form { padding-top: 8px; }
+.custom-models-form label { color: var(--text-bright); font-weight: var(--weight-bold); }
+.custom-models-form p { margin: 3px 0 0; color: var(--text); line-height: var(--leading-copy); }
+.custom-models-form code { font-family: var(--font-mono); }
+.custom-models-json { width: 100%; min-height: 260px; resize: vertical; font-family: var(--font-mono); font-size: var(--text-small); line-height: var(--leading-copy); tab-size: 2; }
+.custom-models-form .settings-error { margin: 0; color: var(--danger); white-space: pre-wrap; }
+.custom-models-form .custom-models-status { margin: 0; color: var(--success); }
+.custom-models-actions { display: flex; justify-content: flex-end; }
+
+/* Provider sign-in steps inside the connect area. */
+.settings-oauth-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 4px 0; }
+.settings-oauth-card p { margin: 0; }
+.settings-oauth-card > :is([data-oauth-device-auth], [data-oauth-waiting-status])[hidden] { display: none; }
+.settings-oauth-waiting-status { display: flex; align-items: center; gap: 8px; }
+.settings-oauth-complete-marker { width: 16px; flex: 0 0 auto; color: var(--success); text-align: center; }
+.settings-oauth-card > .status-list { margin-top: 0; }
+@media (max-width: 700px) {
+  .settings-oauth-card > .button { width: 100%; }
+}
