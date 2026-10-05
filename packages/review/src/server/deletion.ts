@@ -90,7 +90,11 @@ function fileList(workspaceId: string, fingerprint: string, repository: string, 
 }
 
 function commitSummary(workspaceId: string, fingerprint: string, repository: string, commit: UnpushedCommit): string {
-  const summary = renderFileSummary({ kind: "text", text: commit.subject }, `<code title="${escapeHtml(commit.hash)}">${escapeHtml(commit.hash.slice(0, 12))}</code>`);
+  const branches = commit.branches.length ? commit.branches.join(", ") : "Detached HEAD";
+  const summary = renderFileSummary(
+    { kind: "text", text: commit.subject },
+    `<span class="workspace-deletion-commit-branches" title="${escapeHtml(branches)}">${escapeHtml(branches)}</span><code title="${escapeHtml(commit.hash)}">${escapeHtml(commit.hash.slice(0, 12))}</code>`,
+  );
   const query = new URLSearchParams({ fingerprint, repository, commit: commit.hash });
   const frameId = commitFrameId(workspaceId, fingerprint, repository, commit.hash);
   return `<details class="review-file workspace-deletion-change-group" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/review/deletion/commit?${query}`)}</details>`;
