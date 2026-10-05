@@ -21,6 +21,6 @@ export { ids, type AgentRenderContext } from "./render-context.ts";
 export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
 export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, finalAssistantTextIndexes, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
 export { type AgentTranscriptSnapshot, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
-export { prepareAgentMcp, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest, registerAgentTurnSettler } from "./mcp.ts";
+export { prepareAgentMcp, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest, registerAgentTurnSettler, type AgentTurnFinishReason } from "./mcp.ts";
 export { publishSessionSnapshot, projectlessSessionShareKey, sessionShareMountPath, sessionShareKeySlug, sessionShareKeyForInit, sessionShareDir, workspaceSessionShareKey } from "./session-share.ts";
 export { configureAgentToolPresentations, type AgentToolPresentation } from "./tool-presentations.ts";

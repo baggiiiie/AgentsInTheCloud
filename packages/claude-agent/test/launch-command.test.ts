@@ -128,6 +128,7 @@ test("registers session-local turn boundary hooks", async () => {
   expect(JSON.parse(args[args.indexOf("--settings") + 1]!)).toMatchObject({ hooks: {
     UserPromptSubmit: [{ hooks: [{ type: "command", command: `sh ${shellQuote(command)} started` }] }],
     Stop: [{ hooks: [{ type: "command", command: `sh ${shellQuote(command)} finished` }] }],
+    StopFailure: [{ hooks: [{ type: "command", command: `sh ${shellQuote(command)} failed` }] }],
   } });
 });
 

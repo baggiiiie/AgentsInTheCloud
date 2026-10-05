@@ -1,7 +1,7 @@
 import { shellQuote } from "@agents-in-the-cloud/core";
 
-/** Turn boundary reported to AgentsInTheCloud: a started turn marks the conversation busy, a finished one requests attention for it. */
-export type TurnBoundary = "started" | "finished";
+/** Turn boundary reported to AgentsInTheCloud: a started turn marks the conversation busy, a finished or failed one requests attention for it. */
+export type TurnBoundary = "started" | "finished" | "failed";
 
 /** Every session gets one signal script, invoked as `sh <script> <boundary>`. */
 export function turnSignalArgv(command: string, boundary: TurnBoundary): string[] {

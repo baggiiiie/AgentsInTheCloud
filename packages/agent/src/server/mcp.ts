@@ -19,8 +19,9 @@ const mcp = createAgentMcpServer({
   tools: ({ workspaceId }) => createAgentsInTheCloudControlTools(workspaceId, { events }),
   instructions: ({ workspaceId, agentId }) => agentMcpInstructions(workspaceId, agentId),
 });
+export type AgentTurnFinishReason = "stop" | "stopFailure";
 /** Resolves once the agent's own record of its finished turn is complete; other agents resolve at once. */
-type TurnSettler = (workspaceId: string, agentId: string, signal: AbortSignal) => Promise<void>;
+type TurnSettler = (workspaceId: string, agentId: string, signal: AbortSignal, reason: AgentTurnFinishReason) => Promise<void>;
 const turnSettlers = new Set<TurnSettler>();
 // Agent IDs name conversations, which are unique across workspaces.
 const settlingTurns = new Map<string, AbortController>();
@@ -41,7 +42,8 @@ export function handleAgentMcpRequest(request: Request, workspaceId?: string): P
   const path = new URL(request.url).pathname;
   if (path === "/mcp") return mcp.fetch(request, workspaceId);
   if (path === "/agent-turn-started") return handleTurnBoundary(request, workspaceId, true);
-  if (path === "/agent-turn-finished") return handleTurnBoundary(request, workspaceId, false);
+  if (path === "/agent-turn-finished") return handleTurnBoundary(request, workspaceId, false, "stop");
+  if (path === "/agent-turn-failed") return handleTurnBoundary(request, workspaceId, false, "stopFailure");
 }
 
 function abandonSettlingTurn(agentId: string): void {
@@ -76,7 +78,7 @@ exit 1`);
 }
 
 /** CLI agents run outside AgentsInTheCloud's runtime, so their turn boundaries arrive as authenticated loopback requests. */
-async function handleTurnBoundary(request: Request, workspaceId: string | undefined, started: boolean): Promise<Response> {
+async function handleTurnBoundary(request: Request, workspaceId: string | undefined, started: boolean, reason: AgentTurnFinishReason = "stop"): Promise<Response> {
   const identity = authenticateAgentRequest(request, credentialStore().authenticate, workspaceId);
   if (identity instanceof Response) return identity;
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -88,15 +90,15 @@ async function handleTurnBoundary(request: Request, workspaceId: string | undefi
     // some of them after this request returns. Answer now; end the turn once it has settled.
     const settling = new AbortController();
     settlingTurns.set(identity.agentId, settling);
-    void finishTurn(identity, settling.signal).catch((error) => {
+    void finishTurn(identity, settling.signal, reason).catch((error) => {
       console.error(`Could not finish the turn of agent ${identity.agentId}`, error);
     });
   }
   return new Response(null, { status: 204 });
 }
 
-async function finishTurn({ workspaceId, agentId }: AgentMcpIdentity, signal: AbortSignal): Promise<void> {
-  await Promise.all([...turnSettlers].map((settle) => settle(workspaceId, agentId, signal)));
+async function finishTurn({ workspaceId, agentId }: AgentMcpIdentity, signal: AbortSignal, reason: AgentTurnFinishReason): Promise<void> {
+  await Promise.all([...turnSettlers].map((settle) => settle(workspaceId, agentId, signal, reason)));
   // A newer turn boundary or revocation owns the busy state now.
   if (signal.aborted) return;
   settlingTurns.delete(agentId);

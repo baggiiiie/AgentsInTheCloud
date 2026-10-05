@@ -18,10 +18,10 @@ async function scenario(script: string): Promise<void> {
       subscribeWorkspaceAgentBusy(({ agentKey, busy }) => log.push((busy ? "busy:" : "idle:") + agentKey.replace("agent:", "")));
       const agentId = crypto.randomUUID();
       const settles = [];
-      registerAgentTurnSettler(async (workspaceId, id, signal) => {
+      registerAgentTurnSettler(async (workspaceId, id, signal, reason) => {
         expect([workspaceId, id]).toEqual(["workspace", agentId]);
         const settled = Promise.withResolvers();
-        settles.push({ signal, settle: settled.resolve });
+        settles.push({ signal, reason, settle: settled.resolve });
         await settled.promise;
       });
       const { token } = await prepareAgentMcp("workspace", agentId);
@@ -56,4 +56,14 @@ test("a new turn or closing the agent abandons a turn that is still settling", (
   settles[1].settle();
   await tick();
   expect(log).toEqual(["busy:" + agentId]);
+`));
+
+test("a failed turn propagates its reason and waits for settlement before ending", () => scenario(`
+  await signal("started");
+  expect((await signal("failed")).status).toBe(204);
+  expect(settles[0].reason).toBe("stopFailure");
+  expect(log).toEqual(["busy:" + agentId]);
+  settles[0].settle();
+  await tick();
+  expect(log).toEqual(["busy:" + agentId, "idle:" + agentId, "workspace_agent_turn_finished:" + agentId]);
 `));

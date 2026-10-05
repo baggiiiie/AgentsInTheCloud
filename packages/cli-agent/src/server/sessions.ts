@@ -1,4 +1,4 @@
-import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug } from "@agents-in-the-cloud/agent/server";
+import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";
@@ -100,12 +100,13 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
 
   // The turn ends once its native history is complete, not when the CLI signals it,
   // and no later than the timeout so a CLI that never completes it cannot stay busy.
-  async function settleTurn(workspaceId: string, id: string, signal: AbortSignal): Promise<void> {
+  async function settleTurn(workspaceId: string, id: string, signal: AbortSignal, reason: AgentTurnFinishReason): Promise<void> {
     if (!list(workspaceId).some((session) => session.id === id)) return;
     const deadline = Date.now() + turnSettleTimeoutMs;
     while (!signal.aborted && !await adapter.turnSettled!(workspaceId, id)) {
       if (Date.now() >= deadline) {
-        console.error(`${adapter.label} history for ${id} did not settle within ${turnSettleTimeoutMs / 1000}s of its finished turn`);
+        // StopFailure may never write the normal stop marker; its timeout is expected.
+        if (reason !== "stopFailure") console.error(`${adapter.label} history for ${id} did not settle within ${turnSettleTimeoutMs / 1000}s of its finished turn`);
         return;
       }
       await Bun.sleep(100);

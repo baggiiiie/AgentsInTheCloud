@@ -421,3 +421,25 @@ test("a CLI turn whose native history never settles ends after ten seconds", () 
   expect(busy).toEqual([true, false]);
   expect(errors).toEqual(["Example CLI history for " + id + " did not settle within 10s of its finished turn"]);
 `));
+
+test("a CLI turn ending with StopFailure times out after ten seconds without logging", () => scenario(`
+  const { subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  const busy = [];
+  const errors = [];
+  console.error = (...args) => errors.push(args.join(" "));
+  subscribeWorkspaceAgentBusy((event) => busy.push(event.busy));
+  const realNow = Date.now;
+  let elapsed = 0;
+  Date.now = () => realNow() + elapsed;
+  turnSettled = async () => false;
+  const { id, signal } = await turnSignals("unsettled");
+  await signal("started");
+  await signal("failed");
+  elapsed = 9_000;
+  await Bun.sleep(250);
+  expect(busy).toEqual([true]);
+  elapsed = 10_000;
+  await Bun.sleep(250);
+  expect(busy).toEqual([true, false]);
+  expect(errors).toEqual([]);
+`));

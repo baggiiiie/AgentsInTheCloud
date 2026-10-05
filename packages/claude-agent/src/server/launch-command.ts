@@ -11,7 +11,7 @@ export const claudeFileLinkInstructions = "When referring to a file you created 
 
 function turnBoundaryHooks(turnSignalCommand: string) {
   const hook = (boundary: TurnBoundary) => [{ hooks: [{ type: "command", command: turnSignalShell(turnSignalCommand, boundary) }] }];
-  return { UserPromptSubmit: hook("started"), Stop: hook("finished") };
+  return { UserPromptSubmit: hook("started"), Stop: hook("finished"), StopFailure: hook("failed") };
 }
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
