@@ -3,7 +3,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { HttpRequestBlockedError, type SecretRequestTransform } from "@agents-in-the-cloud/proxy-egress/server";
-import { availableProviderModels, anthropicSubscriptionUnavailableReason, codexAccountId, modelRefValue, type ModelRef, type ConfiguredModel } from "@agents-in-the-cloud/llm/server";
+import { availableProviderModels, anthropicSubscriptionUnavailableReason, codexAccountId, modelRefValue, type ModelRef, type EnabledModel } from "@agents-in-the-cloud/llm/server";
 
 // Self-describing, non-secret markers survive server restarts without a token registry.
 // Every use is checked against the *current* host-side catalogue and authentication.
@@ -69,10 +69,10 @@ export interface PiCliConfiguration {
 }
 
 /** Export resolved model configuration, never raw models.json (which may contain secrets or commands). */
-export async function createPiCliConfiguration(runtime: Runtime, favorites: ConfiguredModel[]): Promise<PiCliConfiguration> {
+export async function createPiCliConfiguration(runtime: Runtime, enabledModels: EnabledModel[]): Promise<PiCliConfiguration> {
   const result: PiCliConfiguration = { auth: {}, models: { providers: {} }, enabledModels: [] };
   const available = await availableProviderModels(runtime);
-  const favoriteLabels = new Map(favorites.map((model) => [modelRefValue(model), model.label]));
+  const enabledModelLabels = new Map(enabledModels.map((model) => [modelRefValue(model), model.label]));
   for (const model of available) {
     const auth = await runtime.getAuth(model);
     if (!auth) throw new Error(`Provider disconnected while preparing Pi: ${model.provider}`);
@@ -87,10 +87,10 @@ export async function createPiCliConfiguration(runtime: Runtime, favorites: Conf
       placeholder({ provider: model.provider, model: model.id, field: "header", header, style: "plain" }),
     ]));
     const { provider: _provider, ...definition } = model;
-    provider.models.push({ ...definition, name: favoriteLabels.get(modelRefValue(model)) ?? model.name, baseUrl, headers });
+    provider.models.push({ ...definition, name: enabledModelLabels.get(modelRefValue(model)) ?? model.name, baseUrl, headers });
   }
   const exported = new Set(Object.entries(result.models.providers).flatMap(([provider, config]) => config.models.map((model) => modelRefValue({ provider, id: model.id }))));
-  result.enabledModels = favorites.filter((model) => exported.has(modelRefValue(model))).map((model) => `${model.provider}/${model.id}`);
+  result.enabledModels = enabledModels.filter((model) => exported.has(modelRefValue(model))).map((model) => `${model.provider}/${model.id}`);
   return result;
 }
 

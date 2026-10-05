@@ -1,17 +1,17 @@
-import { stopDurableWorkspaceAgentConversation } from "./runtime.ts";
+import { stopDurableWorkspaceAgent } from "./runtime.ts";
 import { existingDurableController } from "./runtime.ts";
 import { AgentsInTheCloudCoreError, requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { matchRoute, response } from "@agents-in-the-cloud/shared/http";
 import { invalidateAgentView, requireAgentPresentation, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
-import { resolveAgentConversation } from "./delegation.ts";
+import { resolveAgent } from "./delegation.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";
 
 export const handleSessionRequest: AgentRouteHandler = async (request, url, options) => {
   let params: string[] | undefined;
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/reveal\/([^/]+)$/)) && request.method === "GET") {
-    const [workspaceId, conversationId, target] = params;
-    const runtime = await requireAgentPresentation(workspaceId, conversationId, options);
+    const [workspaceId, agentId, target] = params;
+    const runtime = await requireAgentPresentation(workspaceId, agentId, options);
     return Response.json({ turnId: runtime.revealTurn(target) ?? null });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/transcript-items\/([^/]+)$/)) && request.method === "GET") {
@@ -21,28 +21,28 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
     return response(html || "not found", { status: html ? 200 : 404 });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/session-images\/([^/]+)\/(\d+)$/)) && request.method === "GET") {
-    const agent = await resolveAgentConversation(params[0], params[1]);
+    const agent = await resolveAgent(params[0], params[1]);
     const controller = await existingDurableController(agent, options);
     return controller ? await controller.image(params[2], Number(params[3])) : new Response("not found", { status: 404 });
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tree(\/summary|\/label|)$/))) {
-    const [workspaceId, conversationId, suffix] = params;
-    const treeResponse = await handleAgentTreeRequest(request, url, suffix, async () => await requireAgentPresentation(workspaceId, conversationId, options), async () => await requireAgentController(workspaceId, conversationId, options));
-    if (treeResponse && request.method === "POST") await invalidateAgentView(options, workspaceId, conversationId);
+    const [workspaceId, agentId, suffix] = params;
+    const treeResponse = await handleAgentTreeRequest(request, url, suffix, async () => await requireAgentPresentation(workspaceId, agentId, options), async () => await requireAgentController(workspaceId, agentId, options));
+    if (treeResponse && request.method === "POST") await invalidateAgentView(options, workspaceId, agentId);
     return treeResponse;
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tools\/([^/]+)\/abort$/)) && request.method === "POST") {
-    const [workspaceId, conversationId, callId] = params;
-    const controller = await requireAgentController(workspaceId, conversationId, options);
+    const [workspaceId, agentId, callId] = params;
+    const controller = await requireAgentController(workspaceId, agentId, options);
     const aborted = await controller.abortTool(callId);
-    await invalidateAgentView(options, workspaceId, conversationId);
+    await invalidateAgentView(options, workspaceId, agentId);
     return requestAcceptsJson(request) ? Response.json({ tool: { callId, aborted } }) : turboStreamResponse("");
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/abort$/)) && request.method === "POST") {
-    const agent = await resolveAgentConversation(params[0], params[1]);
-    await stopDurableWorkspaceAgentConversation(agent, options);
+    const agent = await resolveAgent(params[0], params[1]);
+    await stopDurableWorkspaceAgent(agent, options);
     await invalidateAgentView(options, params[0], params[1]);
-    return requestAcceptsJson(request) ? Response.json({ agent: { conversationId: params[1], state: "idle", aborted: true } }) : turboStreamResponse("");
+    return requestAcceptsJson(request) ? Response.json({ agent: { agentId: params[1], state: "idle", aborted: true } }) : turboStreamResponse("");
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/rewind$/)) && request.method === "POST") {
     const form = await request.formData();

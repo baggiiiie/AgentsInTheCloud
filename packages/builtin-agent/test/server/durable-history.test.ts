@@ -8,7 +8,7 @@ import { createRegistry } from "@earendil-works/pi-durable";
 import { retainedDurableHistories } from "../../src/server/durable-history.ts";
 import { retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
 import { durableJournalDirectory } from "../../src/server/durable-storage.ts";
-import { ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
+import { ensureDefaultWorkspaceAgent, listWorkspaceAgents } from "../../src/server/agent-store.ts";
 
 const original = process.env.ATELIER_DATA_DIR;
 let directory: string;
@@ -46,13 +46,13 @@ test("retained discovery is share-scoped and reads closed/deleted native history
   faux.setResponses([fauxAssistantMessage("Retained answer")]);
   const path = durableJournalDirectory("team", "deleted");
   const owner = await retainedDurableWorkspaceOwner(path, "deleted", {}, load);
-  const controller = await owner.conversation({ conversationId: "tab", title: "Retained title", label: "Agent 1" });
+  const controller = await owner.agent({ agentId: "tab", title: "Retained title", label: "Agent 1" });
   await (await controller.submit({ requestId: "once", text: "Retained input" })).wait(BACKGROUND_CONTEXT);
   await controller.close();
   await owner.delete();
   await rm(join(directory, "workspaces", "deleted"), { recursive: true });
   const foreign = await retainedDurableWorkspaceOwner(durableJournalDirectory("other-team", "foreign"), "foreign", {}, load);
-  await foreign.conversation({ conversationId: "foreign-tab", title: "Private", label: "Agent 1" });
+  await foreign.agent({ agentId: "foreign-tab", title: "Private", label: "Agent 1" });
   load.ready = async () => { throw new Error("Read-only discovery must not probe execution"); };
   load.prepare = async () => { throw new Error("Read-only discovery must not prepare prompts"); };
   const before = await readFile(join(path, "main.jsonl"), "utf8");
@@ -71,7 +71,7 @@ test("retained discovery is share-scoped and reads closed/deleted native history
 test("retained discovery requires an existing viewer and cannot fall through to projectless history", async () => {
   const { load } = await setup();
   const owner = await retainedDurableWorkspaceOwner(durableJournalDirectory("projectless", "deleted"), "deleted", {}, load);
-  await owner.conversation({ conversationId: "private", title: "Projectless history", label: "Agent 1" });
+  await owner.agent({ agentId: "private", title: "Projectless history", label: "Agent 1" });
   for (const viewer of ["missing", "deleted", "../workspaces", "/absolute", "..", "viewer/child"]) {
     await expect(retainedDurableHistories(viewer)).rejects.toThrow();
   }
@@ -84,16 +84,16 @@ test("retained discovery requires an existing viewer and cannot fall through to 
 
 test("committed catalog title reconciles stale tab metadata without reopening a closed tab", async () => {
   const { load } = await setup();
-  const agent = await ensureDefaultWorkspaceAgentConversation("workspace");
+  const agent = await ensureDefaultWorkspaceAgent("workspace");
   const owner = await retainedDurableWorkspaceOwner(agent.path, agent.workspaceId, {}, load);
-  const controller = await owner.conversation(agent);
+  const controller = await owner.agent(agent);
   await controller.setTitle("Committed rename");
-  const metadata = join(directory, "workspaces", "workspace", "metadata", "agent-conversations.json");
+  const metadata = join(directory, "workspaces", "workspace", "metadata", "agents.json");
   expect(await readFile(metadata, "utf8")).toContain("Untitled");
-  expect((await listWorkspaceAgentConversations("workspace"))[0]?.title).toBe("Committed rename");
+  expect((await listWorkspaceAgents("workspace"))[0]?.title).toBe("Committed rename");
   await controller.close();
-  await writeFile(metadata, JSON.stringify({ conversations: [] }));
-  expect(await listWorkspaceAgentConversations("workspace")).toEqual([]);
+  await writeFile(metadata, JSON.stringify({ version: 2, agents: [] }));
+  expect(await listWorkspaceAgents("workspace")).toEqual([]);
   expect((await retainedDurableHistories("workspace"))[0]?.owner).toBe(owner);
   expect((await owner.catalog())[0]?.title).toBe("Committed rename");
 });

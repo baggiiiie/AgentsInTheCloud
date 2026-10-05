@@ -3,7 +3,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { createPiModelRuntime, modelsDialogId, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
+import { createPiModelRuntime, modelsDialogId, setEnabledModels } from "@agents-in-the-cloud/llm/server";
 import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
@@ -134,7 +134,7 @@ async function deleteAllStoredSettings(): Promise<void> {
   await resetOnboarding();
   clearWorkspaceGitHubToken();
   await clearGitIdentity();
-  await setConfiguredModels([]);
+  await setEnabledModels([]);
   const runtime = await createPiModelRuntime();
   for (const credential of await runtime.listCredentials()) await runtime.logout(credential.providerId);
 }

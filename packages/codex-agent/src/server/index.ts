@@ -6,7 +6,7 @@ import { codexLaunchScript } from "./launch-command.ts";
 import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId, codexHistoryFiles } from "./transcript.ts";
 
 export const codexModelSettings = createCliModelSettings({
-  agentProvider: "codex", provider: "openai-codex", label: "Codex",
+  agentTypeId: "codex", provider: "openai-codex", label: "Codex",
   effort: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level),
 });
 

@@ -8,7 +8,7 @@ import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type W
 import { listStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
 import { renderLaunchComposerSettings } from "./render-composer.ts";
-import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";
+import { ensureDefaultWorkspaceAgent } from "./agent-store.ts";
 import { refreshConfiguredAgentRuntimes } from "./runtime.ts";
 
 const stringSchema = Type.String();
@@ -63,7 +63,7 @@ export const nativeAgentLaunch: WorkspaceAgentLaunch = {
     };
   },
   async prepareWorkspace(workspaceId) {
-    await ensureDefaultWorkspaceAgentConversation(workspaceId);
+    await ensureDefaultWorkspaceAgent(workspaceId);
   },
   async refreshConfiguration(frameId) {
     await reconcileAgentModelPreferences();

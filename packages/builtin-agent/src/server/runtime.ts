@@ -1,24 +1,24 @@
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
-import { ConversationPresentation } from "./conversation-presentation.ts";
+import { AgentPresentation } from "./agent-presentation.ts";
 import { openDurableAgentRuntime, type DurableAgentRuntime, type DurableAgentController } from "./durable-runtime.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { workspaceDurableJournalDirectory } from "./durable-storage.ts";
-import { listWorkspaceAgentConversations } from "./session-store.ts";
+import { listWorkspaceAgents } from "./agent-store.ts";
 import type { WorkspaceAgentOptions } from "./runtime-types.ts";
-import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
+import type { WorkspaceAgentInfo } from "./agent-store.ts";
 
 export type { AgentLivePresentationSubscription } from "./runtime-types.ts";
 export { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
 
-const presentations = new Map<string, Promise<ConversationPresentation>>();
+const presentations = new Map<string, Promise<AgentPresentation>>();
 // First attachment can prepare a root before it exists in the catalog. Lifecycle
 // fences must join that acquisition even when no presentation was ever mounted.
 const controllerAcquisitions = new Map<string, Promise<DurableAgentController>>();
 const removedWorkspaceIds = new Set<string>();
-const closedConversationKeys = new Set<string>();
-const nativeClosedConversationKeys = new Set<string>();
+const closedAgentKeys = new Set<string>();
+const nativeClosedAgentKeys = new Set<string>();
 const suspendedWorkspaceIds = new Set<string>();
 let stopping = false;
 const lifecycle = new Map<string, Promise<void>>();
@@ -33,15 +33,15 @@ function lifecycleCommand(workspaceId: string, run: () => Promise<void>): Promis
   return result;
 }
 
-function runtimeKey(workspaceId: string, conversationId: string): string {
-  return `${workspaceId}\u0000${conversationId}`;
+function runtimeKey(workspaceId: string, agentId: string): string {
+  return `${workspaceId}\u0000${agentId}`;
 }
 
-export function unloadWorkspaceAgentPresentation(workspaceId: string, conversationId: string): Promise<void> {
-  return lifecycleCommand(workspaceId, () => unloadRuntime(workspaceId, conversationId));
+export function unloadWorkspaceAgentPresentation(workspaceId: string, agentId: string): Promise<void> {
+  return lifecycleCommand(workspaceId, () => unloadRuntime(workspaceId, agentId));
 }
-async function unloadRuntime(workspaceId: string, conversationId: string): Promise<void> {
-  const key = runtimeKey(workspaceId, conversationId);
+async function unloadRuntime(workspaceId: string, agentId: string): Promise<void> {
+  const key = runtimeKey(workspaceId, agentId);
   const runtime = presentations.get(key);
   if (!runtime) return;
   presentations.delete(key);
@@ -49,9 +49,9 @@ async function unloadRuntime(workspaceId: string, conversationId: string): Promi
 }
 
 /** Roll back a failed close after the durable session remained published. */
-export function restoreWorkspaceAgentRuntime(workspaceId: string, conversationId: string): void {
-  const key = runtimeKey(workspaceId, conversationId);
-  if (!nativeClosedConversationKeys.has(key)) closedConversationKeys.delete(key);
+export function restoreWorkspaceAgentRuntime(workspaceId: string, agentId: string): void {
+  const key = runtimeKey(workspaceId, agentId);
+  if (!nativeClosedAgentKeys.has(key)) closedAgentKeys.delete(key);
 }
 
 export function removeWorkspaceAgentRuntimes(workspaceId: string): Promise<void> {
@@ -71,14 +71,14 @@ async function removeRuntimes(workspaceId: string): Promise<void> {
   await suspendDurableWorkspaceOwner(workspaceId);
 }
 
-export function getWorkspaceAgentPresentation(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}): Promise<ConversationPresentation> {
+export function getWorkspaceAgentPresentation(agent: WorkspaceAgentInfo, options: WorkspaceAgentOptions = {}): Promise<AgentPresentation> {
   assertWorkspaceAgentAvailable(agent);
-  const key = runtimeKey(agent.workspaceId, agent.conversationId);
+  const key = runtimeKey(agent.workspaceId, agent.agentId);
   const pendingLifecycle = lifecycle.get(agent.workspaceId);
   if (pendingLifecycle) return pendingLifecycle.then(() => getWorkspaceAgentPresentation(agent, options));
   let runtime = presentations.get(key);
   if (!runtime) {
-    runtime = (async () => ConversationPresentation.create(agent, await (await durableWorkspaceOwner(agent.workspaceId, options)).conversation(agent)))().catch((error) => {
+    runtime = (async () => AgentPresentation.create(agent, await (await durableWorkspaceOwner(agent.workspaceId, options)).agent(agent)))().catch((error) => {
       presentations.delete(key);
       throw error;
     });
@@ -88,27 +88,27 @@ export function getWorkspaceAgentPresentation(agent: WorkspaceAgentConversationI
 }
 
 /** Explicit user close, distinct from unloading a runtime. */
-export function closeWorkspaceAgentConversation(workspaceId: string, conversationId: string): Promise<void> {
-  closedConversationKeys.add(runtimeKey(workspaceId, conversationId));
-  return lifecycleCommand(workspaceId, () => closeConversation(workspaceId, conversationId));
+export function closeWorkspaceAgent(workspaceId: string, agentId: string): Promise<void> {
+  closedAgentKeys.add(runtimeKey(workspaceId, agentId));
+  return lifecycleCommand(workspaceId, () => closeAgent(workspaceId, agentId));
 }
-async function closeConversation(workspaceId: string, conversationId: string): Promise<void> {
-  const key = runtimeKey(workspaceId, conversationId);
+async function closeAgent(workspaceId: string, agentId: string): Promise<void> {
+  const key = runtimeKey(workspaceId, agentId);
   const pending = presentations.get(key);
   if (pending) await pending;
   await Promise.allSettled([controllerAcquisitions.get(key)]);
-  const agent = (await listWorkspaceAgentConversations(workspaceId)).find(item => item.conversationId === conversationId);
+  const agent = (await listWorkspaceAgents(workspaceId)).find(item => item.agentId === agentId);
   if (agent) {
-    nativeClosedConversationKeys.add(key);
+    nativeClosedAgentKeys.add(key);
     await (await existingDurableController(agent))?.close();
   }
-  await unloadRuntime(workspaceId, conversationId);
+  await unloadRuntime(workspaceId, agentId);
 }
 
 /** Stop is allowed while parked; it does not need an execution/UI mount. */
-export function stopDurableWorkspaceAgentConversation(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}): Promise<void> {
+export function stopDurableWorkspaceAgent(agent: WorkspaceAgentInfo, options: WorkspaceAgentOptions = {}): Promise<void> {
   return lifecycleCommand(agent.workspaceId, async () => {
-    await Promise.allSettled([controllerAcquisitions.get(runtimeKey(agent.workspaceId, agent.conversationId))]);
+    await Promise.allSettled([controllerAcquisitions.get(runtimeKey(agent.workspaceId, agent.agentId))]);
     await (await existingDurableController(agent, options))?.stop();
   });
 }
@@ -153,24 +153,24 @@ export async function stopWorkspaceAgentRuntimes(): Promise<void> {
   await suspendAllDurableWorkspaceOwners();
 }
 
-function assertWorkspaceAgentAvailable(agent: WorkspaceAgentConversationInfo): void {
+function assertWorkspaceAgentAvailable(agent: WorkspaceAgentInfo): void {
   if (stopping || suspendedWorkspaceIds.has(agent.workspaceId)) throw new Error("Workspace agent execution is suspended");
   if (removedWorkspaceIds.has(agent.workspaceId)) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${agent.workspaceId}`);
-  if (closedConversationKeys.has(runtimeKey(agent.workspaceId, agent.conversationId))) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${agent.conversationId}`);
+  if (closedAgentKeys.has(runtimeKey(agent.workspaceId, agent.agentId))) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agent.agentId}`);
 }
 
 /** Execution does not require a mounted transcript or composer. */
-export function getWorkspaceAgentController(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}): Promise<DurableAgentController> {
+export function getWorkspaceAgentController(agent: WorkspaceAgentInfo, options: WorkspaceAgentOptions = {}): Promise<DurableAgentController> {
   assertWorkspaceAgentAvailable(agent);
   const pending = lifecycle.get(agent.workspaceId);
   if (pending) return pending.then(() => getWorkspaceAgentController(agent, options));
-  const key = runtimeKey(agent.workspaceId, agent.conversationId);
+  const key = runtimeKey(agent.workspaceId, agent.agentId);
   let acquisition = controllerAcquisitions.get(key);
   if (!acquisition) {
     acquisition = (async () => {
       const owner = await durableWorkspaceOwner(agent.workspaceId, options);
       assertWorkspaceAgentAvailable(agent);
-      return owner.conversation(agent);
+      return owner.agent(agent);
     })().finally(() => { controllerAcquisitions.delete(key); });
     controllerAcquisitions.set(key, acquisition);
   }
@@ -224,12 +224,12 @@ export async function suspendAllDurableWorkspaceOwners() {
 }
 
 /** Lookup must not create a new root or prepare prompts just to reject bad input. */
-export async function existingDurableController(agent: WorkspaceAgentConversationInfo, options: WorkspaceAgentOptions = {}) {
+export async function existingDurableController(agent: WorkspaceAgentInfo, options: WorkspaceAgentOptions = {}) {
   if (!existsSync(join(await workspaceDurableJournalDirectory(agent.workspaceId), "main.jsonl"))) return undefined;
   const owner = await durableWorkspaceOwner(agent.workspaceId, options);
-  if (!(await owner.catalog()).some(record => record.conversationId === agent.conversationId)) return undefined;
-  return owner.conversation(agent);
+  if (!(await owner.catalog()).some(record => record.agentId === agent.agentId)) return undefined;
+  return owner.agent(agent);
 }
-export async function knownWorkspaceAgentRequest(agent: WorkspaceAgentConversationInfo, requestId: string, options: WorkspaceAgentOptions = {}) {
+export async function knownWorkspaceAgentRequest(agent: WorkspaceAgentInfo, requestId: string, options: WorkspaceAgentOptions = {}) {
   return (await existingDurableController(agent, options))?.knownRequest(requestId) ?? false;
 }

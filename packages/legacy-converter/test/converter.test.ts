@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { type ConversationId, type EntryDraft, UserEntry } from "@earendil-works/pi-durable";
-import { convertLegacyConversations, type HistoryImportDestination, type LegacyConversion, type ConvertedConversation } from "../src/index.ts";
+import { convertLegacyAgents, type HistoryImportDestination, type LegacyConversion, type ConvertedAgent } from "../src/index.ts";
 import { historyNote } from "../src/entries.ts";
 
 let root: string;
@@ -24,7 +24,7 @@ test("standalone converter reads supplied paths and produces native entries with
     { type: "message", id: "user", parentId: null, message: { role: "user", content: "Saved prompt", timestamp: 1 } },
   ].map(row => JSON.stringify(row)).join("\n");
   await writeFile(path, source);
-  let imported: { identity: typeof record; entries: readonly EntryDraft[] } | undefined;
+  let imported: { identity: { agentId: string; label: string; title: string }; entries: readonly EntryDraft[] } | undefined;
   const destination: HistoryImportDestination = {
     async catalog() { return imported ? [imported.identity] : []; },
     async importHistory(identity, entries) {
@@ -34,7 +34,7 @@ test("standalone converter reads supplied paths and produces native entries with
     },
   };
   const input = options(async () => destination, JSON.stringify({ conversations: [record] }));
-  expect(await convertLegacyConversations(input)).toEqual([{ ...record, storage: "durable" }]);
+  expect(await convertLegacyAgents(input)).toEqual([{ agentId: record.conversationId, label: record.label, title: record.title, storage: "durable" }]);
   expect(imported!.entries.map(entry => entry.kind)).toEqual([historyNote.kind, UserEntry.kind]);
   expect(imported!.entries[1]!.model).toEqual([{ role: "user", content: "Saved prompt", timestamp: 1 }]);
   expect(await readFile(path, "utf8")).toBe(source);
@@ -42,13 +42,13 @@ test("standalone converter reads supplied paths and produces native entries with
   // or duplicate import is needed to finish that interrupted cutover.
   await rm(path);
   const first = imported;
-  expect(await convertLegacyConversations(input)).toEqual([{ ...record, storage: "durable" }]);
+  expect(await convertLegacyAgents(input)).toEqual([{ agentId: record.conversationId, label: record.label, title: record.title, storage: "durable" }]);
   expect(imported).toBe(first);
 });
 
 test("native-only metadata and empty discovery do not open a destination", async () => {
   const destination = async (): Promise<HistoryImportDestination> => { throw new Error("must not open a journal"); };
-  const record: ConvertedConversation = { conversationId: "native", label: "Agent 1", title: "Native", storage: "durable" };
-  expect(await convertLegacyConversations(options(destination, JSON.stringify({ conversations: [record] })))).toEqual([record]);
-  expect(await convertLegacyConversations(options(destination))).toEqual([]);
+  const record: ConvertedAgent = { agentId: "native", label: "Agent 1", title: "Native", storage: "durable" };
+  expect(await convertLegacyAgents(options(destination, JSON.stringify({ conversations: [{ conversationId: record.agentId, label: record.label, title: record.title, storage: record.storage }] })))).toEqual([record]);
+  expect(await convertLegacyAgents(options(destination))).toEqual([]);
 });

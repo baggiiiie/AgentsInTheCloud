@@ -15,7 +15,7 @@ async function scenario(script: string): Promise<void> {
       const { registerAgentTurnSettler } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/turn-lifecycle.ts"))});
       const { subscribeWorkspaceAgentBusy } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/workspace-agent-busy.ts"))});
       const log = [];
-      configureAgentMcp({ on() {}, emit: async (name, payload) => { log.push(name + ":" + payload.conversationId); } });
+      configureAgentMcp({ on() {}, emit: async (name, payload) => { log.push(name + ":" + payload.agentId); } });
       subscribeWorkspaceAgentBusy(({ agentKey, busy }) => log.push((busy ? "busy:" : "idle:") + agentKey.replace("agent:", "")));
       const agentId = crypto.randomUUID();
       const settles = [];

@@ -3,7 +3,7 @@ import { cheapestAvailableProviderModel, claudeCodeHeaders, createPiModelRuntime
 export const agentTitleRequestOptions = { maxTokens: 64 } as const;
 
 export function promptFor(userPrompt: string): string {
-  return `Name the task in this agent session using 2–7 meaningful lowercase words joined by hyphens. Return ONLY the slug: no explanation, reasoning, quotes, or punctuation. If the prompt does not identify a task, return exactly error.
+  return `Name this Agent based on its task using 2–7 meaningful lowercase words joined by hyphens. Return ONLY the slug: no explanation, reasoning, quotes, or punctuation. If the prompt does not identify a task, return exactly error.
 
 User's task:
 --
@@ -32,7 +32,7 @@ export function normalizeSlug(value: string): string | undefined {
   return slug || undefined;
 }
 
-export async function suggestSessionSlug(userPrompt: string, selectedModel?: ModelRef): Promise<string | undefined> {
+export async function suggestAgentSlug(userPrompt: string, selectedModel?: ModelRef): Promise<string | undefined> {
   if (!userPrompt.trim()) return undefined;
   const modelRef = selectedModel ?? await resolveNewWorkspaceAgentModel();
   if (!modelRef) return undefined;

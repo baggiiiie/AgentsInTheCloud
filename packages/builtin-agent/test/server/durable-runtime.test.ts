@@ -16,7 +16,7 @@ import { durableEntryContent } from "../../src/server/durable-images.ts";
 const context = BACKGROUND_CONTEXT;
 const paths: string[] = [];
 const runtimes: DurableAgentRuntime[] = [];
-const record = { conversationId: "tab", label: "Agent 1", title: "Native runtime" };
+const record = { agentId: "tab", label: "Agent 1", title: "Native runtime" };
 const png = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGP4z8BAEiJN9aiGUQ1DSgMAkPn/Afnh+ngAAAAASUVORK5CYII=";
 afterEach(async () => {
   await Promise.all(runtimes.splice(0).map((runtime) => runtime.suspend()));
@@ -51,7 +51,7 @@ async function setup(options: WorkspaceAgentToolOptions = {}) {
 test("native runtime owns stable handles and reacquires admission before retry preparation", async () => {
   const { runtime, faux, load, open } = await setup();
   faux.setResponses([fauxAssistantMessage("The original answer")]);
-  const [one, same] = await Promise.all([runtime.conversation(record), runtime.conversation(record)]);
+  const [one, same] = await Promise.all([runtime.agent(record), runtime.agent(record)]);
   expect(one).toBe(same);
   const first = await one.submit({ requestId: "browser-request", text: "Original input" });
   expect((await first.wait(context)).status).toBe("done");
@@ -59,7 +59,7 @@ test("native runtime owns stable handles and reacquires admission before retry p
   load.prepare = async () => { throw new Error("Must not reprepare existing conversations"); };
   load.expand = async () => { throw new Error("Must not reprepare admitted requests"); };
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect(restored.id).toBe(one.id);
   const duplicate = await restored.submit({ requestId: "browser-request", text: "Changed retry" });
   expect(duplicate.id).toBe(first.id);
@@ -78,7 +78,7 @@ test("native runtime owns stable handles and reacquires admission before retry p
 test("model setup fills a model-less conversation and permits submission without recreating it", async () => {
   const { runtime, faux, load, open } = await setup();
   load.prepare = async () => ({ instructions: "Created before model setup" });
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   expect((await agent.settings()).model).toBeUndefined();
   load.validateModel = async (ref) => {
     if (!ref) throw new Error("No connected model");
@@ -91,7 +91,7 @@ test("model setup fills a model-less conversation and permits submission without
   const submission = await agent.submit({ requestId: "after-setup", text: "Hello" });
   expect((await submission.wait(context)).status).toBe("done");
   await runtime.suspend();
-  const restored = await (await open()).conversation(record);
+  const restored = await (await open()).agent(record);
   expect(restored.id).toBe(agent.id);
   expect((await restored.settings()).model).toEqual({ provider: "faux", modelId: "small" });
 });
@@ -99,7 +99,7 @@ test("model setup fills a model-less conversation and permits submission without
 test("model setup preserves explicit selections, including a queued selection", async () => {
   const { runtime, load } = await setup();
   load.prepare = async () => ({});
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   load.validateModel = async () => { entered.resolve(); await release.promise; };
@@ -123,8 +123,8 @@ test("settings serialize with image preparation without blocking another convers
     return text;
   };
   faux.setResponses([fauxAssistantMessage("Independent"), fauxAssistantMessage("Prepared")]);
-  const one = await runtime.conversation(record);
-  const two = await runtime.conversation({ ...record, conversationId: "other" });
+  const one = await runtime.agent(record);
+  const two = await runtime.agent({ ...record, agentId: "other" });
   const admitted = one.submit({ requestId: "slow", text: "Hold preparation", images: [{ type: "image", data: png, mimeType: "image/png" }] });
   await entered.promise;
   const configure = one.configure({ model: { provider: "faux", modelId: "large" } });
@@ -163,7 +163,7 @@ test.each(["suspend", "stop"] as const)("native %s preserves or withdraws commit
       return fauxAssistantMessage("Recovered");
     },
   ]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const initial = await agent.submit({ requestId: "initial", text: "Begin" });
   await started.promise;
   const steer = await agent.submit({ requestId: "steer", text: "Queued instruction" });
@@ -173,7 +173,7 @@ test.each(["suspend", "stop"] as const)("native %s preserves or withdraws commit
   await runtime.suspend();
   await expect(agent.submit({ requestId: "after-suspend", text: "No admission" })).rejects.toThrow("suspended");
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const watch = await restored.watch(context);
   expect(Boolean(watch.value.docs["pi.live"]?.run)).toBe(operation === "suspend");
   const duplicate = await restored.submit({ requestId: "steer", text: "Retry" });
@@ -195,7 +195,7 @@ test.each(["suspend", "stop"] as const)("native %s preserves or withdraws commit
 test("reset changes active context but retains journal history and settings", async () => {
   const { runtime, faux, open } = await setup();
   faux.setResponses([fauxAssistantMessage("Old answer")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const submission = await agent.submit({ requestId: "old", text: "Old input" });
   await submission.wait(context);
   await agent.reset();
@@ -205,7 +205,7 @@ test("reset changes active context but retains journal history and settings", as
   expect((await agent.settings()).model?.modelId).toBe("small");
   await runtime.suspend();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect(JSON.stringify((await restored.context(context)).messages)).not.toContain("Old input");
   expect((await restored.settings()).instructions).toBe("Committed instructions");
 });
@@ -227,7 +227,7 @@ test("committed watches reconnect with complete state; disconnecting a viewer do
     fauxAssistantMessage([fauxToolCall("progress", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Finished"),
   ]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const viewer = await agent.watch(context);
   const sawRun = Promise.withResolvers<void>();
   viewer.start(async (value) => { if (value.docs["pi.live"]?.run) sawRun.resolve(); });
@@ -254,14 +254,14 @@ test("suspending during preparation fences pending admission without adding a re
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   load.expand = async (_workspace, text) => { entered.resolve(); await release.promise; return text; };
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const pending = agent.submit({ requestId: "preparing", text: "Not yet admitted" });
   await entered.promise;
   await runtime.suspend();
   release.resolve();
   await expect(pending).rejects.toThrow("suspended");
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect((await restored.history({}, 100, undefined, context)).items).toHaveLength(0);
   expect(faux.state.callCount).toBe(0);
 });
@@ -269,7 +269,7 @@ test("suspending during preparation fences pending admission without adding a re
 test.each(["close", "delete"] as const)("permanent %s fences preparation and survives reopen with readable history", async (operation) => {
   const { runtime, faux, load, open } = await setup();
   faux.setResponses([fauxAssistantMessage("Saved answer"), fauxAssistantMessage("Other root")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await (await agent.submit({ requestId: "saved", text: "Saved input" })).wait(context);
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
@@ -283,14 +283,14 @@ test.each(["close", "delete"] as const)("permanent %s fences preparation and sur
   await expect(agent.configure({ thinkingLevel: "off" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
   await runtime.suspend();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect(JSON.stringify((await restored.history({}, 100, undefined, context)).items)).toContain("Saved input");
   await expect(restored.submit({ requestId: "saved", text: "Even retries cannot start work" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
   if (operation === "delete") {
-    await expect(reopened.conversation({ ...record, conversationId: "new" })).rejects.toThrow("deleted");
+    await expect(reopened.agent({ ...record, agentId: "new" })).rejects.toThrow("deleted");
   } else {
     load.expand = async (_workspace, text) => text;
-    const other = await reopened.conversation({ ...record, conversationId: "new" });
+    const other = await reopened.agent({ ...record, agentId: "new" });
     await (await other.submit({ requestId: "other", text: "Independent" })).wait(context);
   }
   expect(faux.state.callCount).toBe(operation === "close" ? 2 : 1);
@@ -314,7 +314,7 @@ test.each(["close", "delete"] as const)("recovery after %s gate commit marks wor
     },
   })] }));
   faux.setResponses([fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" })]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await agent.submit({ requestId: "run", text: "Start tool" });
   await started.promise;
   await agent.submit({ requestId: "queued", text: "Must not execute" });
@@ -329,7 +329,7 @@ test.each(["close", "delete"] as const)("recovery after %s gate commit marks wor
   }, context);
   await workspace.close();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const watch = await restored.watch(context);
   const idle = Promise.withResolvers<void>();
   watch.start(async (value) => { if (!value.docs["pi.live"]?.run) idle.resolve(); });
@@ -360,7 +360,7 @@ test.each(["close", "delete"] as const)("live %s cancels work and withdraws queu
     },
   })] }));
   faux.setResponses([fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" })]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const first = await agent.submit({ requestId: "first", text: "Begin" });
   await started.promise;
   const queued = await agent.submit({ requestId: "queued", text: "Never run" });
@@ -378,9 +378,9 @@ test.each(["close", "delete"] as const)("live %s cancels work and withdraws queu
 test("committed titles survive stale attachment metadata and remain discoverable after close and deletion", async () => {
   const { runtime, faux, load, open } = await setup();
   expect(await runtime.catalog()).toEqual([]);
-  const one = await runtime.conversation(record);
-  const otherRecord = { ...record, conversationId: "other", title: "Independent title" };
-  const two = await runtime.conversation(otherRecord);
+  const one = await runtime.agent(record);
+  const otherRecord = { ...record, agentId: "other", title: "Independent title" };
+  const two = await runtime.agent(otherRecord);
   const renamed = await one.setTitle("searchable-durable-title");
   expect(renamed).toEqual({ ...record, durableId: one.id, title: "searchable-durable-title" });
   expect(await runtime.catalog()).toEqual([renamed, { ...otherRecord, durableId: two.id }]);
@@ -388,7 +388,7 @@ test("committed titles survive stale attachment metadata and remain discoverable
   load.prepare = async () => { throw new Error("Catalog reads must not prepare prompts"); };
   const reopened = await open();
   expect((await reopened.catalog())[0]).toEqual(renamed);
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect((await reopened.catalog())[0]?.title).toBe("searchable-durable-title");
   await restored.close();
   await expect(restored.setTitle("Closed rename")).rejects.toThrow("closed");
@@ -407,7 +407,7 @@ test("title changes serialize with commands and cannot cross a close fence", asy
   const entered = Promise.withResolvers<void>();
   const release = Promise.withResolvers<void>();
   load.expand = async (_workspace, text) => { entered.resolve(); await release.promise; return text; };
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const pending = agent.submit({ requestId: "blocked", text: "Waiting" });
   await entered.promise;
   const title = agent.setTitle("Must not commit");
@@ -422,7 +422,7 @@ test("title changes serialize with commands and cannot cross a close fence", asy
 test("reopened reads and known requests stay passive; new execution waits for workspace readiness", async () => {
   const { runtime, faux, load, open } = await setup();
   faux.setResponses([fauxAssistantMessage("Saved"), fauxAssistantMessage("New")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const saved = await agent.submit({ requestId: "saved", text: "Original" });
   await saved.wait(context);
   await runtime.suspend();
@@ -431,7 +431,7 @@ test("reopened reads and known requests stay passive; new execution waits for wo
   let probes = 0;
   load.ready = async () => { probes++; entered.resolve(); await ready.promise; };
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   await reopened.catalog();
   await restored.history({}, 100, undefined, context);
   const watch = await restored.watch(context);
@@ -451,10 +451,10 @@ test("reopened reads and known requests stay passive; new execution waits for wo
 test("readiness failure rejects before prompt preparation and admission, and a later command can retry", async () => {
   const { runtime, faux, load } = await setup();
   load.ready = async () => { throw new Error("Workspace offline"); };
-  await expect(runtime.conversation(record)).rejects.toThrow("Workspace offline");
+  await expect(runtime.agent(record)).rejects.toThrow("Workspace offline");
   expect(await runtime.catalog()).toEqual([]);
   load.ready = async () => {};
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   load.ready = async () => { throw new Error("Workspace offline again"); };
   await expect(agent.submit({ requestId: "retryable", text: "Not admitted" })).rejects.toThrow("Workspace offline again");
   await expect(agent.compact()).rejects.toThrow("Workspace offline again");
@@ -469,7 +469,7 @@ test("readiness failure rejects before prompt preparation and admission, and a l
 
 test.each(["suspend", "close", "delete"] as const)("%s during readiness prevents late admission", async (operation) => {
   const { runtime, faux, load } = await setup();
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const entered = Promise.withResolvers<void>();
   const ready = Promise.withResolvers<void>();
   load.ready = async () => { entered.resolve(); await ready.promise; };
@@ -501,7 +501,7 @@ test("recovery cannot replay a tool until the execution workspace is ready", asy
     fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Recovered answer"),
   ]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await agent.submit({ requestId: "recover", text: "Begin" });
   await started.promise;
   await runtime.suspend();
@@ -509,7 +509,7 @@ test("recovery cannot replay a tool until the execution workspace is ready", asy
   const ready = Promise.withResolvers<void>();
   load.ready = async () => { entered.resolve(); await ready.promise; };
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const recovery = reopened.resume();
   await entered.promise;
   expect(executions).toBe(1);
@@ -536,13 +536,13 @@ test.each(["close", "delete"] as const)("%s persists its fence even if cleanup r
     },
   })] }));
   faux.setResponses([fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" })]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await agent.submit({ requestId: "offline", text: "Begin" });
   await started.promise;
   await runtime.suspend();
   load.ready = async () => { throw new Error("Cleanup workspace offline"); };
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   await expect(operation === "close" ? restored.close() : reopened.delete()).rejects.toThrow("Cleanup workspace offline");
   await expect(restored.submit({ requestId: "offline", text: "Retry" })).rejects.toThrow(operation === "close" ? "closed" : "deleted");
   load.ready = async () => {};
@@ -550,7 +550,7 @@ test.each(["close", "delete"] as const)("%s persists its fence even if cleanup r
   expect(executions).toBe(1);
   expect(faux.state.callCount).toBe(1);
   await reopened.suspend();
-  const retained = await (await open()).conversation(record);
+  const retained = await (await open()).agent(record);
   await expect(retained.setTitle("Cannot reopen")).rejects.toThrow(operation === "close" ? "closed" : "deleted");
 });
 
@@ -573,14 +573,14 @@ test("resetting an idle root cannot recover another root before readiness", asyn
     fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Finished"),
   ]);
-  const busy = await runtime.conversation(record);
-  const idleRecord = { ...record, conversationId: "idle" };
-  await runtime.conversation(idleRecord);
+  const busy = await runtime.agent(record);
+  const idleRecord = { ...record, agentId: "idle" };
+  await runtime.agent(idleRecord);
   await busy.submit({ requestId: "recover", text: "Begin" });
   await started.promise;
   await runtime.suspend();
   const reopened = await open();
-  const idle = await reopened.conversation(idleRecord);
+  const idle = await reopened.agent(idleRecord);
   load.ready = async () => { throw new Error("Workspace offline"); };
   await expect(idle.reset()).rejects.toThrow("Workspace offline");
   expect(executions).toBe(1);
@@ -593,7 +593,7 @@ test("resetting an idle root cannot recover another root before readiness", asyn
   expect(faux.state.callCount).toBe(1);
   ready.resolve();
   await resetting;
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   await (await restored.submit({ requestId: "recover", text: "Retry" })).wait(context);
   expect(executions).toBe(2);
 });
@@ -601,7 +601,7 @@ test("resetting an idle root cannot recover another root before readiness", asyn
 test("native navigation atomically selects immutable forks, preserves settings/history and deduplicates across branches", async () => {
   const { runtime, faux, load, open } = await setup();
   faux.setResponses([fauxAssistantMessage("First answer"), fauxAssistantMessage("Abandoned answer"), fauxAssistantMessage("Fork answer")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await (await agent.submit({ requestId: "first", text: "First input", images: [{ type: "image", data: png, mimeType: "image/png" }] })).wait(context);
   const firstBranch = agent.id;
   const target = (await agent.history({}, 1, undefined, context)).items[0]!;
@@ -629,7 +629,7 @@ test("native navigation atomically selects immutable forks, preserves settings/h
   const selectedId = agent.id;
   await runtime.suspend();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   expect(restored.id).toBe(selectedId);
   expect(JSON.stringify((await restored.context(context)).messages)).toContain("Fork answer");
   expect(JSON.stringify((await restored.context(context)).messages)).not.toContain("Abandoned answer");
@@ -645,8 +645,8 @@ test("native navigation atomically selects immutable forks, preserves settings/h
 test("native rewind rejects foreign IDs and live work, then forks before the selected entry", async () => {
   const { runtime, faux } = await setup();
   faux.setResponses([fauxAssistantMessage("First response"), fauxAssistantMessage("Second response")]);
-  const agent = await runtime.conversation(record);
-  const other = await runtime.conversation({ ...record, conversationId: "foreign" });
+  const agent = await runtime.agent(record);
+  const other = await runtime.agent({ ...record, agentId: "foreign" });
   await (await agent.submit({ requestId: "first", text: "First" })).wait(context);
   await (await agent.submit({ requestId: "second", text: "Second" })).wait(context);
   const second = (await agent.tree()).nodes.find(node => node.entry.model?.some(message => message.role === "user" && JSON.stringify(message).includes("Second")))!;
@@ -683,8 +683,8 @@ test.each(["offline", "commit-crash"] as const)("Stop %s boundary withdraws stee
     },
   })] }));
   faux.setResponses([fauxAssistantMessage([fauxToolCall("probe", {})], { stopReason: "toolUse" })]);
-  const agent = await runtime.conversation(record);
-  const independent = await runtime.conversation({ ...record, conversationId: "independent" });
+  const agent = await runtime.agent(record);
+  const independent = await runtime.agent({ ...record, agentId: "independent" });
   await agent.submit({ requestId: "original", text: "Original input" });
   await started.promise;
   await agent.submit({ requestId: "queued", text: "Withdraw this steering" });
@@ -700,12 +700,12 @@ test.each(["offline", "commit-crash"] as const)("Stop %s boundary withdraws stee
     load.ready = async () => { throw new Error("Workspace unavailable"); };
     load.prepare = async () => { throw new Error("No providers configured"); };
     const offline = await open();
-    const restored = await offline.conversation(record);
+    const restored = await offline.agent(record);
     await expect(restored.stop()).rejects.toThrow("Stop saved");
     await offline.suspend();
   }
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const queued = await restored.submit({ requestId: "queued", text: "Retry must stay withdrawn" });
   expect((await queued.status(context)).status).toBe("unanswered");
   expect(executions).toBe(1);
@@ -719,7 +719,7 @@ test.each(["offline", "commit-crash"] as const)("Stop %s boundary withdraws stee
   expect(executions).toBe(1);
   const original = await restored.submit({ requestId: "original", text: "Retry" });
   expect((await original.status(context)).status).toBe("unanswered");
-  const other = await reopened.conversation({ ...record, conversationId: "independent" });
+  const other = await reopened.agent({ ...record, agentId: "independent" });
   expect(other.id).toBe(independent.id);
   expect((await (await other.submit({ requestId: "other", text: "Independent root" })).wait(context)).status).toBe("done");
   expect(executions).toBe(1);
@@ -741,7 +741,7 @@ test("self-deleting workspace capability releases its invocation so durable dele
     },
   })] }));
   faux.setResponses([fauxAssistantMessage([fauxToolCall("delete_current_workspace", {})], { stopReason: "toolUse" })]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await agent.submit({ requestId: "self-delete", text: "Delete this workspace" });
   await deleted.promise;
   expect((await runtime.admission())?.deleted).toBe(true);
@@ -751,7 +751,7 @@ test("self-deleting workspace capability releases its invocation so durable dele
   await reopened.resume();
   expect(executions).toBe(1);
   expect(faux.state.callCount).toBe(1);
-  await expect((await reopened.conversation(record)).submit({ requestId: "no", text: "No" })).rejects.toThrow("deleted");
+  await expect((await reopened.agent(record)).submit({ requestId: "no", text: "No" })).rejects.toThrow("deleted");
 });
 
 
@@ -775,8 +775,8 @@ test("Stop does not signal another root's active tool", async () => {
     fauxAssistantMessage([fauxToolCall("hold", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Independent answer"),
   ]);
-  const one = await runtime.conversation(record);
-  const two = await runtime.conversation({ ...record, conversationId: "other-live" });
+  const one = await runtime.agent(record);
+  const two = await runtime.agent({ ...record, agentId: "other-live" });
   const first = await one.submit({ requestId: "one", text: "First" });
   await starts[0]!.promise;
   const second = await two.submit({ requestId: "two", text: "Second" });
@@ -792,7 +792,7 @@ test("Stop does not signal another root's active tool", async () => {
 
 test("execution owner publishes busy and finished turns without a presentation mount", async () => {
   const events = createAgentsInTheCloudEventBus();
-  const finished: Array<{ workspaceId: string; conversationId: string }> = [];
+  const finished: Array<{ workspaceId: string; agentId: string }> = [];
   const completed = Promise.withResolvers<void>();
   events.on("workspace_agent_turn_finished", async event => { finished.push(event); completed.resolve(); });
   const busy: boolean[] = [];
@@ -804,19 +804,19 @@ test("execution owner publishes busy and finished turns without a presentation m
     const { runtime, faux } = await setup({ events });
     const entered = Promise.withResolvers<void>();
     faux.setResponses([async () => { entered.resolve(); await release.promise; return fauxAssistantMessage("Finished without a viewer"); }]);
-    const agent = await runtime.conversation(record);
+    const agent = await runtime.agent(record);
     const turn = await agent.submit({ requestId: "headless", text: "Run without a viewer" });
     await entered.promise;
     // No presentation or viewer watch was created.
     expect(busy).toEqual([true]);
-    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeDefined();
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", agentId: record.agentId })).toBeDefined();
     expect(finished).toEqual([]);
     release.resolve();
     await turn.wait(context);
     await completed.promise;
     expect(busy).toEqual([true, false]);
-    expect(finished).toEqual([{ workspaceId: "native-workspace", conversationId: record.conversationId }]);
-    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeUndefined();
+    expect(finished).toEqual([{ workspaceId: "native-workspace", agentId: record.agentId }]);
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", agentId: record.agentId })).toBeUndefined();
     await runtime.suspend();
     expect(finished).toHaveLength(1);
   } finally {
@@ -828,7 +828,7 @@ test("execution owner publishes busy and finished turns without a presentation m
 test("selection listeners observe committed branch switches and can detach", async () => {
   const { runtime, faux } = await setup();
   faux.setResponses([fauxAssistantMessage("First answer"), fauxAssistantMessage("Later answer")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await (await agent.submit({ requestId: "first", text: "First input" })).wait(context);
   const target = (await agent.history({}, 1, undefined, context)).items[0]!;
   await (await agent.submit({ requestId: "later", text: "Later input" })).wait(context);
@@ -854,7 +854,7 @@ test("selection listeners observe committed branch switches and can detach", asy
 test("model availability is validated by commands after request deduplication", async () => {
   const { runtime, faux, load } = await setup();
   faux.setResponses([fauxAssistantMessage("Admitted while available")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const original = await agent.submit({ requestId: "available", text: "Original input" });
   await original.wait(context);
   const validated: Array<{ provider: string; modelId: string } | undefined> = [];
@@ -876,7 +876,7 @@ test("model availability is validated by commands after request deduplication", 
 
 test("owner resumes retained work and emits completion without callers acquiring a controller", async () => {
   const events = createAgentsInTheCloudEventBus();
-  const finished = Promise.withResolvers<{ workspaceId: string; conversationId: string }>();
+  const finished = Promise.withResolvers<{ workspaceId: string; agentId: string }>();
   events.on("workspace_agent_turn_finished", event => { finished.resolve(event); });
   const { runtime, faux, registry, open } = await setup({ events });
   const started = Promise.withResolvers<void>();
@@ -893,7 +893,7 @@ test("owner resumes retained work and emits completion without callers acquiring
     fauxAssistantMessage([fauxToolCall("recover", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Recovered without a viewer"),
   ]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await agent.submit({ requestId: "recover-unmounted", text: "Begin" });
   await started.promise;
   await runtime.suspend();
@@ -901,7 +901,7 @@ test("owner resumes retained work and emits completion without callers acquiring
   expect(executions).toBe(1);
   // No caller acquires a controller, watch, or presentation in the new owner.
   await reopened.resume();
-  expect(await finished.promise).toEqual({ workspaceId: "native-workspace", conversationId: record.conversationId });
+  expect(await finished.promise).toEqual({ workspaceId: "native-workspace", agentId: record.agentId });
   expect(executions).toBe(2);
   expect(faux.state.callCount).toBe(2);
 });
@@ -933,20 +933,20 @@ test("completion-handler failure is reported without disabling execution observa
       await release.promise;
       return fauxAssistantMessage("Second answer");
     }]);
-    const agent = await runtime.conversation(record);
+    const agent = await runtime.agent(record);
     await (await agent.submit({ requestId: "first", text: "First task" })).wait(context);
     await reported.promise;
     const second = await agent.submit({ requestId: "second", text: "Second task" });
     await entered.promise;
     expect(busy).toEqual([true, false, true]);
-    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeDefined();
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", agentId: record.agentId })).toBeDefined();
     release.resolve();
     await second.wait(context);
     await completed.promise;
     expect(busy).toEqual([true, false, true, false]);
     expect(completions).toBe(2);
     expect(log).toHaveBeenCalledWith("Could not publish Agent turn completion", failure);
-    expect(currentNotificationTurn({ workspaceId: "native-workspace", conversationId: record.conversationId })).toBeUndefined();
+    expect(currentNotificationTurn({ workspaceId: "native-workspace", agentId: record.agentId })).toBeUndefined();
     await runtime.suspend();
   } finally { release.resolve(); unsubscribe(); log.mockRestore(); }
 });
@@ -954,7 +954,7 @@ test("completion-handler failure is reported without disabling execution observa
 test("user messages exclude retained history before a reset and follow branch selection", async () => {
   const { runtime, faux } = await setup();
   faux.setResponses([fauxAssistantMessage("Old answer"), fauxAssistantMessage("Current answer")]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   await (await agent.submit({ requestId: "old", text: "Old unrelated task" })).wait(context);
   const target = (await agent.history({}, 1, undefined, context)).items[0]!;
   await agent.reset();
@@ -968,7 +968,7 @@ test("user messages exclude retained history before a reset and follow branch se
 
 test("unknown model selection rejects with invalid_arguments and leaves settings unchanged", async () => {
   const { runtime } = await setup();
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const before = (await agent.settings()).model;
   const result = agent.configure({ model: { provider: "faux", modelId: "missing" } });
   await expect(result).rejects.toBeInstanceOf(AgentsInTheCloudCoreError);
@@ -1010,7 +1010,7 @@ test("aborting one tool preserves the turn and other tool calls", async () => {
       return fauxAssistantMessage("Continued after stopping just one tool");
     },
   ]);
-  const agent = await runtime.conversation(record);
+  const agent = await runtime.agent(record);
   const submission = await agent.submit({ requestId: "abort-one", text: "Begin" });
   await started.promise;
   expect(await agent.abortTool("unknown-call")).toBe(false);

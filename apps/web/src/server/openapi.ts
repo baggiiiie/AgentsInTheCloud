@@ -17,7 +17,7 @@ const jsonAndHtmlResponse = (description: string, schema: TSchema) => ({
   "200": { description, content: { "application/json": { schema }, "text/html": { schema: { type: "string" } } } },
 });
 const workspaceId = { name: "id", in: "path", required: true, schema: { type: "string" } };
-const agentConversation = { name: "agent", in: "query", required: false, description: "Agent conversation to select in the browser surface.", schema: { type: "string" } };
+const agent = { name: "agent", in: "query", required: false, description: "Agent to select in the browser surface.", schema: { type: "string" } };
 const selectedWorkView = { name: "workView", in: "query", required: false, description: "Work-view key to select and reveal in the browser surface.", schema: { type: "string" } };
 const workspaceTemplateId = { name: "workspaceTemplateId", in: "path", required: true, schema: { type: "string" } };
 const variableId = { name: "variableId", in: "path", required: true, schema: { type: "string" } };
@@ -25,27 +25,27 @@ const secretId = { name: "secretId", in: "path", required: true, schema: { type:
 const workspaceTemplateSettingsSection = { name: "section", in: "query", required: false, schema: { type: "string", enum: ["index", "general", "secrets", "ssh", "environment", "container", "repository", "ssh-keys", "dockerfile", "preload-images", "privileged", "danger"] } };
 const settingsSection = { name: "section", in: "query", required: false, schema: { type: "string" } };
 const htmlSurfaceResponses = (description: string) => ({ "200": { description, content: { "text/html": { schema: { type: "string" } } } }, "400": errorResponse, "404": errorResponse });
-const agentConversationId = { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } };
+const agentId = { name: "agentId", in: "path", required: true, schema: { type: "string", format: "uuid" } };
 const jsonBody = (schema: TSchema) => ({ required: true, content: { "application/json": { schema } } });
 const emptyObjectSchema = { type: "object", additionalProperties: false };
 const workspaceIssuesSchema = { type: "array", items: { type: "object", required: ["kind", "message"], properties: { kind: { type: "string", enum: ["readiness", "image"] }, message: { type: "string" } }, additionalProperties: false } };
 const workspaceTemplateSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
 const sshKnownHostsSchema = { type: "object", required: ["knownHosts"], properties: { knownHosts: { type: "string", description: "Operator-verified known_hosts entries; empty clears additional trust. GitHub is trusted by default." } } };
 const workspaceTemplateSummaryProperties = { createdAt: { type: "number", description: "Unix timestamp in milliseconds when the template was added; absent for templates added before this was recorded" }, lastUsedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent use: adding the template or creating a workspace from it" }, lastWorkspaceCreatedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent workspace creation from this template; absent if none has been recorded" }, configurationFingerprint: { type: "string", description: "Opaque fingerprint of workspace setup settings" }, id: { type: "string" }, name: { type: "string" }, gitUrl: { type: "string" }, branch: { type: ["string", "null"] }, sessionShareKey: { type: "string" }, privileged: { type: "boolean", default: false, description: "Host-authorized privileged mode for future workspaces; enables Docker at the cost of host isolation" }, dockerfile: { type: "string" }, preloadImages: { type: "array", items: { type: "string" }, description: "Images prepared before newly created workspaces become ready. Does not change existing workspaces." } };
-const agentConversationSummarySchema = {
+const agentSummarySchema = {
   type: "object",
   required: ["id", "title"],
-  properties: { id: { type: "string", format: "uuid" }, title: { type: "string" }, providerId: { type: "string" }, busy: { type: "boolean" }, requestingAttention: { type: "boolean" } },
+  properties: { id: { type: "string", format: "uuid" }, title: { type: "string" }, agentTypeId: { type: "string" }, busy: { type: "boolean" }, requestingAttention: { type: "boolean" } },
   additionalProperties: false,
 };
 
 export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[], contributedPaths: Record<string, import("@agents-in-the-cloud/core").JsonObject> = {}) {
   const commandSchemas = Object.fromEntries(commands.map((command) => [command.id, command.inputSchema ?? emptyWorkspaceCommandInputSchema]));
-  const closeAgentConversationPath = { post: {
-    summary: "Close an Agent conversation using its provider lifecycle",
-    parameters: [workspaceId, agentConversationId],
+  const closeAgentPath = { post: {
+    summary: "Close an Agent using its Agent type lifecycle",
+    parameters: [workspaceId, agentId],
     responses: {
-      ...jsonResponse("Agent conversation archived", { $ref: "#/components/schemas/AgentConversationCloseResult" }),
+      ...jsonResponse("Agent archived", { $ref: "#/components/schemas/AgentCloseResult" }),
     },
   } };
   const agentMessageResponses = {
@@ -62,7 +62,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       description: "JSON representations of AgentsInTheCloud's content-negotiated UI operations. Send Accept: application/json.",
     },
     paths: {
-      "/agent-providers": { get: { summary: "List available agent providers, default first", responses: jsonResponse("Providers and installation-wide default", { type: "object", properties: { defaultProviderId: { type: "string" }, providers: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } } } } } }) } },
+      "/agent-types": { get: { summary: "List available agent types, default first", responses: jsonResponse("Agent types and installation-wide default", { type: "object", properties: { defaultAgentTypeId: { type: "string" }, agentTypes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } } } } } }) } },
       "/design-system-catalogue.html": { get: { summary: "Browse design-system components, usage and edge-case playgrounds", responses: { "200": { description: "Server-rendered package catalogue", content: { "text/html": { schema: { type: "string" } } } } } } },
       ...contributedPaths,
       "/up": { get: { summary: "Health check", responses: { "200": { description: "AgentsInTheCloud is healthy", content: { "text/plain": { schema: { type: "string" } } } } } } },
@@ -111,7 +111,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       "/workspace-templates/{workspaceTemplateId}/secrets/{secretId}": { post: { summary: "Update a workspace template secret", description: "Omit secretValue to preserve the stored secret. The value is never returned.", parameters: [workspaceTemplateId, secretId], requestBody: jsonBody({ $ref: "#/components/schemas/UpdateSecret" }), responses: jsonResponse("Secret metadata updated", { $ref: "#/components/schemas/SecretEnvelope" }) } },
       "/workspace-templates/{workspaceTemplateId}/secrets/{secretId}/delete": { post: { summary: "Delete a workspace template secret", parameters: [workspaceTemplateId, secretId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Secret deleted", { type: "object", required: ["deleted", "secret"], properties: { deleted: { const: true }, secret: { $ref: "#/components/schemas/SecretSummary" } } }) } },
       "/workspace-templates/{workspaceTemplateId}/delete": { post: { summary: "Delete a workspace template", parameters: [workspaceTemplateId], requestBody: jsonBody(emptyObjectSchema), responses: jsonResponse("Workspace template deleted or blocked by workspace references", { $ref: "#/components/schemas/DeleteWorkspaceTemplateResult" }) } },
-      "/workspaces/{id}": { get: { summary: "Inspect or present a workspace", description: "JSON requests inspect workspace state. Browser navigation presents the workspace and can select an Agent conversation or Work view.", parameters: [workspaceId, agentConversation, selectedWorkView], responses: jsonAndHtmlResponse("Workspace state or browser surface", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
+      "/workspaces/{id}": { get: { summary: "Inspect or present a workspace", description: "JSON requests inspect workspace state. Browser navigation presents the workspace and can select an Agent or Work view.", parameters: [workspaceId, agent, selectedWorkView], responses: jsonAndHtmlResponse("Workspace state or browser surface", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
       "/workspaces/{id}/sidebar-title": { post: { summary: "Rename a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", required: ["title"], properties: { title: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Workspace renamed", { $ref: "#/components/schemas/WorkspaceEnvelope" }) } },
       "/workspaces/{id}/warnings/{kind}/dismiss": { post: { summary: "Dismiss the current workspace warning state", parameters: [workspaceId, { name: "kind", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ type: "object", required: ["state"], properties: { state: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Warning dismissed", { type: "object", required: ["dismissed"], properties: { dismissed: { const: true } } }) } },
       "/workspaces/{id}/provisioning/continue": { post: { summary: "Retry preparation or explicitly continue after a recoverable failure", parameters: [workspaceId, { name: "action", in: "query", schema: { type: "string", enum: ["retry"] }, description: "Retry failed workspace runtime preparation instead of bypassing it." }], responses: { ...jsonResponse("Workspace provisioning resumed", { type: "object", required: ["continued", "stepId"], properties: { continued: { const: true }, stepId: { type: "string" } }, additionalProperties: false }), "409": errorResponse } } },
@@ -120,14 +120,14 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       "/workspaces/{id}/work-views/reorder": { post: { summary: "Reorder a typed Work view", parameters: [workspaceId], requestBody: jsonBody(reorderWorkViewRequestSchema), responses: jsonResponse("Work views reordered", { $ref: "#/components/schemas/WorkViewsEnvelope" }) } },
       "/workspaces/{id}/work-views/{key}/attention/request": { post: { summary: "Request attention for a Work view without changing the visible destination", parameters: [workspaceId, { name: "key", in: "path", required: true, schema: { type: "string" } }], responses: jsonResponse("Attention requested", { type: "object" }) } },
       "/workspaces/{id}/work-views/close": { post: { summary: "Close a typed Work view", parameters: [workspaceId], requestBody: jsonBody(closeWorkViewRequestSchema), responses: jsonResponse("Work view closed", { $ref: "#/components/schemas/WorkViewsEnvelope" }) } },
-      "/workspaces/{id}/agents/{conversationId}/close": closeAgentConversationPath,
+      "/workspaces/{id}/agents/{agentId}/close": closeAgentPath,
       "/workspaces/{id}/park": { post: { summary: "Park a workspace", parameters: [workspaceId, { name: "force", in: "query", schema: { type: "string", enum: ["1"] }, description: "Close terminal and VS Code views before parking. Without confirmation, returns 409 if these views are open." }], responses: { ...jsonResponse("Workspace parked", { type: "object" }), "409": errorResponse } } },
       "/workspaces/{id}/unpark": { post: { summary: "Unpark a workspace", parameters: [workspaceId], responses: jsonResponse("Workspace unparked", { type: "object" }) } },
       "/workspaces/{id}/delete": { post: { summary: "Delete a workspace", parameters: [workspaceId], requestBody: jsonBody({ type: "object", properties: { force: { type: "boolean" } }, additionalProperties: false }), responses: jsonResponse("Workspace deletion scheduled or blocked", { type: "object" }) } },
-      "/workspaces/{id}/agents/{conversationId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,128}$", description: "Caller-generated message identity. Reuse on retries to return the original admission without submitting another message." }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
-      "/workspaces/{id}/agents/{conversationId}/model": { post: { summary: "Select an agent model", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["model"], properties: { model: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Model selected", { $ref: "#/components/schemas/AgentModelEnvelope" }) } },
-      "/workspaces/{id}/agents/{conversationId}/thinking": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentConversationId], requestBody: jsonBody({ type: "object", required: ["level"], properties: { level: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingEnvelope" }) } },
-      "/workspaces/{id}/agents/{conversationId}/abort": { post: { summary: "Abort the active agent turn", parameters: [workspaceId, agentConversationId], responses: jsonResponse("Agent aborted", { $ref: "#/components/schemas/AgentStateEnvelope" }) } },
+      "/workspaces/{id}/agents/{agentId}/messages": { post: { summary: "Submit or steer an agent message", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,128}$", description: "Caller-generated message identity. Reuse on retries to return the original admission without submitting another message." }, mode: { type: "string", enum: ["send", "steer"] } }, additionalProperties: false }), responses: agentMessageResponses } },
+      "/workspaces/{id}/agents/{agentId}/model": { post: { summary: "Select an agent model", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["model"], properties: { model: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Model selected", { $ref: "#/components/schemas/AgentModelEnvelope" }) } },
+      "/workspaces/{id}/agents/{agentId}/thinking": { post: { summary: "Select an agent thinking level", parameters: [workspaceId, agentId], requestBody: jsonBody({ type: "object", required: ["level"], properties: { level: { type: "string" } }, additionalProperties: false }), responses: jsonResponse("Thinking level selected", { $ref: "#/components/schemas/AgentThinkingEnvelope" }) } },
+      "/workspaces/{id}/agents/{agentId}/abort": { post: { summary: "Abort the active agent turn", parameters: [workspaceId, agentId], responses: jsonResponse("Agent aborted", { $ref: "#/components/schemas/AgentStateEnvelope" }) } },
     },
     components: {
       schemas: {
@@ -144,7 +144,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
               { type: "object", required: ["type", "workspaceTemplate"], properties: { type: { const: "workspace-template" }, workspaceTemplate: { type: "string" } }, additionalProperties: false },
             ] },
             title: { type: "string" },
-            agent: { type: "object", properties: { provider: { type: "string", description: "Agent provider ID; defaults to the most recently created provider" }, initialPrompt: { type: "string" }, model: { type: "string" }, thinkingLevel: { type: "string" }, serviceTier: { type: "string", enum: ["default", "priority"] }, attachmentDraft: { type: "string" } }, additionalProperties: false },
+            agent: { type: "object", properties: { agentTypeId: { type: "string", description: "Agent type ID; defaults to the most recently created Agent type" }, initialPrompt: { type: "string" }, model: { type: "string" }, thinkingLevel: { type: "string" }, attachmentDraft: { type: "string" } }, additionalProperties: false },
           },
           additionalProperties: false,
         },
@@ -195,18 +195,18 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
             warnings: { type: "array", items: { type: "object", required: ["kind", "state", "title", "message"], properties: { kind: { type: "string" }, state: { type: "string" }, title: { type: "string" }, message: { type: "string" }, action: { type: "object", properties: { href: { type: "string" }, caption: { type: "string" } } } } } },
             dismissedWarnings: { type: "object", additionalProperties: { type: "string" } },
             id: { type: "string" }, title: { type: "string" }, phase: { $ref: "#/components/schemas/WorkspacePhase" }, requestingAttention: { type: "boolean" }, url: { type: "string" }, issues: workspaceIssuesSchema,
-            agentConversations: { type: "array", items: { $ref: "#/components/schemas/AgentConversationSummary" } },
+            agents: { type: "array", items: { $ref: "#/components/schemas/AgentSummary" } },
             workViews: { type: "array", items: { $ref: "#/components/schemas/PresentedWorkView" } },
             commands: { type: "array", items: { type: "object" } },
           } } },
         },
-        AgentConversationSummary: agentConversationSummarySchema,
-        AgentConversationCloseResult: {
+        AgentSummary: agentSummarySchema,
+        AgentCloseResult: {
           type: "object",
-          required: ["archivedConversationId", "agentConversations"],
+          required: ["closedAgentId", "agents"],
           properties: {
-            archivedConversationId: { type: "string", format: "uuid" },
-            agentConversations: { type: "array", items: { $ref: "#/components/schemas/AgentConversationSummary" } },
+            closedAgentId: { type: "string", format: "uuid" },
+            agents: { type: "array", items: { $ref: "#/components/schemas/AgentSummary" } },
           },
           additionalProperties: false,
         },
@@ -215,9 +215,9 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
           required: ["agent"],
           properties: { agent: {
             type: "object",
-            required: ["conversationId", "state"],
+            required: ["agentId", "state"],
             properties: {
-              conversationId: { type: "string", format: "uuid" },
+              agentId: { type: "string", format: "uuid" },
               state: { type: "string", enum: ["idle", "running"] },
               aborted: { type: "boolean" },
               compacted: { type: "boolean" },
@@ -229,20 +229,20 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
         AgentModelEnvelope: {
           type: "object",
           required: ["agent"],
-          properties: { agent: { type: "object", required: ["conversationId", "model"], properties: { conversationId: { type: "string", format: "uuid" }, model: { type: "string" } }, additionalProperties: false } },
+          properties: { agent: { type: "object", required: ["agentId", "model"], properties: { agentId: { type: "string", format: "uuid" }, model: { type: "string" } }, additionalProperties: false } },
           additionalProperties: false,
         },
         AgentThinkingEnvelope: {
           type: "object",
           required: ["agent"],
-          properties: { agent: { type: "object", required: ["conversationId", "thinkingLevel"], properties: { conversationId: { type: "string", format: "uuid" }, thinkingLevel: { type: "string" } }, additionalProperties: false } },
+          properties: { agent: { type: "object", required: ["agentId", "thinkingLevel"], properties: { agentId: { type: "string", format: "uuid" }, thinkingLevel: { type: "string" } }, additionalProperties: false } },
           additionalProperties: false,
         },
         WorkViewReference: workViewReferenceSchema,
         PresentedWorkView: { type: "object", required: ["key", "reference", "requestingAttention"], properties: { key: { type: "string" }, reference: { $ref: "#/components/schemas/WorkViewReference" }, requestingAttention: { type: "boolean" }, attentionSequence: { type: "integer" } }, additionalProperties: false },
         WorkViewsEnvelope: { type: "object", required: ["workViews"], properties: { workViews: { type: "array", items: { $ref: "#/components/schemas/PresentedWorkView" } } } },
         CommandResult: { type: "object", required: ["command", "workViews"], properties: {
-          command: { type: "object", required: ["id"], properties: { id: { type: "string" }, workView: { $ref: "#/components/schemas/WorkViewReference" }, agentConversationId: { type: "string", format: "uuid" } }, additionalProperties: false },
+          command: { type: "object", required: ["id"], properties: { id: { type: "string" }, workView: { $ref: "#/components/schemas/WorkViewReference" }, agentId: { type: "string", format: "uuid" } }, additionalProperties: false },
           workViews: { type: "array", items: { $ref: "#/components/schemas/PresentedWorkView" } },
         }, additionalProperties: false },
       },

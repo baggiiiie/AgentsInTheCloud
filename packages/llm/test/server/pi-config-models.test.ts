@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getCustomModelsJson, loginPiOAuthProvider, setCustomModelsJson } from "../../src/server/pi-config-models.ts";
+import { getCustomModelsJson, getEnabledModels, loginPiOAuthProvider, setCustomModelsJson, setEnabledModels } from "../../src/server/pi-config-models.ts";
+import { updateJsonSettings } from "@agents-in-the-cloud/core/json-settings";
 let dataDir: string;
 beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-llm-models-"));
@@ -11,6 +12,35 @@ beforeEach(async () => {
 afterEach(async () => {
   delete process.env.ATELIER_DATA_DIR;
   await rm(dataDir, { recursive: true, force: true });
+});
+
+describe("enabled model storage", () => {
+  test("reads the older saved list and writes enabledModels without losing other settings", async () => {
+    const path = join(dataDir, "pi-config", "models.json");
+    const model = { provider: "example", id: "first", label: "First" };
+    await updateJsonSettings(path, stored => {
+      stored.picker = [model];
+      stored.otherOwner = { retained: true };
+    });
+    expect(await getEnabledModels()).toEqual([model]);
+    await setEnabledModels([model]);
+    const saved = JSON.parse(await readFile(path, "utf8"));
+    expect(saved.enabledModels).toEqual([model]);
+    expect(saved.picker).toBeUndefined();
+    expect(saved.otherOwner).toEqual({ retained: true });
+  });
+
+  test("an explicitly empty enabled list takes precedence over the older saved list", async () => {
+    const path = join(dataDir, "pi-config", "models.json");
+    await updateJsonSettings(path, stored => {
+      stored.enabledModels = [];
+      stored.picker = [{ provider: "example", id: "old", label: "Old" }];
+    });
+    expect(await getEnabledModels()).toEqual([]);
+    await setEnabledModels([]);
+    expect(JSON.parse(await readFile(path, "utf8")).enabledModels).toEqual([]);
+    expect(JSON.parse(await readFile(path, "utf8")).picker).toBeUndefined();
+  });
 });
 
 describe("custom Pi model configuration", () => {

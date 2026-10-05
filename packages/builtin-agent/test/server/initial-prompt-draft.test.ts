@@ -40,11 +40,11 @@ describe("initial Agent prompt drafts", () => {
     expect(await readInitialPromptDraft(workspaceId, firstId)).toEqual({ prompt: "Wait for a model" });
     expect(await readInitialPromptDraft(workspaceId, secondId)).toBeUndefined();
 
-    const firstAgent = { workspaceId, conversationId: firstId, label: "Agent 1", title: "First", path: "/tmp/first.jsonl" };
-    const secondAgent = { workspaceId, conversationId: secondId, label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" };
-    const firstRender = await renderAgentPane({ workspaceId, conversationId: firstId }, firstAgent, emptyPaneState);
-    const reconstructed = await renderAgentPane({ workspaceId, conversationId: firstId }, firstAgent, emptyPaneState);
-    const secondRender = await renderAgentPane({ workspaceId, conversationId: secondId }, secondAgent, emptyPaneState);
+    const firstAgent = { workspaceId, agentId: firstId, label: "Agent 1", title: "First", path: "/tmp/first.jsonl" };
+    const secondAgent = { workspaceId, agentId: secondId, label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" };
+    const firstRender = await renderAgentPane({ workspaceId, agentId: firstId }, firstAgent, emptyPaneState);
+    const reconstructed = await renderAgentPane({ workspaceId, agentId: firstId }, firstAgent, emptyPaneState);
+    const secondRender = await renderAgentPane({ workspaceId, agentId: secondId }, secondAgent, emptyPaneState);
     expect(firstRender).toContain(">Wait for a model</textarea>");
     expect(reconstructed).toContain(">Wait for a model</textarea>");
     expect(secondRender).not.toContain("Wait for a model");

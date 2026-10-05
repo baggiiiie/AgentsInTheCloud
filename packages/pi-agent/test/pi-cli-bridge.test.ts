@@ -27,18 +27,18 @@ function jwt(account: string) {
   return `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: account } })).toString("base64url")}.real-signature`;
 }
 
-test("exports favorites, labels, capabilities and custom models without credentials or raw auth configuration", async () => {
+test("exports enabled models, labels, capabilities and custom models without credentials or raw auth configuration", async () => {
   const models = [model("custom"), model("openai-codex", "openai-codex-responses", "https://chatgpt.com/backend-api"), model("anthropic", "anthropic-messages", "https://api.anthropic.com")];
   const runtime = fixture(models, {
     custom: { auth: { apiKey: "custom-secret", headers: { "x-custom-auth": "custom-header-secret" } } },
     "openai-codex": { auth: { apiKey: jwt("real-account") }, source: "OAuth" },
     anthropic: { auth: { apiKey: "sk-ant-oat-real-secret" }, source: "OAuth" },
   });
-  const config = await createPiCliConfiguration(runtime, [{ provider: "custom", id: "test-model", label: "My favorite" }, { provider: "anthropic", id: "test-model", label: "Claude" }]);
+  const config = await createPiCliConfiguration(runtime, [{ provider: "custom", id: "test-model", label: "My enabled model" }, { provider: "anthropic", id: "test-model", label: "Claude" }]);
   // Anthropic permits Claude subscription tokens only in Claude Code.
   expect(config.enabledModels).toEqual(["custom/test-model"]);
   expect(config.auth.anthropic).toBeUndefined();
-  expect(config.models.providers.custom!.models[0]!.name).toBe("My favorite");
+  expect(config.models.providers.custom!.models[0]!.name).toBe("My enabled model");
   expect(config.models.providers.custom!.models[0]!.thinkingLevelMap).toEqual({ minimal: null });
   const serialized = JSON.stringify(config);
   for (const secret of ["custom-secret", "custom-header-secret", "real-account", "real-signature", "sk-ant-oat-real-secret", "refresh"]) expect(serialized).not.toContain(secret);

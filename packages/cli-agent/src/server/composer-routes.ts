@@ -1,16 +1,16 @@
-import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentSessionNameCommand } from "@agents-in-the-cloud/agent/server";
+import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentNameCommand } from "@agents-in-the-cloud/agent/server";
 import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
-import type { CliSessions } from "./sessions.ts";
+import type { CliAgents } from "./agents.ts";
 
-export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
+export function cliComposerRoutes(providerId: string, agents: CliAgents) {
   return async (request: Request, url: URL): Promise<Response | undefined> => {
     const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/composer(?:\/(completions(?:\/prompt-template-expand)?|consumed))?$/);
     if (!match || match[2] !== providerId) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
-    const conversationId = decodeURIComponent(match[3]!);
+    const agentId = decodeURIComponent(match[3]!);
     const operation = match[4] ?? "";
-    const session = await sessions.ready(workspaceId, conversationId);
+    const session = await agents.ready(workspaceId, agentId);
     if (request.method === "GET" && operation === "completions") {
       const html = renderFileCompletionMenu(await listFileCompletions(workspaceId, url.searchParams.get("q") ?? "", url.searchParams.get("mode") === "fuzzy" ? "fuzzy" : "direct"));
       return response(html);
@@ -19,7 +19,7 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
       const form = await request.formData();
       return textResponse(await expandPromptTemplate(workspaceId, String(form.get("text") ?? "")));
     }
-    const draftId = agentAttachmentDraftId(workspaceId, `${providerId}:${conversationId}`);
+    const draftId = agentAttachmentDraftId(workspaceId, `${providerId}:${agentId}`);
     if (request.method === "POST" && operation === "consumed") {
       const form = await request.formData();
       if (form.get("attachmentDraft") !== draftId) return new Response("Invalid draft", { status: 422 });
@@ -27,17 +27,17 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
       return new Response(null, { status: 204 });
     }
     if (request.method !== "POST" || operation) return undefined;
-    const terminal = await sessions.terminalState(workspaceId, session);
+    const terminal = await agents.terminalState(workspaceId, session);
     if (session.error || !terminal.exists || terminal.ended) return new Response("Terminal unavailable", { status: 409 });
     const form = await request.formData();
     if (form.get("attachmentDraft") !== draftId) return new Response("Invalid draft", { status: 422 });
-    const nameResult = await runAgentSessionNameCommand(String(form.get("text") ?? ""), {
-      suggest: () => sessions.suggestTitle(workspaceId, conversationId),
-      setTitle: (title) => sessions.setTitle(workspaceId, conversationId, title),
+    const nameResult = await runAgentNameCommand(String(form.get("text") ?? ""), {
+      suggest: () => agents.suggestTitle(workspaceId, agentId),
+      setTitle: (title) => agents.setTitle(workspaceId, agentId, title),
     });
     if (nameResult) return nameResult === "named"
       ? new Response(null, { status: 204 })
-      : new Response("No prompt available to name this session", { status: 422 });
+      : new Response("No prompt available to name this Agent", { status: 422 });
     const ids = form.getAll("attachment").map(String);
     const attachments = await Promise.all(ids.map(async (id) => {
       const attachment = await findStagedAttachment(draftId, id);
@@ -48,12 +48,12 @@ export function cliComposerRoutes(providerId: string, sessions: CliSessions) {
     if (!text.trim() && !attachments.length) return new Response("Enter a prompt or attach a file", { status: 422 });
     const notes: string[] = [];
     for (const attachment of attachments) {
-      const path = `/tmp/agents-in-the-cloud-attachments/${providerId}-${conversationId}/${attachment.id}/${attachment.name}`;
+      const path = `/tmp/agents-in-the-cloud-attachments/${providerId}-${agentId}/${attachment.id}/${attachment.name}`;
       await copyAttachmentIntoWorkspace(workspaceId, attachment, path);
       notes.push(`[Attached ${attachment.isImage ? "image" : "file"} available at ${path}]`);
     }
     text = [text, ...notes].filter(Boolean).join("\n\n");
-    await sessions.recordNamingPrompt(workspaceId, conversationId, text);
+    await agents.recordNamingPrompt(workspaceId, agentId, text);
     return textResponse(text);
   };
 }

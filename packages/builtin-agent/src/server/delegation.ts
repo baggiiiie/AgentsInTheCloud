@@ -2,7 +2,7 @@ import type { Models } from "@earendil-works/pi-ai";
 import type { Extension, Harness, ConversationView, EntryRecord } from "@earendil-works/pi-durable";
 import type { AgentTranscriptSnapshot } from "@agents-in-the-cloud/agent/server/transcript-contributions";
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
-import { listWorkspaceAgentConversations, type WorkspaceAgentConversationInfo } from "./session-store.ts";
+import { listWorkspaceAgents, type WorkspaceAgentInfo } from "./agent-store.ts";
 
 import { configureAgentToolPresentations, type AgentToolPresentation } from "@agents-in-the-cloud/agent/server";
 export type { AgentToolPresentation } from "@agents-in-the-cloud/agent/server";
@@ -11,7 +11,7 @@ export interface AgentDelegation {
   create(models: Models, harness: () => Harness): { extension: Extension; models: Models };
   transcript(view: ConversationView): AgentTranscriptSnapshot;
   attributed(entry: EntryRecord): "task" | "message" | undefined;
-  resolveConversation(workspaceId: string, conversationId: string): Promise<WorkspaceAgentConversationInfo | undefined>;
+  resolveAgent(workspaceId: string, agentId: string): Promise<WorkspaceAgentInfo | undefined>;
   toolPresentations?: ReadonlyMap<string, AgentToolPresentation>;
 }
 
@@ -23,10 +23,10 @@ export function configureAgentDelegation(delegation: AgentDelegation | undefined
   configureAgentToolPresentations(delegation?.toolPresentations);
 }
 
-export async function resolveAgentConversation(workspaceId: string, conversationId: string): Promise<WorkspaceAgentConversationInfo> {
-  const root = (await listWorkspaceAgentConversations(workspaceId)).find((agent) => agent.conversationId === conversationId);
+export async function resolveAgent(workspaceId: string, agentId: string): Promise<WorkspaceAgentInfo> {
+  const root = (await listWorkspaceAgents(workspaceId)).find((agent) => agent.agentId === agentId);
   if (root) return root;
-  const child = await agentDelegation?.resolveConversation(workspaceId, conversationId);
+  const child = await agentDelegation?.resolveAgent(workspaceId, agentId);
   if (child) return child;
-  throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+  throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agentId}`);
 }

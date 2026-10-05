@@ -34,7 +34,7 @@ registry.install(defineExtension({
   }), replay === "generation" ? "safe" : replay)],
 }));
 const workspace = await openDurableWorkspace(directory, "crash-workspace", { models, registry });
-const conversation = await workspace.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" }, {
+const conversation = await workspace.agent({ agentId: "crash-tab", label: "Agent 1", title: "Crash recovery" }, {
   model: { provider: "faux", modelId: "faux-1" },
 });
 await conversation.submit({ type: "input", content: "Run the operation", requestId: "crash-request" }, BACKGROUND_CONTEXT);

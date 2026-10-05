@@ -15,10 +15,10 @@ test("Pi configuration installation refreshes managed fields atomically and pres
       await mkdir(directory, { recursive: true });
       await writeFile(directory + "/settings.json", JSON.stringify({ theme: "light", enabledModels: ["old/model"], transport: "websocket" }));
       const model = { provider: "custom", id: "test", name: "Test", api: "openai-completions", baseUrl: "https://model.example/v1", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 10000, maxTokens: 1000 };
-      let favorites = [{ provider: "custom", id: "test", label: "Favorite" }];
+      let enabledModels = [{ provider: "custom", id: "test", label: "Enabled model" }];
       mock.module("@agents-in-the-cloud/llm/server", () => ({ ...config,
         createPiModelRuntime: async () => ({ getAvailable: async () => [model], getAuth: async () => ({ auth: { apiKey: "real-secret-never-copy" } }) }),
-        getConfiguredModels: async () => favorites,
+        getEnabledModels: async () => enabledModels,
       }));
       mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (_id, script, options) => {
         const process = Bun.spawn(["sh", "-c", script], { stdin: new Blob([options.stdin]), stdout: "pipe", stderr: "pipe" });
@@ -32,7 +32,7 @@ test("Pi configuration installation refreshes managed fields atomically and pres
         expect((await stat(directory + "/" + name)).mode & 0o777).toBe(0o600);
         expect(await readFile(directory + "/" + name, "utf8")).not.toContain("real-secret-never-copy");
       }
-      favorites = [];
+      enabledModels = [];
       await installPiCliConfiguration("three");
       expect(JSON.parse(await readFile(directory + "/settings.json", "utf8")).enabledModels).toEqual([]);
     `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, HOME: home }, stdout: "pipe", stderr: "pipe" });

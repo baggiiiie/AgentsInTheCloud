@@ -7,7 +7,7 @@ import { parseModelRef, getAgentModelThinkingLevel } from "@agents-in-the-cloud/
 import { expandPromptTemplate } from "@agents-in-the-cloud/agent/server/prompt-templates";
 import { getWorkspaceAgentController, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, stopWorkspaceAgentRuntimes } from "./runtime.ts";
 import { resumeInterruptedAgentSessions } from "./restart-recovery.ts";
-import { ensureDefaultWorkspaceAgentConversation } from "./session-store.ts";
+import { ensureDefaultWorkspaceAgent } from "./agent-store.ts";
 
 export function registerAgentEvents(events: AgentsInTheCloudEventBus): void {
   configureDurableOwnerEvents(events);
@@ -22,7 +22,7 @@ export function registerAgentEvents(events: AgentsInTheCloudEventBus): void {
   });
   events.on("workspace_created", async ({ workspaceId, context }) => {
     const agentContext = context?.agent;
-    if (!agentContext || (agentContext.provider && agentContext.provider !== "builtin")) return;
+    if (!agentContext || (agentContext.agentTypeId && agentContext.agentTypeId !== "builtin")) return;
     const hasPrompt = !agentContext.initialPromptMode && Boolean(agentContext.initialPrompt?.trim());
     if (hasPrompt) await events.emit("workspace_provision_progress", { workspaceId, detail: "Start initial agent task" });
     await initializeWorkspaceAgent(workspaceId, agentContext, events);
@@ -30,7 +30,7 @@ export function registerAgentEvents(events: AgentsInTheCloudEventBus): void {
 }
 
 async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorkspaceParameters, events: AgentsInTheCloudEventBus): Promise<void> {
-  const agent = await ensureDefaultWorkspaceAgentConversation(workspaceId);
+  const agent = await ensureDefaultWorkspaceAgent(workspaceId);
   const runtime = await getWorkspaceAgentController(agent, { events });
   const modelRef = context.model ? parseModelRef(context.model) : undefined;
   if (modelRef) await runtime.configure({ model: { provider: modelRef.provider, modelId: modelRef.id } });
@@ -40,9 +40,9 @@ async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorks
   const input = context.input!;
   if (context.initialPromptMode === "composer") {
     const prompt = input.text;
-    if (prompt) await stageInitialPrompt(workspaceId, agent.conversationId, prompt);
+    if (prompt) await stageInitialPrompt(workspaceId, agent.agentId, prompt);
     const attachmentDraft = context.attachmentDraft ?? "";
-    if (validDraftId(attachmentDraft)) await moveAttachmentDraft(attachmentDraft, agentAttachmentDraftId(workspaceId, agent.conversationId));
+    if (validDraftId(attachmentDraft)) await moveAttachmentDraft(attachmentDraft, agentAttachmentDraftId(workspaceId, agent.agentId));
     return;
   }
 

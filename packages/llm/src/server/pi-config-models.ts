@@ -17,9 +17,9 @@ import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
-export interface ConfiguredModel extends ModelRef { label: string }
+export interface EnabledModel extends ModelRef { label: string }
 const stringSchema = Type.String();
-interface ModelSettings { providers?: JsonObject; picker?: ConfiguredModel[] }
+interface ModelSettings { providers?: JsonObject; enabledModels?: EnabledModel[] }
 
 export interface CustomModelsSaveResult {
   skippedOfficialModels: ModelRef[];
@@ -53,7 +53,7 @@ function modelReferenceFromJsonObject(value: JsonObject): ModelRef | undefined {
   return provider && id ? { provider, id } : undefined;
 }
 
-function configuredModelFromJson(value: JsonValue | undefined): ConfiguredModel | undefined {
+function enabledModelFromJson(value: JsonValue | undefined): EnabledModel | undefined {
   if (!isJsonObject(value)) return undefined;
   const reference = modelReferenceFromJsonObject(value);
   if (!reference) return undefined;
@@ -61,10 +61,11 @@ function configuredModelFromJson(value: JsonValue | undefined): ConfiguredModel 
 }
 
 function parseModelSettings(stored: JsonObject): ModelSettings {
+  const enabledModels = stored.enabledModels ?? stored.picker; // Read the previously saved app-owned list.
   return {
     providers: isJsonObject(stored.providers) ? stored.providers : undefined,
-    picker: Array.isArray(stored.picker) ? stored.picker.flatMap((entry) => {
-      const model = configuredModelFromJson(entry);
+    enabledModels: Array.isArray(enabledModels) ? enabledModels.flatMap((entry) => {
+      const model = enabledModelFromJson(entry);
       return model ? [model] : [];
     }) : undefined,
   };
@@ -79,7 +80,8 @@ async function updateModelSettings(update: (settings: ModelSettings) => void): P
     const settings = parseModelSettings(stored);
     update(settings);
     stored.providers = settings.providers ?? {};
-    if (settings.picker) stored.picker = settings.picker.map((model) => ({ ...model }));
+    if (settings.enabledModels) stored.enabledModels = settings.enabledModels.map((model) => ({ ...model }));
+    delete stored.picker;
   });
 }
 
@@ -162,20 +164,20 @@ export async function setCustomModelsJson(source: string): Promise<CustomModelsS
   return result;
 }
 
-export async function getConfiguredModels(): Promise<ConfiguredModel[]> { return (await getModelSettings()).picker ?? []; }
+export async function getEnabledModels(): Promise<EnabledModel[]> { return (await getModelSettings()).enabledModels ?? []; }
 export function hasConnectedModelProvider(runtime: Pick<ModelRuntime, "getProviders" | "getProviderAuthStatus">): boolean {
   return runtime.getProviders().some((provider) => runtime.getProviderAuthStatus(provider.id).configured);
 }
 
-export async function hasAvailableConfiguredModel(): Promise<boolean> {
+export async function hasAvailableEnabledModel(): Promise<boolean> {
   const runtime = await createPiModelRuntime();
-  const models = await getConfiguredModels();
+  const models = await getEnabledModels();
   const availability = await providerAvailability(runtime, models.map((model) => model.provider));
   return models.some((model) => availability.get(model.provider)!.modelIds.has(model.id));
 }
 
-export async function setConfiguredModels(models: ConfiguredModel[]): Promise<void> {
-  await updateModelSettings((settings) => { settings.picker = models.map(({ provider, id, label }) => ({ provider, id, label })); });
+export async function setEnabledModels(models: EnabledModel[]): Promise<void> {
+  await updateModelSettings((settings) => { settings.enabledModels = models.map(({ provider, id, label }) => ({ provider, id, label })); });
 }
 
 let modelRuntime: Promise<ModelRuntime> | undefined;
@@ -280,18 +282,18 @@ export async function disconnectModelProvider(provider: string): Promise<void> {
   forgetSubscriptionState(provider);
   if (provider === "openai" || provider === "anthropic") await syncSubscriptionClis(runtime);
   await updateModelSettings((settings) => {
-    settings.picker = (settings.picker ?? []).filter((model) => model.provider !== provider);
+    settings.enabledModels = (settings.enabledModels ?? []).filter((model) => model.provider !== provider);
   });
 }
 
-export async function seedProviderFavoriteModels(provider: string): Promise<void> {
+export async function seedProviderEnabledModels(provider: string): Promise<void> {
   const runtime = await createPiModelRuntime();
   const available = await availableProviderModels(runtime, provider);
   const defaults = defaultProviderModels(provider, available);
   await updateModelSettings((settings) => {
-    const favorites = settings.picker ?? [];
-    if (!favorites.some((model) => model.provider === provider)) {
-      settings.picker = [...favorites, ...defaults.map((model) => ({ provider, id: model.id, label: modelDisplayName(model.name ?? model.id) }))];
+    const enabledModels = settings.enabledModels ?? [];
+    if (!enabledModels.some((model) => model.provider === provider)) {
+      settings.enabledModels = [...enabledModels, ...defaults.map((model) => ({ provider, id: model.id, label: modelDisplayName(model.name ?? model.id) }))];
     }
   });
 }

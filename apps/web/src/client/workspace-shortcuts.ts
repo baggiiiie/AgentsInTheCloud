@@ -486,15 +486,15 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
     const resident = document.querySelector<HTMLElement>(".workspace-detail-resident.visible[data-workspace-id]");
     if (!resident) return [];
     const workspaceId = resident.dataset.workspaceId!;
-    return [...resident.querySelectorAll<HTMLButtonElement>("[data-work-view-key], [data-agent-conversation-id]")].map((destination) => {
-      const key = destination.dataset.workViewKey ?? destination.dataset.agentConversationId!;
+    return [...resident.querySelectorAll<HTMLButtonElement>("[data-work-view-key], [data-agent-id]")].map((destination) => {
+      const key = destination.dataset.workViewKey ?? destination.dataset.agentId!;
       const label = destination.textContent?.trim() || key;
       const visible = destination.getAttribute("aria-selected") === "true";
       const matchScore = fuzzyScore(`${label} ${key}`);
       return {
         id: `destination:${workspaceId}:${key}`,
         title: label,
-        subtitle: destination.dataset.agentConversationId ? "Agent conversation" : "Work view",
+        subtitle: destination.dataset.agentId ? "Agent" : "Work view",
         badge: visible ? "open" : undefined,
         keywords: [key],
         score: matchScore > 0 ? matchScore + (visible ? 20 : 0) : 0,

@@ -53,8 +53,8 @@ function activeAgentComposer(): HTMLElement | undefined {
     .find((composer) => composer.closest(".workspace-detail-resident")?.classList.contains("visible") ?? true);
 }
 
-// Hotkeyed prompt templates are workspace shortcuts aimed at the active Agent
-// conversation, independent of focus and of whether its composer is shown.
+// Hotkeyed prompt templates are workspace shortcuts aimed at the active Agent,
+// independent of focus and of whether its composer is shown.
 export function registerPromptTemplateCommands(hooks: WorkspaceClientHooks): void {
   hooks.registerCommandProvider(() => {
     const composer = activeAgentComposer();
@@ -67,7 +67,7 @@ export function registerPromptTemplateCommands(hooks: WorkspaceClientHooks): voi
       return [{
         id: `prompt-template.${trigger.slice(1)}`,
         label: `Send ${trigger}`,
-        scope: "agent-conversation",
+        scope: "agent",
         binding: promptTemplateBinding(hotkey, isApplePlatform()),
         run: () => { composer.dispatchEvent(new CustomEvent<AgentComposerSendPromptDetail>(agentComposerSendPromptEvent, { detail: { text: trigger } })); },
       }];

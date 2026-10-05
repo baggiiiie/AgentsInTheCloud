@@ -34,7 +34,7 @@ function renderAgentTreeContinuationMenu(entryId: string): string {
 }
 
 export async function handleAgentTreeRequest(request: Request, url: URL, suffix: string,
-  presentation: () => Promise<import("./conversation-presentation.ts").ConversationPresentation>,
+  presentation: () => Promise<import("./agent-presentation.ts").AgentPresentation>,
   controller: () => ReturnType<typeof import("./runtime.ts").getWorkspaceAgentController>,
 ): Promise<Response | undefined> {
   if (suffix === "/summary" && request.method === "GET") {

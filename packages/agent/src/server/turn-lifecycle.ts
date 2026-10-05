@@ -1,5 +1,5 @@
 import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import { agentConversationKey } from "./render-context.ts";
+import { agentKey } from "./render-context.ts";
 import { publishWorkspaceAgentBusy } from "./workspace-agent-busy.ts";
 
 type AgentTurnIdentity = { workspaceId: string; agentId: string };
@@ -7,7 +7,7 @@ export type AgentTurnFinishReason = "stop" | "stopFailure";
 /** Resolves once the agent's own record of its finished turn is complete; other agents resolve at once. */
 type TurnSettler = (workspaceId: string, agentId: string, signal: AbortSignal, reason: AgentTurnFinishReason) => Promise<void>;
 const turnSettlers = new Set<TurnSettler>();
-// Agent IDs name conversations, which are unique across workspaces.
+// Agent IDs are unique across Workspaces.
 const settlingTurns = new Map<string, AbortController>();
 
 /** Every finished turn waits for all settlers, including turns of sessions restored after a restart. */
@@ -24,7 +24,7 @@ export function abandonSettlingTurn(agentId: string): void {
 export function handleAgentTurnBoundary(identity: AgentTurnIdentity, started: boolean, reason: AgentTurnFinishReason, events: AgentsInTheCloudEventBus): void {
   abandonSettlingTurn(identity.agentId);
   if (started) {
-    publishWorkspaceAgentBusy({ workspaceId: identity.workspaceId, agentKey: agentConversationKey(identity.agentId), busy: true });
+    publishWorkspaceAgentBusy({ workspaceId: identity.workspaceId, agentKey: agentKey(identity.agentId), busy: true });
   } else {
     // The finished signal can precede the CLI's last history writes, and Claude only makes
     // some of them after this request returns. Answer now; end the turn once it has settled.
@@ -41,6 +41,6 @@ async function finishTurn({ workspaceId, agentId }: AgentTurnIdentity, signal: A
   // A newer turn boundary or revocation owns the busy state now.
   if (signal.aborted) return;
   settlingTurns.delete(agentId);
-  publishWorkspaceAgentBusy({ workspaceId, agentKey: agentConversationKey(agentId), busy: false });
-  await events.emit("workspace_agent_turn_finished", { workspaceId, conversationId: agentId });
+  publishWorkspaceAgentBusy({ workspaceId, agentKey: agentKey(agentId), busy: false });
+  await events.emit("workspace_agent_turn_finished", { workspaceId, agentId });
 }

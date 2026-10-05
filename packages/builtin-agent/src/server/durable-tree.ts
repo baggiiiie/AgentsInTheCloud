@@ -5,7 +5,7 @@ import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import type { DurableAgentRuntime } from "./durable-runtime.ts";
 import { treeFilterOptions, type TreeFilterMode } from "./session-tree.ts";
 
-type Controller = Awaited<ReturnType<DurableAgentRuntime["conversation"]>>;
+type Controller = Awaited<ReturnType<DurableAgentRuntime["agent"]>>;
 
 /** Native history is a union of immutable fork prefixes, not a legacy SessionManager tree. */
 export function renderDurableTree(history: Awaited<ReturnType<Controller["tree"]>>, options: { filter: TreeFilterMode; query: string; historyPath?: string }) {

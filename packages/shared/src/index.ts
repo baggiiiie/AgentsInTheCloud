@@ -84,8 +84,8 @@ export interface WorkspaceAgentTabSummary {
 /** Durable Agent-tab seam: cheap shell metadata plus on-demand body rendering. */
 export interface WorkspaceAgentTabProvider {
   list(context: { workspaceId: string }): Promise<readonly WorkspaceAgentTabSummary[]>;
-  render(context: { workspaceId: string; conversationId: string }): Promise<string>;
-  close(context: { workspaceId: string; conversationId: string }): Promise<void>;
+  render(context: { workspaceId: string; agentId: string }): Promise<string>;
+  close(context: { workspaceId: string; agentId: string }): Promise<void>;
 }
 
 export interface WorkspaceWorkViewPresentation {
@@ -144,7 +144,7 @@ export interface WorkspaceCommandSurfaces {
   shortcut?: WorkspaceCommandShortcutSurface;
 }
 
-export type WorkspaceCommandScope = "global" | "workspace" | "agent-conversation" | "work-view";
+export type WorkspaceCommandScope = "global" | "workspace" | "agent" | "work-view";
 
 export interface WorkspaceCommandContribution<Input = Record<string, never>> {
   id: string;
@@ -170,7 +170,7 @@ export interface StaticFileContribution {
 }
 
 export interface WorkspaceModuleCommandResult {
-  createdAgentConversationId?: string;
+  createdAgentId?: string;
   createdWorkView?: WorkspaceWorkViewReference;
   streamHtml?: string;
 }
@@ -295,9 +295,7 @@ export interface DeleteCurrentWorkspaceResult {
   details?: unknown;
 }
 
-export type AgentServiceTier = "default" | "priority";
-
-/** Host-generated input; every provider must accept text, images and file notes. */
+/** Host-generated input; every Agent type must accept text, images and file notes. */
 export interface WorkspaceAgentInput {
   text: string;
   images: { mimeType: string; data: string }[];
@@ -305,14 +303,13 @@ export interface WorkspaceAgentInput {
 }
 
 export interface AgentWorkspaceParameters {
-  provider?: string;
+  agentTypeId?: string;
   /** Filled by AgentsInTheCloud before prepareWorkspace and workspace_created. */
   input?: WorkspaceAgentInput;
   initialPrompt?: string;
   initialPromptMode?: "composer";
   model?: string;
   thinkingLevel?: string;
-  serviceTier?: AgentServiceTier;
   attachmentDraft?: string;
 }
 
@@ -355,7 +352,7 @@ export interface WorkspaceModule {
   routes?: WorkspaceModuleRouteHandler[];
   workViews?: WorkspaceModuleWorkViewAdapter[];
   deletionReview?: WorkspaceDeletionReview;
-  agentProvider?: WorkspaceAgentProvider;
+  agentType?: WorkspaceAgentType;
   initialize?(context: WorkspaceServerModuleContext): Promise<void> | void;
   attachToWorkspace?(context: WorkspaceAttachContext): Promise<WorkspaceAttachment> | WorkspaceAttachment;
 }
@@ -383,7 +380,7 @@ export const phoneLayoutMediaQuery = "(max-width: 700px), (hover: none) and (poi
 /** The composer rules are about available space, not touch: mobile is a viewport of 700px or less. */
 export const mobileComposerMediaQuery = "(max-width: 700px)";
 
-/** Asks an Agent conversation's composer to send a prompt without touching its draft. */
+/** Asks an Agent's composer to send a prompt without touching its draft. */
 export const agentComposerSendPromptEvent = "agent-composer:send-prompt";
 export interface AgentComposerSendPromptDetail { text: string }
 
@@ -450,7 +447,7 @@ export interface WorkspaceClientCommand {
   id: string;
   label: string;
   description?: string;
-  scope: "global" | "workspace" | "agent-conversation" | "work-view";
+  scope: "global" | "workspace" | "agent" | "work-view";
   binding?: string;
   run(): void | Promise<void>;
 }
@@ -516,18 +513,18 @@ export interface AgentLaunchFooterContext {
 export interface WorkspaceAgentLaunch {
   renderFooter(context: AgentLaunchFooterContext): Promise<string>;
   prepare(parameters?: JsonObject): Promise<WorkspaceCreationContext | undefined>;
-  /** Validate provider settings; the host owns prompt, attachments and submission identity. */
+  /** Validate Agent type settings; the host owns prompt, attachments and submission identity. */
   submit(form: FormData): Promise<{ prepare(): Promise<WorkspaceCreationContext> } | { response: Response }>;
   /** New-workspace provisioning only; never invoked to fill an empty pane. Input is host-prepared. */
   prepareWorkspace(workspaceId: string, context?: WorkspaceCreationContext): Promise<void>;
   refreshConfiguration?(frameId: string): Promise<string>;
 }
 
-/** Providers own contents and lifecycle; AgentsInTheCloud owns tabs, chrome and creation UI.
- * Conversation IDs must be globally unique within a workspace (UUIDs are recommended).
+/** Agent types own contents and lifecycle; AgentsInTheCloud owns tabs, chrome and creation UI.
+ * Agent IDs must be globally unique within a workspace (UUIDs are recommended).
  * Metadata listing must not create an agent or boot a runtime.
  */
-export interface WorkspaceAgentProvider {
+export interface WorkspaceAgentType {
   id: string;
   label: string;
   iconHtml: string;

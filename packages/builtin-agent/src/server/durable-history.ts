@@ -5,7 +5,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
-import { sessionShareDir, workspaceSessionShareKey } from "./session-store.ts";
+import { sessionShareDir, workspaceSessionShareKey } from "./agent-store.ts";
 import { durableJournalDirectory } from "./durable-storage.ts";
 import { retainedDurableWorkspaceOwner } from "./runtime.ts";
 import { projectDurableTranscript } from "./durable-transcript.ts";
@@ -53,7 +53,7 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
     return rendered;
   }
   const viewer = decodeURIComponent(match[1]!);
-  const [source = "", conversationId = "", operation = "", item = "", index = ""] = match.slice(2).map(value => value === undefined ? "" : decodeURIComponent(value));
+  const [source = "", agentId = "", operation = "", item = "", index = ""] = match.slice(2).map(value => value === undefined ? "" : decodeURIComponent(value));
   const base = `/workspaces/${encodeURIComponent(viewer)}/agent-history`;
   const histories = await retainedDurableHistories(viewer);
   if (!source) {
@@ -62,19 +62,19 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
       const gates = await history.owner.admission();
       for (const record of await history.owner.catalog()) {
         const state = gates?.deleted ? "Deleted workspace" : gates?.closed.includes(record.durableId) ? "Closed conversation" : "Conversation";
-        rows.push(actionItemHtml({ kind: "single", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.conversationId)}"` } }));
+        rows.push(actionItemHtml({ kind: "single", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.agentId)}"` } }));
       }
     }
     return page("Agent history", `<p>Read-only history from this template's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`);
   }
   const history = histories.find(history => history.workspaceId === source);
-  const record = history && (await history.owner.catalog()).find(record => record.conversationId === conversationId);
+  const record = history && (await history.owner.catalog()).find(record => record.agentId === agentId);
   if (!history || !record) return response("Not found", { status: 404 });
-  const controller = await history.owner.conversation(record);
+  const controller = await history.owner.agent(record);
   if (operation === "session-images") return controller.image(item, Number(index));
   const branch = url.searchParams.get("branch") ?? String(record.durableId);
   if (!(record.branches ?? [record.durableId]).some(id => String(id) === branch)) return response("Not found", { status: 404 });
-  const ctx = { workspaceId: source, conversationId, readOnly: true, transcriptQuery: `branch=${encodeURIComponent(branch)}`, transcriptBasePath: `${base}/${encodeURIComponent(source)}/${encodeURIComponent(conversationId)}` };
+  const ctx = { workspaceId: source, agentId, readOnly: true, transcriptQuery: `branch=${encodeURIComponent(branch)}`, transcriptBasePath: `${base}/${encodeURIComponent(source)}/${encodeURIComponent(agentId)}` };
   const view = await controller.historyView(branch);
   const items = projectDurableTranscript(view);
   if (operation === "transcript-items") {

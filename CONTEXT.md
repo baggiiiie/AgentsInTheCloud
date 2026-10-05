@@ -29,27 +29,35 @@ The collapsible navigation region for finding and switching between workspaces.
 _Avoid_: Left sidebar, workspace tab
 
 **Agent**:
-A coding collaborator that acts through an Agent conversation.
-_Avoid_: Agent conversation, Agent session
+An independently named coding collaborator within a Workspace, with its own AgentPaneComposer and Agent session. A Workspace may contain one or more Agents, with one active at a time; starting a fresh session does not create another Agent.
+_Avoid_: Agent conversation, Agent view, agent tab, chat, thread
+
+**Agent type**:
+The coding-agent implementation an Agent uses: Builtin, Claude Code, Codex, or Pi. An Agent type is distinct from the Model provider supplying its models.
+_Avoid_: Agent provider, agent backend
+
+**Model provider**:
+A service that supplies models, such as OpenAI or Anthropic. The Model providers available to an Agent depend on its Agent type and connected credentials.
+_Avoid_: Agent provider
+
+**Enabled model**:
+A model included in the saved list used for an Agent’s composer model choices. Models may be enabled automatically when connecting a Model provider or by the user; being enabled does not guarantee availability through the Agent type, account access, or current credentials.
+_Avoid_: Favorite model, configured model, your models, model shortlist
 
 **Agent pane**:
-The primary region for using the active Agent conversation in a workspace.
+The primary region for collaborating with the active Agent in a Workspace.
 _Avoid_: Left tab, chat tab
 
 **AgentPaneComposer**:
-The composer in an Agent pane for continuing its active Agent conversation and selecting the model, thinking level, and service tier used for subsequent Agent work.
+The composer in an Agent pane for collaborating with its active Agent and selecting the model and thinking level used for subsequent Agent work.
 _Avoid_: Agent composer, in-pane composer, prompt box, chat input
 
 **LaunchComposer**:
-The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model, thinking level, and service tier with which the Workspace starts.
+The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model and thinking level with which the Workspace starts.
 _Avoid_: Launch form, launch prompt, new-workspace composer
 
-**Agent conversation**:
-An independently stateful transcript and AgentPaneComposer for collaborating with an Agent inside a Workspace. A Workspace may contain one or more Agent conversations, with one active at a time.
-_Avoid_: Agent, Agent view, agent tab, chat, thread
-
 **Agent session**:
-The replaceable interaction history backing an Agent conversation. Replacing an Agent session retains the identity of its Agent conversation.
+An Agent's replaceable interaction history. Starting a fresh Agent session resets the active context while keeping the same Agent, its settings, and its searchable history.
 _Avoid_: Agent, Agent conversation
 
 **Work pane**:
@@ -69,7 +77,7 @@ A workspace-level utility Work view, such as Files.
 _Avoid_: Permanent view, special view
 
 **Mobile destination**:
-A top-level phone navigation target for the Workspace pane, an open Agent conversation, or a Work view configured for direct mobile access. Every open Agent conversation is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.
+A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.
 _Avoid_: Mobile tab, mobile Work pane
 
 **AgentsInTheCloud bar**:

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import { createNextWorkspaceAgentConversation, ensureDefaultWorkspaceAgentConversation, listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
+import { createNextWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents } from "../../src/server/agent-store.ts";
 import { builtinAgentWorkspaceModule, createWorkspaceAgentTabProvider, workspaceAgentTabProvider } from "../../src/server/web.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
 import { agentAttachmentDraftId, findStagedAttachment, stageAttachment } from "@agents-in-the-cloud/prompt/server";
@@ -34,7 +34,7 @@ afterEach(async () => {
 
 test("a delegated agent finishing while its parent works does not request workspace attention", async () => {
   await dataDir();
-  const root = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+  const root = await ensureDefaultWorkspaceAgent("workspace-1");
   const childId = crypto.randomUUID();
   const events = createAgentsInTheCloudEventBus();
   const surfaceRequests: string[] = [];
@@ -60,27 +60,27 @@ test("a delegated agent finishing while its parent works does not request worksp
   builtinAgentWorkspaceModule.initialize!(context);
 
   // The delegated conversation is not a top-level workspace Agent tab.
-  publishWorkspaceAgentBusy({ workspaceId: "workspace-1", agentKey: `agent:${root.conversationId}`, busy: true });
-  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", conversationId: childId });
+  publishWorkspaceAgentBusy({ workspaceId: "workspace-1", agentKey: `agent:${root.agentId}`, busy: true });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", agentId: childId });
   expect(surfaceRequests).toEqual([`agent:${childId}`]);
   expect(workspaceRequests).toEqual([]);
-  expect(busyAgents.has(`agent:${root.conversationId}`)).toBe(true);
+  expect(busyAgents.has(`agent:${root.agentId}`)).toBe(true);
 
-  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", conversationId: root.conversationId });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-1", agentId: root.agentId });
   expect(workspaceRequests).toEqual(["workspace-1"]);
 });
 
 describe("Workspace Agent-tab provider", () => {
   test("keeps listing metadata-only and renders exactly the requested immutable identity", async () => {
     const conversations = [
-      { workspaceId: "workspace-1", conversationId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
-      { workspaceId: "workspace-1", conversationId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
+      { workspaceId: "workspace-1", agentId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
+      { workspaceId: "workspace-1", agentId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
     ];
     const rendered: string[] = [];
     const provider = createWorkspaceAgentTabProvider({
       list: async () => conversations,
       render: async (conversation) => {
-        rendered.push(conversation.conversationId);
+        rendered.push(conversation.agentId);
         return `<article>${conversation.title}</article>`;
       },
       dispose: async () => {},
@@ -89,58 +89,58 @@ describe("Workspace Agent-tab provider", () => {
     });
 
     expect(await provider.list({ workspaceId: "workspace-1" })).toEqual([
-      { id: conversations[0]!.conversationId, title: "First", untitled: false },
-      { id: conversations[1]!.conversationId, title: "Second", untitled: false },
+      { id: conversations[0]!.agentId, title: "First", untitled: false },
+      { id: conversations[1]!.agentId, title: "Second", untitled: false },
     ]);
     expect(rendered).toEqual([]);
-    expect(await provider.render({ workspaceId: "workspace-1", conversationId: conversations[1]!.conversationId })).toBe("<article>Second</article>");
-    expect(rendered).toEqual([conversations[1]!.conversationId]);
-    expect(provider.render({ workspaceId: "workspace-1", conversationId: conversations[1]!.label })).rejects.toMatchObject({ code: "agent_conversation_not_found" });
+    expect(await provider.render({ workspaceId: "workspace-1", agentId: conversations[1]!.agentId })).toBe("<article>Second</article>");
+    expect(rendered).toEqual([conversations[1]!.agentId]);
+    expect(provider.render({ workspaceId: "workspace-1", agentId: conversations[1]!.label })).rejects.toMatchObject({ code: "agent_not_found" });
   });
 
   test("listing an unoccupied workspace does not create a native session", async () => {
     await dataDir();
     expect(await workspaceAgentTabProvider.list({ workspaceId: "workspace-1" })).toEqual([]);
-    expect(await listWorkspaceAgentConversations("workspace-1")).toEqual([]);
+    expect(await listWorkspaceAgents("workspace-1")).toEqual([]);
   });
 
   test("lists shell metadata without labels, paths, or bodies", async () => {
     await dataDir();
-    const first = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const second = await createNextWorkspaceAgentConversation("workspace-1");
+    const first = await ensureDefaultWorkspaceAgent("workspace-1");
+    const second = await createNextWorkspaceAgent("workspace-1");
 
     expect(await workspaceAgentTabProvider.list({ workspaceId: "workspace-1" })).toEqual([
-      { id: first.conversationId, title: "Untitled", untitled: true },
-      { id: second.conversationId, title: "Untitled", untitled: true },
+      { id: first.agentId, title: "Untitled", untitled: true },
+      { id: second.agentId, title: "Untitled", untitled: true },
     ]);
   });
 
   test("failed archival rolls back the close tombstone so the published conversation remains usable", async () => {
     const conversations = [
-      { workspaceId: "workspace-1", conversationId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
-      { workspaceId: "workspace-1", conversationId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
+      { workspaceId: "workspace-1", agentId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
+      { workspaceId: "workspace-1", agentId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
     ];
     const blocked = new Set<string>();
     const provider = createWorkspaceAgentTabProvider({
       list: async () => conversations,
       render: async (conversation) => {
-        if (blocked.has(conversation.conversationId)) throw new Error("conversation tombstoned");
+        if (blocked.has(conversation.agentId)) throw new Error("conversation tombstoned");
         return conversation.title;
       },
-      dispose: async (_workspaceId, conversationId) => { blocked.add(conversationId); },
-      restore: (_workspaceId, conversationId) => { blocked.delete(conversationId); },
+      dispose: async (_workspaceId, agentId) => { blocked.add(agentId); },
+      restore: (_workspaceId, agentId) => { blocked.delete(agentId); },
       archive: async () => { throw new Error("archive failed"); },
     });
 
-    await expect(provider.close({ workspaceId: "workspace-1", conversationId: conversations[0]!.conversationId })).rejects.toThrow("archive failed");
+    await expect(provider.close({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId })).rejects.toThrow("archive failed");
 
-    expect(await provider.render({ workspaceId: "workspace-1", conversationId: conversations[0]!.conversationId })).toBe("First");
+    expect(await provider.render({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId })).toBe("First");
   });
 
   test("close waits for runtime disposal before archiving the conversation", async () => {
     const conversations = [
-      { workspaceId: "workspace-1", conversationId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
-      { workspaceId: "workspace-1", conversationId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
+      { workspaceId: "workspace-1", agentId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
+      { workspaceId: "workspace-1", agentId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
     ];
     const disposal = deferred();
     const lifecycle: string[] = [];
@@ -158,7 +158,7 @@ describe("Workspace Agent-tab provider", () => {
       },
     });
 
-    const closing = provider.close({ workspaceId: "workspace-1", conversationId: conversations[0]!.conversationId });
+    const closing = provider.close({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId });
     await Bun.sleep(0);
     expect(lifecycle).toEqual(["dispose:start"]);
 
@@ -169,39 +169,39 @@ describe("Workspace Agent-tab provider", () => {
 
   test("can dispose all native sessions without imposing the shell last-tab policy", async () => {
     await dataDir();
-    const first = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const second = await createNextWorkspaceAgentConversation("workspace-1");
+    const first = await ensureDefaultWorkspaceAgent("workspace-1");
+    const second = await createNextWorkspaceAgent("workspace-1");
 
     const results = await Promise.allSettled([
-      workspaceAgentTabProvider.close({ workspaceId: "workspace-1", conversationId: first.conversationId }),
-      workspaceAgentTabProvider.close({ workspaceId: "workspace-1", conversationId: second.conversationId }),
+      workspaceAgentTabProvider.close({ workspaceId: "workspace-1", agentId: first.agentId }),
+      workspaceAgentTabProvider.close({ workspaceId: "workspace-1", agentId: second.agentId }),
     ]);
 
     expect(results[0]).toMatchObject({ status: "fulfilled" });
     expect(results[1]).toMatchObject({ status: "fulfilled" });
-    expect(await listWorkspaceAgentConversations("workspace-1")).toEqual([]);
+    expect(await listWorkspaceAgents("workspace-1")).toEqual([]);
   });
 
   test("Agent file completions reject a display label in place of the immutable conversation id", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
     const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${encodeURIComponent(conversation.label)}/completions?q=src`);
 
-    expect(handleAgentRequest(request, new URL(request.url))).rejects.toMatchObject({ code: "agent_conversation_not_found" });
+    expect(handleAgentRequest(request, new URL(request.url))).rejects.toMatchObject({ code: "agent_not_found" });
   });
 
   test("Agent prompt-template expansion resolves the immutable conversation id, not its label", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
     const request = (identity: string) => new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${encodeURIComponent(identity)}/completions/prompt-template-expand`, {
       method: "POST",
       body: new URLSearchParams({ text: "Keep this prompt" }),
     });
 
     const labelRequest = request(conversation.label);
-    expect(handleAgentRequest(labelRequest, new URL(labelRequest.url))).rejects.toMatchObject({ code: "agent_conversation_not_found" });
+    expect(handleAgentRequest(labelRequest, new URL(labelRequest.url))).rejects.toMatchObject({ code: "agent_not_found" });
 
-    const conversationRequest = request(conversation.conversationId);
+    const conversationRequest = request(conversation.agentId);
     const response = await handleAgentRequest(conversationRequest, new URL(conversationRequest.url));
     expect(response?.status).toBe(200);
     expect(response?.headers.get("content-type")).toContain("text/plain");
@@ -210,11 +210,11 @@ describe("Workspace Agent-tab provider", () => {
 
   test("rejects an empty Agent submission without accepting or clearing the composer", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "text/vnd.turbo-stream.html" },
-      body: new URLSearchParams({ text: "   ", attachmentDraft: agentAttachmentDraftId("workspace-1", conversation.conversationId) }),
+      body: new URLSearchParams({ text: "   ", attachmentDraft: agentAttachmentDraftId("workspace-1", conversation.agentId) }),
     });
 
     const response = await handleAgentRequest(request, new URL(request.url));
@@ -225,8 +225,8 @@ describe("Workspace Agent-tab provider", () => {
 
   test("requests parking the current Workspace when /park is submitted", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({ text: "/park" }),
@@ -238,13 +238,13 @@ describe("Workspace Agent-tab provider", () => {
     expect(response?.headers.get("location")).toBe("/workspaces/workspace-1/park");
   });
 
-  test("renames the current Agent conversation when /name has a title", async () => {
+  test("renames the current Agent when /name has a title", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
     const events = createAgentsInTheCloudEventBus();
     const renamed: string[] = [];
-    events.on("workspace_agent_conversation_title_changed", ({ title }) => { renamed.push(title); });
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    events.on("workspace_agent_title_changed", ({ title }) => { renamed.push(title); });
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({ text: "/name investigate-name-command" }),
@@ -253,17 +253,17 @@ describe("Workspace Agent-tab provider", () => {
     const response = await handleAgentRequest(request, new URL(request.url), { events });
 
     expect(response?.status).toBe(200);
-    expect(await response?.json()).toEqual({ agent: { conversationId: conversation.conversationId, state: "idle" } });
-    expect((await listWorkspaceAgentConversations("workspace-1"))[0]?.title).toBe("investigate-name-command");
+    expect(await response?.json()).toEqual({ agent: { agentId: conversation.agentId, state: "idle" } });
+    expect((await listWorkspaceAgents("workspace-1"))[0]?.title).toBe("investigate-name-command");
     expect(renamed).toEqual(["investigate-name-command"]);
   });
 
   test("accepts a message with the exact Agent draft and consumes the initial composer text", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const draftId = agentAttachmentDraftId("workspace-1", conversation.conversationId);
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
+    const draftId = agentAttachmentDraftId("workspace-1", conversation.agentId);
     const attachment = await stageAttachment(draftId, new File(["image"], "reference.png", { type: "image/png" }));
-    await stageInitialPrompt("workspace-1", conversation.conversationId, "Draft task");
+    await stageInitialPrompt("workspace-1", conversation.agentId, "Draft task");
     const submissions: Array<{ text: string; imageCount: number; requestId?: string }> = [];
     const runtime = {
       async submit(input: { text: string; images?: unknown[]; requestId?: string }): Promise<void> {
@@ -272,7 +272,7 @@ describe("Workspace Agent-tab provider", () => {
       userMessages: () => [],
       settings: async () => ({}),
     };
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "text/vnd.turbo-stream.html" },
       body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id, requestId: "image-request" }),
@@ -288,16 +288,16 @@ describe("Workspace Agent-tab provider", () => {
     expect(response?.headers.get("x-agents-in-the-cloud-attachment-draft-consumed")).toBe("true");
     expect(html).toBe("");
     expect(submissions).toEqual([{ text: "", imageCount: 1, requestId: "image-request" }]);
-    expect(await readInitialPromptDraft("workspace-1", conversation.conversationId)).toBeUndefined();
+    expect(await readInitialPromptDraft("workspace-1", conversation.agentId)).toBeUndefined();
     expect(await findStagedAttachment(draftId, attachment.id)).toBeUndefined();
   });
 
   test("failed prompt preflight retains the durable composer draft and staged attachments", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const draftId = agentAttachmentDraftId("workspace-1", conversation.conversationId);
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
+    const draftId = agentAttachmentDraftId("workspace-1", conversation.agentId);
     const attachment = await stageAttachment(draftId, new File(["image"], "reference.png", { type: "image/png" }));
-    await stageInitialPrompt("workspace-1", conversation.conversationId, "Draft task");
+    await stageInitialPrompt("workspace-1", conversation.agentId, "Draft task");
     let suggestedTitle = false;
     const runtime = {
       async submit(): Promise<void> {
@@ -306,7 +306,7 @@ describe("Workspace Agent-tab provider", () => {
       userMessages: () => [],
       settings: async () => ({}),
     };
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "text/vnd.turbo-stream.html" },
       body: new URLSearchParams({ text: "Keep this text", attachmentDraft: draftId, attachment: attachment.id }),
@@ -319,23 +319,23 @@ describe("Workspace Agent-tab provider", () => {
     })).rejects.toThrow("model authentication unavailable");
 
     expect(suggestedTitle).toBe(false);
-    expect(await readInitialPromptDraft("workspace-1", conversation.conversationId)).toEqual({ prompt: "Draft task" });
+    expect(await readInitialPromptDraft("workspace-1", conversation.agentId)).toEqual({ prompt: "Draft task" });
     expect(await findStagedAttachment(draftId, attachment.id)).toBeDefined();
   });
 
   test("rejects attachment drafts owned by another Agent or Workspace without consuming them", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
-    const sibling = await createNextWorkspaceAgentConversation("workspace-1");
-    const otherWorkspace = await ensureDefaultWorkspaceAgentConversation("workspace-2");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
+    const sibling = await createNextWorkspaceAgent("workspace-1");
+    const otherWorkspace = await ensureDefaultWorkspaceAgent("workspace-2");
     const foreignDrafts = [
-      agentAttachmentDraftId("workspace-1", sibling.conversationId),
-      agentAttachmentDraftId("workspace-2", otherWorkspace.conversationId),
+      agentAttachmentDraftId("workspace-1", sibling.agentId),
+      agentAttachmentDraftId("workspace-2", otherWorkspace.agentId),
     ];
 
     for (const [index, draftId] of foreignDrafts.entries()) {
       const attachment = await stageAttachment(draftId, new File([`image-${index}`], `foreign-${index}.png`, { type: "image/png" }));
-      const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+      const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
         method: "POST",
         headers: { accept: "text/vnd.turbo-stream.html" },
         body: new URLSearchParams({ attachmentDraft: draftId, attachment: attachment.id }),
@@ -351,7 +351,7 @@ describe("Workspace Agent-tab provider", () => {
 
   test("keeps JSON message submission compatible without an attachment list", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
     const submissions: string[] = [];
     const runtime = {
       async submit(input: { text: string }): Promise<void> {
@@ -360,7 +360,7 @@ describe("Workspace Agent-tab provider", () => {
       userMessages: () => [],
       settings: async () => ({}),
     };
-    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+    const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({ text: "Keep going" }),
@@ -373,12 +373,12 @@ describe("Workspace Agent-tab provider", () => {
     });
 
     expect(response?.status).toBe(202);
-    expect(await response?.json()).toEqual({ agent: { conversationId: conversation.conversationId, state: "running" } });
+    expect(await response?.json()).toEqual({ agent: { agentId: conversation.agentId, state: "running" } });
     expect(submissions).toEqual(["Keep going"]);
   });
   test("message request identities are forwarded unchanged and invalid identities reject before runtime admission", async () => {
     await dataDir();
-    const conversation = await ensureDefaultWorkspaceAgentConversation("workspace-1");
+    const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
     const admissions: string[] = [];
     const runtime = {
       async submit(input: { requestId: string }) { admissions.push(input.requestId); },
@@ -386,7 +386,7 @@ describe("Workspace Agent-tab provider", () => {
       settings: async () => ({}),
     };
     for (const requestId of ["browser_retry-123", "browser_retry-123", "", "has spaces", "x".repeat(129), 42]) {
-      const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.conversationId}/messages`, {
+      const request = new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${conversation.agentId}/messages`, {
         method: "POST", headers: { accept: "application/json", "content-type": "application/json" },
         body: JSON.stringify({ text: "Hello", requestId }),
       });

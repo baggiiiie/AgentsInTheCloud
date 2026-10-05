@@ -18,14 +18,13 @@ import {
   ProviderCatalogueRefreshError,
   createPiModelRuntime,
   disconnectModelProvider,
-  getConfiguredModels,
+  getEnabledModels,
   getCustomModelsJson,
-  hasAvailableConfiguredModel,
-  seedProviderFavoriteModels,
+  hasAvailableEnabledModel,
+  seedProviderEnabledModels,
   loginPiOAuthProvider,
   setCustomModelsJson,
-  setConfiguredModels,
-  type ConfiguredModel,
+  setEnabledModels,
   type PiAuthPrompt,
 } from "./pi-config-models.ts";
 import { domId, errorMessage, escapeHtml, providerBadgeHtml, providerBrandIconHtml } from "@agents-in-the-cloud/shared";
@@ -43,7 +42,7 @@ const ids = {
   panel: (host: ModelsHost) => domId("models_panel", host),
   connect: (host: ModelsHost) => domId("models_connect", host),
   otherProviders: (host: ModelsHost) => domId("models_other_providers", host),
-  favorites: (host: ModelsHost) => domId("models_favorites", host),
+  enabledModels: (host: ModelsHost) => domId("models_enabled_models", host),
   catalogue: (host: ModelsHost) => domId("models_catalogue", host),
   catalogueRow: (host: ModelsHost, model: ModelRef) => domId("models_catalogue_row", host, model.provider, model.id),
   continue: (host: ModelsHost) => domId("models_continue", host),
@@ -62,15 +61,15 @@ function providerChoices(runtime: Runtime): ProviderChoice[] {
   })));
 }
 
-type CatalogueEntry = ConfiguredModel & { providerLabel: string; added: boolean };
+type CatalogueEntry = ModelRef & { label: string; providerLabel: string; enabled: boolean };
 
 /** Every model the connected accounts offer, popular providers and models first. */
 async function catalogue(runtime: Runtime, accounts: Account[]): Promise<CatalogueEntry[]> {
-  const favorites = new Set((await getConfiguredModels()).map(modelKey));
+  const enabledModels = new Set((await getEnabledModels()).map(modelKey));
   const perProvider = await Promise.all(accounts.filter((account) => account.connection === "connected").map(async (account) => {
     const rank = (id: string) => getPopularModelRank(account.provider, id) ?? Number.MAX_SAFE_INTEGER;
     return (await availableProviderModels(runtime, account.provider))
-      .map((model): CatalogueEntry => ({ provider: account.provider, id: model.id, label: modelDisplayName(model.name ?? model.id), providerLabel: account.label, added: favorites.has(modelKey({ provider: account.provider, id: model.id })) }))
+      .map((model): CatalogueEntry => ({ provider: account.provider, id: model.id, label: modelDisplayName(model.name ?? model.id), providerLabel: account.label, enabled: enabledModels.has(modelKey({ provider: account.provider, id: model.id })) }))
       .sort((a, b) => rank(a.id) - rank(b.id) || a.label.localeCompare(b.label));
   }));
   return perProvider.flat();
@@ -132,7 +131,7 @@ function renderProviderChoice(provider: ProviderChoice, host: ModelsHost): strin
 function renderOtherProviders(providers: ProviderChoice[], host: ModelsHost, query = ""): string {
   const normalized = query.trim().toLowerCase();
   const matching = providers.filter((provider) => `${provider.label} ${provider.provider}`.toLowerCase().includes(normalized));
-  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other providers">${matching.map((provider) => renderProviderChoice(provider, host)).join("") || '<div class="managed-list__empty" role="status">No matching providers.</div>'}</div></turbo-frame>`;
+  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other model providers">${matching.map((provider) => renderProviderChoice(provider, host)).join("") || '<div class="managed-list__empty" role="status">No matching model providers.</div>'}</div></turbo-frame>`;
 }
 
 function connectFrame(host: ModelsHost, body: string): string {
@@ -158,7 +157,7 @@ function renderConnectChoices(host: ModelsHost, runtime: Runtime, accounts: Acco
   return connectFrame(host, `<div class="model-provider-groups">
     <p class="model-connect__hint">Bring your own subscription or API key.</p>
     <div class="model-popular-providers">${popular.map((provider) => renderProviderChoice(provider, host)).join("")}</div>
-    <details>${actionItemHtml({ kind: "single", element: { tag: "summary" }, label: { kind: "text", text: "Other providers" }, leadingHtml: Icons.Disclosure })}
+    <details>${actionItemHtml({ kind: "single", element: { tag: "summary" }, label: { kind: "text", text: "Other model providers" }, leadingHtml: Icons.Disclosure })}
       <div class="model-other-providers-body"><form method="get" action="/models/connect/providers" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.otherProviders(host)}">
         <input type="hidden" name="host" value="${host}"><input class="text-field" type="search" name="q" placeholder="Find a provider…" aria-label="Find a provider" autocomplete="off"><button type="submit" hidden>Search</button>
       </form>${renderOtherProviders(other, host)}</div>
@@ -166,32 +165,32 @@ function renderConnectChoices(host: ModelsHost, runtime: Runtime, accounts: Acco
   </div>${cancel}`);
 }
 
-async function renderFavorites(runtime: Runtime, host: ModelsHost): Promise<string> {
-  const favorites = await getConfiguredModels();
-  const availability = await providerAvailability(runtime, favorites.map((model) => model.provider));
+async function renderEnabledModelsList(runtime: Runtime, host: ModelsHost): Promise<string> {
+  const enabledModels = await getEnabledModels();
+  const availability = await providerAvailability(runtime, enabledModels.map((model) => model.provider));
   const labels = new Map(runtime.getProviders().map((provider) => [provider.id, providerLabel(provider)]));
-  const rows = favorites.map((model) => {
+  const rows = enabledModels.map((model) => {
     const reason = modelUnavailableReason(availability.get(model.provider)!, model, runtime);
     const providerName = labels.get(model.provider) ?? model.provider;
     return `<div class="managed-list__item">
       <span class="managed-list__visual" aria-hidden="true">${providerBrandIconHtml(model.provider, providerName)}</span>
       <div class="managed-list__content"><div class="managed-list__label"><span class="managed-list__label-text" title="${escapeHtml(model.id)}">${escapeHtml(model.label)}</span></div><div class="managed-list__description">${escapeHtml(reason ? `${providerName} · ${reason}` : providerName)}</div></div>
-      <div class="managed-list__actions"><form method="post" action="/models/your-models/remove?${hostQuery(host)}" data-turbo="true"><input type="hidden" name="model" value="${escapeHtml(modelKey(model))}">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: `Remove ${model.label}` } })}</form></div>
+      <div class="managed-list__actions"><form method="post" action="/models/enabled-models/disable?${hostQuery(host)}" data-turbo="true"><input type="hidden" name="model" value="${escapeHtml(modelKey(model))}">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: `Disable ${model.label}` } })}</form></div>
     </div>`;
   }).join("");
-  return `<div id="${ids.favorites(host)}" class="managed-list model-favorites"><div class="managed-list__items">${rows}</div>${rows ? "" : '<div class="managed-list__empty">Nothing here yet. Find a model below to add it.</div>'}</div>`;
+  return `<div id="${ids.enabledModels(host)}" class="managed-list enabled-models"><div class="managed-list__items">${rows}</div>${rows ? "" : '<div class="managed-list__empty">No enabled models yet. Find a model below to enable it.</div>'}</div>`;
 }
 
 function catalogueRow(model: CatalogueEntry, host: ModelsHost): string {
-  return `<form id="${ids.catalogueRow(host, model)}" method="post" action="/models/your-models/add?${hostQuery(host)}" data-turbo="true">
+  return `<form id="${ids.catalogueRow(host, model)}" method="post" action="/models/enabled-models/enable?${hostQuery(host)}" data-turbo="true">
     <input type="hidden" name="model" value="${escapeHtml(modelKey(model))}">
     ${actionItemHtml({
       kind: "single",
-      element: { tag: "button", attributesHtml: `type="submit"${model.added ? " disabled" : ""} title="${escapeHtml(model.id)}"` },
+      element: { tag: "button", attributesHtml: `type="submit"${model.enabled ? " disabled" : ""} title="${escapeHtml(model.id)}"` },
       label: { kind: "text", text: model.label },
       description: model.providerLabel,
       leadingHtml: providerBrandIconHtml(model.provider, model.providerLabel),
-      trailingHtml: model.added ? '<span class="usage-caption">Added</span>' : Icons.Plus,
+      trailingHtml: model.enabled ? '<span class="usage-caption">Enabled</span>' : Icons.Plus,
     })}
   </form>`;
 }
@@ -202,16 +201,16 @@ function renderCatalogue(entries: CatalogueEntry[], host: ModelsHost, query: str
   return `<turbo-frame class="model-provider-results" id="${ids.catalogue(host)}"><div class="model-provider-models" tabindex="0" role="region" aria-label="All models">${matching.map((model) => catalogueRow(model, host)).join("") || '<div class="managed-list__empty">No matching models.</div>'}</div></turbo-frame>`;
 }
 
-async function renderYourModels(runtime: Runtime, accounts: Account[], host: ModelsHost, focus: boolean): Promise<string> {
-  return `<section class="models-panel__section" aria-labelledby="${domId("models_your_models", host)}">
+async function renderEnabledModelsSection(runtime: Runtime, accounts: Account[], host: ModelsHost, focus: boolean): Promise<string> {
+  return `<section class="models-panel__section" aria-labelledby="${domId("models_enabled_models_section", host)}">
     <header class="models-panel__header">
-      <h3 class="models-panel__heading" id="${domId("models_your_models", host)}">Your models</h3>
-      <p class="models-panel__hint">These are the models you can pick in the composer.</p>
+      <h3 class="models-panel__heading" id="${domId("models_enabled_models_section", host)}">Enabled models</h3>
+      <p class="models-panel__hint">Choose which models appear in the composer.</p>
     </header>
-    ${await renderFavorites(runtime, host)}
+    ${await renderEnabledModelsList(runtime, host)}
     <div class="managed-list" data-managed-list-server-filter="true"><form class="managed-list__filter" method="get" action="/models/catalogue" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.catalogue(host)}">
       <input type="hidden" name="host" value="${host}">
-      <input class="text-field" type="search" name="q" placeholder="Find a model to add…" aria-label="Find a model to add" autocomplete="off"${focus ? " autofocus" : ""}><button type="submit" hidden>Search</button>
+      <input class="text-field" type="search" name="q" placeholder="Find a model to enable…" aria-label="Find a model to enable" autocomplete="off"${focus ? " autofocus" : ""}><button type="submit" hidden>Search</button>
     </form>${renderCatalogue(await catalogue(runtime, accounts), host, "")}</div>
   </section>`;
 }
@@ -281,13 +280,13 @@ async function renderModelsPanel(host: ModelsHost, options: PanelOptions = {}): 
   const accounts = await listAccounts(runtime);
   const connect = options.connectHtml ?? (accounts.length ? connectButton(host) : renderConnectChoices(host, runtime, accounts));
   const providers = `<section class="models-panel__section" aria-labelledby="${domId("models_providers", host)}">
-    <h3 class="models-panel__heading" id="${domId("models_providers", host)}">Providers</h3>
+    <h3 class="models-panel__heading" id="${domId("models_providers", host)}">Model providers</h3>
     ${accounts.length ? `<div class="model-accounts">${accounts.map((account) => renderAccountCard(account, host, options.focus === account.id)).join("")}</div>` : ""}
     ${connect}
   </section>`;
-  const models = accounts.length ? await renderYourModels(runtime, accounts, host, options.focus === "models") : "";
+  const models = accounts.length ? await renderEnabledModelsSection(runtime, accounts, host, options.focus === "models") : "";
   const advanced = host === "settings" ? renderCustomModelsSettings({ source: await getCustomModelsJson(), ...options.customModels }) : "";
-  const actions = host === "onboarding" ? onboardingActions(await hasAvailableConfiguredModel()) : "";
+  const actions = host === "onboarding" ? onboardingActions(await hasAvailableEnabledModel()) : "";
   const error = options.error ? `<p class="settings-error" role="alert">${escapeHtml(options.error)}</p>` : "";
   return `<div id="${ids.panel(host)}" class="models-panel">${error}${providers}${models}${advanced}${actions}</div>`;
 }
@@ -405,7 +404,7 @@ async function startOAuthFlow(provider: ProviderChoice, host: ModelsHost): Promi
     },
     prompt: (prompt) => handleOAuthPrompt(flow, prompt),
   }).then(async () => {
-    await seedProviderFavoriteModels(provider.provider);
+    await seedProviderEnabledModels(provider.provider);
     flow.status = "complete";
     flow.prompt = undefined;
   }).catch((error) => {
@@ -598,7 +597,7 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
     return response(renderCatalogue(await catalogue(runtime, await listAccounts(runtime)), host, url.searchParams.get("q") ?? ""));
   }
   if (url.pathname === "/models/finish" && request.method === "POST") {
-    if (!await hasAvailableConfiguredModel()) return response("Choose at least one available model", { status: 422 });
+    if (!await hasAvailableEnabledModel()) return response("Choose at least one available model", { status: 422 });
     return await finishOnboarding();
   }
   if (url.pathname === "/models/catalogue/refresh" && request.method === "POST") {
@@ -630,8 +629,8 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
       return stream(replace("custom_models_settings", renderCustomModelsSettings({ source, open: true, error: errorMessage(error) })));
     }
   }
-  if (["/models/your-models/add", "/models/your-models/remove"].includes(url.pathname) && request.method === "POST") {
-    return await handleYourModelsAction(request, url.pathname.endsWith("/add"), renderPickerUpdates);
+  if (["/models/enabled-models/enable", "/models/enabled-models/disable"].includes(url.pathname) && request.method === "POST") {
+    return await handleEnabledModelsAction(request, url.pathname.endsWith("/enable"), renderPickerUpdates);
   }
   let match = url.pathname.match(/^\/models\/providers\/([^/]+)\/connect$/);
   if (match && request.method === "POST") {
@@ -646,7 +645,7 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
     const form = await request.formData();
     try {
       await connectModelProviderApiKey(provider.provider, String(form.get("secret") ?? ""));
-      await seedProviderFavoriteModels(provider.provider);
+      await seedProviderEnabledModels(provider.provider);
     } catch (error) {
       if (error instanceof ProviderCatalogueRefreshError) return panelResponse(host, renderPickerUpdates, { focus: provider.provider, error: error.message });
       return stream(replace(ids.connect(host), renderApiKeyConnectionStep(provider, host, errorMessage(error))));
@@ -687,26 +686,26 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
   return undefined;
 }
 
-async function handleYourModelsAction(request: Request, add: boolean, renderPickerUpdates: () => Promise<string>): Promise<Response> {
+async function handleEnabledModelsAction(request: Request, enable: boolean, renderPickerUpdates: () => Promise<string>): Promise<Response> {
   const form = await request.formData();
   const model = parseModelRef(String(form.get("model") ?? ""));
   if (!model) return response("Invalid model", { status: 400 });
   const runtime = await createPiModelRuntime();
-  const current = await getConfiguredModels();
+  const current = await getEnabledModels();
   const index = current.findIndex((candidate) => modelKey(candidate) === modelKey(model));
   const accounts = (await listAccounts(runtime)).filter((account) => account.provider === model.provider);
   const entry = (await catalogue(runtime, accounts)).find((candidate) => modelKey(candidate) === modelKey(model));
-  if (add) {
+  if (enable) {
     if (!entry) return response("Model not offered by a connected provider", { status: 400 });
     if (index < 0) current.push({ provider: entry.provider, id: entry.id, label: entry.label });
   } else if (index >= 0) {
     current.splice(index, 1);
   }
-  await setConfiguredModels(current);
-  const ready = await hasAvailableConfiguredModel();
-  // Every host on the page shows the same favorites, so all of them follow along.
-  const updates = await Promise.all(modelsHosts.map(async (host) => replace(ids.favorites(host), await renderFavorites(runtime, host))
-    + (entry ? replace(ids.catalogueRow(host, entry), catalogueRow({ ...entry, added: add }, host)) : "")
+  await setEnabledModels(current);
+  const ready = await hasAvailableEnabledModel();
+  // Every host on the page shows the same enabled models, so all of them follow along.
+  const updates = await Promise.all(modelsHosts.map(async (host) => replace(ids.enabledModels(host), await renderEnabledModelsList(runtime, host))
+    + (entry ? replace(ids.catalogueRow(host, entry), catalogueRow({ ...entry, enabled: enable }, host)) : "")
     + (host === "onboarding" ? replace(ids.continue(host), continueButton(host, ready)) : "")));
   return stream(updates.join("") + await renderPickerUpdates());
 }

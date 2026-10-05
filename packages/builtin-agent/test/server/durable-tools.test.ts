@@ -40,7 +40,7 @@ async function runTool(tool: WorkspaceTool<any, any>, args: Record<string, JsonV
   registry.install(defineExtension({ name: "workspace-tools", tools: [durableWorkspaceTool(tool)] }));
   const workspace = await openDurableWorkspace(path, "test-workspace", { models, registry });
   workspaces.push(workspace);
-  const conversation = await workspace.conversation({ conversationId: "tab", label: "Agent 1", title: "Tools" }, {
+  const conversation = await workspace.agent({ agentId: "tab", label: "Agent 1", title: "Tools" }, {
     model: { provider: "faux", modelId: "faux-1" },
   });
   const submission = await conversation.submit({ type: "input", content: "Use the tool", requestId: "request" }, context);
@@ -52,7 +52,7 @@ async function runTool(tool: WorkspaceTool<any, any>, args: Record<string, JsonV
   await workspace.close();
   const reopened = await openDurableWorkspace(path, "test-workspace", { models, registry });
   workspaces.push(reopened);
-  const restored = await reopened.conversation({ conversationId: "tab", label: "Agent 1", title: "Tools" });
+  const restored = await reopened.agent({ agentId: "tab", label: "Agent 1", title: "Tools" });
   expect((await restored.entries({}, 100, undefined, context)).items).toEqual(entries);
   await reopened.close();
   return { result: result!, journal: await readFile(join(path, "main.jsonl"), "utf8") };

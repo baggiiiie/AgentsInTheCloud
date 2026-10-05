@@ -1,3 +1,5 @@
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import { mkdir } from "node:fs/promises";
 import { lock } from "proper-lockfile";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
@@ -12,8 +14,8 @@ import {
 import { markGatedDurableWork, WorkspaceAdmission } from "./durable-lifecycle.ts";
 import { openNodeJsonlStorage } from "@earendil-works/pi-durable/storage/jsonl/node";
 
-export type DurableConversationRecord = {
-  conversationId: string;
+export type DurableAgentRecord = {
+  agentId: string;
   durableId: ConversationId;
   label: string;
   title: string;
@@ -26,15 +28,32 @@ export type DurableConversationRecord = {
   branches?: ConversationId[];
 };
 
+const previousWorkspaceAgentsSchema = Type.Object({
+  workspaceId: Type.String(),
+  conversations: Type.Array(Type.Object({
+    conversationId: Type.String(), durableId: Type.Number(), label: Type.String(), title: Type.String(),
+    readOnly: Type.Optional(Type.Boolean()), parentId: Type.Optional(Type.String()), rootId: Type.Optional(Type.String()),
+    taskName: Type.Optional(Type.String()), branches: Type.Optional(Type.Array(Type.Number())),
+  })),
+});
+
+type WorkspaceAgentCatalog = { workspaceId: string; agents: DurableAgentRecord[] };
+
 /** Application identity is independent of Durable's storage-local numeric IDs. */
-export const WorkspaceConversations = defineDoc<{
-  workspaceId: string;
-  conversations: DurableConversationRecord[];
-}>({
+export const WorkspaceAgents = defineDoc<WorkspaceAgentCatalog>({
   kind: "agents-in-the-cloud.workspace",
-  version: 1,
+  version: 2,
   scope: "session",
-  initial: () => ({ workspaceId: "", conversations: [] }),
+  initial: () => ({ workspaceId: "", agents: [] }),
+  migrate(value, fromVersion) {
+    if (fromVersion !== 1) throw new Error(`Unsupported workspace catalog version: ${fromVersion}`);
+    Value.Assert(previousWorkspaceAgentsSchema, value);
+    // SAFETY: The previous catalog is validated above; its storage-local numeric IDs retain their native brands.
+    return {
+      workspaceId: value.workspaceId,
+      agents: value.conversations.map(({ conversationId, ...record }) => ({ ...record, agentId: conversationId })),
+    } as WorkspaceAgentCatalog;
+  },
 });
 
 /**
@@ -65,7 +84,7 @@ export async function openDurableWorkspace(directory: string, workspaceId: strin
     }
     try {
       await harness.commit(async (tx) => {
-        const workspace = await tx.doc(WorkspaceConversations);
+        const workspace = await tx.doc(WorkspaceAgents);
         if (workspace.workspaceId && workspace.workspaceId !== workspaceId) {
           throw new Error(`Journal belongs to workspace ${workspace.workspaceId}, not ${workspaceId}`);
         }
@@ -80,15 +99,15 @@ export async function openDurableWorkspace(directory: string, workspaceId: strin
     return {
       harness,
       /** Idempotent creation: catalog, conversation, and initial settings commit together. */
-      async conversation(record: Omit<DurableConversationRecord, "durableId">, agent: AgentChange = {}) {
+      async agent(record: Omit<DurableAgentRecord, "durableId">, agent: AgentChange = {}) {
         const id = await harness.commit(async (tx) => {
-          const workspace = await tx.doc(WorkspaceConversations);
-          const existing = workspace.conversations.find((item) => item.conversationId === record.conversationId);
+          const workspace = await tx.doc(WorkspaceAgents);
+          const existing = workspace.agents.find((item) => item.agentId === record.agentId);
           if (existing) return existing.durableId;
           if ((await tx.doc(WorkspaceAdmission)).deleted) throw new Error("Durable workspace is deleted");
           const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
           await configure(tx, created.id, agent);
-          workspace.conversations.push({ ...record, durableId: created.id });
+          workspace.agents.push({ ...record, durableId: created.id });
           return created.id;
         }, BACKGROUND_CONTEXT);
         return (await harness.conversation(id, BACKGROUND_CONTEXT))!;

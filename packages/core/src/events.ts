@@ -1,6 +1,6 @@
 export interface AgentSystemPromptPrepareEvent {
   workspaceId: string;
-  conversationId: string;
+  agentId: string;
   lines: string[];
 }
 

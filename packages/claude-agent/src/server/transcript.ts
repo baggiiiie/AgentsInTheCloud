@@ -54,7 +54,7 @@ function resultText(value: ClaudeBlock["content"]): string {
 export function claudeTranscriptRecords(jsonl: string): TranscriptRecord[] {
   const rows = Array.from(nativeJsonlRows(jsonl, rowSchema));
   // Claude can rewind and fork. Display the ancestry of the last mainline message,
-  // not abandoned alternatives or independent subagent conversations.
+  // not abandoned alternatives or independent subagents.
   const byId = new Map(rows.flatMap((row) => row.uuid ? [[row.uuid, row] as const] : []));
   const leaf = rows.findLast((row) => (row.type === "user" || row.type === "assistant") && row.isSidechain !== true && row.uuid);
   const lineage = new Set<string>();

@@ -3,7 +3,7 @@ import { errorMessage } from "@agents-in-the-cloud/shared";
 import { getWorkspaceTitle, listWorkspaces, setWorkspaceTitle } from "@agents-in-the-cloud/workspace";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
 import { cheapestAvailableProviderModel, claudeCodeHeaders, createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/server";
-import { listWorkspaceAgentConversations, setWorkspaceAgentConversationTitle, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
+import { listWorkspaceAgents, setWorkspaceAgentTitle, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
 
 /**
  * A slug needs no reasoning, and asking for one shrinks the answer room a thinking
@@ -26,7 +26,7 @@ export function createAutomaticWorkspaceNamingGate() {
 }
 
 const automaticallyNameWorkspace = createAutomaticWorkspaceNamingGate();
-const automaticallyNameConversation = createAutomaticWorkspaceNamingGate();
+const automaticallyNameAgent = createAutomaticWorkspaceNamingGate();
 const serializeTitleOperation = createKeyedOperationQueue();
 
 async function workspaceShouldFollowAgentTitle(workspaceId: string, agentTitle: string): Promise<boolean> {
@@ -35,34 +35,34 @@ async function workspaceShouldFollowAgentTitle(workspaceId: string, agentTitle: 
   return workspace?.title === null || workspace?.title === agentTitle;
 }
 
-interface AgentSessionTitleStore {
-  listConversations(workspaceId: string): Promise<WorkspaceAgentConversationInfo[]>;
-  setConversationTitle(agent: WorkspaceAgentConversationInfo, title: string): Promise<WorkspaceAgentConversationInfo>;
+interface AgentTitleStore {
+  listAgents(workspaceId: string): Promise<WorkspaceAgentInfo[]>;
+  setAgentTitle(agent: WorkspaceAgentInfo, title: string): Promise<WorkspaceAgentInfo>;
   workspaceShouldFollowAgentTitle(workspaceId: string, agentTitle: string): Promise<boolean>;
   setWorkspaceTitle(workspaceId: string, title: string): Promise<void>;
 }
 
-export function createAgentSessionTitleSetter(store: AgentSessionTitleStore) {
-  return async (agent: WorkspaceAgentConversationInfo, title: string, options: { events?: AgentsInTheCloudEventBus; onlyIfUnnamed?: boolean } = {}): Promise<WorkspaceAgentConversationInfo> => {
+export function createAgentTitleSetter(store: AgentTitleStore) {
+  return async (agent: WorkspaceAgentInfo, title: string, options: { events?: AgentsInTheCloudEventBus; onlyIfUnnamed?: boolean } = {}): Promise<WorkspaceAgentInfo> => {
     const result = await serializeTitleOperation(agent.workspaceId, async () => {
-      const current = (await store.listConversations(agent.workspaceId)).find((candidate) => candidate.conversationId === agent.conversationId);
-      if (!current) throw new Error(`Agent conversation not found: ${agent.conversationId}`);
-      if (options.onlyIfUnnamed && current.title !== untitledAgentConversationTitle) return { agent: current, workspaceNamed: false, unchanged: true };
-      const renamed = await store.setConversationTitle(current, title);
+      const current = (await store.listAgents(agent.workspaceId)).find((candidate) => candidate.agentId === agent.agentId);
+      if (!current) throw new Error(`Agent not found: ${agent.agentId}`);
+      if (options.onlyIfUnnamed && current.title !== untitledAgentTitle) return { agent: current, workspaceNamed: false, unchanged: true };
+      const renamed = await store.setAgentTitle(current, title);
       const workspaceShouldFollow = await store.workspaceShouldFollowAgentTitle(agent.workspaceId, current.title);
       if (workspaceShouldFollow) await store.setWorkspaceTitle(agent.workspaceId, title);
       return { agent: renamed, workspaceNamed: workspaceShouldFollow };
     });
     if (result.unchanged) return result.agent;
-    await options.events?.emit("workspace_agent_conversation_title_changed", { workspaceId: agent.workspaceId, conversationId: agent.conversationId, title });
+    await options.events?.emit("workspace_agent_title_changed", { workspaceId: agent.workspaceId, agentId: agent.agentId, title });
     if (result.workspaceNamed) await options.events?.emit("workspace_title_changed", { workspaceId: agent.workspaceId, title });
     return result.agent;
   };
 }
 
-export const setAgentSessionTitle = createAgentSessionTitleSetter({
-  listConversations: listWorkspaceAgentConversations,
-  setConversationTitle: setWorkspaceAgentConversationTitle,
+export const setAgentTitle = createAgentTitleSetter({
+  listAgents: listWorkspaceAgents,
+  setAgentTitle: setWorkspaceAgentTitle,
   workspaceShouldFollowAgentTitle,
   setWorkspaceTitle: async (workspaceId, title) => { await setWorkspaceTitle(workspaceId, title); },
 });
@@ -74,11 +74,11 @@ interface AgentTitleSuggestionErrorDetails {
   error?: unknown;
 }
 
-function logAgentTitleSuggestionError(agent: { workspaceId: string; conversationId?: string }, model: ModelRef | undefined, message: string, details: AgentTitleSuggestionErrorDetails = {}): void {
-  console.error("could not suggest Agent session title", { workspaceId: agent.workspaceId, conversationId: agent.conversationId, model: model ? `${model.provider}/${model.id}` : undefined, message, ...details });
+function logAgentTitleSuggestionError(agent: { workspaceId: string; agentId?: string }, model: ModelRef | undefined, message: string, details: AgentTitleSuggestionErrorDetails = {}): void {
+  console.error("could not suggest Agent title", { workspaceId: agent.workspaceId, agentId: agent.agentId, model: model ? `${model.provider}/${model.id}` : undefined, message, ...details });
 }
 
-function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string }, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef }): void {
+function suggestAgentTitle(agent: { workspaceId: string; agentId?: string }, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef }): void {
   const promptText = userMessages.map((message) => message.trim()).filter(Boolean).join("\n\n");
   if (!promptText) return;
 
@@ -86,12 +86,12 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
     let titleModelRef = options.agentModel;
     try {
       // The persisted title also suppresses automatic naming after a server restart.
-      if (agent.conversationId) {
-        const conversation = (await listWorkspaceAgentConversations(agent.workspaceId)).find((candidate) => candidate.conversationId === agent.conversationId);
-        if (!conversation) throw new Error(`Agent conversation not found: ${agent.conversationId}`);
-        if (conversation.title !== untitledAgentConversationTitle) return true;
+      if (agent.agentId) {
+        const currentAgent = (await listWorkspaceAgents(agent.workspaceId)).find((candidate) => candidate.agentId === agent.agentId);
+        if (!currentAgent) throw new Error(`Agent not found: ${agent.agentId}`);
+        if (currentAgent.title !== untitledAgentTitle) return true;
       } else if (await getWorkspaceTitle(agent.workspaceId) !== null) return true;
-      if (!titleModelRef && !agent.conversationId) titleModelRef = await resolveNewWorkspaceAgentModel();
+      if (!titleModelRef && !agent.agentId) titleModelRef = await resolveNewWorkspaceAgentModel();
       if (!titleModelRef) {
         logAgentTitleSuggestionError(agent, undefined, "agent model is not selected");
         return false;
@@ -121,26 +121,26 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
       const title = normalizeSlug(responseText);
       if (!title) {
         if (responseText.toLowerCase() !== "error") {
-          logAgentTitleSuggestionError(agent, titleModelRef, "model returned an unusable Agent session title", { responseText, stopReason: response.stopReason });
+          logAgentTitleSuggestionError(agent, titleModelRef, "model returned an unusable Agent title", { responseText, stopReason: response.stopReason });
         }
         return false;
       }
-      if (!agent.conversationId) {
+      if (!agent.agentId) {
         await serializeTitleOperation(agent.workspaceId, async () => {
           // Recheck after the LLM returns: a manual title always wins.
           if (await getWorkspaceTitle(agent.workspaceId) !== null) return;
           await setWorkspaceTitle(agent.workspaceId, title);
           await options.events?.emit("workspace_title_changed", { workspaceId: agent.workspaceId, title });
-          const conversations = await listWorkspaceAgentConversations(agent.workspaceId);
-          const conversation = conversations[0];
-          if (conversation?.title === untitledAgentConversationTitle) {
-            await setWorkspaceAgentConversationTitle(conversation, title);
-            await options.events?.emit("workspace_agent_conversation_title_changed", { workspaceId: agent.workspaceId, conversationId: conversation.conversationId, title });
+          const agents = await listWorkspaceAgents(agent.workspaceId);
+          const firstAgent = agents[0];
+          if (firstAgent?.title === untitledAgentTitle) {
+            await setWorkspaceAgentTitle(firstAgent, title);
+            await options.events?.emit("workspace_agent_title_changed", { workspaceId: agent.workspaceId, agentId: firstAgent.agentId, title });
           }
         });
       } else {
-        const conversation = (await listWorkspaceAgentConversations(agent.workspaceId)).find((candidate) => candidate.conversationId === agent.conversationId)!;
-        await setAgentSessionTitle(conversation, title, { events: options.events, onlyIfUnnamed: true });
+        const currentAgent = (await listWorkspaceAgents(agent.workspaceId)).find((candidate) => candidate.agentId === agent.agentId)!;
+        await setAgentTitle(currentAgent, title, { events: options.events, onlyIfUnnamed: true });
       }
       return true;
     } catch (error) {
@@ -148,14 +148,14 @@ function suggestAgentTitle(agent: { workspaceId: string; conversationId?: string
       return false;
     }
   };
-  if (agent.conversationId) {
-    void automaticallyNameConversation(`${agent.workspaceId}:${agent.conversationId}`, suggest);
+  if (agent.agentId) {
+    void automaticallyNameAgent(`${agent.workspaceId}:${agent.agentId}`, suggest);
   } else {
     void automaticallyNameWorkspace(agent.workspaceId, suggest);
   }
 }
 
-export function maybeNameAgentFromPrompt(agent: WorkspaceAgentConversationInfo, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef } = {}): void {
+export function maybeNameAgentFromPrompt(agent: WorkspaceAgentInfo, userMessages: string[], options: { events?: AgentsInTheCloudEventBus; agentModel?: ModelRef } = {}): void {
   suggestAgentTitle(agent, userMessages, options);
 }
 

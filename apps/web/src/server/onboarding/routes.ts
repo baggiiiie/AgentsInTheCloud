@@ -5,14 +5,14 @@ import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { agentsInTheCloudBrandIconHtml } from "@agents-in-the-cloud/design-system/icons";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { hasWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { hasAvailableConfiguredModel, renderModelsDialog } from "@agents-in-the-cloud/llm/server";
+import { hasAvailableEnabledModel, renderModelsDialog } from "@agents-in-the-cloud/llm/server";
 import { renderGitHubConnectButton, renderGitHubSetup } from "../settings/github.ts";
 import { update } from "@agents-in-the-cloud/shared/http";
 
 export async function renderOnboardingDialog(options: { includeCompleted?: boolean; resumeAfter?: "github" } = {}): Promise<string> {
   if (!options.includeCompleted && !options.resumeAfter && await onboardingCompleted()) return "";
   const githubConnected = hasWorkspaceGitHubToken();
-  const modelsReady = await hasAvailableConfiguredModel();
+  const modelsReady = await hasAvailableEnabledModel();
   if (options.resumeAfter) return renderModelsDialog({ host: "onboarding" });
   if (!options.includeCompleted && githubConnected) return modelsReady ? "" : renderModelsDialog({ host: "onboarding" });
 

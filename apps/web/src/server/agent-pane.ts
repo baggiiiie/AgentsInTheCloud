@@ -17,7 +17,7 @@ export interface AgentPaneContribution {
   attentionSequence?: number;
   untitled?: boolean;
   id: string;
-  providerId: string;
+  agentTypeId: string;
   iconHtml: string;
   title: string;
   close?: ViewCloseAction;
@@ -39,16 +39,16 @@ export function agentActionsDomId(workspaceId: string): string {
   return domId("fixed_workspace", workspaceId, "agent_actions");
 }
 
-export function agentTabDomId(workspaceId: string, conversationId: string): string {
-  return domId("fixed_workspace", workspaceId, "agent_tab", conversationId);
+export function agentTabDomId(workspaceId: string, agentId: string): string {
+  return domId("fixed_workspace", workspaceId, "agent_tab", agentId);
 }
 
-export function agentPaneSlotDomId(workspaceId: string, conversationId: string): string {
-  return domId("fixed_workspace", workspaceId, "agent_pane", conversationId);
+export function agentPaneSlotDomId(workspaceId: string, agentId: string): string {
+  return domId("fixed_workspace", workspaceId, "agent_pane", agentId);
 }
 
-export function agentContentId(workspaceId: string, conversationId: string): string {
-  return domId("agent_content", workspaceId, conversationId);
+export function agentContentId(workspaceId: string, agentId: string): string {
+  return domId("agent_content", workspaceId, agentId);
 }
 
 function mobileAgentAttentionHtml(agents: readonly AgentPaneContribution[]): string {
@@ -69,16 +69,16 @@ function renderAgentTab(workspaceId: string, agent: AgentPaneContribution): stri
       attributesHtml: `data-agent-attention-id="${escapeHtml(agent.id)}"${agent.attentionSequence === undefined ? "" : ` data-attention-sequence="${agent.attentionSequence}"`}`,
     },
     containerAttributesHtml: `id="${agentTabDomId(workspaceId, agent.id)}"`,
-    primary: { tag: "button", attributesHtml: `type="button" data-agent-conversation-id="${escapeHtml(agent.id)}" ${fullscreenViewAttributes(agent.id, agent.title)} data-action="click->workspace-presentation#selectAgent"` },
+    primary: { tag: "button", attributesHtml: `type="button" data-agent-id="${escapeHtml(agent.id)}" ${fullscreenViewAttributes(agent.id, agent.title)} data-action="click->workspace-presentation#selectAgent"` },
     closeHtml: agent.close ? selectorCloseForm(agent.close) : "",
   });
 }
 
-function providerOptions(presentation: WorkspacePresentation, menu: boolean): string {
-  return presentation.agentProviders.map((provider) => {
-    const action = `/workspaces/${encodeURIComponent(presentation.workspace.id)}/commands/agent.create.${encodeURIComponent(provider.id)}`;
+function agentTypeOptions(presentation: WorkspacePresentation, menu: boolean): string {
+  return presentation.agentTypes.map((agentType) => {
+    const action = `/workspaces/${encodeURIComponent(presentation.workspace.id)}/commands/agent.create.${encodeURIComponent(agentType.id)}`;
     const item = actionItemHtml({
-      kind: "single", label: { kind: "text", text: provider.label }, leadingHtml: provider.iconHtml,
+      kind: "single", label: { kind: "text", text: agentType.label }, leadingHtml: agentType.iconHtml,
       element: { tag: "button", attributesHtml: `type="submit"${menu ? ' role="menuitem"' : ""}` },
     });
     return `<form method="post" action="${action}" data-turbo="true">${item}</form>`;
@@ -86,25 +86,25 @@ function providerOptions(presentation: WorkspacePresentation, menu: boolean): st
 }
 
 export function renderAgentNavigation(presentation: WorkspacePresentation): string {
-  const conversations = presentation.agentConversations.length
+  const agents = presentation.agents.length
     ? tabStripHtml({
-      label: "Agent conversations",
+      label: "Agents",
       id: agentTabListDomId(presentation.workspace.id),
-      tabsHtml: presentation.agentConversations.map((agent) => renderAgentTab(presentation.workspace.id, { ...agent, title: presentation.agentConversations.length === 1 && agent.untitled ? presentation.workspace.title : agent.title })).join(""),
+      tabsHtml: presentation.agents.map((agent) => renderAgentTab(presentation.workspace.id, { ...agent, title: presentation.agents.length === 1 && agent.untitled ? presentation.workspace.title : agent.title })).join(""),
     })
     : `<div class="fixed-shell-workspace-title"><strong>${escapeHtml(presentation.workspace.title)}</strong></div>`;
   const menu = popupHtml({
-    id: domId("agent_providers", presentation.workspace.id), label: "New agent",
+    id: domId("agent_types", presentation.workspace.id), label: "New agent",
     trigger: { variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "New agent" } },
-    contentHtml: providerOptions(presentation, true),
+    contentHtml: agentTypeOptions(presentation, true),
   });
-  return `${conversations}${menu}`;
+  return `${agents}${menu}`;
 }
 
 function agentEmptyId(workspaceId: string): string { return domId("agent_empty", workspaceId); }
 
 function renderAgentEmpty(presentation: WorkspacePresentation): string {
-  return `<div id="${agentEmptyId(presentation.workspace.id)}" class="agent-empty-canvas"><div class="agent-empty-choices"><div class="action-list">${providerOptions(presentation, false)}</div></div></div>`;
+  return `<div id="${agentEmptyId(presentation.workspace.id)}" class="agent-empty-canvas"><div class="agent-empty-choices"><div class="action-list">${agentTypeOptions(presentation, false)}</div></div></div>`;
 }
 
 function renderAgentPaneSlot(workspaceId: string, agent: AgentPaneContribution, active: boolean): string {
@@ -126,7 +126,7 @@ function renderAgentActions(presentation: WorkspacePresentation): string {
 }
 
 export function renderAgentPane(presentation: WorkspacePresentation): string {
-  const panes = presentation.agentConversations.map((agent) => renderAgentPaneSlot(presentation.workspace.id, agent, agent.id === (presentation.initialSelection?.agent ?? presentation.agentConversations[0]?.id))).join("");
+  const panes = presentation.agents.map((agent) => renderAgentPaneSlot(presentation.workspace.id, agent, agent.id === (presentation.initialSelection?.agent ?? presentation.agents[0]?.id))).join("");
   return `<div class="fixed-shell-agent-pane"><div class="workspace-warning-stack" id="${domId("workspace_warnings", presentation.workspace.id)}">${presentation.warningsHtml ?? ""}</div>${panelHtml({
     element: { tag: "section",  attributesHtml: 'data-workspace-role-region="agent" data-workspace-presentation-target="agentPane" aria-label="Agent"' },
     headerHtml: `${barButton("Show Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-show-workspace-pane")}<div id="${agentNavigationDomId(presentation.workspace.id)}" class="fixed-shell-agent-navigation">${renderAgentNavigation(presentation)}</div><div id="${agentActionsDomId(presentation.workspace.id)}" class="fixed-shell-agent-actions">${renderAgentActions(presentation)}</div>`,
@@ -134,6 +134,6 @@ export function renderAgentPane(presentation: WorkspacePresentation): string {
   })}</div>`;
 }
 
-export function selectAgentTurboStream(workspaceId: string, conversationId: string): string {
-  return behaviorTurboStream("select-agent", workspaceId, { "conversation-id": conversationId });
+export function selectAgentTurboStream(workspaceId: string, agentId: string): string {
+  return behaviorTurboStream("select-agent", workspaceId, { "agent-id": agentId });
 }

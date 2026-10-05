@@ -27,18 +27,18 @@ export interface WorkspaceTitleChangedEvent {
 
 export interface WorkspaceAgentTurnFinishedEvent {
   workspaceId: string;
-  conversationId: string;
+  agentId: string;
 }
 
-export interface WorkspaceAgentConversationTitleChangedEvent {
+export interface WorkspaceAgentTitleChangedEvent {
   workspaceId: string;
-  conversationId: string;
+  agentId: string;
   title: string;
 }
 
 export interface WorkspaceAgentViewInvalidatedEvent {
   workspaceId: string;
-  conversationId: string;
+  agentId: string;
 }
 
 export interface WorkspaceAgentPromptPreparingEvent {
@@ -71,7 +71,7 @@ export interface WorkspaceImageConfigureEvent {
 
 declare module "@agents-in-the-cloud/core" {
   interface AgentsInTheCloudEventMap {
-    agent_provider_default_changed: { providerId: string };
+    agent_type_default_changed: { agentTypeId: string };
     workspace_image_configure: WorkspaceImageConfigureEvent;
     workspace_source_prepare: WorkspaceSourcePrepareEvent;
     workspace_plan_prepare: WorkspacePlanPrepareEvent;
@@ -84,7 +84,7 @@ declare module "@agents-in-the-cloud/core" {
     workspace_user_activity: WorkspaceUserActivityEvent;
     workspace_title_changed: WorkspaceTitleChangedEvent;
     workspace_agent_turn_finished: WorkspaceAgentTurnFinishedEvent;
-    workspace_agent_conversation_title_changed: WorkspaceAgentConversationTitleChangedEvent;
+    workspace_agent_title_changed: WorkspaceAgentTitleChangedEvent;
     workspace_agent_view_invalidated: WorkspaceAgentViewInvalidatedEvent;
     workspace_agent_prompt_preparing: WorkspaceAgentPromptPreparingEvent;
     workspace_agent_prompt_submitted: WorkspaceAgentPromptSubmittedEvent;

@@ -23,7 +23,7 @@ AgentsInTheCloud uses the **MultiAgentV2** surface with optional role/model over
 | `wait_agent` | Optional `timeout_ms` | `{ message, timed_out }`, **without duplicating message contents** |
 | `interrupt_agent` | `target` | `{ previous_status }` |
 
-Descriptions are copied from the pinned `multi_agents_spec.rs`. Input property descriptions and provider-facing output schemas use the same contract. Encryption annotations are deliberately omitted: all agent-to-agent payloads remain plaintext. The earlier mixed-in v1 `close_agent` and `resume_agent` are no longer exposed to the model; internal close remains available for conversation/workspace disposal.
+Descriptions are copied from the pinned `multi_agents_spec.rs`. Input property descriptions and provider-facing output schemas use the same contract. Encryption annotations are deliberately omitted: all agent-to-agent payloads remain plaintext. The earlier mixed-in v1 `close_agent` and `resume_agent` are no longer exposed to the model; internal close remains available for Agent/Workspace disposal.
 
 Canonical names are `/root`, `/root/review`, `/root/review/check`, etc. Relative references resolve beneath the caller. The same leaf name can exist under different parents. IDs remain internal correlation data rather than part of the message text. A non-root agent can receive follow-up tasks or interruption from another agent in the same tree. Other root trees/workspaces remain isolated.
 
@@ -62,7 +62,7 @@ On Codex Responses, this is not a `user` message with a decorative prefix. Per-c
 
 ## Presentation is separate from model delivery
 
-Open **Subagents** from the Work-view launcher. It follows the selected root Agent tab. There is no root selector, repeated header, or separate communication dashboard. Children form a divider-free action-item list with normal body typography, canonical paths and lifecycle state; each opens its native AgentsInTheCloud transcript. Nested children appear beneath their parent. Multiple transcripts can stay open, with browser-local expansion state retained per root.
+Open **Subagents** from the Work-view launcher. It follows the selected root Agent. There is no root selector, repeated header, or separate communication dashboard. Children form a divider-free action-item list with normal body typography, canonical paths and lifecycle state; each opens its native AgentsInTheCloud transcript. Nested children appear beneath their parent. Multiple transcripts can stay open, with browser-local expansion state retained per root.
 
 Incoming messages appear in the recipient transcript from the durable routing ledger, immediately after receipt is persisted—not only when Pi incorporates them into model context. They are foldable action-items with a green incoming-message dot and labels such as “Incoming message from: /root/review type: update”. Message, completion and task traffic display as update, completed and task. Expanding the row reveals the body and delivery state, without transport IDs. A subtle **Pending context** label distinguishes queued traffic; failure remains visible. Updating delivery changes the same identified entry, rather than inserting a second copy. Arrival order is a presentation timeline; it is not a claim about provider message ordering or that a model read/acted on a message.
 
@@ -79,7 +79,7 @@ session-shares/<share-key>/subagents/<workspace-id>/<agent-id>.jsonl # native Pi
 
 Ledger writes are serialized and atomically renamed. Task/message IDs connect the sender's tool call, routing event, recipient context and visualization. They remain accessible in the JSON representation for debugging. No application-layer encryption is used; ordinary provider transport security remains unchanged. Do not send secrets in inter-agent messages.
 
-Closing a root conversation stops its descendants. Interrupting a child stops that child's current turn, clears pending input, and retains its transcript and availability. Unacknowledged discarded messages become failed rather than lingering as supposedly deliverable. Workspace removal shuts down coordination and disposes all sessions.
+Closing a root Agent stops its descendants. Interrupting a child stops that child's current turn, clears pending input, and retains its transcript and availability. Unacknowledged discarded messages become failed rather than lingering as supposedly deliverable. Workspace removal shuts down coordination and disposes all sessions.
 
 After a server restart, previously running/starting children become interrupted. Unacknowledged traffic becomes failed with an explicit explanation; tasks are not silently replayed. Inspect the retained transcript before resending.
 
@@ -88,8 +88,8 @@ After a server restart, previously running/starting children become interrupted.
 Follow [automation.md](automation.md) and discover the running instance's `/openapi.json`.
 
 - `subagents.open` opens `{ "type": "subagents" }`.
-- `GET /workspaces/:id/subagents?agent=:conversationId` with `Accept: application/json` inspects the tree and ledger.
-- A browser workspace URL can select the root and view with `?agent=:conversationId&workView=subagents:workspace`.
+- `GET /workspaces/:id/subagents?agent=:agentId` with `Accept: application/json` inspects the tree and ledger.
+- A browser workspace URL can select the root and view with `?agent=:agentId&workView=subagents:workspace`.
 - `subagent=:childId&message=:messageId` additionally reveals a correlated message after the view is open.
 
 Non-UI tests cover native request serialization, envelopes, tool schemas, output schemas, plaintext-only behavior, provider user-message mapping, paths, history forks, wait/steer/abort, lifecycle, routing isolation and persistence. No UI tests are added. The running instance has been exercised with real model calls using native `agent_message`, both fresh and inherited child contexts, progress messages, final results, follow-up tasks and `list_agents`.

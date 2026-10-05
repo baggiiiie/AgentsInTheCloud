@@ -23,7 +23,7 @@ async function scenario(script: string): Promise<void> {
       const slugRequests = [];
       let suggestedSlug;
       let slugDelay;
-      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agentServer, suggestSessionSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
+      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agentServer, suggestAgentSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",
@@ -39,14 +39,14 @@ async function scenario(script: string): Promise<void> {
       const module = createCliAgentModule(adapter);
       const titleEvents = [];
       module.initialize({ events: { on() {}, emit: async (name, payload) => { titleEvents.push({ name, payload }); } }, registerSocketHandler() {} });
-      const provider = module.agentProvider;
-      const saved = (workspaceId, providerId = "example") => Bun.file(process.env.ATELIER_DATA_DIR + "/workspaces/" + workspaceId + "/metadata/" + providerId + "-agents.json").json();
-      const list = (workspaceId) => provider.tabs.list({ workspaceId });
+      const agentType = module.agentType;
+      const saved = (workspaceId, agentTypeId = "example") => Bun.file(process.env.ATELIER_DATA_DIR + "/workspaces/" + workspaceId + "/metadata/" + agentTypeId + "-agents.json").json();
+      const list = (workspaceId) => agentType.tabs.list({ workspaceId });
       // Creates a session in a fresh workspace and reports its turn boundaries the way its CLI does.
       async function turnSignals(workspaceId) {
         const { configureAgentMcp, handleAgentMcpRequest } = await import("@agents-in-the-cloud/agent/server");
         configureAgentMcp({ on() {}, emit: async () => {} });
-        const id = await provider.create({ workspaceId });
+        const id = await agentType.create({ workspaceId });
         const token = calls.findLast((call) => call[2]?.stdin?.includes("Authorization: Bearer"))[2].stdin.match(/Authorization: Bearer ([\\w.-]+)/)[1];
         return { id, signal: (boundary) => handleAgentMcpRequest(new Request("http://localhost/agent-turn-" + boundary, { method: "POST", headers: { authorization: "Bearer " + token } }), workspaceId) };
       }
@@ -59,8 +59,8 @@ async function scenario(script: string): Promise<void> {
 
 test("creation materializes images and passes input and settings to the adapter once", () => scenario(`
   const input = { text: "Inspect this image", images: [{ mimeType: "image/png", data: "aW1hZ2U=" }], attachmentNotes: ["File: /work/notes.txt"] };
-  const settings = { input, model: "any-provider::model", thinkingLevel: "custom", serviceTier: "fast" };
-  await provider.launch.prepareWorkspace("initial", { agent: settings });
+  const settings = { input, model: "any-provider::model", thinkingLevel: "custom" };
+  await agentType.launch.prepareWorkspace("initial", { agent: settings });
   const [tab] = await list("initial");
   expect(calls).toHaveLength(4);
   const image = "/tmp/agents-in-the-cloud-attachments/example-" + tab.id + "/0.png";
@@ -69,7 +69,7 @@ test("creation materializes images and passes input and settings to the adapter 
   expect(calls[3][1]).toContain("tmux -N new-session");
   expect(launches).toEqual([{ input, images: [image], settings }]);
   expect(preparations).toEqual(["initial"]);
-  const [session] = (await saved("initial")).sessions;
+  const [session] = (await saved("initial")).agents;
   expect(session).toMatchObject({ id: tab.id, title: "Example CLI", input, kind: "example", model: settings.model, thinkingLevel: "custom", tmuxSession: "example-" + tab.id });
   await list("initial");
   expect(calls).toHaveLength(4);
@@ -78,17 +78,17 @@ test("creation materializes images and passes input and settings to the adapter 
 test("a launch prompt names the tab with a suggested slug", () => scenario(`
   suggestedSlug = "inspect-attached-image";
   const input = { text: "Inspect this image", images: [], attachmentNotes: [] };
-  await provider.launch.prepareWorkspace("named", { agent: { input, model: "any-provider::model" } });
+  await agentType.launch.prepareWorkspace("named", { agent: { input, model: "any-provider::model" } });
   const [tab] = await list("named");
   while (!titleEvents.length) await Bun.sleep(1);
   expect(slugRequests).toEqual([[input.text, { provider: "any-provider", id: "model" }]]);
   expect(await list("named")).toEqual([{ id: tab.id, title: suggestedSlug }]);
-  expect((await saved("named")).sessions[0].historySlug).toBe(suggestedSlug);
-  expect(titleEvents).toEqual([{ name: "workspace_agent_conversation_title_changed", payload: { workspaceId: "named", conversationId: tab.id, title: suggestedSlug } }]);
+  expect((await saved("named")).agents[0].historySlug).toBe(suggestedSlug);
+  expect(titleEvents).toEqual([{ name: "workspace_agent_title_changed", payload: { workspaceId: "named", agentId: tab.id, title: suggestedSlug } }]);
 `));
 
 test("CLI composer /name renames the tab without sending text to the terminal", () => scenario(`
-  const id = await provider.create({ workspaceId: "rename" });
+  const id = await agentType.create({ workspaceId: "rename" });
   const route = module.routes[0].handle;
   const url = new URL("http://localhost/workspaces/rename/example-agents/" + id + "/composer");
   const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
@@ -96,9 +96,9 @@ test("CLI composer /name renames the tab without sending text to the terminal", 
   const explicit = await route(form("/name manual-title"), url);
   expect(explicit.status).toBe(204);
   expect(await list("rename")).toEqual([{ id, title: "manual-title" }]);
-  expect((await saved("rename")).sessions[0].historySlug).toBe("manual-title");
-  expect((await saved("rename")).sessions[0].input.text).toBe("");
-  expect(titleEvents).toEqual([{ name: "workspace_agent_conversation_title_changed", payload: { workspaceId: "rename", conversationId: id, title: "manual-title" } }]);
+  expect((await saved("rename")).agents[0].historySlug).toBe("manual-title");
+  expect((await saved("rename")).agents[0].input.text).toBe("");
+  expect(titleEvents).toEqual([{ name: "workspace_agent_title_changed", payload: { workspaceId: "rename", agentId: id, title: "manual-title" } }]);
   expect((await route(form("/name"), url)).status).toBe(422);
   expect(await list("rename")).toEqual([{ id, title: "manual-title" }]);
 `));
@@ -106,7 +106,7 @@ test("CLI composer /name renames the tab without sending text to the terminal", 
 test("a late automatic title cannot replace a manual CLI /name", () => scenario(`
   suggestedSlug = "automatic-title";
   slugDelay = Promise.withResolvers();
-  await provider.launch.prepareWorkspace("race", { agent: { input: { text: "Investigate the timeout", images: [], attachmentNotes: [] } } });
+  await agentType.launch.prepareWorkspace("race", { agent: { input: { text: "Investigate the timeout", images: [], attachmentNotes: [] } } });
   const [{ id }] = await list("race");
   while (!slugRequests.length) await Bun.sleep(1);
   const url = new URL("http://localhost/workspaces/race/example-agents/" + id + "/composer");
@@ -116,12 +116,12 @@ test("a late automatic title cannot replace a manual CLI /name", () => scenario(
   slugDelay.resolve();
   await Bun.sleep(20);
   expect(await list("race")).toEqual([{ id, title: "manual-title" }]);
-  expect((await saved("race")).sessions[0].historySlug).toBe("manual-title");
+  expect((await saved("race")).agents[0].historySlug).toBe("manual-title");
   expect(titleEvents).toHaveLength(1);
 `));
 
 test("CLI composer /name uses the saved prompt when no title is supplied", () => scenario(`
-  const id = await provider.create({ workspaceId: "context" });
+  const id = await agentType.create({ workspaceId: "context" });
   const url = new URL("http://localhost/workspaces/context/example-agents/" + id + "/composer");
   const { agentAttachmentDraftId } = await import("@agents-in-the-cloud/prompt/server");
   const form = (text) => new Request(url, { method: "POST", body: new URLSearchParams({ text, attachmentDraft: agentAttachmentDraftId("context", "example:" + id) }) });
@@ -135,38 +135,38 @@ test("CLI composer /name uses the saved prompt when no title is supplied", () =>
 
 test("startup failure leaves a durable tab with its actual error", () => scenario(`
   result = { ...result, stderr: "tmux service unavailable", exitCode: 1 };
-  const id = await provider.create({ workspaceId: "failure" });
-  expect((await saved("failure")).sessions[0]).toMatchObject({ id, error: "tmux service unavailable" });
+  const id = await agentType.create({ workspaceId: "failure" });
+  expect((await saved("failure")).agents[0]).toMatchObject({ id, error: "tmux service unavailable" });
   expect(await list("failure")).toEqual([{ id, title: "Example CLI" }]);
 `));
 
 test("adapter preparation failures are retained without launching a process", () => scenario(`
   preparationError = new Error("credentials could not be installed");
-  await provider.create({ workspaceId: "failure" });
-  expect((await saved("failure")).sessions[0].error).toBe(preparationError.message);
+  await agentType.create({ workspaceId: "failure" });
+  expect((await saved("failure")).agents[0].error).toBe(preparationError.message);
   expect(calls).toHaveLength(0);
   expect(launches).toHaveLength(0);
-  await provider.launch.prepareWorkspace("failure");
+  await agentType.launch.prepareWorkspace("failure");
   expect(preparations).toHaveLength(1);
 `));
 
 test("ended process retains its terminal until the tab is closed", () => scenario(`
-  const id = await provider.create({ workspaceId: "ended" });
+  const id = await agentType.create({ workspaceId: "ended" });
   result = { ...result, stdout: "1:42\\n" };
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
-  const sessions = createCliSessions(adapter);
-  expect(await sessions.terminalState("ended", sessions.get("ended", id))).toMatchObject({ ended: true, exitCode: 42 });
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
+  const agents = createCliAgents(adapter);
+  expect(await agents.terminalState("ended", agents.get("ended", id))).toMatchObject({ ended: true, exitCode: 42 });
   expect(calls.some(call => call[1].includes("kill-session"))).toBe(false);
-  await provider.tabs.close({ workspaceId: "ended", conversationId: id });
+  await agentType.tabs.close({ workspaceId: "ended", agentId: id });
   expect(calls.at(-1)[1]).toContain("tmux kill-session");
   expect(await list("ended")).toEqual([]);
 `));
 
 test("missing session closes without restarting or trying to kill it", () => scenario(`
-  const id = await provider.create({ workspaceId: "missing" });
+  const id = await agentType.create({ workspaceId: "missing" });
   calls.length = 0;
   result = { ...result, stderr: "can't find session", exitCode: 1 };
-  await provider.tabs.close({ workspaceId: "missing", conversationId: id });
+  await agentType.tabs.close({ workspaceId: "missing", agentId: id });
   expect(calls).toHaveLength(1);
   expect(calls[0][1]).toContain("tmux list-panes");
   expect(await list("missing")).toEqual([]);
@@ -174,42 +174,42 @@ test("missing session closes without restarting or trying to kill it", () => sce
 `));
 
 test("unexpected inspection errors propagate and preserve the tab", () => scenario(`
-  const id = await provider.create({ workspaceId: "broken" });
+  const id = await agentType.create({ workspaceId: "broken" });
   result = { ...result, stderr: "container unavailable", exitCode: 125 };
-  await expect(provider.tabs.close({ workspaceId: "broken", conversationId: id })).rejects.toMatchObject({ code: "example_session_check_failed" });
+  await expect(agentType.tabs.close({ workspaceId: "broken", agentId: id })).rejects.toMatchObject({ code: "example_session_check_failed" });
   expect(await list("broken")).toHaveLength(1);
 `));
 
 test("concurrent provisioning claims launch once, and recovery never resubmits", () => scenario(`
   const context = { agent: { input: { text: "Only once", images: [], attachmentNotes: [] } } };
-  await Promise.all([provider.launch.prepareWorkspace("recovery", context), provider.launch.prepareWorkspace("recovery", context)]);
-  await createCliAgentModule(adapter).agentProvider.launch.prepareWorkspace("recovery", context);
+  await Promise.all([agentType.launch.prepareWorkspace("recovery", context), agentType.launch.prepareWorkspace("recovery", context)]);
+  await createCliAgentModule(adapter).agentType.launch.prepareWorkspace("recovery", context);
   expect(calls).toHaveLength(3);
   expect(launches).toHaveLength(1);
   expect(await list("recovery")).toHaveLength(1);
 `));
 
-test("providers and workspaces have independent session stores", () => scenario(`
-  const other = createCliAgentModule({ ...adapter, id: "other", label: "Other CLI" }).agentProvider;
+test("Agent types and Workspaces have independent Agent stores", () => scenario(`
+  const other = createCliAgentModule({ ...adapter, id: "other", label: "Other CLI" }).agentType;
   const [first, second, third] = await Promise.all([
-    provider.create({ workspaceId: "one" }), other.create({ workspaceId: "one" }), provider.create({ workspaceId: "two" }),
+    agentType.create({ workspaceId: "one" }), other.create({ workspaceId: "one" }), agentType.create({ workspaceId: "two" }),
   ]);
   expect(new Set([first, second, third]).size).toBe(3);
-  expect((await saved("one")).sessions.map(s => s.id)).toEqual([first]);
-  expect((await saved("one", "other")).sessions.map(s => s.id)).toEqual([second]);
-  expect((await saved("two")).sessions.map(s => s.id)).toEqual([third]);
+  expect((await saved("one")).agents.map(s => s.id)).toEqual([first]);
+  expect((await saved("one", "other")).agents.map(s => s.id)).toEqual([second]);
+  expect((await saved("two")).agents.map(s => s.id)).toEqual([third]);
 `));
 
-test("existing Codex placeholders, Claude and Pi sessions retain paths, IDs and tmux names", () => scenario(`
+test("existing Codex placeholders, Claude and Pi agents retain paths, IDs and tmux names", () => scenario(`
   for (const id of ["codex", "claude", "pi"]) {
     const session = { id: "old-" + id, title: "Existing tab", tmuxSession: id + "-existing", input: { text: "Never submit", images: [], attachmentNotes: [] }, model: "saved-model", thinkingLevel: "high", firstPresentation: true, ...(id !== "codex" ? { kind: id } : {}) };
     const path = process.env.ATELIER_DATA_DIR + "/workspaces/legacy/metadata/" + id + "-agents.json";
     await Bun.write(path, JSON.stringify({ sessions: [session] }));
-    const legacy = createCliAgentModule({ ...adapter, id }).agentProvider;
+    const legacy = createCliAgentModule({ ...adapter, id }).agentType;
     expect(await legacy.tabs.list({ workspaceId: "legacy" })).toEqual([{ id: session.id, title: session.title }]);
     await legacy.launch.prepareWorkspace("legacy");
     expect(await Bun.file(path).json()).toEqual({ sessions: [session] });
-    await legacy.tabs.close({ workspaceId: "legacy", conversationId: session.id });
+    await legacy.tabs.close({ workspaceId: "legacy", agentId: session.id });
     expect(calls.at(-1)[1]).toContain(id + "-existing");
   }
   expect(launches).toHaveLength(0);
@@ -218,42 +218,42 @@ test("existing Codex placeholders, Claude and Pi sessions retain paths, IDs and 
 
 test("setup errors reject before a session is claimed", () => scenario(`
   setupError = new Error("connect account");
-  await expect(provider.create({ workspaceId: "no-auth" })).rejects.toThrow("connect account");
-  await expect(provider.launch.prepare({})).rejects.toThrow("connect account");
-  await expect(provider.launch.submit(new FormData())).rejects.toThrow("connect account");
-  await expect(provider.launch.prepareWorkspace("no-auth")).rejects.toThrow("connect account");
+  await expect(agentType.create({ workspaceId: "no-auth" })).rejects.toThrow("connect account");
+  await expect(agentType.launch.prepare({})).rejects.toThrow("connect account");
+  await expect(agentType.launch.submit(new FormData())).rejects.toThrow("connect account");
+  await expect(agentType.launch.prepareWorkspace("no-auth")).rejects.toThrow("connect account");
   expect(await list("no-auth")).toEqual([]);
   expect(preparations).toHaveLength(0);
 `));
 
 test("launch settings are prepared by the adapter for both form and programmatic launches", () => scenario(`
-  const settings = { model: "local::model", serviceTier: "fast" };
-  expect(await provider.launch.prepare(settings)).toEqual({ agent: settings });
+  const settings = { model: "local::model" };
+  expect(await agentType.launch.prepare(settings)).toEqual({ agent: settings });
   const form = new FormData();
   form.set("model", "local::other");
   form.set("level", "high");
-  const submitted = await provider.launch.submit(form);
+  const submitted = await agentType.launch.submit(form);
   expect(await submitted.prepare()).toEqual({ agent: { model: "local::other", thinkingLevel: "high" } });
-  const minimal = createCliAgentModule({ ...adapter, id: "minimal", prepareWorkspace: undefined }).agentProvider;
+  const minimal = createCliAgentModule({ ...adapter, id: "minimal", prepareWorkspace: undefined }).agentType;
   await minimal.create({ workspaceId: "local" });
   expect(preparations).toHaveLength(0);
   expect(launches).toHaveLength(1);
 `));
 
 test("starting claims are not ended, and socket admission waits for tmux creation", () => scenario(`
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
   const { cliSocketHandler } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sockets.ts"))});
   const entered = Promise.withResolvers();
   const preparation = Promise.withResolvers();
-  const sessions = createCliSessions({ ...adapter, prepareWorkspace: async () => { entered.resolve(); await preparation.promise; } });
-  const launch = sessions.create("starting");
+  const agents = createCliAgents({ ...adapter, prepareWorkspace: async () => { entered.resolve(); await preparation.promise; } });
+  const launch = agents.create("starting");
   await entered.promise;
-  const [claim] = sessions.list("starting");
-  expect(await sessions.terminalState("starting", claim)).toEqual({ starting: true, exists: false, ended: false });
+  const [claim] = agents.list("starting");
+  expect(await agents.terminalState("starting", claim)).toEqual({ starting: true, exists: false, ended: false });
   expect(calls).toHaveLength(0);
   let ready = false, admitted = false;
-  const readiness = sessions.ready("starting", claim.id).then(session => { ready = true; return session; });
-  const socket = cliSocketHandler("example", sessions)(new URL("http://localhost/workspaces/starting/example-agents/" + claim.id + "/ws")).then(connection => { admitted = true; return connection; });
+  const readiness = agents.ready("starting", claim.id).then(session => { ready = true; return session; });
+  const socket = cliSocketHandler("example", agents)(new URL("http://localhost/workspaces/starting/example-agents/" + claim.id + "/ws")).then(connection => { admitted = true; return connection; });
   await Bun.sleep(10);
   expect(ready).toBe(false);
   expect(admitted).toBe(false);
@@ -262,20 +262,20 @@ test("starting claims are not ended, and socket admission waits for tmux creatio
   expect(await readiness).toBe(claim);
   expect(await socket).toBeDefined();
   expect(calls).toHaveLength(3);
-  expect(await sessions.terminalState("starting", claim)).toMatchObject({ exists: true, ended: false });
+  expect(await agents.terminalState("starting", claim)).toMatchObject({ exists: true, ended: false });
 `));
 
 test("failed startup releases readiness waiters but rejects socket admission", () => scenario(`
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
   const { cliSocketHandler } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sockets.ts"))});
   const entered = Promise.withResolvers();
   const preparation = Promise.withResolvers();
-  const sessions = createCliSessions({ ...adapter, prepareWorkspace: async () => { entered.resolve(); await preparation.promise; throw new Error("preparation failed"); } });
-  const launch = sessions.create("failed-start");
+  const agents = createCliAgents({ ...adapter, prepareWorkspace: async () => { entered.resolve(); await preparation.promise; throw new Error("preparation failed"); } });
+  const launch = agents.create("failed-start");
   await entered.promise;
-  const [claim] = sessions.list("failed-start");
-  const readiness = sessions.ready("failed-start", claim.id);
-  const socket = cliSocketHandler("example", sessions)(new URL("http://localhost/workspaces/failed-start/example-agents/" + claim.id + "/ws"));
+  const [claim] = agents.list("failed-start");
+  const readiness = agents.ready("failed-start", claim.id);
+  const socket = cliSocketHandler("example", agents)(new URL("http://localhost/workspaces/failed-start/example-agents/" + claim.id + "/ws"));
   const rejection = socket.then(() => { throw new Error("Socket unexpectedly admitted"); }, error => error);
   preparation.resolve();
   await launch;
@@ -295,7 +295,7 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
   events.on("workspace_agent_turn_finished", event => { finished.push(event); });
   subscribeWorkspaceAgentBusy(event => { busy.push(event); });
   configureAgentMcp(events);
-  const id = await provider.create({ workspaceId: "completion" });
+  const id = await agentType.create({ workspaceId: "completion" });
   const script = calls.find(call => call[2]?.stdin?.includes("Authorization: Bearer"))[2].stdin;
   const token = script.match(/Authorization: Bearer ([\\w.-]+)/)[1];
   const request = (headers = {}, method = "POST", boundary = "finished") => new Request("http://localhost/agent-turn-" + boundary, { method, headers: { authorization: "Bearer " + token, ...headers } });
@@ -316,12 +316,12 @@ test("authenticated turn boundaries identify the exact CLI session and close rev
     { workspaceId: "completion", agentKey: "agent:" + id, busy: true },
     { workspaceId: "completion", agentKey: "agent:" + id, busy: false },
   ]);
-  expect(finished).toEqual([{ workspaceId: "completion", conversationId: id }]);
+  expect(finished).toEqual([{ workspaceId: "completion", agentId: id }]);
   expect(attention).toEqual(["completion"]);
-  await events.emit("workspace_agent_turn_finished", { workspaceId: "completion", conversationId: "delegated-or-other-provider" });
-  await events.emit("workspace_agent_turn_finished", { workspaceId: "another-workspace", conversationId: id });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "completion", agentId: "delegated-or-other-provider" });
+  await events.emit("workspace_agent_turn_finished", { workspaceId: "another-workspace", agentId: id });
   expect(attention).toEqual(["completion"]);
-  await provider.tabs.close({ workspaceId: "completion", conversationId: id });
+  await agentType.tabs.close({ workspaceId: "completion", agentId: id });
   expect((await handleAgentMcpRequest(request({}, "POST", "started"), "completion")).status).toBe(401);
 `));
 
@@ -332,8 +332,8 @@ test("startup failure revokes credentials issued before adapter preparation", ()
     token = mcp.token;
     throw new Error("session configuration failed");
   };
-  const id = await provider.create({ workspaceId: "failed-credentials" });
-  expect((await saved("failed-credentials")).sessions[0]).toMatchObject({ id, error: "session configuration failed" });
+  const id = await agentType.create({ workspaceId: "failed-credentials" });
+  expect((await saved("failed-credentials")).agents[0]).toMatchObject({ id, error: "session configuration failed" });
   expect(launches).toHaveLength(0);
   const request = new Request("http://localhost/agent-turn-finished", { method: "POST", headers: { authorization: "Bearer " + token } });
   expect((await handleAgentMcpRequest(request, "failed-credentials")).status).toBe(401);
@@ -341,44 +341,44 @@ test("startup failure revokes credentials issued before adapter preparation", ()
 
 
 test("automatic recovery restores missing processes once without replaying saved input", () => scenario(`
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
   const resumed = [];
-  const sessions = createCliSessions({ ...adapter, resumeScript: async (...args) => { resumed.push(args); inspectionResult = { ...result, stdout: "0:\\n" }; return "printf resumed"; } }, async () => {});
+  const agents = createCliAgents({ ...adapter, resumeScript: async (...args) => { resumed.push(args); inspectionResult = { ...result, stdout: "0:\\n" }; return "printf resumed"; } }, async () => {});
   const settings = { model: "provider::saved", thinkingLevel: "high", input: { text: "NEVER REPLAY", images: [], attachmentNotes: ["original attachment"] } };
-  const id = await sessions.create("restore", settings);
+  const id = await agents.create("restore", settings);
   inspectionResult = { ...result, exitCode: 1 };
-  await Promise.all([sessions.restoreWorkspace("restore"), sessions.restoreWorkspace("restore")]);
+  await Promise.all([agents.restoreWorkspace("restore"), agents.restoreWorkspace("restore")]);
   expect(resumed).toHaveLength(1);
   expect(resumed[0][0]).toBe("restore");
   expect(resumed[0][1]).toEqual({ model: settings.model, thinkingLevel: settings.thinkingLevel });
   expect(resumed[0][2].id).toBe(id);
   expect(launches).toHaveLength(1);
-  expect((await saved("restore")).sessions[0]).toMatchObject({ id, input: settings.input });
+  expect((await saved("restore")).agents[0]).toMatchObject({ id, input: settings.input });
 `));
 
 test("recovery leaves existing live and dead panes alone", () => scenario(`
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
-  const sessions = createCliSessions({ ...adapter, resumeScript: async () => { throw new Error("must not resume"); } }, async () => {});
-  await sessions.create("existing");
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
+  const agents = createCliAgents({ ...adapter, resumeScript: async () => { throw new Error("must not resume"); } }, async () => {});
+  await agents.create("existing");
   for (const stdout of ["0:\\n", "1:42\\n"]) {
     inspectionResult = { ...result, stdout };
-    await sessions.restoreWorkspace("existing");
+    await agents.restoreWorkspace("existing");
   }
-  expect((await saved("existing")).sessions[0].error).toBeUndefined();
+  expect((await saved("existing")).agents[0].error).toBeUndefined();
   expect(launches).toHaveLength(1);
 `));
 
 test("one restoration failure preserves its tab and does not block other agents", () => scenario(`
-  const { createCliSessions } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/sessions.ts"))});
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
   const resumed = [];
-  const sessions = createCliSessions({ ...adapter, resumeScript: async (_workspaceId, _settings, session) => { resumed.push(session.id); if (resumed.length === 1) throw new Error("native history could not be loaded"); return "printf resumed"; } }, async () => {});
-  const first = await sessions.create("failure");
-  const second = await sessions.create("failure");
+  const agents = createCliAgents({ ...adapter, resumeScript: async (_workspaceId, _settings, session) => { resumed.push(session.id); if (resumed.length === 1) throw new Error("native history could not be loaded"); return "printf resumed"; } }, async () => {});
+  const first = await agents.create("failure");
+  const second = await agents.create("failure");
   inspectionResult = { ...result, exitCode: 1 };
-  await sessions.restoreWorkspace("failure");
+  await agents.restoreWorkspace("failure");
   expect(resumed).toEqual([first, second]);
-  expect((await saved("failure")).sessions[0]).toMatchObject({ id: first, error: "native history could not be loaded" });
-  expect((await saved("failure")).sessions[1].error).toBeUndefined();
+  expect((await saved("failure")).agents[0]).toMatchObject({ id: first, error: "native history could not be loaded" });
+  expect((await saved("failure")).agents[1].error).toBeUndefined();
 `));
 
 test("a CLI turn ends only once the adapter finds its native history settled", () => scenario(`

@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentModelThinkingLevel, setAgentProviderServiceTier, getAgentProviderServiceTier, createPiModelRuntime, disconnectModelProvider, seedProviderFavoriteModels, getCustomModelsJson, setCustomModelsJson, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
-import { reconcileAgentModelPreferences, getConfiguredAgentModels } from "../../src/server/model-preferences.ts";
+import { getAgentModelPreference, setAgentModelPreference, getAgentModelThinkingLevel, setAgentModelThinkingLevel, createPiModelRuntime, disconnectModelProvider, seedProviderEnabledModels, getCustomModelsJson, setCustomModelsJson, setEnabledModels } from "@agents-in-the-cloud/llm/server";
+import { reconcileAgentModelPreferences, getAgentEnabledModels } from "../../src/server/model-preferences.ts";
 
 let dataDir: string;
 
@@ -19,21 +19,19 @@ afterEach(async () => {
 });
 
 describe("Agent model settings transactions", () => {
-  test("concurrent preference and picker updates preserve each other", async () => {
+  test("concurrent preference and enabled-model updates preserve each other", async () => {
     await Promise.all([
-      setConfiguredModels([{ provider: "openai-codex", id: "gpt-5.4", label: "My model" }]),
+      setEnabledModels([{ provider: "openai-codex", id: "gpt-5.4", label: "My model" }]),
       setAgentModelPreference("builtin", { provider: "openai-codex", id: "gpt-5.4" }, "high"),
       setAgentModelThinkingLevel("builtin", { provider: "anthropic", id: "claude" }, "medium"),
-      setAgentProviderServiceTier("builtin", "openai-codex", "priority"),
     ]);
 
-    expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
+    expect(await getAgentEnabledModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
     // Selecting a model is a preference update, not a catalogue update.
-    await setAgentModelPreference("builtin", { provider: "openai-codex", id: "not-a-favorite" });
-    expect(await getConfiguredAgentModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
+    await setAgentModelPreference("builtin", { provider: "openai-codex", id: "not-enabled" });
+    expect(await getAgentEnabledModels()).toEqual([{ provider: "openai-codex", id: "gpt-5.4", label: "My model", active: true }]);
     expect(await getAgentModelThinkingLevel("builtin", { provider: "openai-codex", id: "gpt-5.4" })).toBe("high");
     expect(await getAgentModelThinkingLevel("builtin", { provider: "anthropic", id: "claude" })).toBe("medium");
-    expect(await getAgentProviderServiceTier("builtin", "openai-codex")).toBe("priority");
   });
 
   test("custom model materialization preserves concurrent preferences", async () => {
@@ -51,43 +49,43 @@ describe("Agent model settings transactions", () => {
 test("connecting seeds defaults once, preserves other selections, and disconnect removes only that provider", async () => {
   const runtime = await createPiModelRuntime();
   await runtime.login("openai", "api_key", { prompt: async () => "test-only-key", notify: () => {} });
-  await seedProviderFavoriteModels("openai");
-  const first = await getConfiguredAgentModels();
+  await seedProviderEnabledModels("openai");
+  const first = await getAgentEnabledModels();
   expect(first.length).toBeGreaterThan(0);
   expect(first[0]!.active).toBe(true);
 
   const retained = { provider: "openai", id: "gpt-5.4", label: "My selection", active: true };
-  await setConfiguredModels([retained]);
-  await seedProviderFavoriteModels("openai");
-  expect(await getConfiguredAgentModels()).toEqual([retained]);
+  await setEnabledModels([retained]);
+  await seedProviderEnabledModels("openai");
+  expect(await getAgentEnabledModels()).toEqual([retained]);
 
   await runtime.login("anthropic", "api_key", { prompt: async () => "test-only-key", notify: () => {} });
-  await seedProviderFavoriteModels("anthropic");
-  const both = await getConfiguredAgentModels();
+  await seedProviderEnabledModels("anthropic");
+  const both = await getAgentEnabledModels();
   expect(both.find((model) => model.active)?.provider).toBe("openai");
   expect(both.some((model) => model.provider === "anthropic")).toBe(true);
 
   await disconnectModelProvider("openai");
   expect(runtime.getProviderAuthStatus("openai").configured).toBe(false);
-  expect((await getConfiguredAgentModels()).every((model) => model.provider === "anthropic")).toBe(true);
-  expect((await getConfiguredAgentModels())[0]!.active).toBe(true);
+  expect((await getAgentEnabledModels()).every((model) => model.provider === "anthropic")).toBe(true);
+  expect((await getAgentEnabledModels())[0]!.active).toBe(true);
 
   await disconnectModelProvider("anthropic");
-  expect(await getConfiguredAgentModels()).toEqual([]);
+  expect(await getAgentEnabledModels()).toEqual([]);
 });
 
 
 test("catalogue changes forget a removed native default without losing thinking preferences", async () => {
   const first = { provider: "openai", id: "first", label: "First" };
   const second = { provider: "openai", id: "second", label: "Second" };
-  await setConfiguredModels([first, second]);
+  await setEnabledModels([first, second]);
   await setAgentModelPreference("builtin", { provider: first.provider, id: first.id }, "high");
-  await setConfiguredModels([second]);
+  await setEnabledModels([second]);
   await reconcileAgentModelPreferences();
-  await setConfiguredModels([first, second]);
-  expect((await getConfiguredAgentModels()).find((model) => model.active)?.id).toBe("second");
+  await setEnabledModels([first, second]);
+  expect((await getAgentEnabledModels()).find((model) => model.active)?.id).toBe("second");
   expect(await getAgentModelThinkingLevel("builtin", { provider: first.provider, id: first.id })).toBe("high");
-  await setConfiguredModels([]);
+  await setEnabledModels([]);
   await reconcileAgentModelPreferences();
   expect(await getAgentModelPreference("builtin")).toBeUndefined();
 });
@@ -100,36 +98,27 @@ test("reads individual legacy preferences and preserves unrelated persisted fiel
       "openai::valid": { thinkingLevel: "high", retained: true },
       "openai::invalid": { thinkingLevel: 42 },
     };
-    stored.providerPreferences = { valid: { serviceTier: "priority", retained: true }, legacy: { serviceTier: "unknown" }, invalid: 42 };
     stored.otherOwner = { retained: true };
   });
   expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "valid" })).toBe("high");
   expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "invalid" })).toBeUndefined();
   expect(await getAgentModelThinkingLevel("builtin", { provider: "openai", id: "missing" })).toBeUndefined();
-  expect(await getAgentProviderServiceTier("builtin", "valid")).toBe("priority");
-  expect(await getAgentProviderServiceTier("builtin", "legacy")).toBe("default");
-  expect(await getAgentProviderServiceTier("builtin", "invalid")).toBeUndefined();
   await setAgentModelThinkingLevel("builtin", { provider: "openai", id: "valid" }, "medium");
-  await setAgentProviderServiceTier("builtin", "valid", "default");
   const saved = JSON.parse(await readFile(path, "utf8"));
   expect(saved.agentPreferences.builtin.modelPreferences["openai::valid"]).toEqual({ thinkingLevel: "medium", retained: true });
-  expect(saved.agentPreferences.builtin.providerPreferences.valid).toEqual({ serviceTier: "default", retained: true });
   expect(saved.otherOwner).toEqual({ retained: true });
   expect(saved.modelPreferences).toBeUndefined();
-  expect(saved.providerPreferences).toBeUndefined();
 });
 
-test("all agent types share storage but isolate selections, model thinking levels, and service tiers", async () => {
+test("all agent types share storage but isolate selections and model thinking levels", async () => {
   const model = { provider: "openai", id: "shared" };
   const agents = ["builtin", "pi", "codex", "claude"];
   await Promise.all(agents.map(async (agent, index) => {
     await setAgentModelPreference(agent, model, `level-${index}`);
-    await setAgentProviderServiceTier(agent, model.provider, index % 2 ? "priority" : "default");
   }));
   for (const [index, agent] of agents.entries()) {
     expect(await getAgentModelPreference(agent)).toEqual(model);
     expect(await getAgentModelThinkingLevel(agent, model)).toBe(`level-${index}`);
-    expect(await getAgentProviderServiceTier(agent, model.provider)).toBe(index % 2 ? "priority" : "default");
   }
   await setAgentModelPreference("pi", { provider: "anthropic", id: "different" });
   expect(await getAgentModelPreference("builtin")).toEqual(model);

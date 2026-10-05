@@ -9,16 +9,16 @@ afterEach(data.tearDown);
 
 describe("launch title generation", () => {
   test.each([
-    { provider: "builtin", launch: agent.nativeAgentLaunch, model: "provider::model" },
-    { provider: "codex", launch: codexModule.agentProvider!.launch, model: "openai-codex::gpt-5.4" },
-  ])("names $provider from the launch prompt after provisioning without an Agent conversation", async ({ provider, launch, model }) => {
+    { agentTypeId: "builtin", launch: agent.nativeAgentLaunch, model: "provider::model" },
+    { agentTypeId: "codex", launch: codexModule.agentType!.launch, model: "openai-codex::gpt-5.4" },
+  ])("names $agentTypeId from the launch prompt after provisioning without an Agent", async ({ agentTypeId, launch, model }) => {
     const prepare = spyOn(launch, "prepare").mockImplementation(async (parameters) => ({ agent: { initialPrompt: String(parameters?.initialPrompt ?? ""), model: String(parameters?.model ?? "") } }));
     const name = spyOn(agent, "maybeNameWorkspaceFromPrompt").mockImplementation(() => {});
     try {
       const ready = deferred();
       const { app, registry } = createTestApp({ provision: () => ready.promise });
       const response = await app.fetch(postJson("/workspaces", {
-        agent: { provider, initialPrompt: "Build a calendar", model },
+        agent: { agentTypeId, initialPrompt: "Build a calendar", model },
       }));
       expect(response.status).toBe(202);
       const { workspace } = await response.json();

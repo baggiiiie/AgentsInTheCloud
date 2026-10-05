@@ -22,7 +22,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       id: "transcription.toggle",
       label: "Start or stop transcription",
       description: "Toggle microphone dictation in the active composer.",
-      scope: "agent-conversation",
+      scope: "agent",
       binding: "Meta+Alt+Backslash",
       run: () => activeTranscriptionButton()?.click(),
     });

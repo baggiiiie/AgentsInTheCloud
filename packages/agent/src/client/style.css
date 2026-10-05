@@ -1,7 +1,7 @@
-/* Agent conversation transcript and pinned AgentPaneComposer */
+/* Agent transcript and pinned AgentPaneComposer */
 
-.fixed-shell-live-body:has(> .agent-conversation-pane) { padding: 0; overflow: hidden; }
-.agent-conversation-pane { height: 100%; min-height: 0; }
+.fixed-shell-live-body:has(> .agent-pane) { padding: 0; overflow: hidden; }
+.agent-pane { height: 100%; min-height: 0; }
 
 .agent-pane {
   --agent-inline-gutter: clamp(.75rem, 4cqi, 2.5rem);

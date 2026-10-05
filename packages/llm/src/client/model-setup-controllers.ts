@@ -10,7 +10,7 @@ export function createLaunchModelRefreshController(Controller: WorkspaceClientCo
       const model = modelInput.value;
       const level = frame.querySelector<HTMLSelectElement>('select[name="level"]')?.value;
       const url = new URL("/launch-composer/settings", window.location.href);
-      url.searchParams.set("provider", frame.dataset.agentProvider!);
+      url.searchParams.set("provider", frame.dataset.agentType!);
       if (model) url.searchParams.set("model", model);
       if (level) url.searchParams.set("level", level);
       const source = url.pathname + url.search;

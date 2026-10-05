@@ -67,8 +67,8 @@ export interface WorkspacePanePresentation {
 export interface WorkspacePresentation {
   initialSelection?: { agent?: string; workView?: string };
   workspace: Pick<WorkspacePaneEntry, "id" | "title">;
-  agentConversations: readonly AgentPaneContribution[];
-  agentProviders: readonly { id: string; label: string; iconHtml: string }[];
+  agents: readonly AgentPaneContribution[];
+  agentTypes: readonly { id: string; label: string; iconHtml: string }[];
   workViews: readonly WorkPaneContribution[];
   commands?: readonly { id: string; label: string; description?: string; scope: string; iconHtml?: string; placement?: "work-launcher" | "agent-action"; binding?: string; shortcutCommandId?: string }[];
   overlayHtml?: readonly string[];
@@ -408,7 +408,7 @@ export function renderMobileWorkspaceBar(destinationsHtml = "", moreMenuHtml = "
 }
 
 function renderWorkspaceBar(presentation: WorkspacePresentation, inert = false): string {
-  const agentsDestination = renderMobileDestination("Agents", "agents", `${Icons.Agent}${renderMobileAgentAttention(presentation.workspace.id, presentation.agentConversations)}`);
+  const agentsDestination = renderMobileDestination("Agents", "agents", `${Icons.Agent}${renderMobileAgentAttention(presentation.workspace.id, presentation.agents)}`);
   const workViews = renderMobileWorkViews(presentation.workViews);
   const launchers = (presentation.commands ?? []).filter((command) => command.placement === "work-launcher").map((command) => renderWorkLauncherCommand(command, presentation.workspace.id, "submit->workspace-presentation#closeMore")).join("");
   const closers = presentation.workViews.map(renderMobileWorkViewCloser).join("");

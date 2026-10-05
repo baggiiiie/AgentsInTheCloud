@@ -49,11 +49,11 @@ import { Value } from "typebox/value";
 import { createAgentPaneHost } from "./agent-pane-host.ts";
 import { welcomeBrandHtml } from "./brand/welcome-brand.ts";
 import { agentContentId, selectAgentTurboStream } from "./agent-pane.ts";
-import { agentProvider, defaultAgentProvider, orderedAgentProviders, registeredAgentProviders, rememberAgentProvider } from "./agent-providers.ts";
+import { getAgentType, defaultAgentType, orderedAgentTypes, registeredAgentTypes, rememberAgentType } from "./agent-types.ts";
 import { openWorkspaceFile } from "./file-navigation.ts";
 import { httpErrorStatus, problemJsonResponse } from "./http-responses.ts";
 import { jsonResponse, matchRoute, replace, response, textResponse, update, wantsStream } from "@agents-in-the-cloud/shared/http";
-import { launchComposerContent, renderLaunchComposer, renderLaunchProvider } from "./launch-composer.ts";
+import { launchComposerContent, renderLaunchComposer, renderLaunchAgentType } from "./launch-composer.ts";
 import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
@@ -101,7 +101,7 @@ export interface WebApp {
   globalSidebarContributions: GlobalSidebarContributionRegistry;
 }
 
-type WorkspaceCommandResponse = { id: string; workView?: WorkspaceWorkViewReference; agentConversationId?: string };
+type WorkspaceCommandResponse = { id: string; workView?: WorkspaceWorkViewReference; agentId?: string };
 
 function selectWorkspaceTurboStream(workspaceId: string): string {
   return `<turbo-stream action="select-workspace" target="workspace_detail" data-workspace-id="${escapeHtml(workspaceId)}"></turbo-stream>`;
@@ -122,8 +122,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     cancelPreparation: (id) => provisioning.cancel(id),
     changed: invalidatePresentation,
   });
-  const agentProviders = registeredAgentProviders();
-  const agentTabs = createAgentPaneHost(agentProviders);
+  const agentTypes = registeredAgentTypes();
+  const agentTabs = createAgentPaneHost(agentTypes);
   const presentationStore = createWorkspacePresentationStore({
     workViewContributions: workViewAdapters,
   });
@@ -189,9 +189,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return surfaceFor(identifier).subscribe(listener);
   }
 
-  deps.events?.on("agent_provider_default_changed", invalidatePresentation);
+  deps.events?.on("agent_type_default_changed", invalidatePresentation);
   deps.events?.on("workspace_agent_view_invalidated", invalidatePresentation);
-  deps.events?.on("workspace_agent_conversation_title_changed", invalidatePresentation);
+  deps.events?.on("workspace_agent_title_changed", invalidatePresentation);
 
   const pendingSshTrustIds = new Map<string, Set<string>>();
   onWorkspaceSshTrustChanged((workspaceId) => {
@@ -290,8 +290,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; workspaceTemplateId?: string }): Promise<string> {
     const draftId = crypto.randomUUID();
-    const providers = await orderedAgentProviders();
-    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, provider: providers[0]!, providers, workspaceTemplateId: options.workspaceTemplateId });
+    const agentTypes = await orderedAgentTypes();
+    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: options.workspaceTemplateId });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
         attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut composer-focus" data-action="mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:software-keyboard@document->launch-composer-dialog#layout resize@window->launch-composer-dialog#layout" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
@@ -347,8 +347,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return { action: `/workspaces/${encodeURIComponent(workspaceId)}/work-views/${encoded}/close`, label: `${label} Work view` };
   }
 
-  function agentClose(workspaceId: string, conversationId: string, title: string) {
-    return { action: `/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(conversationId)}/close`, label: `${title} Agent conversation` };
+  function agentClose(workspaceId: string, agentId: string, title: string) {
+    return { action: `/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(agentId)}/close`, label: `${title} Agent` };
   }
 
   async function workspacePaneCollections(activeWorkspaceId: string): Promise<WorkspacePanePresentation> {
@@ -412,10 +412,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }
 
   async function agentPaneContributions(workspaceId: string) {
-    return (await agentTabs.list({ workspaceId })).map((conversation) => ({
-      ...conversation,
-      ...registry.agentState(workspaceId, `agent:${conversation.id}`),
-      close: agentClose(workspaceId, conversation.id, conversation.title),
+    return (await agentTabs.list({ workspaceId })).map((agent) => ({
+      ...agent,
+      ...registry.agentState(workspaceId, `agent:${agent.id}`),
+      close: agentClose(workspaceId, agent.id, agent.title),
     }));
   }
 
@@ -427,12 +427,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }> {
     const entry = requireWorkspace(workspaceId);
     const attachments = await attachWorkspaceModules(workspaceId);
-    const agentConversations = await agentPaneContributions(workspaceId);
+    const agents = await agentPaneContributions(workspaceId);
     const currentWorkViews = attachments.flatMap((attachment) => attachment.workViews ?? []);
     const storedWorkViews = await presentationStore.listWorkViews(workspaceId);
     const commandContributions: WorkspaceCommandContribution[] = [...attachments.flatMap((attachment) => attachment.commands ?? []),
       { id: "agent.create", label: "New Agent", scope: "workspace" },
-      ...agentProviders.map((provider) => ({ id: `agent.create.${provider.id}`, label: `New ${provider.label} agent`, scope: "workspace" as const })),
+      ...agentTypes.map((agentType) => ({ id: `agent.create.${agentType.id}`, label: `New ${agentType.label} agent`, scope: "workspace" as const })),
     ];
     const commands = commandContributions.map((command) => ({
       shortcutCommandId: command.surfaces?.ui?.shortcutCommandId,
@@ -443,8 +443,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const workPresentationIntent = intent && registry.surfaceState(workspaceId, intent.key).requestingAttention ? intent : undefined;
     const presentation: FixedWorkspacePresentation = {
       workspace: { id: entry.id, title: workspaceTitle(entry) },
-      agentProviders: await orderedAgentProviders(),
-      agentConversations,
+      agentTypes: await orderedAgentTypes(),
+      agents,
       workViews: workViewPresentations(workspaceId, currentWorkViews, storedWorkViews),
       commands,
       workPresentationIntent,
@@ -479,11 +479,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return [{
       target: workspaceResidentId(workspaceId),
       html: renderWorkspacePresentation({ ...presentation,
-        agentConversations: presentation.agentConversations.map(agent => ({ ...agent, bodyHtml: undefined })),
+        agents: presentation.agents.map(agent => ({ ...agent, bodyHtml: undefined })),
         workViews: presentation.workViews.map(view => ({ ...view, bodyHtml: undefined })),
       }),
       children: [
-        ...presentation.agentConversations.flatMap(agent => agent.bodyHtml === undefined ? [] : [{ target: agentContentId(workspaceId, agent.id), html: agent.bodyHtml }]),
+        ...presentation.agents.flatMap(agent => agent.bodyHtml === undefined ? [] : [{ target: agentContentId(workspaceId, agent.id), html: agent.bodyHtml }]),
         ...presentation.workViews.flatMap(view => view.bodyHtml === undefined ? [] : [{ target: workContentId(workspaceId, view.key), html: view.bodyHtml }]),
       ],
     }];
@@ -492,11 +492,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function prepareWorkspacePresentation(id: string, selection: NonNullable<FixedWorkspacePresentation["initialSelection"]>): Promise<FixedWorkspacePresentation> {
     const { presentation, storedWorkViews } = await workspacePresentationBundle(id);
     presentation.initialSelection = {
-      agent: presentation.agentConversations.find(agent => agent.id === selection.agent)?.id ?? presentation.agentConversations[0]?.id,
+      agent: presentation.agents.find(agent => agent.id === selection.agent)?.id ?? presentation.agents[0]?.id,
       workView: presentation.workViews.find(view => view.key === selection.workView)?.key,
     };
     await Promise.all([
-      ...presentation.agentConversations.filter(agent => agent.id === presentation.initialSelection!.agent).map(async agent => { agent.bodyHtml = await agentTabs.render({ workspaceId: id, conversationId: agent.id }); }),
+      ...presentation.agents.filter(agent => agent.id === presentation.initialSelection!.agent).map(async agent => { agent.bodyHtml = await agentTabs.render({ workspaceId: id, agentId: agent.id }); }),
       ...presentation.workViews.filter(view => view.key === presentation.initialSelection!.workView).map(async view => {
         if (view.availability.phase === "unavailable") return;
         const reference = storedWorkViews.find(stored => workViewKey(stored.reference) === view.key)!.reference;
@@ -647,7 +647,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return jsonResponse({ workspace: {
       ...workspace,
       ...warningState,
-      agentConversations: presentation.agentConversations.map(({ id, title, providerId, busy, requestingAttention }) => ({ id, title, providerId, busy, requestingAttention })),
+      agents: presentation.agents.map(({ id, title, agentTypeId, busy, requestingAttention }) => ({ id, title, agentTypeId, busy, requestingAttention })),
       workViews: workViewSummaries(id, storedWorkViews),
       commands: commandContributions.filter((command) => handlers.has(command.id)).map((command) => ({
         id: command.id,
@@ -724,13 +724,13 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const title = command.title?.trim() ?? "";
     let context = command.context;
     if (!context) {
-      const providerId = stringField(command.agent?.provider, "agent.provider");
-      const provider = providerId ? agentProvider(providerId) : await defaultAgentProvider();
+      const agentTypeId = stringField(command.agent?.agentTypeId, "agent.agentTypeId");
+      const agentType = agentTypeId ? getAgentType(agentTypeId) : await defaultAgentType();
       const initialPrompt = stringField(command.agent?.initialPrompt, "agent.initialPrompt");
       const attachmentDraft = stringField(command.agent?.attachmentDraft, "agent.attachmentDraft");
       if (attachmentDraft && !validDraftId(attachmentDraft)) throw invalidArguments("Invalid attachment draft");
-      const prepared = await provider.launch.prepare(command.agent);
-      context = { ...prepared, agent: { ...prepared?.agent, initialPrompt, attachmentDraft, provider: provider.id } };
+      const prepared = await agentType.launch.prepare(command.agent);
+      context = { ...prepared, agent: { ...prepared?.agent, initialPrompt, attachmentDraft, agentTypeId: agentType.id } };
     }
     if (context?.agent?.initialPrompt) provisioningPrompts.set(id, context.agent.initialPrompt);
     registry.add(id, title || null, init);
@@ -776,8 +776,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const form = await request.formData();
     const submissionId = String(form.get("attachmentDraft") ?? "");
     if (!validDraftId(submissionId)) throw invalidArguments("Invalid attachment draft");
-    const provider = agentProvider(String(form.get("provider") ?? "builtin"));
-    const submission = await provider.launch.submit(form);
+    const agentType = getAgentType(String(form.get("agentTypeId") ?? "builtin"));
+    const submission = await agentType.launch.submit(form);
     if ("response" in submission) return submission.response;
     let launch = launchComposerSubmissions.get(submissionId);
     if (!launch) {
@@ -785,7 +785,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
         const prepared = await submission.prepare();
         return createWorkspaceFromCommand({
           init: options.workspaceTemplate ? workspaceInitFromTemplate(options.workspaceTemplate) : undefined,
-          context: { ...prepared, agent: { ...prepared.agent, provider: provider.id, initialPrompt: String(form.get("text") ?? ""), attachmentDraft: submissionId } },
+          context: { ...prepared, agent: { ...prepared.agent, agentTypeId: agentType.id, initialPrompt: String(form.get("text") ?? ""), attachmentDraft: submissionId } },
         });
       })();
       launchComposerSubmissions.set(submissionId, launch);
@@ -977,16 +977,16 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }
 
   function workspaceModuleCommands(): WorkspaceModuleCommandHandler[] {
-    const create = async (workspaceId: string, providerId?: string) => {
-      const provider = providerId ? agentProvider(providerId) : await defaultAgentProvider();
-      const createdAgentConversationId = await provider.create({ workspaceId, events: deps.events });
-      await rememberAgentProvider(provider.id, deps.events);
-      return { createdAgentConversationId };
+    const create = async (workspaceId: string, agentTypeId?: string) => {
+      const agentType = agentTypeId ? getAgentType(agentTypeId) : await defaultAgentType();
+      const createdAgentId = await agentType.create({ workspaceId, events: deps.events });
+      await rememberAgentType(agentType.id, deps.events);
+      return { createdAgentId };
     };
     return [
       ...workspaceModules.flatMap((module) => module.commands ?? []),
       { id: "agent.create", execute: ({ workspaceId }) => create(workspaceId) },
-      ...agentProviders.map((provider): WorkspaceModuleCommandHandler => ({ id: `agent.create.${provider.id}`, execute: ({ workspaceId }) => create(workspaceId, provider.id) })),
+      ...agentTypes.map((agentType): WorkspaceModuleCommandHandler => ({ id: `agent.create.${agentType.id}`, execute: ({ workspaceId }) => create(workspaceId, agentType.id) })),
     ];
   }
 
@@ -1045,11 +1045,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (result.createdWorkView) {
       ({ reference: createdWorkView } = await openAvailableWorkView(workspaceId, result.createdWorkView));
     }
-    const origin = `${result.createdAgentConversationId ? selectAgentTurboStream(workspaceId, result.createdAgentConversationId) : ""}${createdWorkView ? presentWorkViewTurboStream(workspaceId, workViewKey(createdWorkView)) : ""}${result.streamHtml ?? ""}`;
+    const origin = `${result.createdAgentId ? selectAgentTurboStream(workspaceId, result.createdAgentId) : ""}${createdWorkView ? presentWorkViewTurboStream(workspaceId, workViewKey(createdWorkView)) : ""}${result.streamHtml ?? ""}`;
     if (requestAcceptsJson(request) && !wantsStream(request)) {
       const command: WorkspaceCommandResponse = { id: commandId };
       if (createdWorkView) command.workView = createdWorkView;
-      if (result.createdAgentConversationId) command.agentConversationId = result.createdAgentConversationId;
+      if (result.createdAgentId) command.agentId = result.createdAgentId;
       return jsonResponse({ command, workViews: workViewSummaries(workspaceId, await presentationStore.listWorkViews(workspaceId)) });
     }
     return turboStreamResponse(origin);
@@ -1114,21 +1114,21 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return requestAcceptsJson(request) && !wantsStream(request) ? jsonResponse({ attention: stored.reference }) : turboStreamResponse("");
   }
 
-  async function closeAgentConversationEndpoint(workspaceId: string, conversationId: string, request: Request): Promise<Response> {
+  async function closeAgentEndpoint(workspaceId: string, agentId: string, request: Request): Promise<Response> {
     requireWorkspace(workspaceId);
     const before = await agentTabs.list({ workspaceId });
-    if (!before.some(agent => agent.id === conversationId)) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
-    await agentTabs.close({ workspaceId, conversationId });
-    registry.clearSurfaceAttention(workspaceId, `agent:${conversationId}`);
+    if (!before.some(agent => agent.id === agentId)) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agentId}`);
+    await agentTabs.close({ workspaceId, agentId });
+    registry.clearSurfaceAttention(workspaceId, `agent:${agentId}`);
     if (requestAcceptsJson(request) && !wantsStream(request)) {
       const agents = await agentPaneContributions(workspaceId);
-      return jsonResponse({ archivedConversationId: conversationId, agentConversations: agents.map(({ id, title, providerId, busy, requestingAttention }) => ({ id, title, providerId, busy, requestingAttention })) });
+      return jsonResponse({ closedAgentId: agentId, agents: agents.map(({ id, title, agentTypeId, busy, requestingAttention }) => ({ id, title, agentTypeId, busy, requestingAttention })) });
     }
     return turboStreamResponse("");
   }
 
   async function renderModelPickerUpdates(request: Request): Promise<string> {
-    const launchUpdates = (await Promise.all(agentProviders.map(provider => provider.launch.refreshConfiguration?.(launchComposerSettingsFrameId)))).join("");
+    const launchUpdates = (await Promise.all(agentTypes.map(agentType => agentType.launch.refreshConfiguration?.(launchComposerSettingsFrameId)))).join("");
     return requestAcceptsJson(request) && !wantsStream(request) ? "" : launchUpdates;
   }
 
@@ -1159,9 +1159,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const page = await homePage();
       return request.method === "HEAD" ? new Response(null, { status: page.status, statusText: page.statusText, headers: page.headers }) : page;
     }
-    if (url.pathname === "/agent-providers" && request.method === "GET") {
-      const providers = await orderedAgentProviders();
-      return jsonResponse({ defaultProviderId: providers[0]!.id, providers: providers.map(({ id, label }) => ({ id, label })) });
+    if (url.pathname === "/agent-types" && request.method === "GET") {
+      const agentTypes = await orderedAgentTypes();
+      return jsonResponse({ defaultAgentTypeId: agentTypes[0]!.id, agentTypes: agentTypes.map(({ id, label }) => ({ id, label })) });
     }
     if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(agentsInTheCloudOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
     if (url.pathname === "/launch-composer" && request.method === "GET") {
@@ -1170,8 +1170,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
         ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference))
         : await renderEmptyLaunchComposerFrame());
     }
-    if (url.pathname === "/launch-composer/provider" && request.method === "GET") return response(await renderLaunchProvider(agentProvider(url.searchParams.get("provider") ?? "builtin"), await orderedAgentProviders(), launchComposerFooterContext()));
-    if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await agentProvider(url.searchParams.get("provider") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
+    if (url.pathname === "/launch-composer/agent-type" && request.method === "GET") return response(await renderLaunchAgentType(getAgentType(url.searchParams.get("agentTypeId") ?? "builtin"), await orderedAgentTypes(), launchComposerFooterContext()));
+    if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await getAgentType(url.searchParams.get("agentTypeId") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
     const workspaceTemplateSettingsMatch = matchRoute(url, /^\/workspace-templates\/([^/]+)\/settings$/);
     if (workspaceTemplateSettingsMatch && request.method === "GET") {
       const workspaceTemplateId = workspaceTemplateSettingsMatch[0]!;
@@ -1234,8 +1234,8 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     }
     if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/close$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);
-      const conversationId = routeParam(params, 1);
-      return await serializePresentationMutation(workspaceId, async () => await closeAgentConversationEndpoint(workspaceId, conversationId, request));
+      const agentId = routeParam(params, 1);
+      return await serializePresentationMutation(workspaceId, async () => await closeAgentEndpoint(workspaceId, agentId, request));
     }
     if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/work-views\/close$/)) && request.method === "POST") {
       const workspaceId = routeParam(params, 0);

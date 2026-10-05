@@ -6,23 +6,23 @@ import { createPiModelRuntime, type ModelRef } from "@agents-in-the-cloud/llm/se
 import { createLivePresentation } from "@agents-in-the-cloud/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import type { DurableAgentController } from "./durable-runtime.ts";
-import { DurableConversationPresentation } from "./durable-presentation.ts";
-import { configuredModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
+import { DurableAgentPresentation } from "./durable-presentation.ts";
+import { enabledModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
 import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import { renderNotice } from "./render-notice.ts";
 import { ids } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderAgentPaneComposerFooter, renderPromptActions, type AgentStatsView } from "./render-composer.ts";
 import { notificationControlId, renderNotificationControl } from "./render-notification.ts";
-import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
+import type { WorkspaceAgentInfo } from "./agent-store.ts";
 import type { AgentLivePresentationListener } from "./runtime-types.ts";
 
 /** Host chrome wraps committed native views; it never synthesizes transcript events. */
-export class ConversationPresentation {
+export class AgentPresentation {
   readonly workspaceId: string;
-  readonly conversationId: string;
+  readonly agentId: string;
   readonly label: string;
   readonly readOnly: boolean;
-  private presentation!: DurableConversationPresentation;
+  private presentation!: DurableAgentPresentation;
   private readonly transcriptListeners = new Map<AgentLivePresentationListener, { unsubscribe(): void }>();
   private unsubscribeWork!: () => void;
   private unsubscribeUsage!: () => void;
@@ -45,16 +45,16 @@ export class ConversationPresentation {
     ...(this.failure ? [{ target: ids.notices(this), html: renderNotice("error", "This Agent view disconnected. Reload to reconnect.") }] : []),
   ], 50);
 
-  private constructor(agent: WorkspaceAgentConversationInfo, private readonly controller: DurableAgentController, private readonly modelRuntime: Awaited<ReturnType<typeof createPiModelRuntime>>) {
+  private constructor(agent: WorkspaceAgentInfo, private readonly controller: DurableAgentController, private readonly modelRuntime: Awaited<ReturnType<typeof createPiModelRuntime>>) {
     this.workspaceId = agent.workspaceId;
-    this.conversationId = agent.conversationId;
+    this.agentId = agent.agentId;
     this.label = agent.label;
     this.readOnly = controller.readOnly;
   }
-  static async create(agent: WorkspaceAgentConversationInfo, controller: DurableAgentController) {
-    const runtime = new ConversationPresentation(agent, controller, await createPiModelRuntime());
+  static async create(agent: WorkspaceAgentInfo, controller: DurableAgentController) {
+    const runtime = new AgentPresentation(agent, controller, await createPiModelRuntime());
     try {
-      runtime.presentation = await DurableConversationPresentation.attach(controller, { ...agent, branchId: String(controller.id) }, BACKGROUND_CONTEXT, () => runtime.committed());
+      runtime.presentation = await DurableAgentPresentation.attach(controller, { ...agent, branchId: String(controller.id) }, BACKGROUND_CONTEXT, () => runtime.committed());
       runtime.unsubscribeWork = controller.subscribeWork(() => runtime.chrome.invalidate());
       runtime.unsubscribeUsage = controller.subscribeUsage(() => { void runtime.refreshUsage().catch(error => console.error("Could not refresh descendant usage", error)); });
       await runtime.refreshUsage();
@@ -83,7 +83,7 @@ export class ConversationPresentation {
   private async attachSelectedBranch() {
     if (this.disposed) return;
     const previous = this.presentation;
-    const next = await DurableConversationPresentation.attach(this.controller, { workspaceId: this.workspaceId, conversationId: this.conversationId, branchId: String(this.controller.id) }, BACKGROUND_CONTEXT, () => this.committed());
+    const next = await DurableAgentPresentation.attach(this.controller, { workspaceId: this.workspaceId, agentId: this.agentId, branchId: String(this.controller.id) }, BACKGROUND_CONTEXT, () => this.committed());
     if (this.disposed) { await next.dispose(); return; }
     this.presentation = next;
     this.observePresentation();
@@ -150,7 +150,7 @@ export class ConversationPresentation {
     const settings = await this.controller.settings();
     this.model = settings.model ? { provider: settings.model.provider, id: settings.model.modelId } : undefined;
     this.thinking = settings.thinkingLevel ?? "off";
-    this.models = await configuredModelOptionViews(this.currentModel() ?? null, this.modelRuntime);
+    this.models = await enabledModelOptionViews(this.currentModel() ?? null, this.modelRuntime);
     this.chrome.invalidate();
   }
   async detailHtml(key: string, count?: number) { return this.presentation.detailHtml(key, count); }

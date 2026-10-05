@@ -61,8 +61,8 @@ test("workspace journal retains the original searchable journal and deletion gat
   };
   const runtime = await openDurableAgentRuntime(await workspaceDurableJournalDirectory("retained"), "retained", {}, load);
   runtimes.push(runtime);
-  const record = { conversationId: "tab", label: "Agent 1", title: "Retained history" };
-  const agent = await runtime.conversation(record);
+  const record = { agentId: "tab", label: "Agent 1", title: "Retained history" };
+  const agent = await runtime.agent(record);
   await (await agent.submit({ requestId: "retained-request", text: "Searchable retained input" })).wait(BACKGROUND_CONTEXT);
   await runtime.delete();
   await runtime.suspend();
@@ -75,7 +75,7 @@ test("workspace journal retains the original searchable journal and deletion gat
   const restored = await openDurableAgentRuntime(directory, "retained", {}, load);
   runtimes.push(restored);
   expect((await restored.catalog())[0]?.title).toBe("Retained history");
-  const history = await restored.conversation(record);
+  const history = await restored.agent(record);
   expect(JSON.stringify((await history.history({}, 100, undefined, BACKGROUND_CONTEXT)).items)).toContain("Retained answer");
   await expect(history.submit({ requestId: "retained-request", text: "Retry" })).rejects.toThrow("deleted");
   expect(faux.state.callCount).toBe(1);

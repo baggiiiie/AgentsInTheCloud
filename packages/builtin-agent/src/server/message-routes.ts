@@ -1,17 +1,17 @@
-import { suggestSessionSlug } from "@agents-in-the-cloud/agent/server";
+import { suggestAgentSlug } from "@agents-in-the-cloud/agent/server";
 import { knownWorkspaceAgentRequest } from "./runtime.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { readJsonObject, requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
-import { maybeNameAgentFromPrompt, setAgentSessionTitle } from "./agent-title-suggestion.ts";
+import { maybeNameAgentFromPrompt, setAgentTitle } from "./agent-title-suggestion.ts";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { expandPromptTemplate, parseCompactCommand } from "@agents-in-the-cloud/agent/server/prompt-templates";
-import { runAgentSessionNameCommand } from "@agents-in-the-cloud/agent/server/session-name-command";
+import { runAgentNameCommand } from "@agents-in-the-cloud/agent/server/agent-name-command";
 import { matchRoute } from "@agents-in-the-cloud/shared/http";
 import { resolveAgentController, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
-import { resolveAgentConversation } from "./delegation.ts";
+import { resolveAgent } from "./delegation.ts";
 
 export const handleMessageRequest: AgentRouteHandler = async (request, url, options) => {
   const params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/messages$/);
@@ -19,8 +19,8 @@ export const handleMessageRequest: AgentRouteHandler = async (request, url, opti
   return await submitMessage(params[0], params[1], request, options);
 };
 
-async function submitMessage(workspaceId: string, conversationId: string, request: Request, options: AgentRouteOptions): Promise<Response> {
-  const agent = await resolveAgentConversation(workspaceId, conversationId);
+async function submitMessage(workspaceId: string, agentId: string, request: Request, options: AgentRouteOptions): Promise<Response> {
+  const agent = await resolveAgent(workspaceId, agentId);
   const json = requestAcceptsJson(request) ? await readJsonObject(request) : undefined;
   const form = json ? undefined : await request.formData();
   // Older API callers can omit the identity, but cannot retry idempotently.
@@ -33,11 +33,11 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   if (text.trim() === "/new") {
     const runtime = await resolveAgentController(agent, options);
     await runtime.reset();
-    await removeInitialPromptDraft(workspaceId, conversationId);
-    return json ? Response.json({ agent: { conversationId, state: "idle" } }) : turboStreamResponse("");
+    await removeInitialPromptDraft(workspaceId, agentId);
+    return json ? Response.json({ agent: { agentId, state: "idle" } }) : turboStreamResponse("");
   }
   if (text.trim() === "/park") {
-    await removeInitialPromptDraft(workspaceId, conversationId);
+    await removeInitialPromptDraft(workspaceId, agentId);
     return new Response(null, { status: 307, headers: { Location: `/workspaces/${encodeURIComponent(workspaceId)}/park` } });
   }
   const compactCommand = parseCompactCommand(text);
@@ -45,29 +45,29 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
     const runtime = await resolveAgentController(agent, options);
     await options.events?.emit("workspace_user_activity", { workspaceId });
     await runtime.compact(compactCommand.customInstructions);
-    await removeInitialPromptDraft(workspaceId, conversationId);
-    return json ? Response.json({ agent: { conversationId, state: "idle", compacted: true } }) : turboStreamResponse("");
+    await removeInitialPromptDraft(workspaceId, agentId);
+    return json ? Response.json({ agent: { agentId, state: "idle", compacted: true } }) : turboStreamResponse("");
   }
-  const nameResult = await runAgentSessionNameCommand(text, {
+  const nameResult = await runAgentNameCommand(text, {
     suggest: async () => {
       const runtime = await resolveAgentController(agent, options);
       const model = (await runtime.settings()).model;
-      return suggestSessionSlug((await runtime.userMessages()).join("\n\n"), model && { provider: model.provider, id: model.modelId });
+      return suggestAgentSlug((await runtime.userMessages()).join("\n\n"), model && { provider: model.provider, id: model.modelId });
     },
-    setTitle: async (title) => { await setAgentSessionTitle(agent, title, { events: options.events }); },
+    setTitle: async (title) => { await setAgentTitle(agent, title, { events: options.events }); },
   });
   if (nameResult) {
-    if (nameResult === "no-title") return json ? Response.json({ error: { code: "invalid_arguments", message: "No prompt available to name this session" } }, { status: 422 }) : turboStreamResponse("", { status: 422 });
-    await removeInitialPromptDraft(workspaceId, conversationId);
-    return json ? Response.json({ agent: { conversationId, state: "idle" } }) : turboStreamResponse("");
+    if (nameResult === "no-title") return json ? Response.json({ error: { code: "invalid_arguments", message: "No prompt available to name this Agent" } }, { status: 422 }) : turboStreamResponse("", { status: 422 });
+    await removeInitialPromptDraft(workspaceId, agentId);
+    return json ? Response.json({ agent: { agentId, state: "idle" } }) : turboStreamResponse("");
   }
 
-  const attachmentDraft = agentAttachmentDraftId(workspaceId, conversationId);
+  const attachmentDraft = agentAttachmentDraftId(workspaceId, agentId);
   if (form && String(form.get("attachmentDraft") ?? "") !== attachmentDraft) return turboStreamResponse("", { status: 422 });
   // Admission wins even if the previous response was lost after attachment cleanup.
   if (await (options.knownRequest ?? knownWorkspaceAgentRequest)(agent, requestId, { events: options.events })) {
     const headers = { "x-agents-in-the-cloud-attachment-draft-consumed": "true" };
-    return json ? Response.json({ agent: { conversationId, state: "accepted" } }, { status: 202, headers }) : turboStreamResponse("", { headers });
+    return json ? Response.json({ agent: { agentId, state: "accepted" } }, { status: 202, headers }) : turboStreamResponse("", { headers });
   }
   const attachmentIds = form?.getAll("attachment").map(String) ?? [];
   const { images, attachmentNotes } = attachmentIds.length > 0
@@ -92,9 +92,9 @@ async function submitMessage(workspaceId: string, conversationId: string, reques
   }
   await removeStagedAttachments(attachmentDraft, attachmentIds);
   if (reviewCommentIds.length) await options.events?.emit("workspace_agent_prompt_submitted", { workspaceId, reviewCommentIds });
-  await removeInitialPromptDraft(workspaceId, conversationId);
+  await removeInitialPromptDraft(workspaceId, agentId);
   const acceptedHeaders = { "x-agents-in-the-cloud-attachment-draft-consumed": "true" };
   return json
-    ? Response.json({ agent: { conversationId, state: "running" } }, { status: 202, headers: acceptedHeaders })
+    ? Response.json({ agent: { agentId, state: "running" } }, { status: 202, headers: acceptedHeaders })
     : turboStreamResponse("", { headers: acceptedHeaders });
 }

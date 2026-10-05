@@ -5,11 +5,11 @@ const expandedTurns = new WeakMap<Element, Set<string>>();
 
 export function createAgentTurnController(Controller: WorkspaceClientControllerConstructor) {
   return class AgentTurnController extends Controller {
-    static values = { workspaceId: String, conversationId: String, turnId: String, branchId: String, reveal: String };
+    static values = { workspaceId: String, agentId: String, turnId: String, branchId: String, reveal: String };
     static targets = ["items"];
     declare readonly element: HTMLDetailsElement;
     declare readonly workspaceIdValue: string;
-    declare readonly conversationIdValue: string;
+    declare readonly agentIdValue: string;
     declare readonly turnIdValue: string;
     declare readonly branchIdValue: string;
     declare readonly revealValue: string;
@@ -29,7 +29,7 @@ export function createAgentTurnController(Controller: WorkspaceClientControllerC
       }
       if (this.subscription) return;
       this.subscription = window.AgentsInTheCloudCable!.subscribe(
-        CableTopics.agentTurn(this.workspaceIdValue, this.conversationIdValue, this.turnIdValue, this.branchIdValue),
+        CableTopics.agentTurn(this.workspaceIdValue, this.agentIdValue, this.turnIdValue, this.branchIdValue),
         { onReady: () => this.reveal() },
       );
     };

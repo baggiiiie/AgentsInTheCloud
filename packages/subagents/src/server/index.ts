@@ -2,7 +2,7 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
-import { listWorkspaceAgentConversations, configureAgentDelegation, durableWorkspaceOwner } from "@agents-in-the-cloud/builtin-agent/server";
+import { listWorkspaceAgents, configureAgentDelegation, durableWorkspaceOwner } from "@agents-in-the-cloud/builtin-agent/server";
 import { createNativeDelegationExtension } from "./native-runtime.ts";
 import { delegationModels } from "./native-models.ts";
 import { nativeDelegationTranscript } from "./native-transcript.ts";
@@ -20,8 +20,8 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       transcript: nativeDelegationTranscript,
       attributed: attributedEntry,
       toolPresentations: nativeToolPresentations,
-      async resolveConversation(workspaceId, conversationId) {
-        const record = (await (await durableWorkspaceOwner(workspaceId)).catalog()).find(record => record.parentId && record.conversationId === conversationId);
+      async resolveAgent(workspaceId, agentId) {
+        const record = (await (await durableWorkspaceOwner(workspaceId)).catalog()).find(record => record.parentId && record.agentId === agentId);
         return record ? { ...record, workspaceId, path: "", storage: "durable" } : undefined;
       },
     });
@@ -34,8 +34,8 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     name: "subagents",
     subscribe(identifier, listener) {
       if (identifier.channel !== "module" || identifier.name !== "subagents") throw new Error("Invalid Subagents channel");
-      const params = Value.Parse(Type.Object({ conversationId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), identifier.params);
-      return subscribeSubagentTree(identifier.workspaceId, params.conversationId, listener);
+      const params = Value.Parse(Type.Object({ agentId: Type.String({ minLength: 1 }) }, { additionalProperties: false }), identifier.params);
+      return subscribeSubagentTree(identifier.workspaceId, params.agentId, listener);
     },
   }],
   attachToWorkspace() {
@@ -53,8 +53,8 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
         const message = snapshot.messages.find((message) => message.id === String(form.get("message")));
         if (!message || (message.from !== target && message.to !== target)) return new Response("Subagent message not found", { status: 404 });
         if (!child) {
-          const roots = await listWorkspaceAgentConversations(workspaceId);
-          if (!roots.some((root) => root.conversationId === target)) return new Response("Agent not found", { status: 404 });
+          const roots = await listWorkspaceAgents(workspaceId);
+          if (!roots.some((root) => root.agentId === target)) return new Response("Agent not found", { status: 404 });
           const query = new URLSearchParams({ agent: target, agentTarget: message.id });
           return new Response(null, { status: 303, headers: { location: `/workspaces/${encodeURIComponent(workspaceId)}?${query}` } });
         }

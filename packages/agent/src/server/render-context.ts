@@ -5,7 +5,7 @@ import type { SessionImageRef } from "./transcript.ts";
 export interface AgentRenderContext {
   streamingText?: (key: string, source: string) => { stableHtml: string; tailHtml: string };
   workspaceId: string;
-  conversationId: string;
+  agentId: string;
   model?: ModelRef;
   revealTarget?: string;
   branchId?: string;
@@ -22,12 +22,12 @@ export function commentaryContext(ctx: AgentRenderContext): AgentRenderContext {
   return { ...ctx, commentary: true };
 }
 
-export function agentConversationKey(conversationId: string): string {
-  return `agent:${conversationId}`;
+export function agentKey(agentId: string): string {
+  return `agent:${agentId}`;
 }
 
 function prefix(ctx: AgentRenderContext): string {
-  return domId("ag", ctx.workspaceId, ctx.conversationId, ...(ctx.commentary ? ["commentary"] : []));
+  return domId("ag", ctx.workspaceId, ctx.agentId, ...(ctx.commentary ? ["commentary"] : []));
 }
 
 export const ids = {
@@ -53,7 +53,7 @@ export const ids = {
 };
 
 export function agentPath(ctx: AgentRenderContext, suffix: string): string {
-  return `${ctx.transcriptBasePath ?? `/workspaces/${encodeURIComponent(ctx.workspaceId)}/agents/${encodeURIComponent(ctx.conversationId)}`}${suffix}`;
+  return `${ctx.transcriptBasePath ?? `/workspaces/${encodeURIComponent(ctx.workspaceId)}/agents/${encodeURIComponent(ctx.agentId)}`}${suffix}`;
 }
 
 export function transcriptItemPath(ctx: AgentRenderContext, key: string, query = ""): string {

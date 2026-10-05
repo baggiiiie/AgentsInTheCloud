@@ -17,7 +17,7 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     const runtime = await requireAgentController(params[0], params[1], options);
     await runtime.configure({ model: { provider: model.provider, modelId: model.id } });
     await invalidateAgentView(options, params[0], params[1]);
-    return json ? Response.json({ agent: { conversationId: params[1], model: `${model.provider}::${model.id}` } }) : turboStreamResponse("");
+    return json ? Response.json({ agent: { agentId: params[1], model: `${model.provider}::${model.id}` } }) : turboStreamResponse("");
   }
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/thinking$/)) && request.method === "POST") {
     const json = requestAcceptsJson(request);
@@ -32,7 +32,7 @@ export const handleConfigurationRequest: AgentRouteHandler = async (request, url
     const model = (await runtime.settings()).model;
     if (model) await setAgentModelThinkingLevel("builtin", { provider: model.provider, id: model.modelId }, level);
     await invalidateAgentView(options, params[0], params[1]);
-    return json ? Response.json({ agent: { conversationId: params[1], thinkingLevel: level } }) : turboStreamResponse("");
+    return json ? Response.json({ agent: { agentId: params[1], thinkingLevel: level } }) : turboStreamResponse("");
   }
   return undefined;
 };

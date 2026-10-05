@@ -62,13 +62,13 @@ ${ready ? thinkingSelection : ""}
 }
 
 export function renderLaunchModelSettings(options: {
-  frameId: string; formId: string; url: string; agentProvider: string; selectedValue: string;
+  frameId: string; formId: string; url: string; agentTypeId: string; selectedValue: string;
   models: ComposerModelOption[]; thinkingLevels: string[]; selectedThinkingLevel: string; connectedProvider: boolean;
 }): string {
   const modelFormId = `${options.frameId}_model_form`;
-  return `<turbo-frame id="${escapeHtml(options.frameId)}" class="launch-model-settings" data-agent-provider="${escapeHtml(options.agentProvider)}">
+  return `<turbo-frame id="${escapeHtml(options.frameId)}" class="launch-model-settings" data-agent-type="${escapeHtml(options.agentTypeId)}">
 <form id="${escapeHtml(modelFormId)}" method="get" action="${escapeHtml(options.url)}" data-turbo-frame="${escapeHtml(options.frameId)}" hidden></form>
-<input type="hidden" name="provider" value="${escapeHtml(options.agentProvider)}" form="${escapeHtml(modelFormId)}">
+<input type="hidden" name="agentTypeId" value="${escapeHtml(options.agentTypeId)}" form="${escapeHtml(modelFormId)}">
 <input type="hidden" name="model" value="${escapeHtml(options.selectedValue)}" form="${escapeHtml(options.formId)}">
 ${renderSharedComposerSelections({ ...options, modelFormId, thinkingFormId: options.formId })}</turbo-frame>`;
 }

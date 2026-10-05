@@ -8,8 +8,8 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { historyNote } from "./entries.ts";
 
-export interface ConvertedConversation {
-  conversationId: string;
+export interface ConvertedAgent {
+  agentId: string;
   label: string;
   title: string;
   storage: "durable";
@@ -19,8 +19,8 @@ export interface ConvertedConversation {
  * Existing identities must return their original ID without appending entries.
  */
 export interface HistoryImportDestination {
-  catalog(): Promise<readonly { conversationId: string }[]>;
-  importHistory(identity: Pick<ConvertedConversation, "conversationId" | "label" | "title">, entries: readonly EntryDraft[]): Promise<ConversationId>;
+  catalog(): Promise<readonly { agentId: string }[]>;
+  importHistory(identity: Pick<ConvertedAgent, "agentId" | "label" | "title">, entries: readonly EntryDraft[]): Promise<ConversationId>;
 }
 
 export interface LegacyConversion {
@@ -109,7 +109,7 @@ async function transcript(path: string): Promise<EntryDraft[]> {
  * Journal import precedes metadata replacement. The catalog UUID is the retry marker;
  * a crash in that gap reuses the committed import even if the source is now absent.
  */
-export async function convertLegacyConversations(options: LegacyConversion): Promise<ConvertedConversation[]> {
+export async function convertLegacyAgents(options: LegacyConversion): Promise<ConvertedAgent[]> {
   const { workspaceId, metadata, shareDirectory: directory } = options;
   const records = metadata === undefined ? [] : Value.Parse(oldMetadata, JSON.parse(metadata)).conversations;
   const files = await readdir(directory).catch((error: NodeJS.ErrnoException) => {
@@ -130,10 +130,10 @@ export async function convertLegacyConversations(options: LegacyConversion): Pro
     const owner = await options.destination();
     const catalog = await owner.catalog();
     for (const source of sources.values()) {
-      if (!catalog.some(record => record.conversationId === source.conversationId)) {
-        await owner.importHistory(source, await transcript(source.path));
+      if (!catalog.some(record => record.agentId === source.conversationId)) {
+        await owner.importHistory({ agentId: source.conversationId, label: source.label, title: source.title }, await transcript(source.path));
       }
     }
   }
-  return records.map(record => ({ conversationId: record.conversationId, label: record.label, title: record.title, storage: "durable" }));
+  return records.map(record => ({ agentId: record.conversationId, label: record.label, title: record.title, storage: "durable" }));
 }

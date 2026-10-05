@@ -2,11 +2,11 @@ import { expect, spyOn, test } from "bun:test";
 import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { publishWorkspaceAgentBusy } from "../../agent/src/server/workspace-agent-busy.ts";
 import type { CliAgentAdapter } from "../src/server/adapter.ts";
-import type { CliSessions } from "../src/server/sessions.ts";
+import type { CliAgents } from "../src/server/agents.ts";
 import { cliTranscriptChannel } from "../src/server/transcript-routes.ts";
 
 function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>) {
-  const conversationId = crypto.randomUUID();
+  const agentId = crypto.randomUUID();
   const adapter: CliAgentAdapter = {
     id: "review", label: "Review", iconHtml: "",
     requireSetup: async () => {},
@@ -14,15 +14,15 @@ function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>)
     launchScript: () => "true",
     loadTranscript,
   };
-  const sessions: Pick<CliSessions, "ready"> = {
-    ready: async () => ({ id: conversationId, title: "Review", tmuxSession: `review-${conversationId}`, input: { text: "", images: [], attachmentNotes: [] } }),
+  const agents: Pick<CliAgents, "ready"> = {
+    ready: async () => ({ id: agentId, title: "Review", tmuxSession: `review-${agentId}`, input: { text: "", images: [], attachmentNotes: [] } }),
   };
   return {
-    conversationId,
-    channel: cliTranscriptChannel(adapter, sessions),
-    identifier: { channel: "module" as const, name: "review-transcript", workspaceId: "workspace", params: { conversationId } },
+    agentId,
+    channel: cliTranscriptChannel(adapter, agents),
+    identifier: { channel: "module" as const, name: "review-transcript", workspaceId: "workspace", params: { agentId } },
     finishTurn() {
-      publishWorkspaceAgentBusy({ workspaceId: "workspace", agentKey: `agent:${conversationId}`, busy: false });
+      publishWorkspaceAgentBusy({ workspaceId: "workspace", agentKey: `agent:${agentId}`, busy: false });
     },
   };
 }
@@ -51,7 +51,7 @@ test("a failed incremental history read is reported and queued publications cont
     expect(reads).toBe(3);
     expect(publications).toBe(2);
     expect(report).toHaveBeenCalledTimes(1);
-    expect(report).toHaveBeenCalledWith(`Could not publish Review transcript for ${f.conversationId}`, failure);
+    expect(report).toHaveBeenCalledWith(`Could not publish Review transcript for ${f.agentId}`, failure);
   } finally {
     subscription.unsubscribe();
     report.mockRestore();

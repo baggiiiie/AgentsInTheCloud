@@ -4,9 +4,9 @@ import { renderTranscript, renderTranscriptItem, renderTranscriptItemDetailFrame
 import type { AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import type { ToolView, TranscriptItem } from "@agents-in-the-cloud/agent/server/transcript";
 
-const ctx: AgentRenderContext = { workspaceId: "ws", conversationId: "00000000-0000-4000-8000-000000000001" };
-const agent = { workspaceId: "ws", conversationId: "00000000-0000-4000-8000-000000000001", label: "agent", title: "Agent", path: "/tmp/agent.jsonl" };
-const ctxPrefix = `ag_ws_${agent.conversationId}`;
+const ctx: AgentRenderContext = { workspaceId: "ws", agentId: "00000000-0000-4000-8000-000000000001" };
+const agent = { workspaceId: "ws", agentId: "00000000-0000-4000-8000-000000000001", label: "agent", title: "Agent", path: "/tmp/agent.jsonl" };
+const ctxPrefix = `ag_ws_${agent.agentId}`;
 const tool = (overrides: Partial<ToolView>): ToolView => ({ callId: "call", name: "read", args: {}, status: "ok", ...overrides });
 const renderBash = (command: string, overrides: Partial<ToolView> = {}): string => renderTranscriptItemDetailFrame(ctx, { type: "tool", key: "bash", tool: tool({ name: "bash", args: { command }, ...overrides }) });
 const renderedText = (html: string): string => html.replace(/<script[^>]*>[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, "");
@@ -19,8 +19,8 @@ describe("transcript rendering", () => {
   test("server-rendered panes and routes use immutable conversation identity", async () => {
     const stats = { contextPercent: null, compactAvailable: false, inputTokens: 0, outputTokens: 0, cost: 0, modelName: undefined, thinkingLevel: "off", thinkingLevels: [], models: [] };
     const html = await renderAgentPane(ctx, agent, { transcriptHtml: "", busy: false, stats });
-    expect(html).toContain(`data-agent-pane-conversation-id-value="${agent.conversationId}"`);
-    expect(html).toContain(`/agents/${agent.conversationId}/messages`);
+    expect(html).toContain(`data-agent-pane-agent-id-value="${agent.agentId}"`);
+    expect(html).toContain(`/agents/${agent.agentId}/messages`);
     expect(html).not.toContain("data-agent-pane-label-value");
   });
 
@@ -43,13 +43,6 @@ describe("transcript rendering", () => {
   test("user messages retain their original text for keyboard prompt history", () => {
     const html = renderTranscriptItem(ctx, { type: "user", key: "user-history", text: "**bold** & quoted \"text\"", images: [] });
     expect(html).toContain('data-agent-user-text="**bold** &amp; quoted &quot;text&quot;"');
-  });
-
-  test("composers omit Fast mode", () => {
-    const html = renderAgentPaneComposerFooter(ctx, { contextPercent: null, compactAvailable: false, inputTokens: 0, outputTokens: 0, cost: 0, modelName: "GPT", thinkingLevel: "high", thinkingLevels: ["high"], models: [] });
-    expect(html).toContain('data-agent-compact-available="false"');
-    expect(html).not.toContain('aria-label="Fast mode"');
-    expect(html).not.toContain("/service-tier");
   });
 
   test("completed activity with no items is omitted", () => {

@@ -9,7 +9,7 @@ export async function nativeSnapshot(workspaceId: string) {
   const agents = await owner.harness.commit(async tx => {
     const agents = [];
     for (const record of records.filter(item => item.parentId)) agents.push({
-      id: record.conversationId, parentId: record.parentId!, rootId: record.rootId!, taskName: record.taskName!,
+      id: record.agentId, parentId: record.parentId!, rootId: record.rootId!, taskName: record.taskName!,
       status: await nativeStatus(tx, record), task: record.title,
     });
     return agents;

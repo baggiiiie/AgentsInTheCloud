@@ -51,8 +51,8 @@ export function validDraftId(draftId: string): boolean {
 }
 
 /** Stable composer draft identity for one immutable Workspace/Agent pair. */
-export function agentAttachmentDraftId(workspaceId: string, conversationId: string): string {
-  const digest = createHash("sha256").update(JSON.stringify([workspaceId, conversationId])).digest("hex");
+export function agentAttachmentDraftId(workspaceId: string, agentId: string): string {
+  const digest = createHash("sha256").update(JSON.stringify([workspaceId, agentId])).digest("hex");
   return `agent-${digest}`;
 }
 

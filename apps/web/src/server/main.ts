@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { agentProvider, rememberAgentProvider } from "./agent-providers.ts";
+import { getAgentType, rememberAgentType } from "./agent-types.ts";
 import { createWebApp, type WebApp } from "./app.ts";
 import { parseAssetManifest } from "./asset-manifest.ts";
 import { createCableServer, type CableSocketData } from "./cable.ts";
@@ -78,7 +78,7 @@ app = createWebApp({
       await options.run.step(hook.id, hook.label, work, hook.recovery);
     }
     await options.run.step("workspace.integrations", "Run workspace startup integrations", () => agentsInTheCloudEvents.emit("workspace_created", { workspaceId: id, init: options.init, context: options.context }));
-    await rememberAgentProvider(options.context?.agent?.provider ?? "builtin", agentsInTheCloudEvents);
+    await rememberAgentType(options.context?.agent?.agentTypeId ?? "builtin", agentsInTheCloudEvents);
     const draft = options.context?.agent?.attachmentDraft;
     if (draft && validDraftId(draft)) await removeAttachmentDraft(draft);
   },
@@ -121,14 +121,14 @@ for (const module of workspaceModules) {
 
 provisioningHooks.push({ id: "workspace.agent", label: "Prepare agent", async run({ workspaceId, creationContext }) {
   const parameters = creationContext?.agent;
-  const provider = agentProvider(parameters?.provider ?? "builtin");
+  const agentType = getAgentType(parameters?.agentTypeId ?? "builtin");
   if (parameters) {
     const attachments = parameters.attachmentDraft && validDraftId(parameters.attachmentDraft)
       ? await deliverAttachmentDraft(workspaceId, parameters.attachmentDraft)
       : { images: [], attachmentNotes: [] };
     parameters.input = { text: parameters.initialPrompt ?? "", ...attachments };
   }
-  await provider.launch.prepareWorkspace(workspaceId, creationContext);
+  await agentType.launch.prepareWorkspace(workspaceId, creationContext);
 } });
 
 app.resumeWorkspaceDeletions();

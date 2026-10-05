@@ -5,10 +5,10 @@ import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, rend
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
-import { configuredModelOptionViews, launchComposerThinkingSettings, selectAvailableConfiguredModel } from "@agents-in-the-cloud/agent/server/model-state";
-import { agentConversationKey, agentPath, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
+import { enabledModelOptionViews, launchComposerThinkingSettings, selectAvailableEnabledModel } from "@agents-in-the-cloud/agent/server/model-state";
+import { agentKey, agentPath, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderAgentNotifications } from "./render-notification.ts";
-import type { WorkspaceAgentConversationInfo } from "./session-store.ts";
+import type { WorkspaceAgentInfo } from "./agent-store.ts";
 import { formatCost, formatTokens } from "@agents-in-the-cloud/agent/server/transcript";
 
 export interface AgentStatsView {
@@ -35,18 +35,18 @@ export interface AgentPaneState {
   stats: AgentStatsView;
 }
 
-export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceAgentConversationInfo, state: AgentPaneState, completionCatalogHtml = ""): Promise<string> {
-  const key = agentConversationKey(agent.conversationId);
-  const draftId = agentAttachmentDraftId(ctx.workspaceId, ctx.conversationId);
+export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceAgentInfo, state: AgentPaneState, completionCatalogHtml = ""): Promise<string> {
+  const key = agentKey(agent.agentId);
+  const draftId = agentAttachmentDraftId(ctx.workspaceId, ctx.agentId);
   const attachments = state.readOnly ? [] : await listStagedAttachments(draftId);
-  const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.conversationId);
+  const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.agentId);
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
-  return `<section id="${domId("agent_pane", ctx.workspaceId, agent.conversationId)}" data-turbo-permanent class="agent-conversation-pane" data-agent-conversation-source="${escapeHtml(key)}">
+  return `<section id="${domId("agent_pane", ctx.workspaceId, agent.agentId)}" data-turbo-permanent class="agent-pane" data-agent-source="${escapeHtml(key)}">
     <div class="agent-pane agent-composer-pane" id="${ids.pane(ctx)}"
       ${state.readOnly ? "" : `data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
-      data-agent-pane-conversation-id-value="${escapeHtml(ctx.conversationId)}"
+      data-agent-pane-agent-id-value="${escapeHtml(ctx.agentId)}"
       ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}`}>
       ${state.readOnly ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
       <div class="agent-transcript-region">
@@ -55,7 +55,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
         </div>
         ${state.readOnly ? "" : renderFloatingStack({ openComposer: renderOpenComposerButton(), followLatest: renderFollowLatestButton('data-agent-pane-target="transcriptEnd" data-action="agent-pane#scrollToTranscriptEnd"') })}
       </div>
-      ${state.readOnly ? '<p class="agent-noticeline">This conversation is read-only. Start a new Agent conversation to continue.</p>' : renderAgentPaneComposer({
+      ${state.readOnly ? '<p class="agent-noticeline">This Agent is read-only. Start a new Agent to continue.</p>' : renderAgentPaneComposer({
         ctx,
         action: agentPath(ctx, "/messages"),
         draftId,
@@ -115,12 +115,12 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
 }
 
 export async function renderLaunchComposerSettings(options: { frameId: string; formId: string; url: string; selectedModel?: string; selectedThinkingLevel?: string }): Promise<string> {
-  const models = await configuredModelOptionViews();
-  const selected = selectAvailableConfiguredModel(models, options.selectedModel ? parseModelRef(options.selectedModel) : undefined);
+  const models = await enabledModelOptionViews();
+  const selected = selectAvailableEnabledModel(models, options.selectedModel ? parseModelRef(options.selectedModel) : undefined);
   const selectedValue = selected ? modelRefValue(selected) : "";
   const { selected: selectedThinkingLevel, levels: thinkingLevels } = await launchComposerThinkingSettings(selected);
   return renderLaunchModelSettings({
-    ...options, agentProvider: "builtin", selectedValue,
+    ...options, agentTypeId: "builtin", selectedValue,
     models: models.map((model) => ({ ...model, selected: modelRefValue(model) === selectedValue })),
     thinkingLevels,
     selectedThinkingLevel: options.selectedThinkingLevel && thinkingLevels.includes(options.selectedThinkingLevel) ? options.selectedThinkingLevel : selectedThinkingLevel ?? "",

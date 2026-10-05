@@ -2,7 +2,7 @@ import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
-import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentProvider } from "@agents-in-the-cloud/shared";
+import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentType } from "@agents-in-the-cloud/shared";
 
 /** Host-owned launch composer content. */
 export interface AgentLaunchPresentation {
@@ -12,28 +12,28 @@ export interface AgentLaunchPresentation {
   footerHtml: string;
   discardUrl: string;
 }
-const launchProviderFrameId = "launch_composer_provider";
+const launchAgentTypeFrameId = "launch_composer_agent_type";
 
-export async function renderLaunchProvider(provider: WorkspaceAgentProvider, providers: readonly WorkspaceAgentProvider[], context: AgentLaunchFooterContext): Promise<string> {
-  const selectionFormId = `${launchProviderFrameId}_selection`;
+export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agentTypes: readonly WorkspaceAgentType[], context: AgentLaunchFooterContext): Promise<string> {
+  const selectionFormId = `${launchAgentTypeFrameId}_selection`;
   const picker = popupHtml({
-    id: `${launchProviderFrameId}_menu`, label: "Agent provider", placement: "above",
-    trigger: { variant: "secondary", content: { kind: "caption", caption: provider.label, iconHtml: provider.iconHtml } },
-    contentHtml: providers.map((item) => actionItemHtml({
+    id: `${launchAgentTypeFrameId}_menu`, label: "Agent type", placement: "above",
+    trigger: { variant: "secondary", content: { kind: "caption", caption: agentType.label, iconHtml: agentType.iconHtml } },
+    contentHtml: agentTypes.map((item) => actionItemHtml({
       kind: "single", label: { kind: "text", text: item.label }, leadingHtml: item.iconHtml,
-      element: { tag: "button", attributesHtml: `type="submit" name="provider" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === provider.id}"` },
+      element: { tag: "button", attributesHtml: `type="submit" name="agentTypeId" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === agentType.id}"` },
     })).join(""),
   });
-  return `<turbo-frame id="${launchProviderFrameId}">
-    <form id="${selectionFormId}" method="get" action="/launch-composer/provider" data-turbo-frame="${launchProviderFrameId}" hidden></form>
-    <input type="hidden" name="provider" value="${escapeHtml(provider.id)}" form="${escapeHtml(context.formId)}">
+  return `<turbo-frame id="${launchAgentTypeFrameId}">
+    <form id="${selectionFormId}" method="get" action="/launch-composer/agent-type" data-turbo-frame="${launchAgentTypeFrameId}" hidden></form>
+    <input type="hidden" name="agentTypeId" value="${escapeHtml(agentType.id)}" form="${escapeHtml(context.formId)}">
     ${picker}
-    ${await provider.launch.renderFooter(context)}
+    ${await agentType.launch.renderFooter(context)}
   </turbo-frame>`;
 }
 
-/** The host owns text and attachments; provider switches replace only the settings footer. */
-export async function launchComposerContent(options: { draftId: string; provider: WorkspaceAgentProvider; providers: readonly WorkspaceAgentProvider[]; context: AgentLaunchFooterContext; workspaceTemplateId?: string }): Promise<AgentLaunchPresentation> {
+/** The host owns text and attachments; Agent type switches replace only the settings footer. */
+export async function launchComposerContent(options: { draftId: string; agentType: WorkspaceAgentType; agentTypes: readonly WorkspaceAgentType[]; context: AgentLaunchFooterContext; workspaceTemplateId?: string }): Promise<AgentLaunchPresentation> {
   const { draftId } = options;
   const rowId = domId("agent_draft_attach", draftId);
   return {
@@ -43,7 +43,7 @@ export async function launchComposerContent(options: { draftId: string; provider
       draft: { id: draftId, rowId },
       inputHtml: `<textarea class="composer-input" name="text" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste"></textarea>`,
     }),
-    footerHtml: await renderLaunchProvider(options.provider, options.providers, options.context),
+    footerHtml: await renderLaunchAgentType(options.agentType, options.agentTypes, options.context),
     discardUrl: `/agent-attachment-drafts/${encodeURIComponent(draftId)}/discard`,
   };
 }

@@ -1,4 +1,4 @@
-import { agentConversationKey, ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, subscribeWorkspaceAgentBusy, type AgentRenderContext } from "@agents-in-the-cloud/agent/server";
+import { agentKey, ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, subscribeWorkspaceAgentBusy, type AgentRenderContext } from "@agents-in-the-cloud/agent/server";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { renderFollowLatestButton } from "@agents-in-the-cloud/prompt/server";
@@ -7,11 +7,11 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { response } from "@agents-in-the-cloud/shared/http";
 import type { CliAgentAdapter } from "./adapter.ts";
-import type { CliSessions } from "./sessions.ts";
+import type { CliAgents } from "./agents.ts";
 
 type CliTranscriptContext = AgentRenderContext & { transcriptBasePath: string };
-function context(workspaceId: string, conversationId: string, providerId: string): CliTranscriptContext {
-  return { workspaceId, conversationId, transcriptBasePath: `/workspaces/${encodeURIComponent(workspaceId)}/${providerId}-agents/${encodeURIComponent(conversationId)}/transcript` };
+function context(workspaceId: string, agentId: string, providerId: string): CliTranscriptContext {
+  return { workspaceId, agentId, transcriptBasePath: `/workspaces/${encodeURIComponent(workspaceId)}/${providerId}-agents/${encodeURIComponent(agentId)}/transcript` };
 }
 
 /** Available: the transcript can stand in for the terminal. Never mid-turn, and only once there is something to read. */
@@ -19,49 +19,49 @@ function renderTranscriptContent(ctx: CliTranscriptContext, available: boolean, 
   return `<div id="${ids.transcript(ctx)}" class="agent-transcript-content" data-cli-terminal-target="transcriptContent" data-available="${available}">${html}</div>`;
 }
 
-export function renderCliTranscriptView(adapter: CliAgentAdapter, workspaceId: string, conversationId: string): string {
+export function renderCliTranscriptView(adapter: CliAgentAdapter, workspaceId: string, agentId: string): string {
   if (!adapter.loadTranscript) return "";
-  return `<div class="agent-transcript cli-transcript-view" data-cli-terminal-target="transcript" data-action="scroll->cli-terminal#transcriptScrolled">${renderTranscriptContent(context(workspaceId, conversationId, adapter.id), false)}</div>`;
+  return `<div class="agent-transcript cli-transcript-view" data-cli-terminal-target="transcript" data-action="scroll->cli-terminal#transcriptScrolled">${renderTranscriptContent(context(workspaceId, agentId, adapter.id), false)}</div>`;
 }
 
-export function cliTranscriptAttributes(adapter: CliAgentAdapter, conversationId: string): string {
+export function cliTranscriptAttributes(adapter: CliAgentAdapter, agentId: string): string {
   if (!adapter.loadTranscript) return "";
-  return `data-cli-terminal-conversation-id-value="${escapeHtml(conversationId)}" data-cli-terminal-transcript-channel-value="${escapeHtml(cliTranscriptChannelName(adapter))}"`;
+  return `data-cli-terminal-agent-id-value="${escapeHtml(agentId)}" data-cli-terminal-transcript-channel-value="${escapeHtml(cliTranscriptChannelName(adapter))}"`;
 }
 
 function cliTranscriptChannelName(adapter: CliAgentAdapter): string { return `${adapter.id}-transcript`; }
 
 /** Publishes whether the transcript is available whenever the CLI starts or finishes a turn, with the transcript itself for panes showing it. */
-export function cliTranscriptChannel(adapter: CliAgentAdapter, sessions: Pick<CliSessions, "ready">): CableChannelAdapter {
-  // Agent keys name conversations, which are unique across workspaces.
+export function cliTranscriptChannel(adapter: CliAgentAdapter, agents: Pick<CliAgents, "ready">): CableChannelAdapter {
+  // Agent keys identify Agents, which are unique across workspaces.
   const busy = new Set<string>();
   const watchers = new Set<{ agentKey: string; changed(): void }>();
   subscribeWorkspaceAgentBusy(({ agentKey, busy: started }) => {
     if (started) busy.add(agentKey); else busy.delete(agentKey);
     for (const watcher of watchers) if (watcher.agentKey === agentKey) watcher.changed();
   });
-  async function render(workspaceId: string, conversationId: string, includeTranscript: boolean): Promise<string> {
+  async function render(workspaceId: string, agentId: string, includeTranscript: boolean): Promise<string> {
     // The transcript is only shown between turns, so every turn in it has finished.
-    const records = busy.has(agentConversationKey(conversationId)) ? undefined : await adapter.loadTranscript!(workspaceId, conversationId);
+    const records = busy.has(agentKey(agentId)) ? undefined : await adapter.loadTranscript!(workspaceId, agentId);
     const available = records?.some((record) => record.kind === "user") ?? false;
-    const ctx = context(workspaceId, conversationId, adapter.id);
+    const ctx = context(workspaceId, agentId, adapter.id);
     return turboStream("replace", ids.transcript(ctx), renderTranscriptContent(ctx, available, includeTranscript && available ? renderReadOnlyTranscript(ctx, records!) : ""));
   }
   return {
     name: cliTranscriptChannelName(adapter),
     async subscribe(identifier, listener) {
       if (identifier.channel !== "module" || identifier.name !== cliTranscriptChannelName(adapter)) throw new Error(`Invalid ${adapter.label} transcript channel`);
-      const { conversationId, transcript } = Value.Parse(Type.Object({ conversationId: Type.String({ minLength: 1 }), transcript: Type.Optional(Type.Literal("shown")) }, { additionalProperties: false }), identifier.params);
+      const { agentId, transcript } = Value.Parse(Type.Object({ agentId: Type.String({ minLength: 1 }), transcript: Type.Optional(Type.Literal("shown")) }, { additionalProperties: false }), identifier.params);
       const workspaceId = identifier.workspaceId;
-      await sessions.ready(workspaceId, conversationId);
-      const publish = async () => listener(await render(workspaceId, conversationId, transcript !== undefined));
+      await agents.ready(workspaceId, agentId);
+      const publish = async () => listener(await render(workspaceId, agentId, transcript !== undefined));
       // Turn boundaries can arrive while the transcript loads; publish each in order.
       let latest = publish();
       const watcher = {
-        agentKey: agentConversationKey(conversationId),
+        agentKey: agentKey(agentId),
         changed() {
           latest = latest.then(publish).catch((error) => {
-            console.error(`Could not publish ${adapter.label} transcript for ${conversationId}`, error);
+            console.error(`Could not publish ${adapter.label} transcript for ${agentId}`, error);
           });
         },
       };
@@ -83,19 +83,19 @@ export function renderCliTranscriptControls(adapter: CliAgentAdapter): CliTransc
   };
 }
 
-export function cliTranscriptRoutes(adapter: CliAgentAdapter, sessions: CliSessions) {
+export function cliTranscriptRoutes(adapter: CliAgentAdapter, agents: CliAgents) {
   return async (request: Request, url: URL): Promise<Response | undefined> => {
     const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/transcript\/(transcript-items|session-images)\/([^/]+)(?:\/(\d+))?$/);
     if (!match || match[2] !== adapter.id || request.method !== "GET" || !adapter.loadTranscript) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
-    const conversationId = decodeURIComponent(match[3]!);
-    await sessions.ready(workspaceId, conversationId);
-    const ctx = context(workspaceId, conversationId, adapter.id);
+    const agentId = decodeURIComponent(match[3]!);
+    await agents.ready(workspaceId, agentId);
+    const ctx = context(workspaceId, agentId, adapter.id);
     if (match[4] === "session-images") {
       if (!adapter.loadTranscriptImage || match[6] === undefined) return new Response("Not found", { status: 404 });
-      return adapter.loadTranscriptImage(workspaceId, conversationId, decodeURIComponent(match[5]!), Number(match[6]));
+      return adapter.loadTranscriptImage(workspaceId, agentId, decodeURIComponent(match[5]!), Number(match[6]));
     }
-    const records = await adapter.loadTranscript(workspaceId, conversationId);
+    const records = await adapter.loadTranscript(workspaceId, agentId);
     const count = Math.max(100, Math.min(100_000, Number(url.searchParams.get("count") ?? 100) || 100));
     const html = records && renderReadOnlyTranscriptDetail(ctx, records, decodeURIComponent(match[5]!), count);
     return response(html ?? "Not found", { status: html ? 200 : 404 });

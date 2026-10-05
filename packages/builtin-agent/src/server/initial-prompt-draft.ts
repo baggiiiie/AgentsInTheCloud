@@ -13,29 +13,29 @@ function initialPromptDraftWorkspacePath(workspaceId: string): string {
   return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "agent-initial-prompt-drafts", workspaceId);
 }
 
-function initialPromptDraftPath(workspaceId: string, conversationId: string): string {
-  return `${initialPromptDraftWorkspacePath(workspaceId)}/${conversationId}.json`;
+function initialPromptDraftPath(workspaceId: string, agentId: string): string {
+  return `${initialPromptDraftWorkspacePath(workspaceId)}/${agentId}.json`;
 }
 
-export async function stageInitialPrompt(workspaceId: string, conversationId: string, prompt: string): Promise<void> {
-  const path = initialPromptDraftPath(workspaceId, conversationId);
+export async function stageInitialPrompt(workspaceId: string, agentId: string, prompt: string): Promise<void> {
+  const path = initialPromptDraftPath(workspaceId, agentId);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify({ prompt })}\n`, "utf8");
 }
 
-export async function readInitialPromptDraft(workspaceId: string, conversationId: string): Promise<{ prompt: string } | undefined> {
-  const text = await readTextIfExists(initialPromptDraftPath(workspaceId, conversationId));
+export async function readInitialPromptDraft(workspaceId: string, agentId: string): Promise<{ prompt: string } | undefined> {
+  const text = await readTextIfExists(initialPromptDraftPath(workspaceId, agentId));
   if (text === undefined) return undefined;
   const draft = Value.Parse(initialPromptDraftSchema, JSON.parse(text));
   if (draft.accepted === false) {
-    await removeInitialPromptDraft(workspaceId, conversationId);
+    await removeInitialPromptDraft(workspaceId, agentId);
     return undefined;
   }
   return { prompt: draft.prompt };
 }
 
-export async function removeInitialPromptDraft(workspaceId: string, conversationId: string): Promise<void> {
-  await rm(initialPromptDraftPath(workspaceId, conversationId), { force: true });
+export async function removeInitialPromptDraft(workspaceId: string, agentId: string): Promise<void> {
+  await rm(initialPromptDraftPath(workspaceId, agentId), { force: true });
 }
 
 export async function removeWorkspaceInitialPromptDrafts(workspaceId: string): Promise<void> {

@@ -5,17 +5,18 @@ import { join } from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider, InMemoryCredentialStore } from "@earendil-works/pi-ai";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { createRegistry, defineExtension, defineTool, LiveDoc, type HarnessOptions } from "@earendil-works/pi-durable";
+import { createRegistry, defineDoc, Harness, defineExtension, defineTool, LiveDoc, type HarnessOptions } from "@earendil-works/pi-durable";
 import { Type } from "typebox";
+import { openNodeJsonlStorage } from "@earendil-works/pi-durable/storage/jsonl/node";
 import { submitDurableInput } from "../../src/server/durable-input.ts";
 import { durableWorkspaceTool } from "../../src/server/durable-tools.ts";
 import { defineWorkspaceTool } from "@agents-in-the-cloud/agent/server/workspace-tool";
-import { openDurableWorkspace, WorkspaceConversations, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
+import { openDurableWorkspace, WorkspaceAgents, type DurableWorkspace } from "../../src/server/durable-workspace.ts";
 
 const context = BACKGROUND_CONTEXT;
 const directories: string[] = [];
 const workspaces: DurableWorkspace[] = [];
-const record = { conversationId: "agents-in-the-cloud-tab-1", label: "Agent 1", title: "Find the durability regression" };
+const record = { agentId: "agents-in-the-cloud-tab-1", label: "Agent 1", title: "Find the durability regression" };
 const agent = { model: { provider: "faux", modelId: "faux-1" } };
 
 async function directory() {
@@ -48,20 +49,20 @@ describe("Durable workspace journal", () => {
     const options = provider();
     const first = await open(path, options);
     const [one, same] = await Promise.all([
-      first.conversation(record, agent),
-      first.conversation(record, agent),
+      first.agent(record, agent),
+      first.agent(record, agent),
     ]);
     expect(same.id).toBe(one.id);
-    const two = await first.conversation({ ...record, conversationId: "agents-in-the-cloud-tab-2", label: "Agent 2" }, agent);
+    const two = await first.agent({ ...record, agentId: "agents-in-the-cloud-tab-2", label: "Agent 2" }, agent);
     expect(two.id).not.toBe(one.id);
     expect((await first.harness.inspect(context)).scheduling).toBe("paused");
-    const catalog = await first.harness.snapshot(WorkspaceConversations, context);
-    expect(catalog?.conversations).toHaveLength(2);
+    const catalog = await first.harness.snapshot(WorkspaceAgents, context);
+    expect(catalog?.agents).toHaveLength(2);
     expect(catalog?.workspaceId).toBe("workspace-1");
     await first.close();
 
     const reopened = await open(path, options);
-    expect((await reopened.conversation(record)).id).toBe(one.id);
+    expect((await reopened.agent(record)).id).toBe(one.id);
     expect((await reopened.harness.inspect(context)).scheduling).toBe("paused");
     // Raw journals remain searchable without a separate transcript export.
     const main = await readFile(join(path, "main.jsonl"), "utf8");
@@ -69,7 +70,7 @@ describe("Durable workspace journal", () => {
     const journal = (await Promise.all(files.map((file) => readFile(join(path, file), "utf8")))).join("\n");
     expect(main).toContain("agents-in-the-cloud.workspace");
     expect(journal).toContain(record.title);
-    expect(journal).toContain(record.conversationId);
+    expect(journal).toContain(record.agentId);
   });
 
   test("deduplicates admitted inputs across reopening and keeps their text searchable", async () => {
@@ -77,14 +78,14 @@ describe("Durable workspace journal", () => {
     const options = provider();
     options.faux.setResponses([fauxAssistantMessage("The committed answer.")]);
     const first = await open(path, options);
-    const conversation = await first.conversation(record, agent);
+    const conversation = await first.agent(record, agent);
     const input = { type: "input", content: "Searchable user request.", requestId: "browser-request-1" } as const;
     const submission = await conversation.submit(input, context);
     expect((await submission.wait(context)).status).toBe("done");
     await first.close();
 
     const reopened = await open(path, options);
-    const same = await (await reopened.conversation(record)).submit(input, context);
+    const same = await (await reopened.agent(record)).submit(input, context);
     expect(same.id).toBe(submission.id);
     expect((await same.wait(context)).status).toBe("done");
     expect(options.faux.state.callCount).toBe(1);
@@ -145,7 +146,7 @@ describe("Durable workspace journal", () => {
       },
     ]);
     const first = await open(path, options);
-    const conversation = await first.conversation(record, agent);
+    const conversation = await first.agent(record, agent);
     const initial = await submitDurableInput(conversation, "workspace-1", options.models, { text: "Begin", requestId: "initial" }, context, async (_workspace, text) => text);
     await started.promise;
     const steer = await submitDurableInput(conversation, "workspace-1", options.models, { text: "Use the steered instruction", requestId: "steer" }, context, async (_workspace, text) => text);
@@ -203,7 +204,7 @@ describe("Durable workspace journal", () => {
       const pending = (await reopened.harness.submission(inspection.submissions[0]!.id, context))!;
       expect((await pending.wait(context)).status).toBe("done");
       expect(await readFile(join(path, "executions.txt"), "utf8")).toBe(replay === "safe" ? "executed\nexecuted\n" : "executed\n");
-      const conversation = await reopened.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" });
+      const conversation = await reopened.agent({ agentId: "crash-tab", label: "Agent 1", title: "Crash recovery" });
       const entries = (await conversation.entries({}, 100, undefined, context)).items;
       const results = entries.filter((entry) => entry.kind === "pi.tool-result").flatMap((entry) => entry.model ?? []);
       expect(results).toHaveLength(1);
@@ -236,7 +237,7 @@ describe("Durable workspace journal", () => {
         return fauxAssistantMessage("Recovered generation");
       }]);
       const reopened = await open(path, options, "crash-workspace");
-      const conversation = await reopened.conversation({ conversationId: "crash-tab", label: "Agent 1", title: "Crash recovery" });
+      const conversation = await reopened.agent({ agentId: "crash-tab", label: "Agent 1", title: "Crash recovery" });
       const partial = (await reopened.harness.snapshot(LiveDoc, conversation.id, context))?.generation?.message;
       expect(JSON.stringify(partial?.content)).toContain("Committed");
       expect(options.faux.state.callCount).toBe(0);
@@ -260,9 +261,32 @@ describe("Durable workspace journal", () => {
     faux.setResponses([fauxAssistantMessage("Existing model runtime works.")]);
     runtime.registerNativeProvider(faux.provider);
     const workspace = await open(await directory(), { models: runtime, registry: createRegistry() });
-    const conversation = await workspace.conversation(record, agent);
+    const conversation = await workspace.agent(record, agent);
     const submission = await conversation.submit({ type: "input", content: "Hello" }, context);
     expect((await submission.wait(context)).status).toBe("done");
     expect(faux.state.callCount).toBe(1);
   });
+});
+
+
+test("previous workspace journal catalog retains native history while renaming Agent identities", async () => {
+  const path = await directory();
+  const options = provider();
+  const previousCatalog = defineDoc<{
+    workspaceId: string;
+    conversations: { conversationId: string; durableId: number; label: string; title: string; branches: number[] }[];
+  }>({ kind: "agents-in-the-cloud.workspace", version: 1, scope: "session", initial: () => ({ workspaceId: "workspace-1", conversations: [] }) });
+  const harness = await Harness.open(await openNodeJsonlStorage(path, context), options, context);
+  const id = await harness.commit(async tx => {
+    const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
+    (await tx.doc(previousCatalog)).conversations.push({ conversationId: record.agentId, durableId: created.id, label: record.label, title: record.title, branches: [created.id] });
+    return created.id;
+  }, context);
+  await harness.close(context);
+  const workspace = await open(path, options);
+  expect((await workspace.agent(record)).id).toBe(id);
+  expect((await workspace.harness.snapshot(WorkspaceAgents, context))!.agents).toEqual([{ ...record, durableId: id, branches: [id] }]);
+  await workspace.close();
+  const reopened = await open(path, options);
+  expect((await reopened.agent(record)).id).toBe(id);
 });

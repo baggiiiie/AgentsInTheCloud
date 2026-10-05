@@ -13,7 +13,7 @@ async function scenario(script: string) {
       let runtimeCreations = 0;
       let runtime;
       let availabilityChecks = 0;
-      let favorites = [
+      let enabledModels = [
         { provider: "anthropic", id: "claude", label: "Claude" },
         { provider: "openai-codex", id: "gpt", label: "GPT" },
         { provider: "custom", id: "model", label: "Custom" },
@@ -21,10 +21,10 @@ async function scenario(script: string) {
         { provider: "amazon-bedrock", id: "ambient", label: "AWS profile" },
       ];
       mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
-        getConfiguredModels: async () => favorites,
+        getEnabledModels: async () => enabledModels,
         createPiModelRuntime: async () => {
           runtimeCreations++;
-          return runtime = { getAvailable: async () => favorites.filter(m => m.id !== "unavailable"), checkAuth: async () => true, getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
+          return runtime = { getAvailable: async () => enabledModels.filter(m => m.id !== "unavailable"), checkAuth: async () => true, getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) };
         },
         hasConnectedModelProvider: () => true,
         modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high"],
@@ -44,14 +44,14 @@ async function scenario(script: string) {
   }
 }
 
-test("uses AgentsInTheCloud favorites across providers, including custom providers", () => scenario(`
+test("uses AgentsInTheCloud enabled models across providers, including custom providers", () => scenario(`
   expect(await preparePiModelSettings()).toEqual({ model: "anthropic::claude", thinkingLevel: "medium" });
   for (const model of ["anthropic::claude", "openai-codex::gpt", "custom::model"]) {
     expect(await preparePiModelSettings({ model, thinkingLevel: "minimal" })).toEqual({ model, thinkingLevel: "minimal" });
   }
 `));
 
-test("rejects unavailable, unsupported, non-favorite models and non-Pi thinking levels", () => scenario(`
+test("rejects unavailable, unsupported, non-enabled models and non-Pi thinking levels", () => scenario(`
   for (const model of ["custom::unavailable", "custom::unknown", "amazon-bedrock::ambient", 42]) {
     await expect(preparePiModelSettings({ model })).rejects.toMatchObject({ code: "invalid_arguments" });
   }
@@ -61,7 +61,7 @@ test("rejects unavailable, unsupported, non-favorite models and non-Pi thinking 
 `));
 
 test("requires model setup rather than starting with independent Pi defaults", () => scenario(`
-  favorites = [];
+  enabledModels = [];
   await expect(preparePiModelSettings()).rejects.toMatchObject({ code: "agent_setup_required" });
 `));
 

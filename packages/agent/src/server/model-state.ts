@@ -1,5 +1,5 @@
 import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { getConfiguredAgentModels } from "./model-preferences.ts";
+import { getAgentEnabledModels } from "./model-preferences.ts";
 import { createPiModelRuntime, modelUnavailableReason, providerAvailability, modelThinkingLevels, parseModelRef, usesProviderSubscription, getAgentModelThinkingLevel, type ModelRef } from "@agents-in-the-cloud/llm/server";
 
 export interface AgentModelOptionView {
@@ -11,7 +11,7 @@ export interface AgentModelOptionView {
   unavailableReason?: string;
 }
 
-export function selectAvailableConfiguredModel(models: readonly AgentModelOptionView[], requested?: ModelRef): ModelRef | undefined {
+export function selectAvailableEnabledModel(models: readonly AgentModelOptionView[], requested?: ModelRef): ModelRef | undefined {
   const selected = requested
     ? models.find((model) => model.available && model.provider === requested.provider && model.id === requested.id)
     : undefined;
@@ -21,15 +21,15 @@ export function selectAvailableConfiguredModel(models: readonly AgentModelOption
 
 export async function resolveNewWorkspaceAgentModel(selectedModel?: string): Promise<ModelRef | undefined> {
   const requested = selectedModel ? parseModelRef(selectedModel) : undefined;
-  return selectAvailableConfiguredModel(await configuredModelOptionViews(), requested);
+  return selectAvailableEnabledModel(await enabledModelOptionViews(), requested);
 }
 
 /** Omit current to select the saved default; null represents a session without a model. */
-export async function configuredModelOptionViews(current?: ModelRef | null, runtime?: Pick<Awaited<ReturnType<typeof createPiModelRuntime>>, "getAvailable" | "checkAuth" | "getModel" | "listCredentials">): Promise<AgentModelOptionView[]> {
+export async function enabledModelOptionViews(current?: ModelRef | null, runtime?: Pick<Awaited<ReturnType<typeof createPiModelRuntime>>, "getAvailable" | "checkAuth" | "getModel" | "listCredentials">): Promise<AgentModelOptionView[]> {
   runtime ??= await createPiModelRuntime();
   // Anthropic permits Claude subscriptions only in Claude Code.
   const hiddenProvider = await usesProviderSubscription(runtime, "anthropic") ? "anthropic" : undefined;
-  const models = (await getConfiguredAgentModels()).filter((model) => model.provider !== hiddenProvider);
+  const models = (await getAgentEnabledModels()).filter((model) => model.provider !== hiddenProvider);
   const availability = await providerAvailability(runtime, models.map((model) => model.provider));
   return models.map((model) => {
     const unavailableReason = modelUnavailableReason(availability.get(model.provider)!, model, runtime);

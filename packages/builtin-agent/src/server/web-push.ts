@@ -55,8 +55,8 @@ export async function sendTurnNotification(ctx: AgentRenderContext, subscription
   try {
     await webPush.sendNotification(subscription, JSON.stringify({
       title: `${workspaceName} is ready`,
-      url: `/workspaces/${encodeURIComponent(ctx.workspaceId)}?agent=${encodeURIComponent(ctx.conversationId)}`,
-      tag: `agent-turn:${ctx.workspaceId}:${ctx.conversationId}`,
+      url: `/workspaces/${encodeURIComponent(ctx.workspaceId)}?agent=${encodeURIComponent(ctx.agentId)}`,
+      tag: `agent-turn:${ctx.workspaceId}:${ctx.agentId}`,
     }), {
       vapidDetails: { subject: "https://github.com/lucasmeijer/atelier", ...vapid },
       TTL: 60 * 60,

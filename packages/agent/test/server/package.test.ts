@@ -4,9 +4,9 @@ import * as agent from "../../src/server/index.ts";
 import manifest from "../../package.json";
 
 describe("shared agent package", () => {
-  test("provides shared support without registering an agent provider", () => {
+  test("provides shared support without registering an agent type", () => {
     expect(agent.agentWorkspaceModule.id).toBe("agent");
-    expect(agent.agentWorkspaceModule.agentProvider).toBeUndefined();
+    expect(agent.agentWorkspaceModule.agentType).toBeUndefined();
     expect(agent.agentWorkspaceModule.cableChannels).toBeUndefined();
     expect("durableWorkspaceOwner" in agent).toBe(false);
     expect("nativeAgentLaunch" in agent).toBe(false);

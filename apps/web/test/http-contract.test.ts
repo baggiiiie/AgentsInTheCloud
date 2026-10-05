@@ -161,7 +161,7 @@ describe("HTTP contracts", () => {
       branch: "main",
     });
     expect(seen[0]?.options?.context).toEqual({
-      agent: { provider: "builtin", initialPrompt: "Add tests", initialPromptMode: "composer", model: "", thinkingLevel: "", attachmentDraft: undefined },
+      agent: { agentTypeId: "builtin", initialPrompt: "Add tests", initialPromptMode: "composer", model: "", thinkingLevel: "", attachmentDraft: undefined },
     });
   });
 
@@ -320,6 +320,18 @@ describe("HTTP contracts", () => {
     expect(browser.headers.get("location")).toBe("http://test.local/");
   });
 
+  test("Agent type discovery uses distinct type IDs rather than Model provider IDs", async () => {
+    const { app, registry } = createTestApp();
+    await registry.seed([]);
+    const response = await app.fetch(new Request("http://test.local/agent-types", { headers: { accept: "application/json" } }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      defaultAgentTypeId: "builtin",
+      agentTypes: expect.arrayContaining([expect.objectContaining({ id: "builtin" }), expect.objectContaining({ id: "codex" })]),
+    });
+    expect((await app.fetch(new Request("http://test.local/agent-providers"))).status).toBe(404);
+  });
+
   test("OpenAPI advertises the supported automation surface", async () => {
     const { app, registry } = createTestApp();
     await registry.seed([]);
@@ -332,6 +344,7 @@ describe("HTTP contracts", () => {
     expect(response.headers.get("content-type")).toContain("application/json");
     expect(specification).toMatchObject({
       paths: {
+        "/agent-types": {},
         "/workspaces": {},
         "/workspaces/{id}": {
           get: { parameters: expect.arrayContaining([
@@ -352,17 +365,20 @@ describe("HTTP contracts", () => {
         "/workspace-templates/{workspaceTemplateId}/environment/{variableId}/delete": {},
         "/workspace-templates/{workspaceTemplateId}/secrets/{secretId}/delete": {},
         "/workspace-templates/{workspaceTemplateId}/delete": {},
-        "/workspaces/{id}/agents/{conversationId}/close": {
+        "/workspaces/{id}/agents/{agentId}/close": {
           post: { responses: {
-            "200": { content: { "application/json": { schema: { $ref: "#/components/schemas/AgentConversationCloseResult" } } } },
+            "200": { content: { "application/json": { schema: { $ref: "#/components/schemas/AgentCloseResult" } } } },
           } },
         },
       },
       components: { schemas: { CommandResult: {
-        properties: { command: { properties: { agentConversationId: { type: "string", format: "uuid" } } } },
+        properties: { command: { properties: { agentId: { type: "string", format: "uuid" } } } },
       } } },
     });
+    expect(Object.keys(specification.components.schemas.CreateWorkspace.properties.agent.properties).sort()).toEqual([
+      "agentTypeId", "attachmentDraft", "initialPrompt", "model", "thinkingLevel",
+    ]);
     expect(specification).not.toMatchObject({ paths: { "/api/workspaces": expect.anything() } });
-    expect(specification).not.toMatchObject({ paths: { "/workspaces/{id}/agent-conversations/{conversationId}/close": expect.anything() } });
+    expect(specification).not.toMatchObject({ paths: { "/workspaces/{id}/agents/{conversationId}/close": expect.anything() } });
   });
 });

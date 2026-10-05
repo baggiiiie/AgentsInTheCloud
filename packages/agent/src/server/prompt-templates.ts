@@ -39,14 +39,14 @@ const builtinApplicationCommands: PromptTemplate[] = [{
 }, {
   name: "name",
   trigger: "/name",
-  description: "Rename this Agent session, using AI when no name is provided.",
-  argumentHint: "[session-name]",
+  description: "Rename this Agent, using AI when no name is provided.",
+  argumentHint: "[agent-name]",
   prompt: "/name",
   preserveArguments: true,
 }, {
   name: "new",
   trigger: "/new",
-  description: "Start a new Agent conversation.",
+  description: "Start a fresh Agent session.",
   prompt: "/new",
 }, {
   name: "park",
@@ -190,7 +190,7 @@ export function parseCompactCommand(text: string): { customInstructions?: string
   return customInstructions ? { customInstructions } : {};
 }
 
-export function parseAgentSessionNameCommand(text: string): { title?: string } | undefined {
+export function parseAgentNameCommand(text: string): { title?: string } | undefined {
   const match = text.trim().match(/^\/name(?:\s+([\s\S]+))?$/);
   if (!match) return undefined;
   const title = match[1]?.trim();

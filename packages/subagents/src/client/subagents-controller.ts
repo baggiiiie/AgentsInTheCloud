@@ -38,7 +38,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
       }
       if (!id || document.hidden || !this.element.checkVisibility()) { this.stop(); return; }
       if (!this.tree) {
-        this.tree = window.AgentsInTheCloudCable!.subscribe(CableTopics.module("subagents", this.workspaceIdValue, { conversationId: id }), {
+        this.tree = window.AgentsInTheCloudCable!.subscribe(CableTopics.module("subagents", this.workspaceIdValue, { agentId: id }), {
           onReady: () => this.restore(),
           onDisconnected: () => {
             for (const child of this.children.values()) child.subscription.unsubscribe();

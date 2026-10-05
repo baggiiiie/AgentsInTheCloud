@@ -2,48 +2,48 @@ import { AgentsInTheCloudCoreError, createKeyedOperationQueue, type AgentsInTheC
 import { builtinAgentIconHtml } from "@agents-in-the-cloud/design-system/icons";
 import { launchComposerCommand, type WorkspaceAgentTabProvider, type WorkspaceCommandContribution, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { registerAgentEvents } from "./agent-events.ts";
-import { resolveAgentConversation } from "./delegation.ts";
+import { resolveAgent } from "./delegation.ts";
 import { removeWorkspaceInitialPromptDrafts } from "./initial-prompt-draft.ts";
 import { nativeAgentLaunch } from "./launch.ts";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
 import { renderAgentPane } from "./render-composer.ts";
-import { agentConversationKey } from "@agents-in-the-cloud/agent/server/render-context";
+import { agentKey } from "@agents-in-the-cloud/agent/server/render-context";
 import { handleAgentRequest } from "./routes.ts";
-import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgentConversation, getWorkspaceAgentController, getWorkspaceAgentPresentation, restoreWorkspaceAgentRuntime } from "./runtime.ts";
-import { archiveWorkspaceAgentConversation, createNextWorkspaceAgentConversation, listWorkspaceAgentConversations, untitledAgentConversationTitle, type WorkspaceAgentConversationInfo } from "./session-store.ts";
+import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgent, getWorkspaceAgentController, getWorkspaceAgentPresentation, restoreWorkspaceAgentRuntime } from "./runtime.ts";
+import { archiveWorkspaceAgent, createNextWorkspaceAgent, listWorkspaceAgents, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
 
 let agentEvents: AgentsInTheCloudEventBus | undefined;
 
 export function createWorkspaceAgentTabProvider(dependencies: {
-  list(workspaceId: string): Promise<readonly WorkspaceAgentConversationInfo[]>;
-  render(conversation: WorkspaceAgentConversationInfo): Promise<string>;
-  dispose(workspaceId: string, conversationId: string): Promise<void>;
-  restore(workspaceId: string, conversationId: string): void;
-  archive(conversation: WorkspaceAgentConversationInfo): Promise<void>;
+  list(workspaceId: string): Promise<readonly WorkspaceAgentInfo[]>;
+  render(conversation: WorkspaceAgentInfo): Promise<string>;
+  dispose(workspaceId: string, agentId: string): Promise<void>;
+  restore(workspaceId: string, agentId: string): void;
+  archive(conversation: WorkspaceAgentInfo): Promise<void>;
 }): WorkspaceAgentTabProvider {
   const serializedClose = createKeyedOperationQueue();
 
   return {
     async list({ workspaceId }) {
-      return (await dependencies.list(workspaceId)).map(({ conversationId, title }) => ({ id: conversationId, title, untitled: title === untitledAgentConversationTitle }));
+      return (await dependencies.list(workspaceId)).map(({ agentId, title }) => ({ id: agentId, title, untitled: title === untitledAgentTitle }));
     },
 
-    async render({ workspaceId, conversationId }) {
-      const conversation = (await dependencies.list(workspaceId)).find((candidate) => candidate.conversationId === conversationId);
-      if (!conversation) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+    async render({ workspaceId, agentId }) {
+      const conversation = (await dependencies.list(workspaceId)).find((candidate) => candidate.agentId === agentId);
+      if (!conversation) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agentId}`);
       return await dependencies.render(conversation);
     },
 
-    async close({ workspaceId, conversationId }) {
+    async close({ workspaceId, agentId }) {
       await serializedClose(workspaceId, async () => {
         const conversations = await dependencies.list(workspaceId);
-        const conversation = conversations.find((candidate) => candidate.conversationId === conversationId);
-        if (!conversation) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${conversationId}`);
+        const conversation = conversations.find((candidate) => candidate.agentId === agentId);
+        if (!conversation) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agentId}`);
         try {
-          await dependencies.dispose(workspaceId, conversationId);
+          await dependencies.dispose(workspaceId, agentId);
           await dependencies.archive(conversation);
         } catch (error) {
-          dependencies.restore(workspaceId, conversationId);
+          dependencies.restore(workspaceId, agentId);
           throw error;
         }
       });
@@ -52,7 +52,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
 }
 
 export const workspaceAgentTabProvider = createWorkspaceAgentTabProvider({
-  list: listWorkspaceAgentConversations,
+  list: listWorkspaceAgents,
   async render(conversation) {
     const runtime = await getWorkspaceAgentPresentation(conversation, { events: agentEvents });
     const [state, completionCatalog] = await Promise.all([
@@ -60,15 +60,15 @@ export const workspaceAgentTabProvider = createWorkspaceAgentTabProvider({
       runtime.refreshCompletionCatalog(),
     ]);
     return await renderAgentPane(
-      { workspaceId: conversation.workspaceId, conversationId: conversation.conversationId },
+      { workspaceId: conversation.workspaceId, agentId: conversation.agentId },
       conversation,
       state,
       completionCatalog,
     );
   },
-  dispose: closeWorkspaceAgentConversation,
+  dispose: closeWorkspaceAgent,
   restore: restoreWorkspaceAgentRuntime,
-  archive: archiveWorkspaceAgentConversation,
+  archive: archiveWorkspaceAgent,
 });
 
 const launchComposerCommandContribution: WorkspaceCommandContribution = {
@@ -79,7 +79,7 @@ const launchComposerCommandContribution: WorkspaceCommandContribution = {
   surfaces: { shortcut: { defaultBinding: launchComposerCommand.binding } },
 };
 
-async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, source: WorkspaceAgentConversationInfo | undefined, events?: AgentsInTheCloudEventBus): Promise<void> {
+async function applyNewAgentSettings(agent: WorkspaceAgentInfo, source: WorkspaceAgentInfo | undefined, events?: AgentsInTheCloudEventBus): Promise<void> {
   const runtimeOptions = { events };
   const sourceController = source ? await getWorkspaceAgentController(source, runtimeOptions) : undefined;
   const sourceSettings = await sourceController?.settings();
@@ -87,7 +87,7 @@ async function applyNewAgentSettings(agent: WorkspaceAgentConversationInfo, sour
   const target = await getWorkspaceAgentController(agent, runtimeOptions);
   if (model) await target.configure({ model });
   if (sourceSettings?.thinkingLevel) await target.configure({ thinkingLevel: sourceSettings.thinkingLevel });
-  await events?.emit("workspace_agent_view_invalidated", { workspaceId: agent.workspaceId, conversationId: agent.conversationId });
+  await events?.emit("workspace_agent_view_invalidated", { workspaceId: agent.workspaceId, agentId: agent.agentId });
 }
 
 export const builtinAgentWorkspaceModule: WorkspaceModule = {
@@ -96,7 +96,7 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
     name: "agent",
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent") throw new Error("Invalid Agent channel identifier");
-      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId);
+      const agent = await resolveAgent(identifier.workspaceId, identifier.agentId);
       const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeLivePresentation(listener);
     },
@@ -104,7 +104,7 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
     name: "agent-turn",
     async subscribe(identifier, listener, events) {
       if (identifier.channel !== "agent-turn") throw new Error("Invalid Agent turn channel identifier");
-      const agent = await resolveAgentConversation(identifier.workspaceId, identifier.conversationId);
+      const agent = await resolveAgent(identifier.workspaceId, identifier.agentId);
       const runtime = await getWorkspaceAgentPresentation(agent, { events });
       return runtime.subscribeTurnPresentation(identifier.turnId, identifier.branchId, listener);
     },
@@ -114,8 +114,8 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
       summary: "Get this AgentsInTheCloud installation's VAPID public key for browser PushManager subscription",
       responses: { "200": { description: "Public application-server key", content: { "application/json": { schema: { type: "object", properties: { publicKey: { type: "string" } } } } } } },
     } },
-    "/workspaces/{id}/agents/{conversationId}/notification": {
-      parameters: ["id", "conversationId"].map((name) => ({ name, in: "path", required: true, schema: { type: "string" } })),
+    "/workspaces/{id}/agents/{agentId}/notification": {
+      parameters: ["id", "agentId"].map((name) => ({ name, in: "path", required: true, schema: { type: "string" } })),
       get: {
         summary: "Get the current turn's one-shot notification state",
         responses: { "200": { description: "Current turnId (null when idle), busy and armed; HTML clients receive the header control", content: { "application/json": { schema: { type: "object", properties: { turnId: { type: ["string", "null"] }, busy: { type: "boolean" }, armed: { type: "boolean" } } } } } } },
@@ -131,14 +131,14 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
         responses: { "200": { description: "Notification state updated; JSON or Turbo Stream according to Accept" }, "409": { description: "The requested turn is no longer running" }, "422": { description: "Invalid notification intent or unsupported push service" } },
       },
     },
-    "/workspaces/{id}/agents/{conversationId}/tools/{callId}/abort": { post: {
+    "/workspaces/{id}/agents/{agentId}/tools/{callId}/abort": { post: {
       summary: "Abort one live tool call and its owned work without stopping the agent turn",
-      parameters: ["id", "conversationId", "callId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),
+      parameters: ["id", "agentId", "callId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),
       responses: { "200": { description: "Cancellation requested; aborted is false if the call is no longer active. HTML clients receive a Turbo Stream.", content: { "application/json": { schema: { type: "object", properties: { tool: { type: "object", required: ["callId", "aborted"], properties: { callId: { type: "string" }, aborted: { type: "boolean" } } } } } } } } },
     } },
-    "/workspaces/{id}/agents/{conversationId}/reveal/{target}": { get: {
+    "/workspaces/{id}/agents/{agentId}/reveal/{target}": { get: {
       summary: "Resolve the enclosing turn for a transcript navigation target",
-      parameters: ["id", "conversationId", "target"].map((name) => ({ name, in: "path", required: true, schema: { type: "string" } })),
+      parameters: ["id", "agentId", "target"].map((name) => ({ name, in: "path", required: true, schema: { type: "string" } })),
       responses: { "200": { description: "Enclosing turn identity for browser-local navigation", content: { "application/json": { schema: { type: "object", properties: { turnId: { type: ["string", "null"] } } } } } } },
     } },
   },
@@ -148,7 +148,7 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
       return handleAgentRequest(request, url, { events: context.events as AgentsInTheCloudEventBus | undefined, renderPage: context.renderPage });
     },
   }],
-  agentProvider: {
+  agentType: {
     id: "builtin", label: "Builtin", iconHtml: builtinAgentIconHtml,
     tabs: workspaceAgentTabProvider,
     create: createBuiltinAgent,
@@ -159,9 +159,9 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
     const events = context.events as AgentsInTheCloudEventBus;
     agentEvents = events;
     registerAgentEvents(events);
-    events.on("workspace_agent_turn_finished", async ({ workspaceId, conversationId }) => {
-      const agent = (await listWorkspaceAgentConversations(workspaceId)).find((item) => item.conversationId === conversationId);
-      context.registry.requestSurfaceAttention(workspaceId, agentConversationKey(conversationId));
+    events.on("workspace_agent_turn_finished", async ({ workspaceId, agentId }) => {
+      const agent = (await listWorkspaceAgents(workspaceId)).find((item) => item.agentId === agentId);
+      context.registry.requestSurfaceAttention(workspaceId, agentKey(agentId));
       // Delegated conversations finish independently of the root's turn. Their
       // completion belongs to the Agent surface, not workspace-level attention.
       if (agent) context.registry.requestAttention(workspaceId);
@@ -176,11 +176,11 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
 };
 
 async function createBuiltinAgent({ workspaceId, events }: { workspaceId: string; events?: AgentsInTheCloudEventBus }): Promise<string> {
-  const sourceConversation = (await listWorkspaceAgentConversations(workspaceId))[0];
-  const conversation = await createNextWorkspaceAgentConversation(workspaceId);
+  const sourceConversation = (await listWorkspaceAgents(workspaceId))[0];
+  const conversation = await createNextWorkspaceAgent(workspaceId);
   const applySettingsTimer = setTimeout(() => {
-    void applyNewAgentSettings(conversation, sourceConversation, events).catch((error) => console.error("Could not apply settings to new Agent conversation", error));
+    void applyNewAgentSettings(conversation, sourceConversation, events).catch((error) => console.error("Could not apply settings to new Agent", error));
   }, 0);
   applySettingsTimer.unref?.();
-  return conversation.conversationId;
+  return conversation.agentId;
 }

@@ -1,4 +1,4 @@
-import { configuredModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
+import { enabledModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
 import { getAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
 import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
 import { startNotificationTurn, finishNotificationTurn } from "./turn-notifications.ts";
@@ -9,11 +9,11 @@ import { checkWorkspaceReadiness } from "@agents-in-the-cloud/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { contentText, getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { UserEntry, LiveDoc, InboxDoc, AgentDoc, UsageDoc, defineDoc, type Cursor, type EntryId, type EntryRecord, type EntryDraft, type AgentChange, type Conversation, type ConversationId, type ConversationView, type HarnessOptions, type LiveState } from "@earendil-works/pi-durable";
-import { createDurableHarnessOptions, prepareDurableConversation } from "./durable-assembly.ts";
+import { createDurableHarnessOptions, prepareDurableAgent } from "./durable-assembly.ts";
 import { durableStopScope, commitDurableStop, markGatedDurableWork, settleStoppedDurableWork, WorkspaceAdmission, WorkspaceStops } from "./durable-lifecycle.ts";
 import { durableImageEndpoint } from "./durable-images.ts";
 import { submitDurableInput, type DurableInput } from "./durable-input.ts";
-import { openDurableWorkspace, WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
+import { openDurableWorkspace, WorkspaceAgents, type DurableAgentRecord } from "./durable-workspace.ts";
 import { expandWorkspaceSkillCommand } from "@agents-in-the-cloud/agent/server/skills";
 import type { WorkspaceAgentToolOptions } from "@agents-in-the-cloud/agent/server/tools";
 
@@ -21,17 +21,17 @@ const context = BACKGROUND_CONTEXT;
 export const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
   kind: "agents-in-the-cloud.history-labels", version: 1, scope: "session", initial: () => ({ labels: {} }),
 });
-type ConversationIdentity = Omit<DurableConversationRecord, "durableId">;
+type AgentIdentity = Omit<DurableAgentRecord, "durableId">;
 type SettingsChange = Pick<AgentChange, "model"> & { thinkingLevel?: string };
 
 const dependencies = {
   harness: createDurableHarnessOptions,
-  prepare: prepareDurableConversation,
+  prepare: prepareDurableAgent,
   expand: expandWorkspaceSkillCommand,
   ready: checkWorkspaceReadiness,
   async validateModel(ref: AgentChange["model"]) {
     const selected = ref && { provider: ref.provider, id: ref.modelId };
-    const model = selected && (await configuredModelOptionViews(selected)).find(item => item.provider === selected.provider && item.id === selected.id);
+    const model = selected && (await enabledModelOptionViews(selected)).find(item => item.provider === selected.provider && item.id === selected.id);
     if (!model?.available) throw new AgentsInTheCloudCoreError("invalid_arguments", model?.unavailableReason ?? "Choose a connected model in Models");
   },
 };
@@ -101,8 +101,8 @@ export async function openDurableAgentRuntime(
     await harness.commit(async (tx) => {
       const admission = await tx.doc(WorkspaceAdmission);
       admission.deleted = deleted;
-      const records = (await tx.doc(WorkspaceConversations)).conversations;
-      const closedRoots = new Set(records.filter(record => (record.branches ?? [record.durableId]).some(id => closed.has(id))).map(record => record.conversationId));
+      const records = (await tx.doc(WorkspaceAgents)).agents;
+      const closedRoots = new Set(records.filter(record => (record.branches ?? [record.durableId]).some(id => closed.has(id))).map(record => record.agentId));
       for (const record of records) if (record.rootId && closedRoots.has(record.rootId)) for (const id of record.branches ?? [record.durableId]) closed.add(id);
       admission.closed = [...closed];
     }, context);
@@ -113,7 +113,7 @@ export async function openDurableAgentRuntime(
     if (suspended) throw new Error("Durable agent runtime is suspended");
   }
 
-  async function controller(conversation: Conversation, identity: ConversationIdentity) {
+  async function controller(conversation: Conversation, identity: AgentIdentity) {
     // Only host commands queue here, never generation/tool execution. Different
     // roots prepare independently, while model changes cannot race image sizing
     // and skill expansion for this root's next admission.
@@ -121,13 +121,13 @@ export async function openDurableAgentRuntime(
     let closing: Promise<void> | undefined;
     const selectionListeners = new Set<() => Promise<void>>();
     const statusListeners = new Set<() => void>();
-    const renderContext = { workspaceId, conversationId: identity.conversationId };
+    const renderContext = { workspaceId, agentId: identity.agentId };
     let busy = false;
     let observation: Awaited<ReturnType<Conversation["watch"]>> | undefined;
     function statusChanged() { for (const listener of statusListeners) listener(); }
     function publishBusy(value: boolean) {
       busy = value;
-      publishWorkspaceAgentBusy({ workspaceId, agentKey: `agent:${identity.conversationId}`, busy });
+      publishWorkspaceAgentBusy({ workspaceId, agentKey: `agent:${identity.agentId}`, busy });
       statusChanged();
     }
     async function committed(view: ConversationView) {
@@ -173,7 +173,7 @@ export async function openDurableAgentRuntime(
       if (busy) publishBusy(false);
     });
     async function record() {
-      return (await harness.snapshot(WorkspaceConversations, context))!.conversations.find(item => item.conversationId === identity.conversationId)!;
+      return (await harness.snapshot(WorkspaceAgents, context))!.agents.find(item => item.agentId === identity.agentId)!;
     }
     async function branches() {
       const current = await record();
@@ -203,7 +203,7 @@ export async function openDurableAgentRuntime(
     async function assertIdle() {
       const live = await harness.snapshot(LiveDoc, conversation.id, context);
       const inbox = await harness.snapshot(InboxDoc, conversation.id, context);
-      const records = (await harness.snapshot(WorkspaceConversations, context))!.conversations;
+      const records = (await harness.snapshot(WorkspaceAgents, context))!.agents;
       const scope = new Set(durableStopScope(records, conversation.id, !identity.parentId));
       const tasks = (await harness.inspect(context)).tasks;
       if (live?.run || live?.compactions?.length || inbox?.items.length || tasks.some(item => scope.has(item.record.conversationId) && item.record.kind !== "agents-in-the-cloud.delegation-anchor")) {
@@ -219,8 +219,8 @@ export async function openDurableAgentRuntime(
       if (!target) throw new Error("Cannot rewind past the first history entry.");
       const next = await harness.commit(async tx => {
         assertAdmission();
-        const catalog = await tx.doc(WorkspaceConversations);
-        const current = catalog.conversations.find(item => item.conversationId === identity.conversationId)!;
+        const catalog = await tx.doc(WorkspaceAgents);
+        const current = catalog.agents.find(item => item.agentId === identity.agentId)!;
         const fork = await tx.forkConversation(target.branch, target.entry.id, { ownership: { kind: "ownerless" } });
         current.branches = [...(current.branches ?? [current.durableId]), fork.id];
         current.durableId = fork.id;
@@ -238,7 +238,7 @@ export async function openDurableAgentRuntime(
     function command<T>(run: () => Promise<T>, metadataOnly = false): Promise<T> {
       const result = tail.then(() => {
         assertAdmission();
-        if (identity.readOnly && !metadataOnly) throw new AgentsInTheCloudCoreError("invalid_arguments", "This conversation is read-only. Start a new Agent conversation to continue.");
+        if (identity.readOnly && !metadataOnly) throw new AgentsInTheCloudCoreError("invalid_arguments", "This conversation is read-only. Start a new Agent to continue.");
         return run();
       });
       // The caller receives the rejection; a rejected command must not poison
@@ -273,24 +273,24 @@ export async function openDurableAgentRuntime(
       subscribeStatus(listener: () => void) { statusListeners.add(listener); return () => { statusListeners.delete(listener); }; },
       settings: () => conversation.agent(context),
       get hasStoppableWork() {
-        const scope = new Set(durableStopScope(catalogWatch!.value!.conversations, conversation.id, !identity.parentId));
+        const scope = new Set(durableStopScope(catalogWatch!.value!.agents, conversation.id, !identity.parentId));
         return Object.values(taskWatch.value.tasks).some(task => scope.has(task.conversationId) && task.kind !== "agents-in-the-cloud.delegation-anchor");
       },
       subscribeWork(listener: () => void) { workListeners.add(listener); return () => { workListeners.delete(listener); }; },
       isSubagent: Boolean(identity.parentId),
       subscribeUsage(listener: () => void) { usageListeners.add(listener); return () => { usageListeners.delete(listener); }; },
       async descendantCost() {
-        const records = (await harness.snapshot(WorkspaceConversations, context))!.conversations;
-        const descendants = new Set([identity.conversationId]);
+        const records = (await harness.snapshot(WorkspaceAgents, context))!.agents;
+        const descendants = new Set([identity.agentId]);
         let added = true;
         while (added) {
           added = false;
-          for (const record of records) if (record.parentId && descendants.has(record.parentId) && !descendants.has(record.conversationId)) { descendants.add(record.conversationId); added = true; }
+          for (const record of records) if (record.parentId && descendants.has(record.parentId) && !descendants.has(record.agentId)) { descendants.add(record.agentId); added = true; }
         }
-        descendants.delete(identity.conversationId);
+        descendants.delete(identity.agentId);
         if (!descendants.size) return undefined;
         let cost = 0;
-        for (const record of records.filter(record => descendants.has(record.conversationId))) for (const id of record.branches ?? [record.durableId]) {
+        for (const record of records.filter(record => descendants.has(record.agentId))) for (const id of record.branches ?? [record.durableId]) {
           const usage = await harness.snapshot(UsageDoc, id, context);
           for (const value of [...Object.values(usage?.models ?? {}), ...Object.values(usage?.tools ?? {})]) cost += value.cost.total;
         }
@@ -371,8 +371,8 @@ export async function openDurableAgentRuntime(
       /** Commit searchable metadata without creating a second history file. */
       setTitle(title: string) {
         return command(() => harness.commit(async (tx) => {
-          const catalog = await tx.doc(WorkspaceConversations);
-          const record = catalog.conversations.find((item) => item.durableId === conversation.id)!;
+          const catalog = await tx.doc(WorkspaceAgents);
+          const record = catalog.agents.find((item) => item.durableId === conversation.id)!;
           record.title = title;
           const result = { ...record };
           if (record.branches) result.branches = [...record.branches];
@@ -455,14 +455,14 @@ export async function openDurableAgentRuntime(
     };
   }
 
-  const catalogWatch = await harness.watchDoc(WorkspaceConversations, context);
+  const catalogWatch = await harness.watchDoc(WorkspaceAgents, context);
   catalogWatch!.start(async value => {
     if (suspended) return;
     for (const listener of workListeners) listener();
-    for (const record of value?.conversations ?? []) {
-      if (!record.parentId || record.readOnly || agents.has(record.conversationId)) continue;
+    for (const record of value?.agents ?? []) {
+      if (!record.parentId || record.readOnly || agents.has(record.agentId)) continue;
       const pending = (async () => controller((await harness.conversation(record.durableId, context))!, record))();
-      agents.set(record.conversationId, pending);
+      agents.set(record.agentId, pending);
       await pending;
     }
   });
@@ -470,17 +470,17 @@ export async function openDurableAgentRuntime(
 
   return {
     /** Atomic passive import. No prompts, submissions, model calls, or task replay. */
-    async importHistory(identity: Pick<DurableConversationRecord, "conversationId" | "label" | "title">, entries: readonly EntryDraft[]) {
+    async importHistory(identity: Pick<DurableAgentRecord, "agentId" | "label" | "title">, entries: readonly EntryDraft[]) {
       assertOpen();
       return harness.commit(async tx => {
         assertOpen();
-        const catalog = await tx.doc(WorkspaceConversations);
-        const existing = catalog.conversations.find(record => record.conversationId === identity.conversationId);
+        const catalog = await tx.doc(WorkspaceAgents);
+        const existing = catalog.agents.find(record => record.agentId === identity.agentId);
         if (existing) return existing.durableId;
         if (deleted) throw new Error("Durable workspace is deleted");
         const created = await tx.createConversation({ ownership: { kind: "ownerless" } });
         for (const entry of entries) await tx.appendEntry(created.id, entry);
-        catalog.conversations.push({ conversationId: identity.conversationId, label: identity.label, title: identity.title, durableId: created.id, readOnly: true });
+        catalog.agents.push({ agentId: identity.agentId, label: identity.label, title: identity.title, durableId: created.id, readOnly: true });
         return created.id;
       }, context);
     },
@@ -490,30 +490,30 @@ export async function openDurableAgentRuntime(
     /** Discover retained histories without preparing prompts or starting work. */
     async catalog() {
       assertOpen();
-      return (await harness.snapshot(WorkspaceConversations, context))!.conversations;
+      return (await harness.snapshot(WorkspaceAgents, context))!.agents;
     },
     /** Reuse one host command line per AgentsInTheCloud UUID; reopening never rebuilds its prompt. */
-    conversation(record: ConversationIdentity, initial: Pick<AgentChange, "model" | "thinkingLevel"> = {}) {
+    agent(record: AgentIdentity, initial: Pick<AgentChange, "model" | "thinkingLevel"> = {}) {
       assertOpen();
-      let pending = agents.get(record.conversationId);
+      let pending = agents.get(record.agentId);
       if (!pending) {
         pending = (async () => {
-          const catalog = await harness.snapshot(WorkspaceConversations, context);
-          const existing = catalog?.conversations.find((item) => item.conversationId === record.conversationId);
+          const catalog = await harness.snapshot(WorkspaceAgents, context);
+          const existing = catalog?.agents.find((item) => item.agentId === record.agentId);
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
           if (!existing) {
             await checkReady();
             if (deleted) throw new Error("Durable workspace is deleted");
           }
-          const prepared = existing ? {} : await load.prepare(workspaceId, record.conversationId, options, initial);
+          const prepared = existing ? {} : await load.prepare(workspaceId, record.agentId, options, initial);
           assertOpen();
           if (!existing && deleted) throw new Error("Durable workspace is deleted");
-          return controller(await workspace.conversation(record, prepared), existing ?? record);
+          return controller(await workspace.agent(record, prepared), existing ?? record);
         })().catch((error) => {
-          agents.delete(record.conversationId);
+          agents.delete(record.agentId);
           throw error;
         });
-        agents.set(record.conversationId, pending);
+        agents.set(record.agentId, pending);
       }
       return pending;
     },
@@ -535,8 +535,8 @@ export async function openDurableAgentRuntime(
     },
     /** Host restart resumes durable tasks, never submits a synthetic user prompt. */
     async resume() {
-      const catalog = (await harness.snapshot(WorkspaceConversations, context))!;
-      await Promise.all(catalog.conversations.filter(record => !record.readOnly && !closed.has(record.durableId)).map(record => this.conversation(record)));
+      const catalog = (await harness.snapshot(WorkspaceAgents, context))!;
+      await Promise.all(catalog.agents.filter(record => !record.readOnly && !closed.has(record.durableId)).map(record => this.agent(record)));
       await readyForExecution();
       harness.resume();
     },
@@ -550,4 +550,4 @@ export async function openDurableAgentRuntime(
 }
 
 export type DurableAgentRuntime = Awaited<ReturnType<typeof openDurableAgentRuntime>>;
-export type DurableAgentController = Awaited<ReturnType<DurableAgentRuntime["conversation"]>>;
+export type DurableAgentController = Awaited<ReturnType<DurableAgentRuntime["agent"]>>;

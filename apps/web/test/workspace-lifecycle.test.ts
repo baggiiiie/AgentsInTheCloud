@@ -1,4 +1,4 @@
-import { createPiModelRuntime, setConfiguredModels } from "@agents-in-the-cloud/llm/server";
+import { createPiModelRuntime, setEnabledModels } from "@agents-in-the-cloud/llm/server";
 import { addWorkspaceTemplate, isGitWorkspaceTemplateInit } from "@agents-in-the-cloud/workspace-templates";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
@@ -22,7 +22,7 @@ afterEach(async () => {
 async function configureLaunchModel(): Promise<void> {
   await (await createPiModelRuntime()).setRuntimeApiKey("openai", "test-only-key");
   configuredRuntime = true;
-  await setConfiguredModels([{ provider: "openai", id: "gpt-5.4", label: "Test model" }]);
+  await setEnabledModels([{ provider: "openai", id: "gpt-5.4", label: "Test model" }]);
 }
 
 describe("workspace lifecycle", () => {

@@ -16,7 +16,7 @@ interface WorkspaceState {
   title: string;
   phase: { kind: string; status?: string; busy: boolean };
   url: string;
-  agentConversations?: Array<{ id: string; title: string }>;
+  agents?: Array<{ id: string; title: string }>;
   workViews?: WorkView[];
 }
 

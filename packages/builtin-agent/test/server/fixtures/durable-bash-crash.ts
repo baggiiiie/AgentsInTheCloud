@@ -26,6 +26,6 @@ registry.install(createDurableBashExtension("workspace", async (...args) => {
   return result;
 }));
 const workspace = await openDurableWorkspace(join(path!, "journal"), "workspace", { models, registry });
-const conversation = await workspace.conversation({ conversationId: "tab", label: "Agent 1", title: "Bash recovery" }, { model: { provider: "faux", modelId: "faux-1" } });
+const conversation = await workspace.agent({ agentId: "tab", label: "Agent 1", title: "Bash recovery" }, { model: { provider: "faux", modelId: "faux-1" } });
 await conversation.submit({ type: "input", content: "Run", requestId: "one" }, BACKGROUND_CONTEXT);
 setInterval(() => {}, 60_000);

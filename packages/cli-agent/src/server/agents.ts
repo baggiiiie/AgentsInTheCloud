@@ -1,4 +1,4 @@
-import { prepareAgentMcp, revokeAgentMcp, suggestSessionSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
+import { prepareAgentMcp, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";
@@ -12,15 +12,16 @@ import { Value } from "typebox/value";
 import type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
 const inputSchema = Type.Object({ text: Type.String(), images: Type.Array(Type.Object({ mimeType: Type.String(), data: Type.String() })), attachmentNotes: Type.Array(Type.String()) });
-const sessionSchema = Type.Object({
+const agentSchema = Type.Object({
   id: Type.String(), title: Type.String(), tmuxSession: Type.String(), input: inputSchema,
   // Older Codex tabs have no kind. Reading them must never execute their saved prompts.
   kind: Type.Optional(Type.String()), error: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()),
   historySlug: Type.Optional(Type.String()),
 });
-const stateSchema = Type.Object({ sessions: Type.Array(sessionSchema) });
-type CliSession = Static<typeof sessionSchema>;
+const stateSchema = Type.Object({ agents: Type.Array(agentSchema) });
+const previousStateSchema = Type.Object({ sessions: Type.Array(agentSchema) });
+type CliAgentRecord = Static<typeof agentSchema>;
 const turnSettleTimeoutMs = 10_000;
 
 export async function checkedWorkspaceShell(workspaceId: string, command: string, stdin?: string): Promise<void> {
@@ -28,36 +29,42 @@ export async function checkedWorkspaceShell(workspaceId: string, command: string
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `Command failed (exit ${result.exitCode})`);
 }
 
-export function createCliSessions(adapter: CliAgentAdapter, onTitleChanged: (workspaceId: string, id: string, title: string) => Promise<void>) {
+export function createCliAgents(adapter: CliAgentAdapter, onTitleChanged: (workspaceId: string, id: string, title: string) => Promise<void>) {
   let state: ReturnType<typeof createStore> | undefined;
-  function createStore() { return createWorkspaceMetadataState(`${adapter.id}-agents.json`, (value) => Value.Parse(stateSchema, value), () => ({ sessions: [] })); }
+  function createStore() {
+    return createWorkspaceMetadataState(`${adapter.id}-agents.json`, (value) => {
+      // Previous saved CLI Agent metadata called its Agent collection "sessions".
+      if (Value.Check(previousStateSchema, value)) return { agents: value.sessions };
+      return Value.Parse(stateSchema, value);
+    }, () => ({ agents: [] }));
+  }
   function store() { return state ??= createStore(); }
   const serialize = createKeyedOperationQueue();
   // Runtime readiness is separate from the durable claim. After a host restart,
   // inspect tmux; never replay a claimed initial prompt.
   const starting = new Map<string, Promise<void>>();
 
-  function list(workspaceId: string): CliSession[] { return store().read(workspaceId).sessions; }
-  function get(workspaceId: string, id: string): CliSession {
-    const session = list(workspaceId).find((session) => session.id === id);
-    if (!session) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `${adapter.label} conversation not found: ${id}`);
-    return session;
+  function list(workspaceId: string): CliAgentRecord[] { return store().read(workspaceId).agents; }
+  function get(workspaceId: string, id: string): CliAgentRecord {
+    const agent = list(workspaceId).find((agent) => agent.id === id);
+    if (!agent) throw new AgentsInTheCloudCoreError("agent_not_found", `${adapter.label} Agent not found: ${id}`);
+    return agent;
   }
 
   // Called only inside the workspace queue, including the provisioning claim check.
   async function launch(workspaceId: string, input: WorkspaceAgentInput, settings: AgentWorkspaceParameters): Promise<string> {
     await adapter.requireSetup();
     const id = crypto.randomUUID();
-    const session: CliSession = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel };
+    const agent: CliAgentRecord = { id, title: adapter.label, tmuxSession: `${adapter.id}-${id}`, input, kind: adapter.id, model: settings.model, thinkingLevel: settings.thinkingLevel };
     // Claim before side effects. Recovery must never submit the initial prompt twice.
-    store().write(workspaceId, { sessions: [...list(workspaceId), session] });
-    await start(workspaceId, session, settings, input);
-    if (!session.error && input.text.trim()) void nameFromPrompt(workspaceId, session).catch((error) => console.error(`Could not publish ${adapter.label} session title ${id}`, error));
+    store().write(workspaceId, { agents: [...list(workspaceId), agent] });
+    await start(workspaceId, agent, settings, input);
+    if (!agent.error && input.text.trim()) void nameFromPrompt(workspaceId, agent).catch((error) => console.error(`Could not publish ${adapter.label} agent title ${id}`, error));
     return id;
   }
 
-  async function start(workspaceId: string, session: CliSession, settings: AgentWorkspaceParameters, input?: WorkspaceAgentInput): Promise<void> {
-    const { id } = session;
+  async function start(workspaceId: string, agent: CliAgentRecord, settings: AgentWorkspaceParameters, input?: WorkspaceAgentInput): Promise<void> {
+    const { id } = agent;
     const ready = Promise.withResolvers<void>();
     starting.set(id, ready.promise);
     try {
@@ -84,13 +91,13 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
         ? adapter.launchScript(input, imagePaths, settings, launchSession)
         : await adapter.resumeScript!(workspaceId, settings, launchSession);
       const command = `/bin/bash -c ${shellQuote(script)}`;
-      await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: session.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
-      delete session.error;
-      store().write(workspaceId, { sessions: list(workspaceId) });
+      await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: agent.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
+      delete agent.error;
+      store().write(workspaceId, { agents: list(workspaceId) });
     } catch (error) {
-      // Startup failure is durable session state, shown in its tab rather than discarded.
-      session.error = errorMessage(error);
-      store().write(workspaceId, { sessions: list(workspaceId) });
+      // Startup failure is durable agent state, shown in its tab rather than discarded.
+      agent.error = errorMessage(error);
+      store().write(workspaceId, { agents: list(workspaceId) });
       await revokeAgentMcp(workspaceId, id);
     } finally {
       starting.delete(id);
@@ -101,7 +108,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   // The turn ends once its native history is complete, not when the CLI signals it,
   // and no later than the timeout so a CLI that never completes it cannot stay busy.
   async function settleTurn(workspaceId: string, id: string, signal: AbortSignal, reason: AgentTurnFinishReason): Promise<void> {
-    if (!list(workspaceId).some((session) => session.id === id)) return;
+    if (!list(workspaceId).some((agent) => agent.id === id)) return;
     const deadline = Date.now() + turnSettleTimeoutMs;
     while (!signal.aborted && !await adapter.turnSettled!(workspaceId, id)) {
       if (Date.now() >= deadline) {
@@ -116,42 +123,42 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   function restoreWorkspace(workspaceId: string): Promise<void> {
     return serialize(workspaceId, async () => {
       if (!adapter.resumeScript) return;
-      for (const session of list(workspaceId)) {
-        // Legacy placeholders are not runnable sessions. Existing (including dead)
+      for (const agent of list(workspaceId)) {
+        // Legacy placeholders are not runnable agents. Existing (including dead)
         // panes belong to the current runtime and must not be relaunched.
-        if (session.kind !== adapter.id || (await terminalState(workspaceId, session)).exists) continue;
-        await start(workspaceId, session, { model: session.model, thinkingLevel: session.thinkingLevel });
+        if (agent.kind !== adapter.id || (await terminalState(workspaceId, agent)).exists) continue;
+        await start(workspaceId, agent, { model: agent.model, thinkingLevel: agent.thinkingLevel });
       }
     });
   }
 
-  async function suggestSlug(session: CliSession): Promise<string | undefined> {
+  async function suggestSlug(agent: CliAgentRecord): Promise<string | undefined> {
     try {
-      return await suggestSessionSlug(session.input.text, session.model ? parseModelRef(session.model) : undefined);
+      return await suggestAgentSlug(agent.input.text, agent.model ? parseModelRef(agent.model) : undefined);
     } catch (error) {
-      console.error(`Could not name ${adapter.label} session ${session.id}`, error);
+      console.error(`Could not name ${adapter.label} agent ${agent.id}`, error);
       return undefined;
     }
   }
 
   async function applyTitle(workspaceId: string, id: string, title: string, onlyIfUntitled: boolean): Promise<void> {
     const changed = await serialize(workspaceId, async () => {
-      const session = list(workspaceId).find((item) => item.id === id);
-      if (!session && onlyIfUntitled) return false;
-      const current = session ?? get(workspaceId, id);
+      const agent = list(workspaceId).find((item) => item.id === id);
+      if (!agent && onlyIfUntitled) return false;
+      const current = agent ?? get(workspaceId, id);
       if (onlyIfUntitled && (current.title !== adapter.label || current.historySlug)) return false;
       current.title = title;
       current.historySlug = title;
-      store().write(workspaceId, { sessions: list(workspaceId) });
+      store().write(workspaceId, { agents: list(workspaceId) });
       return true;
     });
     if (changed) await onTitleChanged(workspaceId, id, title);
   }
 
   // The launch prompt names the tab; the same slug later names the exported history.
-  async function nameFromPrompt(workspaceId: string, session: CliSession): Promise<void> {
-    const slug = await suggestSlug(session);
-    if (slug) await applyTitle(workspaceId, session.id, slug, true);
+  async function nameFromPrompt(workspaceId: string, agent: CliAgentRecord): Promise<void> {
+    const slug = await suggestSlug(agent);
+    if (slug) await applyTitle(workspaceId, agent.id, slug, true);
   }
 
   function setTitle(workspaceId: string, id: string, title: string): Promise<void> {
@@ -170,14 +177,14 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       if (!list(workspaceId).length) await launch(workspaceId, settings.input ?? emptyAgentInput(), settings);
     });
   }
-  async function ready(workspaceId: string, id: string): Promise<CliSession> {
+  async function ready(workspaceId: string, id: string): Promise<CliAgentRecord> {
     get(workspaceId, id);
     await starting.get(id);
     return get(workspaceId, id);
   }
-  async function terminalState(workspaceId: string, session: CliSession): Promise<{ starting?: boolean; exists: boolean; ended: boolean; exitCode?: number }> {
-    if (starting.has(session.id)) return { starting: true, exists: false, ended: false };
-    const result = await execWorkspaceShell(workspaceId, `tmux list-panes -t ${shellQuote(session.tmuxSession)} -F '#{pane_dead}:#{pane_dead_status}'`);
+  async function terminalState(workspaceId: string, agent: CliAgentRecord): Promise<{ starting?: boolean; exists: boolean; ended: boolean; exitCode?: number }> {
+    if (starting.has(agent.id)) return { starting: true, exists: false, ended: false };
+    const result = await execWorkspaceShell(workspaceId, `tmux list-panes -t ${shellQuote(agent.tmuxSession)} -F '#{pane_dead}:#{pane_dead_status}'`);
     if (result.exitCode === 1) return { exists: false, ended: true };
     if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError(`${adapter.id}_session_check_failed`, result.stderr.trim() || `Could not inspect ${adapter.label} terminal`);
     const [dead, status] = result.stdout.trim().split(":");
@@ -185,39 +192,39 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
   }
   async function recordNamingPrompt(workspaceId: string, id: string, text: string): Promise<void> {
     await serialize(workspaceId, async () => {
-      const session = get(workspaceId, id);
-      if (session.input.text.trim()) return;
-      session.input = { ...session.input, text };
-      store().write(workspaceId, { sessions: list(workspaceId) });
+      const agent = get(workspaceId, id);
+      if (agent.input.text.trim()) return;
+      agent.input = { ...agent.input, text };
+      store().write(workspaceId, { agents: list(workspaceId) });
     });
   }
   async function exportHistory(workspaceId: string, id: string): Promise<void> {
     const historyFiles = adapter.historyFiles;
     if (!historyFiles) return;
     await serialize(workspaceId, async () => {
-      const session = list(workspaceId).find((item) => item.id === id);
-      if (!session || session.error) return;
-      if (!session.historySlug) {
-        session.historySlug = await suggestSlug(session);
-        if (!session.historySlug) return;
-        store().write(workspaceId, { sessions: list(workspaceId) });
+      const agent = list(workspaceId).find((item) => item.id === id);
+      if (!agent || agent.error) return;
+      if (!agent.historySlug) {
+        agent.historySlug = await suggestSlug(agent);
+        if (!agent.historySlug) return;
+        store().write(workspaceId, { agents: list(workspaceId) });
       }
-      await exportCliHistory(workspaceId, adapter.id, session.id, session.historySlug, await historyFiles(workspaceId, session.id));
+      await exportCliHistory(workspaceId, adapter.id, agent.id, agent.historySlug, await historyFiles(workspaceId, agent.id));
     });
   }
   async function close(workspaceId: string, id: string): Promise<void> {
     await exportHistory(workspaceId, id);
     await serialize(workspaceId, async () => {
-      const session = get(workspaceId, id);
+      const agent = get(workspaceId, id);
       await revokeAgentMcp(workspaceId, id);
-      if ((await terminalState(workspaceId, session)).exists) await checkedWorkspaceShell(workspaceId, `tmux kill-session -t ${shellQuote(session.tmuxSession)}`);
-      store().write(workspaceId, { sessions: list(workspaceId).filter((session) => session.id !== id) });
+      if ((await terminalState(workspaceId, agent)).exists) await checkedWorkspaceShell(workspaceId, `tmux kill-session -t ${shellQuote(agent.tmuxSession)}`);
+      store().write(workspaceId, { agents: list(workspaceId).filter((agent) => agent.id !== id) });
     });
   }
   async function exportWorkspaceHistory(workspaceId: string): Promise<void> {
-    for (const session of list(workspaceId)) await exportHistory(workspaceId, session.id);
+    for (const agent of list(workspaceId)) await exportHistory(workspaceId, agent.id);
   }
   return { list, get, ready, settleTurn, create, prepareWorkspace, restoreWorkspace, terminalState, recordNamingPrompt, suggestTitle, setTitle, close, exportHistory, exportWorkspaceHistory };
 }
 
-export type CliSessions = ReturnType<typeof createCliSessions>;
+export type CliAgents = ReturnType<typeof createCliAgents>;

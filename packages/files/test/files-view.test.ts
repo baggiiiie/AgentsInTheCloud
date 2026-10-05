@@ -46,7 +46,7 @@ describe("Files Work view integration", () => {
     // SAFETY: The test fixture supplies the module initialization fields exercised by this test.
     await agentsInTheCloudServerModule.initialize!({ events, invalidateWorkspace: (workspaceId: string) => invalidations.push(workspaceId), onWorkspaceRemoved: () => {} } as never);
     setFilesViewFile("workspace-events", "workspace", path);
-    await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-events", conversationId: "conversation-1" });
+    await events.emit("workspace_agent_turn_finished", { workspaceId: "workspace-events", agentId: "conversation-1" });
     expect(invalidations).toEqual(["workspace-events"]);
     expect(filesDiskGeneration("workspace-events")).toBe(1);
     deleteFilesViewState("workspace-events");

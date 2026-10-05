@@ -1,4 +1,4 @@
-/* Models panel: providers with their usage, then your models. Same markup in its dialog, Settings, and onboarding. */
+/* Models panel: providers with their usage, then enabled models. Same markup in its dialog, Settings, and onboarding. */
 #models_dialog, #onboarding_dialog:has(.models-panel) { width: min(640px, calc(100vw - 32px)); }
 .models-panel { display: grid; gap: 28px; min-width: 0; padding-block: 4px 8px; }
 .models-panel p { margin: 0; font: inherit; }
@@ -43,12 +43,12 @@
 .model-provider-connection > .model-setup-actions { margin-top: 0; }
 .model-provider-results { display: block; }
 .model-provider-models { max-height: min(280px, 30vh); padding-block: 4px; }
-/* Line catalogue rows up with Your models above: same inset, icon box and label column. */
+/* Line catalogue rows up with Enabled models above: same inset, icon box and label column. */
 .model-provider-models .action-item { padding-inline: 12px; gap: 8px; }
 .model-provider-models .action-item .brand-icon { width: 18px; height: 18px; margin-inline: 1px; }
-.model-favorites .managed-list__items { max-height: min(260px, 32vh); }
-.model-favorites .managed-list__visual { display: grid; place-items: center; width: 20px; }
-.model-favorites .managed-list__visual .brand-icon { width: 18px; height: 18px; }
+.enabled-models .managed-list__items { max-height: min(260px, 32vh); }
+.enabled-models .managed-list__visual { display: grid; place-items: center; width: 20px; }
+.enabled-models .managed-list__visual .brand-icon { width: 18px; height: 18px; }
 @media (max-width: 700px) {
   .model-account__body { padding-inline: 12px; }
 }

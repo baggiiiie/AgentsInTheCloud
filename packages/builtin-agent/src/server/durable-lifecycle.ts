@@ -1,4 +1,4 @@
-import { WorkspaceConversations, type DurableConversationRecord } from "./durable-workspace.ts";
+import { WorkspaceAgents, type DurableAgentRecord } from "./durable-workspace.ts";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc, InboxDoc, LiveDoc, type ConversationId, type Cursor, type Harness, type TaskId, type Tx } from "@earendil-works/pi-durable";
 
@@ -25,14 +25,14 @@ export const DurableTaskAdmissions = defineDoc<{ requests: Record<string, { conv
 });
 
 /** The same scope is used to offer Stop and to commit it. Child Stop is local. */
-export function durableStopScope(records: readonly DurableConversationRecord[], conversationId: ConversationId, tree: boolean) {
+export function durableStopScope(records: readonly DurableAgentRecord[], conversationId: ConversationId, tree: boolean) {
   const root = records.find(record => record.durableId === conversationId);
-  return [conversationId, ...records.filter(record => tree && root && record.rootId === root.conversationId).map(record => record.durableId)];
+  return [conversationId, ...records.filter(record => tree && root && record.rootId === root.agentId).map(record => record.durableId)];
 }
 
 /** Commit intent and withdraw steering atomically, without enabling execution. */
 export async function commitDurableStop(tx: Tx, conversationId: ConversationId, tree = false) {
-  const scope = durableStopScope((await tx.doc(WorkspaceConversations)).conversations, conversationId, tree);
+  const scope = durableStopScope((await tx.doc(WorkspaceAgents)).agents, conversationId, tree);
   const scopes = [];
   for (const id of scope) scopes.push({ id, tasks: await stoppedTasks(tx, id), inbox: await tx.doc(InboxDoc, id) });
   for (const { id, tasks, inbox } of scopes) {

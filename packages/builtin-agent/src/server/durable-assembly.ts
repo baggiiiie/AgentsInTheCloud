@@ -46,14 +46,14 @@ const resourceLoaders = {
 };
 
 /**
- * Prepare outside the journal commit; pass the result to workspace.conversation().
+ * Prepare outside the journal commit; pass the result to workspace.agent().
  * The resulting prompt/model are committed with creation, not rebuilt on recovery
  * from potentially changed workspace files or the host's current model default.
  * Existing conversations keep their settings; explicit refresh uses configure().
  */
-export async function prepareDurableConversation(
+export async function prepareDurableAgent(
   workspaceId: string,
-  conversationId: string,
+  agentId: string,
   options: WorkspaceAgentToolOptions = {},
   initial: Pick<AgentChange, "model" | "thinkingLevel"> = {},
   load: typeof resourceLoaders = resourceLoaders,
@@ -62,14 +62,14 @@ export async function prepareDurableConversation(
     load.agents(workspaceId),
     load.skills(workspaceId),
     initial.model !== undefined ? Promise.resolve(undefined) : load.model(),
-    prepareAppendedAgentsInTheCloudInstructions(options.events, workspaceId, conversationId),
+    prepareAppendedAgentsInTheCloudInstructions(options.events, workspaceId, agentId),
   ]);
   const selectedModel = initial.model !== undefined ? initial.model : model ? { provider: model.provider, modelId: model.id } : undefined;
   const thinking = initial.thinkingLevel !== undefined ? initial.thinkingLevel
     : (await load.thinking(selectedModel ? { provider: selectedModel.provider, id: selectedModel.modelId } : undefined)).selected;
   const instructions = [
     agentsInTheCloudSystemPrompt,
-    durableJournalInstructions(workspaceId, conversationId),
+    durableJournalInstructions(workspaceId, agentId),
     ...appended,
     ...agents.map((file) => `# Project instructions: ${file.path}\n\n${file.content}`),
     formatSkillsForPrompt(skills.skills),

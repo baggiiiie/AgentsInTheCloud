@@ -38,7 +38,7 @@ async function setup() {
   };
   return { path, faux, registry, open, workspace: await open() };
 }
-const record = { conversationId: "tab", label: "Agent 1", title: "Images" };
+const record = { agentId: "tab", label: "Agent 1", title: "Images" };
 
 test("shared read registry resolves each conversation's model profile and preserves non-vision images", async () => {
   const { workspace, faux, open } = await setup();
@@ -48,7 +48,7 @@ test("shared read registry resolves each conversation's model profile and preser
       fauxAssistantMessage([fauxToolCall("read", { path: "red.png" })], { stopReason: "toolUse" }),
       fauxAssistantMessage("Done"),
     ]);
-    const conversation = await workspace.conversation({ ...record, conversationId: modelId }, { model: { provider: "faux", modelId } });
+    const conversation = await workspace.agent({ ...record, agentId: modelId }, { model: { provider: "faux", modelId } });
     const submission = await conversation.submit({ type: "input", content: "Read the image" }, context);
     expect((await submission.wait(context)).status).toBe("done");
     const result = (await conversation.entries({}, 100, undefined, context)).items.find((entry) => entry.kind === "pi.tool-result")!;
@@ -68,7 +68,7 @@ test("shared read registry resolves each conversation's model profile and preser
   await workspace.close();
   const reopened = await open();
   for (const { modelId, result } of entries) {
-    const conversation = await reopened.conversation({ ...record, conversationId: modelId });
+    const conversation = await reopened.agent({ ...record, agentId: modelId });
     expect((await conversation.entries({ minEntryId: result.id, maxEntryId: result.id }, 1, undefined, context)).items[0]).toEqual(result);
     const imageIndex = durableEntryContent(result).findIndex((part) => part.type === "image");
     const response = await durableImageEndpoint(conversation, String(result.id), imageIndex, context);
@@ -80,8 +80,8 @@ test("shared read registry resolves each conversation's model profile and preser
 
 test("image retrieval is conversation-scoped, fork-aware, passive, and immutable across reopen", async () => {
   const { workspace, open } = await setup();
-  const one = await workspace.conversation(record);
-  const two = await workspace.conversation({ ...record, conversationId: "another-root" });
+  const one = await workspace.agent(record);
+  const two = await workspace.agent({ ...record, agentId: "another-root" });
   // Commit directly to leave scheduling paused and exercise images from multiple
   // messages in one immutable entry, not just Pi's usual single-message entries.
   const image = await one.commit((tx) => tx.appendEntry(one.id, {
@@ -103,7 +103,7 @@ test("image retrieval is conversation-scoped, fork-aware, passive, and immutable
   }
   await workspace.close();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const response = await durableImageEndpoint(restored, String(image.id), 1, context);
   expect(response.status).toBe(200);
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
@@ -115,7 +115,7 @@ test("image retrieval is conversation-scoped, fork-aware, passive, and immutable
 
 test("unsupported image MIME types are not served as active content", async () => {
   const { workspace } = await setup();
-  const conversation = await workspace.conversation(record);
+  const conversation = await workspace.agent(record);
   const entry = await conversation.commit((tx) => tx.appendEntry(conversation.id, {
     kind: "test.images", model: [{ role: "user", timestamp: 1, content: [{ type: "image", mimeType: "text/html", data: Buffer.from("<script>alert(1)</script>").toString("base64") }] }],
   }), context);
@@ -139,7 +139,7 @@ test("queued image identities survive passive reopen, remain scoped, and retire 
     fauxAssistantMessage([fauxToolCall("block", {})], { stopReason: "toolUse" }),
     fauxAssistantMessage("Recovered"),
   ]);
-  const conversation = await workspace.conversation(record, { model: { provider: "faux", modelId: "small" } });
+  const conversation = await workspace.agent(record, { model: { provider: "faux", modelId: "small" } });
   await conversation.submit({ type: "input", content: "Start" }, context);
   await started.promise;
   const queued = await conversation.submit({ type: "input", whenBusy: "steer", content: [
@@ -150,8 +150,8 @@ test("queued image identities survive passive reopen, remain scoped, and retire 
   expect((await durableImageEndpoint(conversation, id, 1, context)).status).toBe(200);
   await workspace.close();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
-  const other = await reopened.conversation({ ...record, conversationId: "other-root" });
+  const restored = await reopened.agent(record);
+  const other = await reopened.agent({ ...record, agentId: "other-root" });
   const frame = await restored.watch(context);
   const initial = frame.value;
   const response = await durableImageEndpoint(restored, id, 1, context);

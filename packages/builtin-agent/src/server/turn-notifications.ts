@@ -10,7 +10,7 @@ interface NotificationTurn {
 // Only running turns have an entry. Removing one consumes its intent, so no
 // separate finished flag or retained turn object can accidentally be re-armed.
 const turns = new Map<string, NotificationTurn>();
-function key(ctx: AgentRenderContext): string { return JSON.stringify([ctx.workspaceId, ctx.conversationId]); }
+function key(ctx: AgentRenderContext): string { return JSON.stringify([ctx.workspaceId, ctx.agentId]); }
 
 export function currentNotificationTurn(ctx: AgentRenderContext): { id: string; armed: boolean } | undefined {
   const turn = turns.get(key(ctx));

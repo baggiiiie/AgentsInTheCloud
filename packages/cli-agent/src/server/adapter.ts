@@ -30,7 +30,7 @@ export interface CliAgentAdapter {
   launchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: AgentWorkspaceParameters, session: CliAgentSession): string;
   /** Restore native context without submitting any prompt; an empty session opens idle. */
   resumeScript?(workspaceId: string, settings: AgentWorkspaceParameters, session: CliAgentSession): Promise<string>;
-  /** Optional native-history adapter. CLI providers without one remain terminal-only. */
+  /** Optional native-history adapter. CLI Agent types without one remain terminal-only. */
   loadTranscript?(workspaceId: string, sessionId: string): Promise<TranscriptRecord[] | undefined>;
   /** Whether native history holds all of the last finished turn; turn signals can precede the CLI's final writes. */
   turnSettled?(workspaceId: string, sessionId: string): Promise<boolean>;

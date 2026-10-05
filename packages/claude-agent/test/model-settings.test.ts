@@ -10,15 +10,15 @@ async function scenario(script: string) {
     const child = Bun.spawn([process.execPath, "-e", `
       import { expect, mock } from "bun:test";
       const llm = await import("@agents-in-the-cloud/llm/server");
-      const favorites = [
+      const enabledModels = [
         { provider: "openai-codex", id: "codex", label: "Codex" },
         { provider: "anthropic", id: "first", label: "First" },
         { provider: "anthropic", id: "second", label: "Second" },
         { provider: "anthropic", id: "unavailable", label: "Unavailable" },
       ];
       mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
-        getConfiguredModels: async () => favorites,
-        createPiModelRuntime: async () => ({ getAvailable: async () => favorites.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
+        getEnabledModels: async () => enabledModels,
+        createPiModelRuntime: async () => ({ getAvailable: async () => enabledModels.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: null, xhigh: "max" } }) }),
         modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high", "xhigh"],
       }));
       const { claudeModelSettings: { prepare } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
@@ -31,17 +31,17 @@ async function scenario(script: string) {
   }
 }
 
-test("defaults to the first available Claude favorite, never another provider", () => scenario(`
+test("defaults to the first available Claude enabled model, never another provider", () => scenario(`
   expect(await prepare()).toEqual({ model: "anthropic::first", thinkingLevel: "medium" });
 `));
 
-test("accepts a chosen Claude favorite and supported thinking level", () => scenario(`
+test("accepts a chosen Claude enabled model and supported thinking level", () => scenario(`
   expect(await prepare({ model: "anthropic::second", thinkingLevel: "high" })).toEqual({ model: "anthropic::second", thinkingLevel: "high" });
   expect((await prepare({ thinkingLevel: "max" })).thinkingLevel).toBe("max");
 `));
 
-test("rejects foreign, unavailable, non-favorite models and invalid thinking levels", () => scenario(`
-  for (const model of ["openai-codex::codex", "anthropic::unavailable", "anthropic::not-favorite", 42]) {
+test("rejects foreign, unavailable, non-enabled models and invalid thinking levels", () => scenario(`
+  for (const model of ["openai-codex::codex", "anthropic::unavailable", "anthropic::not-enabled", 42]) {
     await expect(prepare({ model })).rejects.toMatchObject({ code: "invalid_arguments" });
   }
   await expect(prepare({ thinkingLevel: "invented" })).rejects.toMatchObject({ code: "invalid_arguments" });

@@ -4,7 +4,7 @@ import type { JsonObject } from "@agents-in-the-cloud/core";
 import { piModelSetupRequired } from "./auth.ts";
 
 const sharedSettings = createCliModelSettings({
-  agentProvider: "pi", label: "Pi",
+  agentTypeId: "pi", label: "Pi",
   // Pi uses its own abstract thinking levels, not the provider-native efforts.
   effort: (level) => level,
   unavailableReason: piCliModelUnavailableReason,

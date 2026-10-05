@@ -17,7 +17,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       return [{
         id: "agent.toggle-composer",
         label: "Toggle Agent composer",
-        scope: "agent-conversation",
+        scope: "agent",
         binding: "Meta+Alt+KeyO",
         run() {
           const control = composer.classList.contains("agent-composer-open") ? '[data-action="agent-composer#close"]' : '[data-agent-composer-target="opener"]';

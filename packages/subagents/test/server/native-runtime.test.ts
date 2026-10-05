@@ -33,7 +33,7 @@ async function setup(pauseSpawn?: (context: Context) => Promise<void>) {
     harness = owner.harness; owners.push(owner); return owner;
   };
   const owner = await open();
-  const root = await owner.conversation({ conversationId: "root", label: "Root", title: "Root" });
+  const root = await owner.agent({ agentId: "root", label: "Root", title: "Root" });
   return { owner, root, faux, open };
 }
 async function completedDeliveries(owner: DurableAgentRuntime) {
@@ -72,7 +72,7 @@ test("spawn, native child completion, passive parent delivery and follow-up surv
   expect(faux.state.callCount).toBe(3); // Receipt did not start an extra parent turn.
   await owner.suspend();
   const reopened = await open();
-  const restored = await reopened.conversation({ conversationId: "root", label: "Root", title: "Root" });
+  const restored = await reopened.agent({ agentId: "root", label: "Root", title: "Root" });
   let followup = false;
   faux.setResponses(Array.from({ length: 10 }, () => request => {
     if (JSON.stringify(request.messages).includes("Your canonical task name is /root/review.")) return fauxAssistantMessage("Follow-up result");
@@ -102,7 +102,7 @@ test("root Stop cancels descendants without retiring their identities", async ()
   await (await root.submit({ requestId: "start", text: "Delegate" })).wait(context);
   await childStarted.promise;
   const child = (await owner.catalog()).find(record => record.parentId)!;
-  const other = await owner.conversation({ conversationId: "other", label: "Other", title: "Other" });
+  const other = await owner.agent({ agentId: "other", label: "Other", title: "Other" });
   const work = async (expected: boolean) => {
     const changed = Promise.withResolvers<void>();
     const check = () => { if (root.hasStoppableWork === expected) changed.resolve(); };
@@ -114,11 +114,11 @@ test("root Stop cancels descendants without retiring their identities", async ()
   expect(other.hasStoppableWork).toBe(false);
   await root.stop();
   await work(false); // Idle identity anchors must not keep Stop available.
-  expect((await owner.catalog()).find(record => record.conversationId === child.conversationId)).toBeDefined();
+  expect((await owner.catalog()).find(record => record.agentId === child.agentId)).toBeDefined();
   expect(Object.values((await owner.harness.snapshot(Delegation, context))!.assignments)[0]?.status).toBe("interrupted");
   expect((await owner.harness.inspect(context)).tasks.every(item => item.record.kind === "agents-in-the-cloud.delegation-anchor")).toBe(true);
   release.resolve();
-  const childController = await owner.conversation(child);
+  const childController = await owner.agent(child);
   faux.setResponses([fauxAssistantMessage("New work succeeds")]);
   expect((await (await childController.submit({ requestId: "new-work", text: "Continue" })).wait(context)).status).toBe("done");
   await root.close();
@@ -158,8 +158,8 @@ test("different root trees cannot address each other's children", async () => {
   ]);
   await (await root.submit({ requestId: "spawn", text: "Delegate" })).wait(context); await completedDeliveries(owner);
   const child = (await owner.catalog()).find(record => record.parentId)!;
-  const other = await owner.conversation({ conversationId: "other", label: "Other", title: "Other" });
-  faux.setResponses([fauxAssistantMessage(fauxToolCall("send_message", { target: child.conversationId, message: "Cross-tree intrusion" }), { stopReason: "toolUse" }), fauxAssistantMessage("Rejected")]);
+  const other = await owner.agent({ agentId: "other", label: "Other", title: "Other" });
+  faux.setResponses([fauxAssistantMessage(fauxToolCall("send_message", { target: child.agentId, message: "Cross-tree intrusion" }), { stopReason: "toolUse" }), fauxAssistantMessage("Rejected")]);
   await (await other.submit({ requestId: "send", text: "Send" })).wait(context);
   expect(Object.values((await owner.harness.snapshot(Delegation, context))!.receipts).some(receipt => receipt.text === "Cross-tree intrusion")).toBe(false);
   const history = await other.history({}, 100, undefined, context);
@@ -209,7 +209,7 @@ test("pending child execution resumes after host suspension without duplicate sp
   expect(receipts.filter(receipt => receipt.kind === "completion")).toHaveLength(1);
   expect(receipts.find(receipt => receipt.kind === "completion")?.text).toBe("Recovered child result");
   expect(faux.state.callCount).toBe(before + 1);
-  const controller = await reopened.conversation({ conversationId: "root", label: "Root", title: "Root" }); await controller.close();
+  const controller = await reopened.agent({ agentId: "root", label: "Root", title: "Root" }); await controller.close();
 });
 
 test("root close persisted before cleanup blocks descendants after reopening", async () => {
@@ -229,7 +229,7 @@ test("root close persisted before cleanup blocks descendants after reopening", a
   expect(faux.state.callCount).toBe(before);
   expect((await reopened.harness.inspect(context)).tasks).toHaveLength(0);
   const child = (await reopened.catalog()).find(record => record.parentId)!;
-  await expect((await reopened.conversation(child)).submit({ requestId: "closed-child", text: "No" })).rejects.toThrow("closed");
+  await expect((await reopened.agent(child)).submit({ requestId: "closed-child", text: "No" })).rejects.toThrow("closed");
 });
 
 test("replay after spawn committed but before its tool result reuses the same child and task", async () => {
@@ -248,15 +248,15 @@ test("replay after spawn committed but before its tool result reuses the same ch
   }));
   await root.submit({ requestId: "replay-spawn", text: "Delegate" });
   await committed.promise;
-  const firstId = (await owner.catalog()).find(record => record.parentId)!.conversationId;
+  const firstId = (await owner.catalog()).find(record => record.parentId)!.agentId;
   await owner.suspend(); pause = false;
   const reopened = await open(); await reopened.resume(); await completedDeliveries(reopened);
   const children = (await reopened.catalog()).filter(record => record.parentId);
-  expect(children).toHaveLength(1); expect(children[0]?.conversationId).toBe(firstId);
+  expect(children).toHaveLength(1); expect(children[0]?.agentId).toBe(firstId);
   const receipts = Object.values((await reopened.harness.snapshot(Delegation, context))!.receipts);
   expect(receipts.filter(receipt => receipt.kind === "task")).toHaveLength(1);
   expect(receipts.filter(receipt => receipt.kind === "completion")).toHaveLength(1);
-  const restored = await reopened.conversation({ conversationId: "root", label: "Root", title: "Root" }); await restored.close();
+  const restored = await reopened.agent({ agentId: "root", label: "Root", title: "Root" }); await restored.close();
 });
 
 test("interrupt_agent retains the child for a later follow-up and returns its prior status", async () => {

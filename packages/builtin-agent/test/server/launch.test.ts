@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareAgentLaunch, nativeAgentLaunch } from "../../src/server/launch.ts";
 import { stageAttachment } from "@agents-in-the-cloud/prompt/server";
-import { listWorkspaceAgentConversations } from "../../src/server/session-store.ts";
+import { listWorkspaceAgents } from "../../src/server/agent-store.ts";
 
 let directory: string;
 beforeEach(async () => {
@@ -21,7 +21,7 @@ test("empty launch settings do not introduce an agent task", async () => {
   expect(await prepareAgentLaunch({ initialPrompt: "   " })).toBeUndefined();
 });
 
-test("empty composer submissions can launch without a configured model", async () => {
+test("empty composer submissions can launch without an available enabled model", async () => {
   for (const text of ["", "   \n "]) {
     const form = new FormData();
     form.set("text", text);
@@ -33,14 +33,14 @@ test("empty composer submissions can launch without a configured model", async (
   }
 });
 
-test("composer prompts still require a configured model", async () => {
+test("composer prompts still require an available enabled model", async () => {
   const form = new FormData();
   form.set("text", "Start working");
   const submission = await nativeAgentLaunch.submit(form);
   expect("response" in submission && submission.response.status).toBe(422);
 });
 
-test("attachment-only composer submissions still require a configured model", async () => {
+test("attachment-only composer submissions still require an available enabled model", async () => {
   const draftId = crypto.randomUUID();
   await stageAttachment(draftId, new File(["Task details"], "task.txt"));
   const form = new FormData();
@@ -55,10 +55,10 @@ test("agent launch owns validation of its parameters", async () => {
   await expect(prepareAgentLaunch({ initialPromptMode: "run-anything" })).rejects.toMatchObject({ code: "invalid_arguments" });
 });
 
-test("explicit composer drafts preserve native settings but ignore removed service tiers", async () => {
+test("explicit composer drafts preserve native settings", async () => {
   expect(await prepareAgentLaunch({
     initialPrompt: "  Investigate later  ", initialPromptMode: "composer",
-    model: "openai::gpt-5.4", thinkingLevel: "high", serviceTier: "priority", attachmentDraft: "draft-1",
+    model: "openai::gpt-5.4", thinkingLevel: "high", attachmentDraft: "draft-1",
   })).toEqual({ agent: {
     initialPrompt: "Investigate later", initialPromptMode: "composer",
     model: "openai::gpt-5.4", thinkingLevel: "high", attachmentDraft: "draft-1",
@@ -67,8 +67,8 @@ test("explicit composer drafts preserve native settings but ignore removed servi
 
 test("host-requested preparation retains the existing native session identity", async () => {
   await nativeAgentLaunch.prepareWorkspace("launch-workspace");
-  const first = await listWorkspaceAgentConversations("launch-workspace");
+  const first = await listWorkspaceAgents("launch-workspace");
   await nativeAgentLaunch.prepareWorkspace("launch-workspace");
-  expect(await listWorkspaceAgentConversations("launch-workspace")).toEqual(first);
+  expect(await listWorkspaceAgents("launch-workspace")).toEqual(first);
   expect(first).toHaveLength(1);
 });

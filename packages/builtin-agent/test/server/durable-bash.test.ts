@@ -109,7 +109,7 @@ async function harness(f: Awaited<ReturnType<typeof fixture>>, operations: BashO
   const path = join(f.path, "journal");
   const workspace = await openDurableWorkspace(path, "workspace", options);
   workspaces.push(workspace);
-  const conversation = await workspace.conversation({ conversationId: "tab", label: "Agent 1", title: "Bash recovery" }, { model: { provider: "faux", modelId: "faux-1" } });
+  const conversation = await workspace.agent({ agentId: "tab", label: "Agent 1", title: "Bash recovery" }, { model: { provider: "faux", modelId: "faux-1" } });
   return { workspace, conversation, path, options };
 }
 
@@ -169,7 +169,7 @@ test("SIGKILL after workspace launch but before host receipt reattaches without 
     const submission = (await workspace.harness.submission(inspection.submissions[0]!.id, context))!;
     expect((await submission.wait(context)).status).toBe("done");
     expect(await readFile(join(f.path, "count"), "utf8")).toBe("once\n");
-    const conversation = await workspace.conversation({ conversationId: "tab", label: "Agent 1", title: "Bash recovery" });
+    const conversation = await workspace.agent({ agentId: "tab", label: "Agent 1", title: "Bash recovery" });
     const entries = (await conversation.entries({}, 100, undefined, context)).items;
     const results = entries.flatMap((entry) => entry.model ?? []).filter((message) => message.role === "toolResult");
     expect(results).toHaveLength(1);

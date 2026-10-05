@@ -19,8 +19,8 @@ interface TestAgentModule {
   module: WorkspaceModule;
   conversations: TestConversation[];
   listedWorkspaceIds: string[];
-  rendered: Array<{ workspaceId: string; conversationId: string }>;
-  closed: Array<{ workspaceId: string; conversationId: string }>;
+  rendered: Array<{ workspaceId: string; agentId: string }>;
+  closed: Array<{ workspaceId: string; agentId: string }>;
 }
 
 interface TestAppContext {
@@ -36,30 +36,30 @@ function createTestAgentModule(initial: TestConversation[], created: TestConvers
   const conversations = initial.map((conversation) => ({ ...conversation }));
   const creations = (Array.isArray(created) ? created : [created]).map((conversation) => ({ ...conversation }));
   const listedWorkspaceIds: string[] = [];
-  const rendered: Array<{ workspaceId: string; conversationId: string }> = [];
-  const closed: Array<{ workspaceId: string; conversationId: string }> = [];
-  const provider: WorkspaceAgentTabProvider = {
+  const rendered: Array<{ workspaceId: string; agentId: string }> = [];
+  const closed: Array<{ workspaceId: string; agentId: string }> = [];
+  const tabs: WorkspaceAgentTabProvider = {
     async list({ workspaceId }) {
       listedWorkspaceIds.push(workspaceId);
       return conversations.map(({ id, title }) => ({ id, title }));
     },
     async render(context) {
-      const conversation = conversations.find((candidate) => candidate.id === context.conversationId);
-      if (!conversation) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${context.conversationId}`);
+      const conversation = conversations.find((candidate) => candidate.id === context.agentId);
+      if (!conversation) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${context.agentId}`);
       rendered.push(context);
       return `<article data-rendered-conversation="${conversation.id}">${conversation.title} body</article>`;
     },
     async close(context) {
-      const index = conversations.findIndex((candidate) => candidate.id === context.conversationId);
-      if (index < 0) throw new AgentsInTheCloudCoreError("agent_conversation_not_found", `Agent conversation not found: ${context.conversationId}`);
+      const index = conversations.findIndex((candidate) => candidate.id === context.agentId);
+      if (index < 0) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${context.agentId}`);
       conversations.splice(index, 1);
       closed.push(context);
     },
   };
   const module: WorkspaceModule = {
     id: "test-agent",
-    agentProvider: {
-      id: "builtin", label: "Builtin", iconHtml: "", tabs: provider,
+    agentType: {
+      id: "builtin", label: "Builtin", iconHtml: "", tabs,
       async create() {
         const conversation = creations.shift()!;
         conversations.push(conversation);
@@ -110,7 +110,7 @@ async function withTestApp(
   }
 }
 
-describe("Agent provider app integration", () => {
+describe("Agent type app integration", () => {
   test("automation retains command schemas and lists host agent commands once", async () => {
     const inputSchema = Type.Object({ value: Type.String() });
     await withTestApp([], async ({ app, workspaceId }) => {
@@ -125,7 +125,7 @@ describe("Agent provider app integration", () => {
     }]);
   });
 
-  test("warning dismissal does not attach modules or list Agent conversations", async () => {
+  test("warning dismissal does not attach modules or list Agents", async () => {
     await withTestApp([{ id: "conversation-a", title: "Alpha" }], async ({ app, agent, registry, workspaceId }) => {
       registry.setIssue(workspaceId, "readiness", "Gateway unavailable");
       const warning = workspaceWarnings(registry.get(workspaceId)!, undefined)[0]!;

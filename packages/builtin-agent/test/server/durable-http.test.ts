@@ -10,7 +10,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai";
 import { createRegistry, defineExtension, defineTool } from "@earendil-works/pi-durable";
 import { type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
-import { ensureDefaultWorkspaceAgentConversation } from "../../src/server/session-store.ts";
+import { ensureDefaultWorkspaceAgent } from "../../src/server/agent-store.ts";
 import { handleAgentRequest } from "../../src/server/routes.ts";
 
 let directory: string;
@@ -27,7 +27,7 @@ afterEach(async () => {
 test("lost HTTP response retries admitted input after attachment staging is consumed, without preparation or another generation", async () => {
   directory = await mkdtemp(join(tmpdir(), "durable-http-"));
   process.env.ATELIER_DATA_DIR = directory;
-  const agent = await ensureDefaultWorkspaceAgentConversation("http-workspace");
+  const agent = await ensureDefaultWorkspaceAgent("http-workspace");
   const models = createModels();
   const faux = fauxProvider({ tokensPerSecond: 100_000, models: [{ id: "test", input: ["text", "image"] }] });
   models.setProvider(faux.provider);
@@ -39,8 +39,8 @@ test("lost HTTP response retries admitted input after attachment staging is cons
     validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {},
   });
-  const controller = await owner.conversation(agent);
-  const draft = agentAttachmentDraftId(agent.workspaceId, agent.conversationId);
+  const controller = await owner.agent(agent);
+  const draft = agentAttachmentDraftId(agent.workspaceId, agent.agentId);
   const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGP4z8BAEiJN9aiGUQ1DSgMAkPn/Afnh+ngAAAAASUVORK5CYII=", "base64");
   const attachment = await stageAttachment(draft, new File([image], "image.png", { type: "image/png" }));
   let preparations = 0;
@@ -57,7 +57,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
       return accepted;
     },
   };
-  const request = () => new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.conversationId}/messages`, {
+  const request = () => new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.agentId}/messages`, {
     method: "POST", body: new URLSearchParams({ text: "Look at the image", requestId: "lost-response", attachmentDraft: draft, attachment: attachment.id, reviewComment: "12345678-1234-1234-1234-123456789abc" }),
   });
   const first = request();
@@ -78,7 +78,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
     validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => { throw new Error("Workspace is offline"); },
   });
-  const reopened = await owner.conversation(agent);
+  const reopened = await owner.agent(agent);
   const retry = request();
   const retried = await handleAgentRequest(retry, new URL(retry.url), {
     events, knownRequest: (_agent, id) => reopened.knownRequest(id),
@@ -95,7 +95,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
 test("offline HTTP Stop bypasses model/UI preparation and commits intent before cleanup failure", async () => {
   directory = await mkdtemp(join(tmpdir(), "durable-http-stop-"));
   process.env.ATELIER_DATA_DIR = directory;
-  const agent = await ensureDefaultWorkspaceAgentConversation(`stop-${crypto.randomUUID()}`);
+  const agent = await ensureDefaultWorkspaceAgent(`stop-${crypto.randomUUID()}`);
   const models = createModels();
   const faux = fauxProvider({ tokensPerSecond: 100_000 });
   models.setProvider(faux.provider);
@@ -114,7 +114,7 @@ test("offline HTTP Stop bypasses model/UI preparation and commits intent before 
     expand: async (_workspace, text) => text, validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => {},
   });
-  const controller = await owner.conversation(agent);
+  const controller = await owner.agent(agent);
   await controller.submit({ requestId: "initial", text: "Start" });
   await started.promise;
   await controller.submit({ requestId: "queued", text: "Steering" });
@@ -125,11 +125,11 @@ test("offline HTTP Stop bypasses model/UI preparation and commits intent before 
     expand: async () => { throw new Error("No workspace"); }, validateModel: async (_ref: { provider: string; modelId: string } | undefined) => {},
     ready: async () => { throw new Error("Offline"); },
   });
-  const request = new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.conversationId}/abort`, { method: "POST" });
+  const request = new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.agentId}/abort`, { method: "POST" });
   await expect(handleAgentRequest(request, new URL(request.url), {
     getPresentation: async () => { throw new Error("Must not mount UI for Stop"); },
   })).rejects.toThrow("Stop saved");
-  const restored = await owner.conversation(agent);
+  const restored = await owner.agent(agent);
   const queued = await restored.submit({ requestId: "queued", text: "Retry" });
   expect((await queued.status(BACKGROUND_CONTEXT)).status).toBe("unanswered");
   const { WorkspaceStops } = await import("../../src/server/durable-lifecycle.ts");

@@ -2,41 +2,38 @@ import { readJsonSettings, updateJsonSettings } from "@agents-in-the-cloud/core/
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { agentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, isJsonObject, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
-import type { AgentServiceTier } from "@agents-in-the-cloud/shared";
 import { modelRefValue, type ModelRef } from "./model-reference.ts";
 
 function settingsPath(): string { return agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "pi-config", "models.json"); }
 const stringSchema = Type.String();
 function object(value: JsonValue | undefined): JsonObject { return isJsonObject(value) ? value : {}; }
 
-function preferences(stored: JsonObject, agent: string): JsonObject {
-  const scoped = object(stored.agentPreferences)[agent];
+function preferences(stored: JsonObject, agentTypeId: string): JsonObject {
+  const scoped = object(stored.agentPreferences)[agentTypeId];
   if (isJsonObject(scoped)) return scoped;
   // Older settings used unscoped keys for the Built-in Agent only.
-  return agent === "builtin" ? {
+  return agentTypeId === "builtin" ? {
     activeModel: stored.activeModel ?? null,
     modelPreferences: stored.modelPreferences ?? {},
-    providerPreferences: stored.providerPreferences ?? {},
   } : {};
 }
 
-async function update(agent: string, change: (preference: JsonObject) => void): Promise<void> {
+async function update(agentTypeId: string, change: (preference: JsonObject) => void): Promise<void> {
   await updateJsonSettings(settingsPath(), (stored) => {
     const agents = object(stored.agentPreferences);
-    const preference = preferences(stored, agent);
+    const preference = preferences(stored, agentTypeId);
     change(preference);
-    agents[agent] = preference;
+    agents[agentTypeId] = preference;
     stored.agentPreferences = agents;
-    if (agent === "builtin") {
+    if (agentTypeId === "builtin") {
       delete stored.activeModel;
       delete stored.modelPreferences;
-      delete stored.providerPreferences;
     }
   });
 }
 
-export async function getAgentModelPreference(agent: string): Promise<ModelRef | undefined> {
-  const active = object(preferences(await readJsonSettings(settingsPath()), agent).activeModel);
+export async function getAgentModelPreference(agentTypeId: string): Promise<ModelRef | undefined> {
+  const active = object(preferences(await readJsonSettings(settingsPath()), agentTypeId).activeModel);
   if (!Value.Check(stringSchema, active.provider) || !Value.Check(stringSchema, active.id)) return undefined;
   return active.provider && active.id ? { provider: active.provider, id: active.id } : undefined;
 }
@@ -48,34 +45,20 @@ function setThinking(preference: JsonObject, model: ModelRef, level: string): vo
   preference.modelPreferences = models;
 }
 
-export async function setAgentModelPreference(agent: string, model: ModelRef | undefined, thinkingLevel?: string): Promise<void> {
-  await update(agent, (preference) => {
+export async function setAgentModelPreference(agentTypeId: string, model: ModelRef | undefined, thinkingLevel?: string): Promise<void> {
+  await update(agentTypeId, (preference) => {
     if (model) preference.activeModel = { ...model };
     else delete preference.activeModel;
     if (model && thinkingLevel) setThinking(preference, model, thinkingLevel);
   });
 }
 
-export async function getAgentModelThinkingLevel(agent: string, model: ModelRef): Promise<string | undefined> {
-  const stored = preferences(await readJsonSettings(settingsPath()), agent);
+export async function getAgentModelThinkingLevel(agentTypeId: string, model: ModelRef): Promise<string | undefined> {
+  const stored = preferences(await readJsonSettings(settingsPath()), agentTypeId);
   const level = object(object(stored.modelPreferences)[modelRefValue(model)]).thinkingLevel;
   return Value.Check(stringSchema, level) ? level || undefined : undefined;
 }
 
-export async function setAgentModelThinkingLevel(agent: string, model: ModelRef, level: string): Promise<void> {
-  await update(agent, (preference) => setThinking(preference, model, level));
-}
-
-export async function getAgentProviderServiceTier(agent: string, provider: string): Promise<AgentServiceTier | undefined> {
-  const stored = preferences(await readJsonSettings(settingsPath()), agent);
-  const preference = object(stored.providerPreferences)[provider];
-  return isJsonObject(preference) ? preference.serviceTier === "priority" ? "priority" : "default" : undefined;
-}
-
-export async function setAgentProviderServiceTier(agent: string, provider: string, serviceTier: AgentServiceTier): Promise<void> {
-  await update(agent, (preference) => {
-    const providers = object(preference.providerPreferences);
-    providers[provider] = { ...object(providers[provider]), serviceTier };
-    preference.providerPreferences = providers;
-  });
+export async function setAgentModelThinkingLevel(agentTypeId: string, model: ModelRef, level: string): Promise<void> {
+  await update(agentTypeId, (preference) => setThinking(preference, model, level));
 }

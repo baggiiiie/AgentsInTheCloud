@@ -23,11 +23,11 @@ export async function providerAvailability(runtime: Pick<ModelRuntime, "getAvail
   })));
 }
 
-/** Why a favorite can't be picked, worded the same wherever models are listed; undefined when it can. */
+/** Why an enabled model can't be picked, worded the same wherever models are listed; undefined when it can. */
 export function modelUnavailableReason(availability: ProviderAvailability, model: ModelRef, runtime: Pick<ModelRuntime, "getModel">): string | undefined {
   if (availability.modelIds.has(model.id)) return undefined;
   return availability.connection === "needs_attention" ? "Sign in again in Models"
-    : availability.connection === "disconnected" ? "Provider not connected"
+    : availability.connection === "disconnected" ? "Model provider not connected"
     : runtime.getModel(model.provider, model.id) ? "Not available on your account"
     : "No longer in the provider’s catalogue";
 }

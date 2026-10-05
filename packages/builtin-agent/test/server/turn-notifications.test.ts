@@ -11,7 +11,7 @@ function subscription(endpoint = "https://web.push.apple.com/example") {
 const unchanged = () => {};
 
 test("a notification belongs to one exact turn and is consumed once", () => {
-  const ctx = { workspaceId: "notification-once", conversationId: "agent" };
+  const ctx = { workspaceId: "notification-once", agentId: "agent" };
   startNotificationTurn(ctx, unchanged);
   const { id } = currentNotificationTurn(ctx)!;
   const target = subscription();
@@ -25,7 +25,7 @@ test("a notification belongs to one exact turn and is consumed once", () => {
 });
 
 test("cancelling clears the intent without unsubscribing the browser", () => {
-  const ctx = { workspaceId: "notification-cancel", conversationId: "agent" };
+  const ctx = { workspaceId: "notification-cancel", agentId: "agent" };
   let changes = 0;
   startNotificationTurn(ctx, () => { changes += 1; });
   const { id } = currentNotificationTurn(ctx)!;
@@ -37,7 +37,7 @@ test("cancelling clears the intent without unsubscribing the browser", () => {
 });
 
 test("repeat arming replaces the destination instead of sending duplicate notifications", () => {
-  const ctx = { workspaceId: "notification-replace", conversationId: "agent" };
+  const ctx = { workspaceId: "notification-replace", agentId: "agent" };
   startNotificationTurn(ctx, unchanged);
   const { id } = currentNotificationTurn(ctx)!;
   const second = subscription();
@@ -47,9 +47,9 @@ test("repeat arming replaces the destination instead of sending duplicate notifi
 });
 
 test("turns are isolated by workspace and conversation and never carry into a later turn", () => {
-  const a = { workspaceId: "notification-a", conversationId: "agent" };
-  const b = { workspaceId: "notification-b", conversationId: "agent" };
-  const c = { workspaceId: "notification-a", conversationId: "other-agent" };
+  const a = { workspaceId: "notification-a", agentId: "agent" };
+  const b = { workspaceId: "notification-b", agentId: "agent" };
+  const c = { workspaceId: "notification-a", agentId: "other-agent" };
   for (const ctx of [a, b, c]) startNotificationTurn(ctx, unchanged);
   const previous = currentNotificationTurn(a)!;
   setTurnNotification(a, previous.id, subscription());

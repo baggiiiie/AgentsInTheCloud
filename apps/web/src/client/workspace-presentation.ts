@@ -63,11 +63,11 @@ function workspaceNavigationStorageKey(workspaceId: string): string {
   return `agents-in-the-cloud:workspace-navigation:${workspaceId}`;
 }
 
-function persistIntendedAgent(workspaceId: string, conversationId: string): void {
-  navigationIntents.set(workspaceId, { ...navigationIntents.get(workspaceId), agent: conversationId });
+function persistIntendedAgent(workspaceId: string, agentId: string): void {
+  navigationIntents.set(workspaceId, { ...navigationIntents.get(workspaceId), agent: agentId });
   const storageKey = workspaceNavigationStorageKey(workspaceId);
   const state = storedNavigation(sessionStorage, storageKey) ?? {};
-  sessionStorage.setItem(storageKey, JSON.stringify({ ...state, activeAgentId: conversationId, phoneDestination: "agents" } satisfies StoredPersonalNavigation));
+  sessionStorage.setItem(storageKey, JSON.stringify({ ...state, activeAgentId: agentId, phoneDestination: "agents" } satisfies StoredPersonalNavigation));
 }
 
 export function markActiveWorkspaceRow(root: ParentNode, workspaceId: string): void {
@@ -133,15 +133,15 @@ export function createWorkspacePresentationController(
 
     selectAgent(event: Event): void {
       // SAFETY: The server-rendered DOM and connected controller contract establish this element shape.
-      const id = (event.currentTarget as HTMLElement).dataset.agentConversationId;
+      const id = (event.currentTarget as HTMLElement).dataset.agentId;
       if (!id) return;
       this.state.activeAgentId = id;
       this.state.phoneDestination = "agents";
       this.persistAndApply();
     }
 
-    selectAgentById(conversationId: string): void {
-      this.state.activeAgentId = conversationId;
+    selectAgentById(agentId: string): void {
+      this.state.activeAgentId = agentId;
       this.state.phoneDestination = "agents";
       this.persistAndApply();
     }
@@ -340,7 +340,7 @@ export function createWorkspacePresentationController(
     }
 
     private normalizeState(): void {
-      const agents = [...this.element.querySelectorAll<HTMLElement>("[data-agent-conversation-id], [data-workspace-pane-role='agent']")].map((item) => item.dataset.agentConversationId ?? item.dataset.workspacePaneId!).filter(Boolean);
+      const agents = [...this.element.querySelectorAll<HTMLElement>("[data-agent-id], [data-workspace-pane-role='agent']")].map((item) => item.dataset.agentId ?? item.dataset.workspacePaneId!).filter(Boolean);
       const workViews = [...this.element.querySelectorAll<HTMLElement>("[data-work-view-key]")].map((item) => item.dataset.workViewKey!);
       const intent = navigationIntents.get(this.workspaceIdValue);
       if (intent?.agent) {
@@ -416,12 +416,12 @@ export function createWorkspacePresentationController(
       const selectedAgentChanged = this.element.dataset.workspaceSelectedAgent !== this.state.activeAgentId;
       this.element.dataset.workspaceSelectedAgent = this.state.activeAgentId ?? "";
 
-      this.element.querySelectorAll<HTMLElement>("[data-agent-conversation-id]").forEach((selector) => {
-        const active = selector.dataset.agentConversationId === this.state.activeAgentId;
+      this.element.querySelectorAll<HTMLElement>("[data-agent-id]").forEach((selector) => {
+        const active = selector.dataset.agentId === this.state.activeAgentId;
         selector.setAttribute("aria-selected", String(active));
       });
       this.element.querySelectorAll<PresentationPane>("[data-workspace-pane-role='agent']").forEach((pane) => pane.classList.toggle("is-active", pane.dataset.workspacePaneId === this.state.activeAgentId));
-      if (selectedAgentChanged) this.element.dispatchEvent(new CustomEvent(workspaceAgentSelectionEvent, { bubbles: true, detail: { workspaceId: this.workspaceIdValue, conversationId: this.state.activeAgentId } }));
+      if (selectedAgentChanged) this.element.dispatchEvent(new CustomEvent(workspaceAgentSelectionEvent, { bubbles: true, detail: { workspaceId: this.workspaceIdValue, agentId: this.state.activeAgentId } }));
 
       this.element.querySelectorAll<HTMLElement>("[data-work-view-key]").forEach((selector) => {
         const active = selector.dataset.workViewKey === this.state.activeWorkViewKey;
@@ -622,7 +622,7 @@ export function createWorkspacePresentationController(
 
 export function installWorkspacePresentationTurboStream(Turbo: TurboLike, application: PresentationApplication): void {
   interface PresentationActions {
-    selectAgentById(conversationId: string): void;
+    selectAgentById(agentId: string): void;
     presentWorkView(key: string): void;
     presentationChanged(): void;
   }
@@ -667,11 +667,11 @@ export function installWorkspacePresentationTurboStream(Turbo: TurboLike, applic
   };
 
   Turbo.StreamActions["select-agent"] = function selectAgent(this: StreamElement): void {
-    const conversationId = this.dataset.conversationId;
-    if (!conversationId) throw new Error("select-agent requires a conversation ID");
+    const agentId = this.dataset.agentId;
+    if (!agentId) throw new Error("select-agent requires an Agent ID");
     const workspaceId = behaviorWorkspaceId(this);
-    persistIntendedAgent(workspaceId, conversationId);
-    for (const target of this.targetElements) controllerFor(target, workspaceId)?.selectAgentById(conversationId);
+    persistIntendedAgent(workspaceId, agentId);
+    for (const target of this.targetElements) controllerFor(target, workspaceId)?.selectAgentById(agentId);
   };
 
 }

@@ -10,6 +10,8 @@ The authoritative contract for the running instance is:
 GET /openapi.json
 ```
 
+Discover available Agent types with `GET /agent-types`; the response contains `agentTypes` and `defaultAgentTypeId`. Agent summaries identify their implementation with `agentTypeId`.
+
 Inspect it without loading the whole document into context:
 
 ```sh
@@ -28,15 +30,15 @@ Errors use `{ "error": { "code": "...", "message": "..." } }`.
 
 ## Present a workspace
 
-Workspace, Agent conversation, and Work-view destinations are browser-navigable surfaces:
+Workspace, Agent, and Work-view destinations are browser-navigable surfaces:
 
 ```text
 /workspaces/:workspaceId
-/workspaces/:workspaceId?agent=:conversationId
+/workspaces/:workspaceId?agent=:agentId
 /workspaces/:workspaceId?workView=:key
 ```
 
-The `agent` and `workView` parameters may be combined to choose both sides of the desktop workspace. Use `GET /workspaces/:workspaceId` with `Accept: application/json` to discover the available Agent conversation IDs and the `key` of each Work view.
+The `agent` and `workView` parameters may be combined to choose both sides of the desktop workspace. Use `GET /workspaces/:workspaceId` with `Accept: application/json` to discover the available Agent IDs and the `key` of each Work view.
 
 ## Present workspace template settings
 
@@ -57,7 +59,7 @@ Other browser-navigable surfaces are:
 /workspaces/new                                           # Launch composer for an empty workspace
 /workspace-templates/:workspaceTemplateId/workspaces/new  # Launch composer for a workspace from a template
 /workspace-templates/new                                  # Add a template
-/models                                 # Models: providers, their usage, and your models
+/models                                 # Models: Model providers, their usage, and enabled models
 /settings                               # AgentsInTheCloud settings
 /settings?section=models                # A specific settings section
 /settings/development                   # Development settings
@@ -80,7 +82,7 @@ created=$(curl -sS -X POST http://localhost:3000/workspaces \
 id=$(jq -r '.workspace.id' <<<"$created")
 ```
 
-`source` may be `{ "type": "empty" }` or `{ "type": "workspace-template", "workspaceTemplate": "name-or-id" }`. Optional `agent` fields are `initialPrompt`, `model`, `thinkingLevel`, `serviceTier`, and `attachmentDraft`.
+`source` may be `{ "type": "empty" }` or `{ "type": "workspace-template", "workspaceTemplate": "name-or-id" }`. Optional `agent` fields are `agentTypeId` (Builtin, Claude Code, Codex, or Pi: `builtin`, `claude`, `codex`, or `pi`), `initialPrompt`, `model`, `thinkingLevel`, and `attachmentDraft`.
 
 Poll the same UI URL with JSON content negotiation:
 
@@ -111,9 +113,9 @@ run again when a workspace resumes or AgentsInTheCloud restarts; bypassing a fai
 permanently disable checks. Existing workspaces keep their saved preload references
 when template settings change.
 
-A running-phase response advertises its `agentConversations`, typed `workViews`, and available `commands` with their `inputSchema`.
+A running-phase response advertises its `agents`, typed `workViews`, and available `commands` with their `inputSchema`.
 
-## Stage Agent conversations and Work views
+## Stage Agents and Work views
 
 Execute commands using their advertised schema:
 
@@ -148,11 +150,10 @@ Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park,
 
 ## Control an agent
 
-- `POST /workspaces/:id/agents/:label/model` with `{ "model": "provider::model" }`
-- `POST /workspaces/:id/agents/:label/thinking` with `{ "level": "medium" }`
-- `POST /workspaces/:id/agents/:label/service-tier` with `{ "serviceTier": "default" | "priority" }`
-- `POST /workspaces/:id/agents/:label/messages` with `{ "text": "...", "mode": "send" }`
-- `POST /workspaces/:id/agents/:label/abort`
+- `POST /workspaces/:id/agents/:agentId/model` with `{ "model": "provider::model" }`
+- `POST /workspaces/:id/agents/:agentId/thinking` with `{ "level": "medium" }`
+- `POST /workspaces/:id/agents/:agentId/messages` with `{ "text": "...", "mode": "send" }`
+- `POST /workspaces/:id/agents/:agentId/abort`
 
 Message submission returns `202 Accepted`; it does not wait for inference to finish.
 
@@ -164,7 +165,7 @@ After staging the desired Work view, use the agent's `present` tool with:
 http://localhost:3000/workspaces/<id>
 ```
 
-## Inspect provider usage
+## Inspect Model provider usage
 
 `GET /usage` with `Accept: application/json` returns all connected providers with
 implemented subscription-usage support (OpenAI Codex and Anthropic). Refresh an

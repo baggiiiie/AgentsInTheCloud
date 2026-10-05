@@ -12,19 +12,19 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       return terminal ? [{
         id: "cli-agent.toggle-mode",
         label: "Switch terminal / transcript",
-        scope: "agent-conversation",
+        scope: "agent",
         binding: "Meta+Alt+KeyP",
         run: () => terminal.toggleMode(),
       }] : [];
     });
     application.register("native-terminal-text-input", createNativeTerminalTextInputController(Controller));
     application.register("cli-terminal", class extends createTerminalKeyBarController(Controller) {
-      static values = { url: String, workspaceId: String, conversationId: String, transcriptChannel: String };
+      static values = { url: String, workspaceId: String, agentId: String, transcriptChannel: String };
       static targets = ["terminal", "connectionStatus", "form", "input", "transcript", "transcriptContent", "transcriptEnd"];
       declare readonly element: HTMLElement;
       declare readonly urlValue: string;
       declare readonly workspaceIdValue: string;
-      declare readonly conversationIdValue: string;
+      declare readonly agentIdValue: string;
       declare readonly transcriptChannelValue: string;
       declare readonly formTarget: HTMLFormElement;
       declare readonly inputTarget: HTMLTextAreaElement;
@@ -231,8 +231,8 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
       /** Only a pane in transcript mode receives the transcript itself. */
       private subscribeTranscript(): void {
         this.transcriptSubscription?.unsubscribe();
-        const conversationId = this.conversationIdValue;
-        this.transcriptSubscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.module(this.transcriptChannelValue, this.workspaceIdValue, this.transcriptMode ? { conversationId, transcript: "shown" } : { conversationId }));
+        const agentId = this.agentIdValue;
+        this.transcriptSubscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.module(this.transcriptChannelValue, this.workspaceIdValue, this.transcriptMode ? { agentId, transcript: "shown" } : { agentId }));
       }
       private syncTranscript(): void {
         this.element.classList.toggle("cli-transcript-available", this.transcriptAvailable);

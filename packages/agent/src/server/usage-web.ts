@@ -80,7 +80,7 @@ function shownUsageWindows(windows: PacedUsageWindow[]) {
 
 /** A failed usage check says nothing about whether the provider's models work, so it reads as a note, not an alert. */
 function renderUsageLimits({ reported, error, windows }: ProviderUsageOverview): string {
-  if (error) return `<div class="usage-unavailable" role="status"><p>Couldn’t check usage limits. This only affects the usage shown here; your models may still work fine.</p><p class="usage-caption">${escapeHtml(error)}</p></div>`;
+  if (error) return `<div class="usage-unavailable" role="status"><p>Couldn’t check usage limits. This only affects the usage shown here; models may still work fine.</p><p class="usage-caption">${escapeHtml(error)}</p></div>`;
   if (!reported) return "<p>Disconnected.</p>";
   const { used, unused } = shownUsageWindows(windows);
   return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length || reported.balance ? "" : '<p>No limits reported.</p>'}`;

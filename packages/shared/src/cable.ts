@@ -13,8 +13,8 @@ export interface CableSubscriptionOptions {
 const cableIdentifierSchema = Type.Union([
   Type.Object({ channel: Type.Literal("shell") }),
   Type.Object({ channel: Type.Literal("module"), name: Type.String({ minLength: 1 }), workspaceId: Type.String({ minLength: 1 }), params: Type.Record(Type.String(), Type.String()) }),
-  Type.Object({ channel: Type.Literal("agent"), workspaceId: Type.String({ minLength: 1 }), conversationId: Type.String({ minLength: 1 }) }),
-  Type.Object({ channel: Type.Literal("agent-turn"), workspaceId: Type.String({ minLength: 1 }), conversationId: Type.String({ minLength: 1 }), turnId: Type.String({ minLength: 1 }), branchId: Type.String({ minLength: 1 }) }),
+  Type.Object({ channel: Type.Literal("agent"), workspaceId: Type.String({ minLength: 1 }), agentId: Type.String({ minLength: 1 }) }),
+  Type.Object({ channel: Type.Literal("agent-turn"), workspaceId: Type.String({ minLength: 1 }), agentId: Type.String({ minLength: 1 }), turnId: Type.String({ minLength: 1 }), branchId: Type.String({ minLength: 1 }) }),
 ]);
 
 const subscriptionIdSchema = Type.String({ minLength: 1 });
@@ -91,20 +91,20 @@ export const CableTopics = {
   module(name: string, workspaceId: string, params: Record<string, string> = {}): CableIdentifier {
     return { channel: "module", name: requireNonEmpty(name, "channel name must not be empty"), workspaceId: requireNonEmpty(workspaceId, "workspace identifier must not be empty"), params };
   },
-  agentTurn(workspaceId: string, conversationId: string, turnId: string, branchId: string): CableIdentifier {
+  agentTurn(workspaceId: string, agentId: string, turnId: string, branchId: string): CableIdentifier {
     return {
       channel: "agent-turn",
       workspaceId: requireNonEmpty(workspaceId, "workspace identifier must not be empty"),
-      conversationId: requireNonEmpty(conversationId, "agent conversation identifier must not be empty"),
+      agentId: requireNonEmpty(agentId, "agent identifier must not be empty"),
       turnId: requireNonEmpty(turnId, "agent turn identifier must not be empty"),
       branchId: requireNonEmpty(branchId, "agent branch identifier must not be empty"),
     };
   },
-  agent(workspaceId: string, conversationId: string): CableIdentifier {
+  agent(workspaceId: string, agentId: string): CableIdentifier {
     return {
       channel: "agent",
       workspaceId: requireNonEmpty(workspaceId, "workspace identifier must not be empty"),
-      conversationId: requireNonEmpty(conversationId, "agent conversation identifier must not be empty"),
+      agentId: requireNonEmpty(agentId, "agent identifier must not be empty"),
     };
   },
 };
@@ -116,14 +116,14 @@ export function serializeCableIdentifier(identifier: CableIdentifier): string {
     case "agent-turn": return JSON.stringify([
       identifier.channel,
       requireNonEmpty(identifier.workspaceId, "workspace identifier must not be empty"),
-      requireNonEmpty(identifier.conversationId, "agent conversation identifier must not be empty"),
+      requireNonEmpty(identifier.agentId, "agent identifier must not be empty"),
       requireNonEmpty(identifier.turnId, "agent turn identifier must not be empty"),
       requireNonEmpty(identifier.branchId, "agent branch identifier must not be empty"),
     ]);
     case "agent": return JSON.stringify([
       identifier.channel,
       requireNonEmpty(identifier.workspaceId, "workspace identifier must not be empty"),
-      requireNonEmpty(identifier.conversationId, "agent conversation identifier must not be empty"),
+      requireNonEmpty(identifier.agentId, "agent identifier must not be empty"),
     ]);
     default: throw new Error("unsupported cable identifier");
   }

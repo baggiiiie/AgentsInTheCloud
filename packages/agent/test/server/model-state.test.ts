@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { configuredModelOptionViews, selectAvailableConfiguredModel, type AgentModelOptionView } from "../../src/server/model-state.ts";
-import { modelRefValue, parseModelRef, setConfiguredModels, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
+import { enabledModelOptionViews, selectAvailableEnabledModel, type AgentModelOptionView } from "../../src/server/model-state.ts";
+import { modelRefValue, parseModelRef, setEnabledModels, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
 import type { Api, Model } from "@earendil-works/pi-ai";
 
 const model = (provider: string, id: string, options: { selected?: boolean; available?: boolean } = {}): AgentModelOptionView => ({
@@ -21,18 +21,18 @@ describe("new workspace model selection", () => {
       model("connected", "fallback"),
     ];
 
-    expect(selectAvailableConfiguredModel(models)).toEqual({ provider: "connected", id: "fallback" });
-    expect(selectAvailableConfiguredModel(models, { provider: "disconnected", id: "active" })).toEqual({ provider: "connected", id: "fallback" });
+    expect(selectAvailableEnabledModel(models)).toEqual({ provider: "connected", id: "fallback" });
+    expect(selectAvailableEnabledModel(models, { provider: "disconnected", id: "active" })).toEqual({ provider: "connected", id: "fallback" });
   });
 
   test("keeps an available requested model and returns no model when all are disconnected", () => {
     const available = model("connected", "requested");
 
-    expect(selectAvailableConfiguredModel([model("connected", "active", { selected: true }), available], {
+    expect(selectAvailableEnabledModel([model("connected", "active", { selected: true }), available], {
       provider: available.provider,
       id: available.id,
     })).toEqual({ provider: "connected", id: "requested" });
-    expect(selectAvailableConfiguredModel([model("disconnected", "only", { selected: true, available: false })])).toBeUndefined();
+    expect(selectAvailableEnabledModel([model("disconnected", "only", { selected: true, available: false })])).toBeUndefined();
   });
 });
 
@@ -54,7 +54,7 @@ describe("Anthropic subscription models", () => {
   beforeEach(async () => {
     dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-model-state-"));
     process.env.ATELIER_DATA_DIR = dataDir;
-    await setConfiguredModels([{ provider: "anthropic", id: "claude", label: "Claude" }, { provider: "openai", id: "gpt", label: "GPT" }]);
+    await setEnabledModels([{ provider: "anthropic", id: "claude", label: "Claude" }, { provider: "openai", id: "gpt", label: "GPT" }]);
     await setAgentModelPreference("builtin", { provider: "anthropic", id: "claude" });
   });
   afterEach(async () => {
@@ -70,13 +70,13 @@ describe("Anthropic subscription models", () => {
   });
 
   test("are hidden from the built-in agent, which falls back to another provider", async () => {
-    const models = await configuredModelOptionViews(undefined, runtime("oauth"));
+    const models = await enabledModelOptionViews(undefined, runtime("oauth"));
     expect(models.map((model) => model.provider)).toEqual(["openai"]);
-    expect(selectAvailableConfiguredModel(models, { provider: "anthropic", id: "claude" })).toEqual({ provider: "openai", id: "gpt" });
+    expect(selectAvailableEnabledModel(models, { provider: "anthropic", id: "claude" })).toEqual({ provider: "openai", id: "gpt" });
   });
 
   test("stay available when Anthropic is connected with an API key", async () => {
-    const models = await configuredModelOptionViews(undefined, runtime("api_key"));
+    const models = await enabledModelOptionViews(undefined, runtime("api_key"));
     expect(models.map((model) => [model.provider, model.available, model.selected])).toEqual([["anthropic", true, true], ["openai", true, false]]);
   });
 });

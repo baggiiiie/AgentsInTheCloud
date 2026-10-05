@@ -16,8 +16,8 @@ export const handleNotificationRequest: AgentRouteHandler = async (request, url,
   }
   const params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/notification$/);
   if (!params || !["GET", "POST"].includes(request.method)) return undefined;
-  const ctx = { workspaceId: params[0], conversationId: params[1] };
-  const runtime = await requireAgentPresentation(ctx.workspaceId, ctx.conversationId, options);
+  const ctx = { workspaceId: params[0], agentId: params[1] };
+  const runtime = await requireAgentPresentation(ctx.workspaceId, ctx.agentId, options);
   const state = () => {
     const turn = currentNotificationTurn(ctx);
     return { turnId: turn?.id ?? null, busy: runtime.isStreaming, armed: turn?.armed ?? false };
@@ -26,7 +26,7 @@ export const handleNotificationRequest: AgentRouteHandler = async (request, url,
   if (request.method === "GET") return response(`<turbo-frame id="${notificationFrameId(ctx)}">${renderNotificationControl(ctx, runtime.isStreaming)}</turbo-frame>`);
   const reply = (message: string, status = 200): Response => requestAcceptsJson(request)
     ? Response.json(status < 400 ? { ...state(), message } : { error: { code: status === 409 ? "turn_ended" : "invalid_arguments", message } }, { status })
-    : turboStreamResponse(turboStream("replace", notificationFeedbackId(ctx.workspaceId, ctx.conversationId), renderNotificationFeedback(ctx.workspaceId, ctx.conversationId, message, status >= 400)), { status });
+    : turboStreamResponse(turboStream("replace", notificationFeedbackId(ctx.workspaceId, ctx.agentId), renderNotificationFeedback(ctx.workspaceId, ctx.agentId, message, status >= 400)), { status });
   let input;
   let subscription;
   try {

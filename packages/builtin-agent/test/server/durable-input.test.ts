@@ -35,12 +35,12 @@ async function setup() {
   };
   return { path, faux, models, open, workspace: await open() };
 }
-const record = { conversationId: "tab", label: "Agent 1", title: "Images" };
+const record = { agentId: "tab", label: "Agent 1", title: "Images" };
 
 test("native input expands skills, sizes attachments per model, and deduplicates after reopen", async () => {
   const { workspace, faux, models, open } = await setup();
   faux.setResponses([fauxAssistantMessage("Done")]);
-  const conversation = await workspace.conversation(record, { model: { provider: "faux", modelId: "small" } });
+  const conversation = await workspace.agent(record, { model: { provider: "faux", modelId: "small" } });
   const input = { requestId: "browser-request", text: " /skill:review ", attachmentNotes: ["Attached red.png"], images: [{ type: "image" as const, mimeType: "image/png", data: png }] };
   const expand = async (workspaceId: string, text: string) => {
     expect(workspaceId).toBe("images-workspace");
@@ -57,7 +57,7 @@ test("native input expands skills, sizes attachments per model, and deduplicates
   expect(JSON.stringify(content)).toContain("4x4");
   await workspace.close();
   const reopened = await open();
-  const restored = await reopened.conversation(record);
+  const restored = await reopened.agent(record);
   const duplicate = await submitDurableInput(restored, "images-workspace", models, input, context, expand);
   expect(duplicate.id).toBe(submission.id);
   expect((await duplicate.wait(context)).status).toBe("done");
@@ -68,7 +68,7 @@ test("native input expands skills, sizes attachments per model, and deduplicates
 test("image-only input retains images and explains non-vision omission", async () => {
   const { workspace, faux, models } = await setup();
   faux.setResponses([fauxAssistantMessage("Done")]);
-  const conversation = await workspace.conversation(record, { model: { provider: "faux", modelId: "text" } });
+  const conversation = await workspace.agent(record, { model: { provider: "faux", modelId: "text" } });
   const submission = await submitDurableInput(conversation, "images-workspace", models, {
     requestId: "image-only", text: "", images: [{ type: "image", data: png, mimeType: "image/png" }],
   }, context, async () => { throw new Error("No text to expand"); });
@@ -80,7 +80,7 @@ test("image-only input retains images and explains non-vision omission", async (
 
 test("invalid admission and preparation failures commit no input or model request", async () => {
   const { workspace, faux, models } = await setup();
-  const conversation = await workspace.conversation(record, { model: { provider: "faux", modelId: "small" } });
+  const conversation = await workspace.agent(record, { model: { provider: "faux", modelId: "small" } });
   for (const input of [{ requestId: "", text: "Hello" }, { requestId: "empty", text: "  " }]) {
     await expect(submitDurableInput(conversation, "images-workspace", models, input, context)).rejects.toThrow();
   }

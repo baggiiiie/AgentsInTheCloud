@@ -35,7 +35,7 @@ spyOn(realSyntax, "highlightCodeHtmlForPath").mockImplementation((code, path) =>
 const code = source(fixture);
 const language = realSyntax.languageFromPath(fixture)!;
 const chunkSize = Number(chunkArg);
-const ctx = { workspaceId: "highlight-repro", conversationId: "highlight-repro" };
+const ctx = { workspaceId: "highlight-repro", agentId: "highlight-repro" };
 let run: (text: string) => void | Promise<void>;
 
 switch (path) {

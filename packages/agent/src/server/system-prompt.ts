@@ -44,8 +44,8 @@ Keep layouts responsive. To preview a separate app, use a Browser Work view.
 `;
 
 /** Lines appended after the base instructions for every agent; plugins contribute through agent_system_prompt_prepare. */
-export async function prepareAppendedAgentsInTheCloudInstructions(events: AgentsInTheCloudEventBus | undefined, workspaceId: string, conversationId: string, lines: string[] = []): Promise<string[]> {
+export async function prepareAppendedAgentsInTheCloudInstructions(events: AgentsInTheCloudEventBus | undefined, workspaceId: string, agentId: string, lines: string[] = []): Promise<string[]> {
   const appended = [...lines];
-  await events?.emit("agent_system_prompt_prepare", { workspaceId, conversationId, lines: appended });
+  await events?.emit("agent_system_prompt_prepare", { workspaceId, agentId, lines: appended });
   return appended;
 }

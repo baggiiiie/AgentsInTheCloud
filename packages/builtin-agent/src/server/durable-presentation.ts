@@ -16,7 +16,7 @@ import { durableViewState, projectDurableTranscript } from "./durable-transcript
  * No optimistic user rows, provider callbacks, timers or secondary transcript.
  * Runtime chrome (composer settings, notifications, catalog) stays with the host.
  */
-export class DurableConversationPresentation {
+export class DurableAgentPresentation {
   private readonly renderer = new LiveTranscriptRenderer();
   private readonly markdown = new Map<string, { source: string; renderer: StreamingMarkdownRenderer; stableHtml: string; tailHtml: string }>();
   private readonly turns = new Map<string, { presentation: ReturnType<typeof createLivePresentation>; subscriptions: Set<AgentLivePresentationSubscription> }>();
@@ -57,7 +57,7 @@ export class DurableConversationPresentation {
 
   static async attach(conversation: Pick<Conversation, "watch">, ctx: AgentRenderContext, context: Context, onCommit?: (view: ConversationView) => void | Promise<void>) {
     const watch = await conversation.watch(context);
-    try { return new DurableConversationPresentation(watch, ctx, onCommit); }
+    try { return new DurableAgentPresentation(watch, ctx, onCommit); }
     catch (error) { await watch.stop(); throw error; }
   }
 

@@ -17,7 +17,7 @@ interface WorkspaceJson {
   workspace: {
     id: string;
     phase: { kind: string; status?: string };
-    agentConversations: { id: string; providerId: string; busy: boolean; title: string }[];
+    agents: { id: string; agentTypeId: string; busy: boolean; title: string }[];
     workViews: { key: string; reference: { type: string } }[];
   };
 }
@@ -55,7 +55,7 @@ export async function stage(options: { atelier: string; workspaceId?: string; mo
   let id = options.workspaceId;
   if (!id) {
     log("creating workspace");
-    const created = await json<{ workspace: { id: string } }>(atelier, "/workspaces", { method: "POST", body: { source: { type: "empty" }, title: "Composer acceptance", agent: { provider: "builtin" } } });
+    const created = await json<{ workspace: { id: string } }>(atelier, "/workspaces", { method: "POST", body: { source: { type: "empty" }, title: "Composer acceptance", agent: { agentTypeId: "builtin" } } });
     id = created.workspace.id;
   }
   await until("workspace to run", 300_000, async () => {
@@ -64,12 +64,12 @@ export async function stage(options: { atelier: string; workspaceId?: string; mo
     return current.phase.kind === "runningPhase" ? true : undefined;
   });
   let current = await workspace(atelier, id);
-  let builtin = current.agentConversations.find((agent) => agent.providerId === "builtin");
+  let builtin = current.agents.find((agent) => agent.agentTypeId === "builtin");
   if (!builtin) {
     log("creating built-in agent");
     await json(atelier, `/workspaces/${id}/commands/agent.create.builtin`, { method: "POST", body: {} });
     current = await workspace(atelier, id);
-    builtin = current.agentConversations.find((agent) => agent.providerId === "builtin")!;
+    builtin = current.agents.find((agent) => agent.agentTypeId === "builtin")!;
   }
   const transcript = await fetch(new URL(`/workspaces/${id}?agent=${builtin.id}`, atelier)).then((response) => response.text());
   if (!transcript.includes("SIGWINCH")) {
@@ -77,13 +77,13 @@ export async function stage(options: { atelier: string; workspaceId?: string; mo
     if (options.model) await json(atelier, `/workspaces/${id}/agents/${builtin.id}/model`, { method: "POST", body: { model: options.model } });
     await json(atelier, `/workspaces/${id}/agents/${builtin.id}/messages`, { method: "POST", body: { text: longPrompt, mode: "send" } });
     await Bun.sleep(3000);
-    await until("the long answer", 300_000, async () => (await workspace(atelier, id!)).agentConversations.find((agent) => agent.id === builtin!.id)!.busy ? undefined : true);
+    await until("the long answer", 300_000, async () => (await workspace(atelier, id!)).agents.find((agent) => agent.id === builtin!.id)!.busy ? undefined : true);
   }
-  let pi = current.agentConversations.find((agent) => agent.providerId === "pi");
+  let pi = current.agents.find((agent) => agent.agentTypeId === "pi");
   if (!pi) {
     log("creating Pi agent");
-    const created = await json<{ command: { agentConversationId: string } }>(atelier, `/workspaces/${id}/commands/agent.create.pi`, { method: "POST", body: {} });
-    pi = { id: created.command.agentConversationId, providerId: "pi", busy: false, title: "Pi" };
+    const created = await json<{ command: { agentId: string } }>(atelier, `/workspaces/${id}/commands/agent.create.pi`, { method: "POST", body: {} });
+    pi = { id: created.command.agentId, agentTypeId: "pi", busy: false, title: "Pi" };
   }
   current = await workspace(atelier, id);
   let terminal = current.workViews.find((view) => view.reference.type === "terminal");

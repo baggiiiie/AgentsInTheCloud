@@ -27,10 +27,10 @@ test("each adapter exposes its own interactive terminal protocol", async () => {
         });
         let handler;
         module.initialize({ events: createAgentsInTheCloudEventBus(), registerSocketHandler: (value) => { handler = value; } });
-        const id = await module.agentProvider.create({ workspaceId: "socket" });
+        const id = await module.agentType.create({ workspaceId: "socket" });
         expect(await handler(new URL("http://localhost/workspaces/socket/unrelated-agents/" + id + "/ws"))).toBeUndefined();
         const route = "http://localhost/workspaces/socket/" + providerId + "-agents/";
-        await expect(handler(new URL(route + "missing/ws"))).rejects.toMatchObject({ code: "agent_conversation_not_found" });
+        await expect(handler(new URL(route + "missing/ws"))).rejects.toMatchObject({ code: "agent_not_found" });
         const connection = await handler(new URL(route + id + "/ws?cols=120&rows=-1"));
         const output = [];
         let socketClosed = false;
