@@ -70,6 +70,21 @@ export const entries: CatalogueEntry[] = [
     }],
   },
   {
+    id: "page-slide", title: "Page slide", when: "Drill into a bounded pane, then return, with fixed header chrome. Works with persistent pages and server-rendered replacements.",
+    contract: "slidePageChange(currentBody, render, direction) snapshots only the outgoing/incoming body and slides it 280ms with the shared easing. currentBody resolves the current body; render updates feature-owned state/markup and returns the incoming body, which may be the same element. Headers update in place. Features retain ownership of URLs, dirty guards, inert state and focus. Forward/back reverse in RTL; reduced motion and browsers without View Transitions render immediately. New navigation finishes the previous animation without canceling its render. No copied forms, duplicate controllers or outgoing DOM is retained.",
+    imports: { "page-slide/client": "slidePageChange", panel: "panelHtml", button: "buttonHtml", "action-item": "actionItemHtml", icons: "Icons" },
+    sources: ["page-slide/page-slide-client.ts", "page-slide/page-slide.css"],
+    examples: [{ title: "Drill in, then Back · try RTL and reduced motion", render: () => `<div data-page-slide-demo>${panelHtml({
+      element: { tag: "section" },
+      headerHtml: '<span hidden data-page-slide-back>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Back, label: "Back to template settings" }, attributesHtml: 'data-catalogue-back-param="true" data-action="catalogue#pageSlide"' }) + '</span><h3 class="panel__title" tabindex="-1" data-page-slide-title>Template settings</h3>',
+      bodyLayout: "padded",
+      bodyHtml: `<div data-page-slide-body style="height: 160px; overflow: hidden">
+        <section data-page-slide-page="index">${actionItemHtml({ kind: "single", label: { kind: "text", text: "Secrets" }, element: { tag: "button", attributesHtml: 'type="button" data-catalogue-back-param="false" data-action="catalogue#pageSlide"' } })}</section>
+        <section data-page-slide-page="detail" hidden><p>Choose a secret to edit.</p>${actionItemHtml({ kind: "single", label: { kind: "text", text: "PAYMENTS_API_KEY" }, description: "Required", element: { tag: "div" } })}</section>
+      </div>`,
+    })}</div>` }],
+  },
+  {
     id: "motion",
     title: "Motion · state changes",
     when: "Try the transitions.dev-inspired animations across the shared components. Open, dismiss and repeat; these are the real shared components.",
@@ -1033,10 +1048,18 @@ export const entries: CatalogueEntry[] = [
     title: "Transient feedback",
     when: "Brief acknowledgement of a completed action. Prefer Copy button for clipboard actions.",
     contract:
-      "Only current content affects layout. Feedback resets automatically. Use transient-feedback/client helpers for browser operations; server renders initial or feedback. Buttons disable during feedback unless explicitly kept enabled.",
+      "Only current content affects layout. Feedback resets automatically. Use transient-feedback/client helpers for browser operations; server renders initial or feedback. Buttons disable during feedback unless explicitly kept enabled; acknowledgement remains full contrast while disabled. Supply caption for icon feedback: the caption stays visible and a fixed icon slot prevents layout shifts through initial, feedback and busy states. Use layout: overlay to animate between a caption and centered feedback at a fixed size; durationMs controls its hold time (default 2000 ms). Reduced motion swaps directly.",
     imports: { "transient-feedback": "transientFeedbackHtml" },
-    sources: ["transient-feedback/transient-feedback-controller.ts"],
+    sources: ["transient-feedback/transient-feedback-html.ts", "transient-feedback/transient-feedback-controller.ts", "transient-feedback/transient-feedback.css"],
     examples: [
+      {
+        title: "Caption → centered check → caption · fixed size",
+        render: () => transientFeedbackHtml({
+          element: { tag: "button", variant: "primary", attributesHtml: 'type="button" data-action="catalogue#feedback" data-transient-feedback-initial-label="Save changes" data-transient-feedback-feedback-label="Changes saved"' },
+          layout: "overlay", durationMs: 1200, state: "initial", initialContent: { kind: "text", text: "Save changes" },
+          feedbackContent: { kind: "html", html: Icons.Check },
+        }),
+      },
       {
         title: "Activate feedback",
         render: () =>

@@ -22,7 +22,7 @@ const selectedWorkView = { name: "workView", in: "query", required: false, descr
 const workspaceTemplateId = { name: "workspaceTemplateId", in: "path", required: true, schema: { type: "string" } };
 const variableId = { name: "variableId", in: "path", required: true, schema: { type: "string" } };
 const secretId = { name: "secretId", in: "path", required: true, schema: { type: "string" } };
-const workspaceTemplateSettingsSection = { name: "section", in: "query", required: false, schema: { type: "string", enum: ["repository", "secrets", "ssh-keys", "environment", "dockerfile", "preload-images", "privileged", "danger"] } };
+const workspaceTemplateSettingsSection = { name: "section", in: "query", required: false, schema: { type: "string", enum: ["index", "general", "secrets", "ssh", "environment", "container", "repository", "ssh-keys", "dockerfile", "preload-images", "privileged", "danger"] } };
 const settingsSection = { name: "section", in: "query", required: false, schema: { type: "string" } };
 const htmlSurfaceResponses = (description: string) => ({ "200": { description, content: { "text/html": { schema: { type: "string" } } } }, "400": errorResponse, "404": errorResponse });
 const agentConversationId = { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } };
@@ -95,8 +95,8 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       "/workspace-templates/{workspaceTemplateId}/settings": {
         get: {
           summary: "Present workspace template settings",
-          description: "A browser-navigable AgentsInTheCloud surface. Use its URL with the presentation tool.",
-          parameters: [workspaceTemplateId, workspaceTemplateSettingsSection],
+          description: "A non-modal settings index with focused section and record editors. Use section=index for the overview; without a section, missing required secrets take precedence. Use its URL with the presentation tool.",
+          parameters: [workspaceTemplateId, workspaceTemplateSettingsSection, { name: "editor", in: "query", required: false, description: "Record ID or new for Secrets, SSH access and Environment; docker, images or dockerfile for Container.", schema: { type: "string" } }],
           responses: htmlSurfaceResponses("AgentsInTheCloud with workspace template settings open"),
         },
       },

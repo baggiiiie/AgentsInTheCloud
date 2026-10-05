@@ -35,8 +35,8 @@ test("form path permission persists and rejects invalid values", async () => {
   expect(await revealWorkspaceTemplateSecrets(workspaceTemplate.id)).toEqual([]);
   expect((await app.fetch(form("false"))).status).toBe(200);
   expect((await listWorkspaceTemplateSecrets(workspaceTemplate.id))[0]?.allowInPath).toBe(false);
-  expect((await app.fetch(form("invalid"))).status).toBe(400);
-  expect((await app.fetch(form(""))).status).toBe(400);
+  expect((await app.fetch(form("invalid"))).status).toBe(422);
+  expect((await app.fetch(form(""))).status).toBe(422);
 });
 
 test("secret forms persist the displayed boolean choice even for known path-based APIs", async () => {
@@ -49,7 +49,7 @@ test("secret forms persist the displayed boolean choice even for known path-base
   ] as const) {
     const response = await app.fetch(new Request(`http://test.local/workspace-templates/${workspaceTemplate.id}/secrets`, {
       method: "POST", headers: { accept: "text/vnd.turbo-stream.html" },
-      body: new URLSearchParams({ envName, hostPattern, allowInPath }),
+      body: new URLSearchParams({ envName, hostPattern, allowInPath, secretValue: "test-only-value" }),
     }));
     expect(response.status).toBe(200);
   }

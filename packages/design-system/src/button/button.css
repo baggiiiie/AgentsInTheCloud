@@ -1,5 +1,7 @@
 /* Native action controls and links share one prominent-action treatment. */
 .button {
+  --button-icon-size: 14px;
+  --button-disabled-opacity: .45;
   --button-background: color-mix(in srgb, var(--panel) 72%, transparent);
   --button-foreground: var(--text);
   --button-hover-background: var(--elev);
@@ -47,7 +49,7 @@
   .button:not(:disabled):not([aria-disabled="true"]):active { transform: scale(.97); }
 }
 .button:disabled,
-.button[aria-disabled="true"] { opacity: .45; cursor: default; transform: none; }
+.button[aria-disabled="true"] { opacity: var(--button-disabled-opacity); cursor: default; transform: none; }
 /* Decorative light does not alter hit targets, border colors, or progress/usage rings. */
 .button:not(:is(.activity-button, .progress-button, .action-link--comparison)) { position: relative; }
 .button:not(:is(.activity-button, .progress-button, .action-link--comparison))::before,
@@ -72,31 +74,29 @@
   --button-lighting-content: var(--button-engaged-lighting-content);
 }
 .button.icon-only { width: 26px; flex: 0 0 auto; padding: 0; }
-.button svg { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.button svg { width: var(--button-icon-size); height: var(--button-icon-size); flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .button svg.brand-icon { fill: currentColor; stroke: none; }
 .button__icon { display: inline-flex; align-items: center; justify-content: center; }
 
 /* Popular desktop sizes; touch-only markers retain regular desktop sizing. */
 .button:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) { min-height: 36.93px; }
 .button.icon-only:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) { width: 38.24px; height: 38.24px; }
-.button:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) svg { width: 18.38px; height: 18.38px; }
-.button.icon-only:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) svg { width: 20.59px; height: 20.59px; }
+.button:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) { --button-icon-size: 18.38px; }
+.button.icon-only:where([data-popular-button]:not([data-popular-button="touch"]), [data-popular-button]:not([data-popular-button="touch"]) *) { --button-icon-size: 20.59px; }
 
 @media (max-width: 700px), (pointer: coarse) {
-  .button { height: 44px; padding-inline: 16px; max-width: 100%; min-width: 0; }
+  .button { --button-icon-size: 20px; height: 44px; padding-inline: 16px; max-width: 100%; min-width: 0; }
   .button:not(.icon-only) { height: auto; min-height: 44px; padding-block: 10px; white-space: normal; overflow-wrap: anywhere; }
   .button__caption { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
   /* Regular icon controls are 15% smaller than the original 50px / 21px. */
-  .button.icon-only { width: 42.5px; height: 42.5px; padding: 0; }
-  .button svg { width: 20px; height: 20px; }
-  .button.icon-only svg { width: 17.85px; height: 17.85px; }
+  .button.icon-only { --button-icon-size: 17.85px; width: 42.5px; height: 42.5px; padding: 0; }
 
   /* Preserve the mobile/touch popular sizes. */
   .button:where([data-popular-button], [data-popular-button] *),
   .button:not(.icon-only):where([data-popular-button], [data-popular-button] *) { min-height: 62.5px; }
   .button.icon-only:where([data-popular-button], [data-popular-button] *) { width: 62.5px; height: 62.5px; }
-  .button:where([data-popular-button], [data-popular-button] *) svg,
-  .button.icon-only:where([data-popular-button], [data-popular-button] *) svg { width: 26.25px; height: 26.25px; }
+  .button:where([data-popular-button], [data-popular-button] *),
+  .button.icon-only:where([data-popular-button], [data-popular-button] *) { --button-icon-size: 26.25px; }
 }
 
 /* Pressed controls and current navigation destinations share selected paint. */

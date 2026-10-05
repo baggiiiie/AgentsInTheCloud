@@ -1,7 +1,10 @@
+import { restoreTemplateSettingsDestination } from "./template-settings-controller.ts";
 import { phoneLayoutMediaQuery } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { liveSurfaceReady, prepareLiveSurface, releaseLiveSurface } from "./live-surface.ts";
 import { controllerForElement, registerWorkspaceControllers, workspaceNavigationController } from "./workspace-controller-registry.ts";
+
+export type WorkspaceSelectionEvent = CustomEvent<{ resume(): Promise<void> }>;
 
 interface ResidentPresentation {
   prepareIntendedSurfaces(): Promise<void>;
@@ -52,6 +55,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     this.reportVisibility();
   }
   async selectWorkspace(workspaceId: string, href: string, historyMode: "push" | "none" = "push"): Promise<void> {
+    if (historyMode === "push" && !this.element.dispatchEvent(new CustomEvent("workspace-residency:before-select", { bubbles: true, cancelable: true, detail: { resume: () => this.selectWorkspace(workspaceId, href, historyMode) } }))) return;
     const selection = ++this.selection;
     this.selectedFromList = historyMode === "push" || (this.intended === workspaceId && this.selectedFromList);
     this.intended = workspaceId;
@@ -160,12 +164,13 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
   }
   private readonly reportVisibility = (): void => {
     const workspaceId = this.visibleWorkspaceId();
-    const hidden = document.hidden || (window.matchMedia(phoneLayoutMediaQuery).matches && this.element.closest(".is-mobile-workspace-pane-open") !== null);
+    const hidden = document.hidden || this.element.inert || (window.matchMedia(phoneLayoutMediaQuery).matches && this.element.closest(".is-mobile-workspace-pane-open") !== null);
     const resident = this.residentTargets.find(item => item.dataset.workspaceId === workspaceId);
     const surfaceKeys = !hidden && resident ? [...resident.querySelectorAll<HTMLElement>('[data-workspace-surface-visible="true"]')].map(pane => `${pane.dataset.workspacePaneRole === "agent" ? "agent:" : ""}${pane.dataset.workspacePaneId}`) : [];
     window.AgentsInTheCloudCable?.reportVisibility({ workspaceId: hidden ? undefined : workspaceId, surfaceKeys });
   };
   private readonly historyChanged = (): void => {
+    if (restoreTemplateSettingsDestination()) return;
     const id = location.pathname.match(/^\/workspaces\/([^/]+)$/)?.[1];
     if (id) void this.selectWorkspace(decodeURIComponent(id), location.href, "none");
     else if (this.intended) this.unselectWorkspace(this.intended);

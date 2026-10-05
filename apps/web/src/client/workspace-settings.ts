@@ -1,3 +1,4 @@
+import { TemplateSettingsController } from "./template-settings-controller.ts";
 import { WorkspaceTemplateSecretPathController } from "./workspace-template-secret-path-controller.ts";
 import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
 import { showTransientFeedback } from "@agents-in-the-cloud/design-system/transient-feedback/client";
@@ -79,36 +80,6 @@ class SettingsAutosaveController extends Controller<HTMLFormElement> {
     } catch (error) {
       this.dispatch("failed");
       throw error;
-    }
-  }
-}
-
-class WorkspaceTemplateSettingsController extends Controller<HTMLDialogElement> {
-  static targets = ["status", "confirm"];
-  declare readonly statusTarget: HTMLElement;
-  declare readonly confirmTarget: HTMLButtonElement;
-
-  saving(): void { this.statusTarget.textContent = "Saving…"; }
-  saved(): void { this.statusTarget.textContent = "✓ Changes saved."; }
-  failed(): void { this.statusTarget.textContent = "Changes could not be saved. Please try again."; }
-
-  async complete(): Promise<void> {
-    this.confirmTarget.disabled = true;
-    try {
-      const controllers = [...this.element.querySelectorAll<HTMLFormElement>('form[data-controller~="settings-autosave"]')].map((form) => {
-        const controller = this.application.getControllerForElementAndIdentifier(form, "settings-autosave");
-        if (!(controller instanceof SettingsAutosaveController)) throw new Error("Settings autosave controller is not connected");
-        return controller;
-      });
-      for (const controller of controllers) {
-        if (!await controller.save()) {
-          this.statusTarget.textContent = "Please check your changes before closing.";
-          return;
-        }
-      }
-      this.element.close();
-    } finally {
-      this.confirmTarget.disabled = false;
     }
   }
 }
@@ -224,7 +195,7 @@ export function registerWorkspaceSettingsControllers(): void {
     "git-identity": GitIdentityController,
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
-    "workspace-template-settings": WorkspaceTemplateSettingsController,
+    "template-settings": TemplateSettingsController,
     "workspace-template-secret-path": WorkspaceTemplateSecretPathController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,

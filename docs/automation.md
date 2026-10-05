@@ -47,7 +47,7 @@ Workspace template settings has a browser-navigable surface that agents can pass
 /workspace-templates/:workspaceTemplateId/settings?section=environment
 ```
 
-Supported sections are `repository`, `secrets`, `ssh-keys`, `environment`, `dockerfile`, `preload-images`, and `danger`. Direct navigation renders the complete AgentsInTheCloud shell, opens template settings, expands configurable sections when selected, and scrolls the selected section into view.
+Supported sections are `index`, `general`, `secrets`, `ssh`, `environment`, and `container`. The index lists the five settings sections; each section opens a focused page in the complete AgentsInTheCloud shell. Use `editor=new` or a record ID for Secrets, SSH keys, or Environment, and `editor=docker`, `images`, or `dockerfile` for Container. Legacy section links (`repository`, `ssh-keys`, `privileged`, `dockerfile`, `preload-images`, and `danger`) still resolve to their corresponding pages.
 
 Use `GET /workspace-templates` with `Accept: application/json` to discover the template ID before constructing the presentation URL.
 

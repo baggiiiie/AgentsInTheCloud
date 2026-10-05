@@ -1,4 +1,5 @@
 import { recentWorkspaceTemplateStorageKey } from "@agents-in-the-cloud/shared";
+import { slidePageChange } from "@agents-in-the-cloud/design-system/page-slide/client";
 import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers, residencyController } from "./workspace-controller-registry.ts";
 import { markActiveWorkspaceRow } from "./workspace-presentation.ts";
@@ -79,8 +80,9 @@ class FirstWorkspaceGuideController extends Controller<HTMLElement> {
 
 /** Slides the workspace pane between the workspace list and the "New workspace" template picker. */
 class WorkspacePaneController extends Controller<HTMLElement> {
-  static targets = ["workspacesHeader", "pickerHeader", "workspaces", "picker", "newWorkspace", "option", "value", "addFirst"];
+  static targets = ["workspacesHeader", "pickerHeader", "body", "workspaces", "picker", "newWorkspace", "option", "value", "addFirst"];
   declare readonly workspacesHeaderTarget: HTMLElement;
+  declare readonly bodyTarget: HTMLElement;
   declare readonly pickerHeaderTarget: HTMLElement;
   declare readonly workspacesTarget: HTMLElement;
   declare readonly pickerTarget: HTMLElement;
@@ -123,8 +125,7 @@ class WorkspacePaneController extends Controller<HTMLElement> {
   }
 
   back(): void {
-    this.showWorkspaces();
-    this.newWorkspaceTarget.focus({ preventScroll: true });
+    this.setPicking(false, () => this.newWorkspaceTarget.focus({ preventScroll: true }));
   }
 
   choose(event: Event): void {
@@ -147,28 +148,32 @@ class WorkspacePaneController extends Controller<HTMLElement> {
     this.showWorkspaces();
   }
 
-  slid(event: TransitionEvent): void {
-    if (event.target === event.currentTarget) window.dispatchEvent(new CustomEvent("workspace-pane:slide-changed"));
-  }
-
   private showPicker(workspaceTemplateId: string | undefined): void {
     this.select(workspaceTemplateId);
-    this.setPicking(true);
-    const checked = this.optionTargets.find((option) => option.getAttribute("aria-checked") === "true");
-    (checked ?? this.addFirstTarget).focus({ preventScroll: true });
+    this.setPicking(true, () => {
+      const checked = this.optionTargets.find((option) => option.getAttribute("aria-checked") === "true");
+      (checked ?? this.addFirstTarget).focus({ preventScroll: true });
+    });
   }
 
   private showWorkspaces(): void {
     this.setPicking(false);
   }
 
-  private setPicking(picking: boolean): void {
-    this.element.classList.toggle("is-picking-template", picking);
-    this.workspacesTarget.inert = picking;
-    this.pickerTarget.inert = !picking;
-    this.workspacesHeaderTarget.hidden = picking;
-    this.pickerHeaderTarget.hidden = !picking;
-    window.dispatchEvent(new CustomEvent("workspace-pane:slide-changed"));
+  private setPicking(picking: boolean, focus?: () => void): void {
+    const render = (): HTMLElement => {
+      this.element.classList.toggle("is-picking-template", picking);
+      this.workspacesTarget.inert = picking;
+      this.pickerTarget.inert = !picking;
+      this.workspacesHeaderTarget.hidden = picking;
+      this.pickerHeaderTarget.hidden = !picking;
+      focus?.();
+      window.dispatchEvent(new CustomEvent("workspace-pane:slide-changed"));
+      return this.bodyTarget;
+    };
+    if (this.element.classList.contains("is-picking-template") === picking) { focus?.(); return; }
+    void slidePageChange(() => this.bodyTarget, render, picking ? "forward" : "back")
+      .then(() => window.dispatchEvent(new CustomEvent("workspace-pane:slide-changed")));
   }
 
   private select(workspaceTemplateId: string | undefined): void {

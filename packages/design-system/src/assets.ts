@@ -82,6 +82,7 @@ export const designSystemStaticFiles = {
     url: new URL("./surface-lighting.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
+  "/page-slide.css": { url: new URL("./page-slide/page-slide.css", import.meta.url), contentType: "text/css; charset=utf-8" },
   "/panel.css": {
     url: new URL("./panel/panel.css", import.meta.url),
     contentType: "text/css; charset=utf-8",

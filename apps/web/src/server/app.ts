@@ -1,3 +1,4 @@
+import { templateSettingsHostId, templateSettingsFrameId } from "./template-settings.ts";
 import { maybeNameWorkspaceFromPrompt } from "@agents-in-the-cloud/builtin-agent/server";
 import {
   AgentsInTheCloudCoreError,
@@ -57,7 +58,7 @@ import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
-import { createWorkspaceTemplateRoutes, type WorkspaceTemplateEditorModalOptions } from "./workspace-template-routes.ts";
+import { createWorkspaceTemplateRoutes, type WorkspaceTemplateEditorOptions } from "./workspace-template-routes.ts";
 import { renderDevelopmentSettingsDialog, renderSettingsDialog } from "./settings/page.ts";
 import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
@@ -566,6 +567,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   type ShellSurface =
     | { kind: "module-modal"; dialogHtml: string }
     | { kind: "workspace-template-editor"; dialogHtml: string }
+    | { kind: "template-settings"; html: string }
     | { kind: "new-workspace"; workspaceTemplate?: WorkspaceTemplateSummary }
     | { kind: "settings"; request: Request; section: string | undefined; development?: true }
     | { kind: "models"; focus: string | undefined };
@@ -582,7 +584,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
     return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""), launchComposerCommand.binding)}
-    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}</main>
+    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}${surface?.kind === "template-settings" ? surface.html : `<div id="${templateSettingsHostId}"></div>`}</main>
     ${renderAgentsInTheCloudBar()}
   </div>
   ${workspaceTemplateEditor}
@@ -599,11 +601,17 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return response(layout(await renderWorkspaceShell(selected?.id)));
   }
 
-  async function workspaceTemplateEditorResponse(request: Request, options: WorkspaceTemplateEditorModalOptions): Promise<Response> {
-    const dialogHtml = await workspaceTemplateRoutes.editorModal(options, request);
+  async function workspaceTemplateEditorResponse(request: Request, options: WorkspaceTemplateEditorOptions): Promise<Response> {
+    if (options.kind === "settings" && request.headers.get("turbo-frame") === templateSettingsFrameId) {
+      return response(await workspaceTemplateRoutes.settingsFrame(options.workspaceTemplateId, options));
+    }
+    const html = await workspaceTemplateRoutes.editorHtml(options);
+    if (options.kind === "settings") return wantsStream(request)
+      ? turboStreamResponse(replace(templateSettingsHostId, html))
+      : surfacePage({ kind: "template-settings", html });
     return wantsStream(request)
-      ? turboStreamResponse(replace("workspace-template-editor-modal", dialogHtml))
-      : surfacePage({ kind: "workspace-template-editor", dialogHtml });
+      ? turboStreamResponse(replace("workspace-template-editor-modal", html))
+      : surfacePage({ kind: "workspace-template-editor", dialogHtml: html });
   }
 
   async function surfacePage(surface: ShellSurface): Promise<Response> {
@@ -1168,7 +1176,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (workspaceTemplateSettingsMatch && request.method === "GET") {
       const workspaceTemplateId = workspaceTemplateSettingsMatch[0]!;
       const section = url.searchParams.get("section") ?? undefined;
-      return workspaceTemplateEditorResponse(request, { kind: "settings", workspaceTemplateId, section });
+      return workspaceTemplateEditorResponse(request, { kind: "settings", workspaceTemplateId, section, editor: url.searchParams.get("editor") ?? undefined });
     }
     const workspaceTemplateWorkspaceMatch = matchRoute(url, /^\/workspace-templates\/([^/]+)\/workspaces\/new$/);
     if (workspaceTemplateWorkspaceMatch && request.method === "GET") return await surfacePage({ kind: "new-workspace", workspaceTemplate: await workspaceTemplateRoutes.byReference(workspaceTemplateWorkspaceMatch[0]!) });

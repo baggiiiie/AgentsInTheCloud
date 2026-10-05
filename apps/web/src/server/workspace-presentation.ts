@@ -213,7 +213,7 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
     element: { tag: "aside",  attributesHtml: 'aria-label="Workspaces"' },
     headerHtml: `<div class="workspace-pane-header" data-workspace-pane-target="workspacesHeader"><span class="panel__title">${Icons.Cloud}Workspaces</span>${buttonGroupHtml({ orientation: "horizontal", semantics: "layout", itemsHtml: `${renderPwaReminder()}${moduleActionsHtml}${settings}${barButton("Collapse Workspace pane", "click->workspace-navigation#toggleWorkspacePaneCollapsed", Icons.Panel, "data-collapse-workspace-pane")}` })}</div>
       <div class="workspace-pane-header" data-workspace-pane-target="pickerHeader" hidden>${back}<span class="panel__title">New workspace</span></div>`,
-    bodyHtml: `<div class="workspace-pane-slides" data-action="transitionend->workspace-pane#slid">
+    bodyHtml: `<div class="workspace-pane-viewport" data-workspace-pane-target="body"><div class="workspace-pane-slides">
       <section class="workspace-pane-slide" data-workspace-pane-target="workspaces" aria-label="Workspaces">
         <div id="${workspacePaneNewWorkspaceDomId}" class="workspace-pane-new-workspace">${renderNewWorkspaceRow(presentation)}</div>
         <div class="fixed-shell-pane-collections" data-workspace-pane-collections>
@@ -222,7 +222,7 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
         </div>
       </section>
       <section class="workspace-pane-slide" data-workspace-pane-target="picker" aria-label="New workspace" inert>${renderWorkspaceTemplatePicker(presentation, launchComposerBinding)}</section>
-    </div>`,
+    </div></div>`,
   })}</div></div>`;
 }
 

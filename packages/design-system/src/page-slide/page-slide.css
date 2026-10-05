@@ -1,0 +1,30 @@
+:root[data-page-slide="left"] { --page-slide-in: 100%; --page-slide-out: -100%; }
+:root[data-page-slide="right"] { --page-slide-in: -100%; --page-slide-out: 100%; }
+
+/* Only the named body moves. The rest of the application, including the header,
+ * switches immediately and remains interactive during the slide. */
+:root[data-page-slide]::view-transition { pointer-events: none; }
+:root[data-page-slide]::view-transition-old(root) { display: none; }
+:root[data-page-slide]::view-transition-new(root) { animation: none; }
+:root[data-page-slide]::view-transition-group(page-slide) {
+  overflow: clip;
+  animation-duration: 280ms;
+  animation-timing-function: var(--motion-ease-out);
+}
+:root[data-page-slide]::view-transition-old(page-slide),
+:root[data-page-slide]::view-transition-new(page-slide) {
+  mix-blend-mode: normal;
+  animation-duration: 280ms;
+  animation-timing-function: var(--motion-ease-out);
+  animation-fill-mode: both;
+}
+:root[data-page-slide]::view-transition-old(page-slide) { animation-name: page-slide-out; }
+:root[data-page-slide]::view-transition-new(page-slide) { animation-name: page-slide-in; }
+@keyframes page-slide-out { from { transform: translateX(0); } to { transform: translateX(var(--page-slide-out)); } }
+@keyframes page-slide-in { from { transform: translateX(var(--page-slide-in)); } to { transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-page-slide]::view-transition-group(page-slide),
+  :root[data-page-slide]::view-transition-old(page-slide),
+  :root[data-page-slide]::view-transition-new(page-slide) { animation-duration: 0s; }
+}

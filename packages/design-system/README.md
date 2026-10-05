@@ -48,6 +48,7 @@ Prefer consistency over feature-specific visual preservation.
 | Persistent non-blocking warning | `warning-banner` | [WarningBannerOptions](src/warning-banner/warning-banner-html.ts), optional single-click dismissal |
 | Status markers / step progress | `status` (native HTML) | `.status-dot` / `.status-list` in [styles](src/status/status.css) |
 | Decorative SVGs | `icons` | [Icons](src/icons/icons-html.ts) |
+| Pane drill-in / return motion | `page-slide/client` | [slidePageChange](src/page-slide/page-slide-client.ts) |
 | Vertical focus navigation | `linear-navigation/client` | [data targets and controller](src/linear-navigation/linear-navigation-controller.ts) |
 
 ## Install the interface once

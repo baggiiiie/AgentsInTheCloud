@@ -1,6 +1,23 @@
 /* Brief action acknowledgement; only the active content contributes to natural layout. */
 .transient-feedback { display: inline-block; }
 .button.transient-feedback { display: inline-flex; }
+/* Captioned actions keep their label and hit target fixed; only the icon changes. */
+.button.transient-feedback--caption { display: inline-grid; grid-template-columns: var(--button-icon-size) minmax(0, auto); }
+.button.transient-feedback--caption > .transient-feedback__content { grid-area: 1 / 1; width: var(--button-icon-size); height: var(--button-icon-size); }
+.button.transient-feedback--caption > .button__caption { grid-area: 1 / 2; }
+.button.transient-feedback--caption > [data-transient-feedback-content="feedback"] { color: var(--success); }
+.button.transient-feedback[aria-busy="true"]:disabled { opacity: 1; }
+
+/* Overlay states both reserve space, including while semantically hidden. */
+.button.transient-feedback--overlay { display: inline-grid; --transient-feedback-rest-opacity: 1; }
+.button.transient-feedback--overlay:disabled { --transient-feedback-rest-opacity: var(--button-disabled-opacity); }
+.button.transient-feedback--overlay[aria-busy="true"] { --transient-feedback-rest-opacity: 1; }
+.button.transient-feedback--overlay > .transient-feedback__content { grid-area: 1 / 1; }
+.button.transient-feedback--overlay > .transient-feedback__content[hidden] { display: inline-flex; visibility: hidden; opacity: 0; align-items: center; justify-content: center; }
+.button.transient-feedback--overlay > [data-transient-feedback-content="feedback"] { color: var(--success); }
+
+/* A completed-action acknowledgement stays legible while the action is unavailable. */
+.button.transient-feedback:disabled[data-transient-feedback-state-value="feedback"] { opacity: 1; }
 .transient-feedback__content[hidden] { display: none; }
 .transient-feedback__status { min-height: 26px; display: inline-flex; align-items: center; color: var(--text); }
 
@@ -11,7 +28,41 @@
 
 /* Animate the acknowledgement, not the button's hit target or layout. */
 @media (prefers-reduced-motion: no-preference) {
-  .transient-feedback__content[data-transient-feedback-content="feedback"]:not([hidden]) {
+  .transient-feedback:not(.transient-feedback--overlay) > .transient-feedback__content[data-transient-feedback-content="feedback"]:not([hidden]) {
     animation: motion-reveal var(--motion-enter) var(--motion-ease-out);
   }
+  .button.transient-feedback--overlay[data-transient-feedback-state-value="feedback"] > [data-transient-feedback-content="initial"] {
+    animation: transient-feedback-out var(--motion-exit) var(--motion-ease-out) both;
+  }
+  .button.transient-feedback--overlay[data-transient-feedback-state-value="feedback"] > [data-transient-feedback-content="feedback"] {
+    animation: transient-feedback-check-in var(--motion-enter) var(--motion-ease-out) both;
+  }
+  .button.transient-feedback--overlay[data-transient-feedback-returning] > [data-transient-feedback-content="initial"] {
+    animation: transient-feedback-caption-in var(--motion-enter) var(--motion-ease-out) both;
+  }
+  .button.transient-feedback--overlay[data-transient-feedback-returning] > [data-transient-feedback-content="feedback"] {
+    animation: transient-feedback-out var(--motion-exit) var(--motion-ease-out) both;
+  }
+  .button.transient-feedback--overlay[data-transient-feedback-returning] {
+    animation: transient-feedback-settle calc(var(--motion-enter) + var(--motion-exit)) ease both;
+  }
+}
+
+@keyframes transient-feedback-out {
+  from { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  to { opacity: 0; visibility: hidden; transform: translateY(-4px) scale(.96); }
+}
+@keyframes transient-feedback-check-in {
+  from { opacity: 0; transform: translateY(4px) scale(.8); }
+  70% { opacity: 1; transform: translateY(0) scale(1.06); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes transient-feedback-caption-in {
+  from { opacity: 0; transform: translateY(4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Restore the caption at full contrast before settling into the clean disabled state. */
+@keyframes transient-feedback-settle {
+  0%, 62.5% { opacity: 1; }
+  to { opacity: var(--transient-feedback-rest-opacity); }
 }

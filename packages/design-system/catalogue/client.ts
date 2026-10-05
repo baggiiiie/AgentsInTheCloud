@@ -1,3 +1,4 @@
+import { slidePageChange } from "../src/page-slide/page-slide-client.ts";
 import { animateWarningChanges } from "../src/warning-banner/warning-banner-controller.ts";
 import { setActivityButtonState } from "../src/activity-button/activity-button-client.ts";
 import { CatalogueReloadController } from "./reload-controller.ts";
@@ -97,6 +98,20 @@ class CatalogueController extends Controller<HTMLElement> {
   async resetWarning(): Promise<void> {
     const region = this.element.querySelector<HTMLElement>("#motion-warning-region")!;
     await animateWarningChanges([region], () => { region.querySelector<HTMLElement>(".warning-banner")!.hidden = false; });
+  }
+  async pageSlide(event: Event & { params: { back: boolean } }): Promise<void> {
+    // SAFETY: This action is bound only to the server-rendered slide specimen buttons.
+    const demo = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-page-slide-demo]")!;
+    const body = demo.querySelector<HTMLElement>("[data-page-slide-body]")!;
+    const title = demo.querySelector<HTMLElement>("[data-page-slide-title]")!;
+    const back = event.params.back;
+    await slidePageChange(() => body, () => {
+      for (const page of body.querySelectorAll<HTMLElement>("[data-page-slide-page]")) page.hidden = page.dataset.pageSlidePage !== (back ? "index" : "detail");
+      demo.querySelector<HTMLElement>("[data-page-slide-back]")!.hidden = back;
+      title.textContent = back ? "Template settings" : "Secrets";
+      return body;
+    }, back ? "back" : "forward");
+    title.focus({ preventScroll: true });
   }
   selectTab(event: Event): void {
     // SAFETY: The action is bound to a server-rendered tab button.

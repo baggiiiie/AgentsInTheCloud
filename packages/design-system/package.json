@@ -22,6 +22,7 @@
     "./help-tip": "./src/help-tip/help-tip-html.ts",
     "./icons": "./src/icons/icons-html.ts",
     "./linear-navigation/client": "./src/linear-navigation/linear-navigation-controller.ts",
+    "./page-slide/client": "./src/page-slide/page-slide-client.ts",
     "./panel": "./src/panel/panel-html.ts",
     "./progress-button": "./src/progress-button/progress-button-html.ts",
     "./popup": "./src/popup/popup-html.ts",
