@@ -7,7 +7,8 @@ import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments
 import { maybeNameAgentFromPrompt, setAgentTitle } from "./agent-title-suggestion.ts";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { removeInitialPromptDraft } from "./initial-prompt-draft.ts";
-import { expandPromptTemplate, parseCompactCommand } from "@agents-in-the-cloud/agent/server/prompt-templates";
+import { expandSlashCommand } from "@agents-in-the-cloud/agent/server/slash-command-input";
+import { parseCompactCommand } from "@agents-in-the-cloud/agent/server/builtin-slash-commands";
 import { runAgentNameCommand } from "@agents-in-the-cloud/agent/server/agent-name-command";
 import { matchRoute } from "@agents-in-the-cloud/shared/http";
 import { resolveAgentController, type AgentRouteHandler, type AgentRouteOptions } from "./route-support.ts";
@@ -76,7 +77,7 @@ async function submitMessage(workspaceId: string, agentId: string, request: Requ
   const reviewCommentIds = (form?.getAll("reviewComment").map(String) ?? []).filter((id) => /^[a-f0-9-]{36}$/.test(id));
   const sections: string[] = [];
   if (reviewCommentIds.length) await options.events?.emit("workspace_agent_prompt_preparing", { workspaceId, reviewCommentIds, sections });
-  const expandedText = await expandPromptTemplate(workspaceId, [text, ...sections].filter((section) => section.trim()).join("\n\n"));
+  const expandedText = await expandSlashCommand(workspaceId, [text, ...sections].filter((section) => section.trim()).join("\n\n"));
   const trimmed = expandedText.trim();
   if (!trimmed && images.length === 0 && attachmentNotes.length === 0) {
     const message = "A prompt or completed attachment is required";

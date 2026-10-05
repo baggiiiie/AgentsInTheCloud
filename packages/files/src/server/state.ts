@@ -17,7 +17,7 @@ const navigationRequests = new Map<string, string>();
 export function filesNavigationRequest(workspaceId: string, id: string): string { return navigationRequests.get(`${workspaceId}:${id}`) ?? ""; }
 
 function parseFilesViews(value: JsonValue): FilesView[] {
-  if (!Value.Check(filesViewsSchema, value)) throw new Error("invalid persisted Files Work views");
+  if (!Value.Check(filesViewsSchema, value)) throw new Error("invalid persisted Files views");
   return value;
 }
 

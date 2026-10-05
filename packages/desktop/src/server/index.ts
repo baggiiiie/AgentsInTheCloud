@@ -29,7 +29,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     render: ({ workspaceId }) => {
       const clipboardCopy = copyButtonHtml({ label: "Copy remote text to local clipboard", attributesHtml: 'data-desktop-pane-target="clipboardCopy" hidden' });
       const fullscreen = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-desktop-pane-target="fullscreen" data-action="desktop-pane#toggleFullscreen" aria-pressed="false"' });
-      const statuses = [["connecting", "Connecting", "running"], ["connected", "Connected", "success"], ["disconnected", "Disconnected · reconnecting", "warning"], ["starting", "Starting desktop", "running"], ["stopped", "Desktop stopped", ""], ["failed", "Desktop failed", "danger"]]
+      const statuses = [["connecting", "Connecting", "running"], ["connected", "Connected", "success"], ["disconnected", "Disconnected · reconnecting", "warning"], ["starting", "Starting Desktop", "running"], ["stopped", "Desktop stopped", ""], ["failed", "Desktop failed", "danger"]]
         .map(([phase, label, tone]) => `<span data-desktop-pane-target="status" aria-label="${label}" title="${label}" data-phase="${phase}"${phase === "connecting" ? "" : " hidden"}><i class="status-dot ${tone}" aria-hidden="true"></i><span class="desktop-status-caption">${label}</span></span>`).join("");
       return `<section id="${domId("desktop_view", workspaceId)}" data-turbo-permanent class="work-view-pane" data-work-view-source="desktop">
         <div class="desktop-pane" data-controller="desktop-pane" data-action="message@window->desktop-pane#receive fullscreenchange@document->desktop-pane#fullscreenChanged">
@@ -49,7 +49,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
             </div>
             ${fullscreen}
           </div>
-          <iframe class="desktop-frame" data-desktop-pane-target="frame" data-controller="workspace-app-frame" data-workspace-app-frame-workspace-id-value="${escapeHtml(workspaceId)}" data-workspace-app-frame-app-key-value="desktop" data-action="load->desktop-pane#loaded desktop:navigating->desktop-pane#reset" title="Workspace desktop"></iframe>
+          <iframe class="desktop-frame" data-desktop-pane-target="frame" data-controller="workspace-app-frame" data-workspace-app-frame-workspace-id-value="${escapeHtml(workspaceId)}" data-workspace-app-frame-app-key-value="desktop" data-action="load->desktop-pane#loaded desktop:navigating->desktop-pane#reset" title="Desktop view"></iframe>
         </div>
       </section>`;
     },
@@ -84,7 +84,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
   attachToWorkspace({ workspaceId }) {
     return {
       workViews: views.read(workspaceId).open ? [presentation] : [],
-      commands: [{ id: "desktop.start", label: "Open Desktop", description: "Start or reuse the workspace's Xvfb display and Chromium, and open Desktop.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Desktop, label: "Desktop" } } }],
+      commands: [{ id: "desktop.start", label: "Open Desktop", description: "Start or reuse the workspace's Xvfb display and Chromium, and open its Desktop view.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Desktop, label: "Desktop" } } }],
     };
   },
 };

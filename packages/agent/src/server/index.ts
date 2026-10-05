@@ -6,7 +6,7 @@ export { renderReadOnlyTranscript, renderReadOnlyTranscriptDetail } from "./read
 export { recordsFromSessionEntries } from "./session-records.ts";
 export { renderWorkspaceCompletionCatalog } from "./completion-catalog.ts";
 export { listFileCompletions, renderFileCompletionMenu } from "./file-completions.ts";
-export { expandPromptTemplate } from "./prompt-templates.ts";
+export { expandSlashCommand } from "./slash-command-input.ts";
 export { runAgentNameCommand } from "./agent-name-command.ts";
 export { agentWorkspaceModule, agentWorkspaceModule as agentsInTheCloudServerModule } from "./web.ts";
 export {

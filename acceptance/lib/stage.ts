@@ -1,7 +1,7 @@
 /**
  * Stages the shared acceptance setup through Atelier's automation API
  * (docs/automation.md): a built-in agent with a long transcript, a Pi CLI
- * agent, a terminal tab and a quick-launch prompt template. An existing
+ * agent, a terminal tab and a prompt template with a composer button. An existing
  * workspace can be reused.
  */
 
@@ -92,13 +92,13 @@ export async function stage(options: { atelier: string; workspaceId?: string; mo
     await json(atelier, `/workspaces/${id}/commands/terminal.create`, { method: "POST", body: { title: "Shell", cwd: "/work" } });
     terminal = (await workspace(atelier, id)).workViews.find((view) => view.reference.type === "terminal")!;
   }
-  await stageQuickLaunch(id);
+  await stagePromptTemplateButton(id);
   return { atelier, workspaceId: id, builtinId: builtin.id, piId: pi.id, terminalKey: terminal.key };
 }
 
-/** A prompt template marked for quick launch, so composers show their quick-launch row. */
-async function stageQuickLaunch(workspaceId: string): Promise<void> {
-  const template = "---\ndescription: Reply with OK\nquick-launch: true\n---\nReply with just the word OK.\n";
+/** A prompt template with its composer button enabled, so composers show their Prompt template button row. */
+async function stagePromptTemplateButton(workspaceId: string): Promise<void> {
+  const template = "---\ndescription: Reply with OK\ncomposer-button: true\n---\nReply with just the word OK.\n";
   await workspaceExec(workspaceId, ["sh", "-c", "mkdir -p /work/.agents-in-the-cloud/prompts && cat > /work/.agents-in-the-cloud/prompts/ok.md"], template);
 }
 

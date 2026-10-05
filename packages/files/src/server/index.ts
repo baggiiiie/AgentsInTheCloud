@@ -114,7 +114,7 @@ const filesWorkspaceModule: WorkspaceModule = {
         match = matchRoute(url, /^\/workspaces\/([^/]+)\/files$/);
         if (match) return request.method === "GET" ? await filesEndpoint(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
 
-        match = matchRoute(url, /^\/workspaces\/([^/]+)\/file-browser\/(upload|delete)$/);
+        match = matchRoute(url, /^\/workspaces\/([^/]+)\/files-view\/(upload|delete)$/);
         if (!match) return undefined;
         const workspaceId = match[0]!;
         if (match[1] === "upload") return request.method === "POST" ? await uploadEndpoint(workspaceId, request, url) : textResponse("Method not allowed", { status: 405 });

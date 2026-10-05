@@ -280,7 +280,7 @@ await scenario("ios-D12-D13-tap-outside", "D12/D13: tapping outside the text fie
   recorder.add(check("Keyboard down", !after.keyboard && !after.focus.includes("composer-input"), `arranged: ${after.keyboard}, focus: ${after.focus || "body"}`));
 });
 
-await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; the full-width text runs under send in the bottom-right corner.", async (recorder) => {
+await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, prompt template buttons, footer or floating buttons; the full-width text runs under send in the bottom-right corner.", async (recorder) => {
   await openComposer();
   await tap(sel.input);
   await Bun.sleep(1500);
@@ -297,8 +297,8 @@ await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only 
     // Two controls of 62.5px, each with its 4px inset above and below.
     check("The text field is at least two controls tall", placement.input[3] >= 2 * (62.5 + 8) - 1, `text field ${Math.round(placement.input[3])}px tall, min ${2 * (62.5 + 8)}px`),
   );
-  const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-quick-launches", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-transcribe"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
-  recorder.add(check("D7: attach, close, transcribe, quick launches and footer hidden", hidden.length === 0, hidden.length ? `visible: ${hidden.join(", ")}` : "all hidden"));
+  const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-prompt-template-buttons", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-transcribe"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
+  recorder.add(check("D7: attach, close, transcribe, prompt template buttons and footer hidden", hidden.length === 0, hidden.length ? `visible: ${hidden.join(", ")}` : "all hidden"));
   await recorder.file("typing.png", await sim.screenshot());
   await tapDone();
   await Bun.sleep(1200);
@@ -312,18 +312,18 @@ await scenario("ios-composer-tap-and-column", "On the phone itself: a tap anywhe
   await Bun.sleep(400);
   const beside = await page.evaluate<{ x: number; y: number } | null>(`(() => {
     const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
-    const row = pane.querySelector(".composer-quick-launches");
+    const row = pane.querySelector(".composer-prompt-template-buttons");
     const buttons = [...row.querySelectorAll("button")];
     if (!buttons.length || !row.checkVisibility()) return null;
     const last = buttons[buttons.length - 1].getBoundingClientRect();
     return { x: last.right + 20, y: last.top + last.height / 2 + ${sim.screen.height} - document.documentElement.clientHeight };
   })()`);
   if (beside) {
-    const { after } = await transition(recorder, "tap beside the quick launches", () => sim.tap(beside.x, beside.y));
+    const { after } = await transition(recorder, "tap beside the prompt template buttons", () => sim.tap(beside.x, beside.y));
     recorder.add(check("A tap outside the controls focuses the text", after.focus.includes("composer-input") && after.keyboard, `focus: ${after.focus}, arranged: ${after.keyboard}`));
     await tapDone();
     await Bun.sleep(1200);
-  } else recorder.add(check("Quick launches staged", false, "this workspace has no quick-launch prompt templates"));
+  } else recorder.add(check("Prompt template buttons staged", false, "this workspace has no prompt templates with composer buttons"));
   // The column: one button per row, all sharing the right edge.
   const measure = (): Promise<{ column: boolean; composer: number; max: number }> => page.evaluate(`(() => {
     const c = [...document.querySelectorAll(".agent-composer-pane > .composer")].find((e) => e.checkVisibility());

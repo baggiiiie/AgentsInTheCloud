@@ -18,7 +18,7 @@
 .agent-chip-prog i { display: block; height: 100%; background: var(--accent); }
 .agent-chip.error { border-color: var(--danger); color: var(--danger); }
 .composer-surface form { cursor: text; position: relative; }
-.composer-surface .composer-buttons, .composer-surface .agent-attach-row, .composer-surface .composer-quick-launches { cursor: default; }
+.composer-surface .composer-buttons, .composer-surface .agent-attach-row, .composer-surface .composer-prompt-template-buttons { cursor: default; }
 /* Thumbnails take one row that scrolls sideways; the text field gets the rest of the height. */
 .agent-attach-row > .agent-chip { flex: 0 0 auto; }
 .composer {
@@ -28,7 +28,7 @@
   position: relative; z-index: 2;
   pointer-events: none;
 }
-/* The text field, with quick launches wrapping under it, beside the buttons
+/* The text field, with prompt template buttons wrapping under it, beside the buttons
    pinned to the bottom right. The field grows line by line (sized by the
    shared editor, which also fills the buttons' height) and
    scrolls past its maximum. */
@@ -47,12 +47,12 @@
 .composer-button { position: relative; display: flex; align-items: center; justify-content: center; width: var(--composer-control-size); height: var(--composer-control-size); }
 /* A captioned action (such as Connect to send) is wider than the column and extends to the left. */
 .composer-send { justify-content: flex-end; }
-.composer-quick-launches { grid-area: 2 / 1; padding: 0 0 var(--composer-control-inset) var(--composer-control-inset); }
-/* Text may come right down to the quick launches. */
-html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer-input-area:has(> .composer-quick-launches:not(:empty)) > .composer-input { padding-bottom: 2px; }
-/* Quick launches make way as soon as anything is written. */
-.composer.composer-has-text .composer-quick-launches { display: none; }
-.composer-quick-launches:empty { display: none; }
+.composer-prompt-template-buttons { grid-area: 2 / 1; padding: 0 0 var(--composer-control-inset) var(--composer-control-inset); }
+/* Text may come right down to the prompt template buttons. */
+html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer-input-area:has(> .composer-prompt-template-buttons:not(:empty)) > .composer-input { padding-bottom: 2px; }
+/* Prompt template buttons make way as soon as anything is written. */
+.composer.composer-has-text .composer-prompt-template-buttons { display: none; }
+.composer-prompt-template-buttons:empty { display: none; }
 .composer-selection { max-width: 170px; padding: 1px 2px; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
 .composer-selection:hover { border-color: var(--line-strong); background: var(--panel); color: var(--text-bright); }
 .composer-footer { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; height: var(--composer-footer-height); display: flex; align-items: center; gap: 8px; overflow: hidden; padding: 0 12px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 72%, transparent); font: inherit; }
@@ -97,7 +97,7 @@ html:not(.software-keyboard-visible) .composer:not(.composer-has-text) .composer
 /* Typing mode: while the soft keyboard is up, only typing-related UI shows.
    The composer collapses to the text field with send beside it. */
 html.software-keyboard-visible .floating-stack,
-html.software-keyboard-visible .composer :is(.composer-attach, .composer-close, .composer-transcribe, .composer-quick-launches, .composer-footer) { display: none; }
+html.software-keyboard-visible .composer :is(.composer-attach, .composer-close, .composer-transcribe, .composer-prompt-template-buttons, .composer-footer) { display: none; }
 html.software-keyboard-visible .composer .composer-surface { --composer-footer-height: 0px; padding-bottom: 0; }
 /* The text takes the full width and runs underneath send, which sits in the bottom-right corner. */
 html.software-keyboard-visible .composer .composer-input-area { position: relative; }

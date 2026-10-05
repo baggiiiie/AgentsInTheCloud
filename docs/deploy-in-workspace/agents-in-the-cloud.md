@@ -52,7 +52,7 @@ AgentsInTheCloud loads repository agent instructions from `AGENTS.md` and, if pr
 
 When both files exist, AgentsInTheCloud applies `AGENTS.md` first and `.agents-in-the-cloud/AGENTS.md` second.
 
-### Agent Skills
+### Skills
 
 AgentsInTheCloud supports the [Agent Skills](https://agentskills.io/) format for reusable, task-specific instructions. Put each skill in its own directory with a `SKILL.md` file under `.agents-in-the-cloud/skills`:
 
@@ -94,10 +94,12 @@ Prompt templates are reusable prompts stored in the workspace repository. Add Ma
 
 Each `*.md` file becomes a slash command named after the file. For example, `.agents-in-the-cloud/prompts/land.md` is available as `/land` in the agent prompt box. AgentsInTheCloud also includes a built-in `/land` template: "Commit and push your work, rebasing when necessary. when succesful, delete this workspace". A repository-provided `/land` template takes precedence over the built-in one. The built-in `/new` command starts a fresh Agent session in the current Agent, preserving the selected model and thinking level. `/name` asks AI to rename the current workspace from the agent, while `/name my-custom-name` applies a name directly. `/park` parks the current workspace. Type `/` to see matching templates and commands, then submit one to run it.
 
+Slash commands are the `/…` entry points in the AgentPaneComposer: they can perform a built-in action, expand a Prompt template, or explicitly invoke a Skill with `/skill:<name>`. Built-in actions such as `/new` and `/compact` are not Prompt templates and cannot be overridden by repository templates. `/land` is a Prompt template, including when AgentsInTheCloud supplies its default.
+
 To add a new prompt template:
 
 1. Create `.agents-in-the-cloud/prompts/<name>.md` in the repository.
-2. Optionally add frontmatter with `description`, `argument-hint`, `quick-launch`, and `shortcut`.
+2. Optionally add frontmatter with `description`, `argument-hint`, `composer-button`, and `shortcut`.
 3. Write the prompt body, using argument placeholders if needed.
 
 Example `.agents-in-the-cloud/prompts/land.md`:
@@ -106,15 +108,17 @@ Example `.agents-in-the-cloud/prompts/land.md`:
 ---
 description: Land the workspace
 argument-hint: "[branch]"
-quick-launch: true
+composer-button: true
 shortcut: l
 ---
 Review the current changes, run the relevant checks, commit them, and prepare to push to ${1:-main}.
 ```
 
-Set `quick-launch: true` to show a compact command button whenever the Agent pane composer is empty, whether or not it has focus. Selecting it expands the template into the composer for review and editing without submitting it. AgentsInTheCloud focuses the composer when doing so will not open a software keyboard; on software-keyboard devices it leaves the composer unfocused. Quick launches do not appear in the new-workspace launch composer and disappear as soon as the user types or starts transcription.
+Set `composer-button: true` to show a Prompt template button whenever the Agent pane composer is empty, whether or not it has focus. Selecting it expands the template into the composer for review and editing without submitting it. AgentsInTheCloud focuses the composer when doing so will not open a software keyboard; on software-keyboard devices it leaves the composer unfocused. Prompt template buttons do not appear in the new-workspace launch composer and disappear as soon as the user types or starts transcription.
 
-Set `shortcut` to one letter to expand and immediately send that template to the workspace's active Agent with Command-Option-letter, or Ctrl+Alt+letter off Apple platforms (for example, `shortcut: l` uses ⌘⌥L). AgentsInTheCloud supplies the modifiers; other shortcut forms are not accepted. If the template is also a quick launch, its button shows the shortcut. Existing AgentsInTheCloud commands take precedence when a letter conflicts.
+Omit `composer-button` or set it to `false` to leave the button hidden. Slash-command access and the optional keyboard shortcut remain available independently.
+
+Set `shortcut` to one letter to expand and immediately send that template to the workspace's active Agent with Command-Option-letter, or Ctrl+Alt+letter off Apple platforms (for example, `shortcut: l` uses ⌘⌥L). AgentsInTheCloud supplies the modifiers; other shortcut forms are not accepted. If the template has a composer button, that button shows the shortcut. Existing AgentsInTheCloud commands take precedence when a letter conflicts.
 
 Supported placeholders in the body:
 
@@ -127,11 +131,13 @@ Supported placeholders in the body:
 
 Use the Work pane `+` menu or mobile More sheet to open Work views:
 
+- **Files**: navigate Workspace files and view or edit a selected file.
 - **Terminal**: shell access inside the workspace.
 - **Browser**: preview web apps running in the workspace.
+- **Desktop**: view and control the Workspace’s remote graphical environment, including its visible Chromium browser.
 - **VS Code**: browser-based VS Code for the workspace.
 
-Work views can be selected, reordered, and closed inside the single contextual Work pane.
+Work views can be selected, reordered, and closed inside the single contextual Work pane. You can open multiple Files views with independent file selections, including the same file in more than one view. Each Files view includes a collapsible Files navigator with a file tree, filter, and upload controls.
 
 ### Docker and Compose
 

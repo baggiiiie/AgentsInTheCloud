@@ -7,7 +7,7 @@ import { handleAgentTreeKeydown, handleAgentTreeMenuEvent, selectAgentTreeOption
 
 const treeComingSoonMessage = "/tree feature is coming soon!";
 
-function showApplicationCommandNotice(input: HTMLInputElement | HTMLTextAreaElement, message: string): void {
+function showBuiltinSlashCommandNotice(input: HTMLInputElement | HTMLTextAreaElement, message: string): void {
   const notices = input.closest(".agent-pane")!.querySelector<HTMLElement>(".agent-notices")!;
   const notice = document.createElement("div");
   notice.className = "agent-noticeline info";
@@ -17,10 +17,10 @@ function showApplicationCommandNotice(input: HTMLInputElement | HTMLTextAreaElem
   notices.append(notice);
 }
 
-function runApplicationCommand(option: HTMLElement, input: HTMLInputElement | HTMLTextAreaElement): boolean {
+function runBuiltinSlashCommand(option: HTMLElement, input: HTMLInputElement | HTMLTextAreaElement): boolean {
   if (option.dataset.commandAction !== "notice") return false;
   input.value = "";
-  showApplicationCommandNotice(input, option.dataset.commandMessage!);
+  showBuiltinSlashCommandNotice(input, option.dataset.commandMessage!);
   return true;
 }
 
@@ -85,7 +85,7 @@ function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks)
     const label = apple ? `⌘⌥${key}` : `Ctrl+Alt+${key}`;
     const conflict = workspacePromptTemplateShortcutConflict(hooks, shortcut);
     if (!conflict) {
-      option.dataset.agentQuickLaunchShortcut = label;
+      option.dataset.agentPromptTemplateButtonShortcut = label;
       option.setAttribute("aria-keyshortcuts", `${apple ? "Meta" : "Control"}+Alt+${key}`);
       continue;
     }
@@ -94,7 +94,7 @@ function labelPromptTemplateShortcuts(html: string, hooks: WorkspaceClientHooks)
     option.title = message;
     option.setAttribute("aria-label", `${option.getAttribute("aria-label") ?? option.dataset.commandTrigger}. ${message}`);
     option.classList.add("shortcut-conflict");
-    option.dataset.agentQuickLaunchShortcut = `${label} used by ${conflict.label}`;
+    option.dataset.agentPromptTemplateButtonShortcut = `${label} used by ${conflict.label}`;
   }
   return container.innerHTML;
 }
@@ -132,16 +132,16 @@ function slashCompletionHtml(catalog: string, query: string, compactAvailable: b
   return filterSlashCompletionCatalog(catalog, query, compactAvailable);
 }
 
-function quickLaunchHtml(catalog: string): string {
+function promptTemplateButtonHtml(catalog: string): string {
   const container = document.createElement("template");
   container.innerHTML = catalog.trim();
-  return container.content.querySelector<HTMLElement>(".agent-quick-launches")?.outerHTML ?? "";
+  return container.content.querySelector<HTMLElement>(".agent-prompt-template-buttons")?.outerHTML ?? "";
 }
 
-async function expandedPromptTemplate(url: string, text: string): Promise<string> {
+async function expandedSlashCommand(url: string, text: string): Promise<string> {
   const body = new FormData();
   body.set("text", text);
-  const response = await fetch(`${url}/prompt-template-expand`, { method: "POST", body, headers: { Accept: "text/plain" } });
+  const response = await fetch(`${url}/slash-command-expand`, { method: "POST", body, headers: { Accept: "text/plain" } });
   return await response.text();
 }
 
@@ -154,7 +154,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
     optionSelector: '[role="option"]:not([hidden]):not(:disabled)',
     loadingHtml: autocompleteHtml({ kind: "message", role: "status", content: { kind: "html", html: '<span class="agent-completion-spinner" aria-hidden="true"></span>Loading completions…' } }),
     triggerKeysWhenClosed: ["/", "@"],
-    fullscreenShortcut: (option) => option.dataset.completionKind === "prompt-template",
+    fullscreenShortcut: (option) => option.hasAttribute("data-agents-in-the-cloud-fullscreen-title"),
     menuEvent: handleAgentTreeMenuEvent,
     request(input, force) {
       if (composerIsTranscribing(input)) return undefined;
@@ -180,7 +180,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
       return html === undefined ? undefined : labelPromptTemplateShortcuts(html, hooks);
     },
     select(option, input, url) {
-      if (runApplicationCommand(option, input)) return;
+      if (runBuiltinSlashCommand(option, input)) return;
       if (selectAgentTreeOption(option, input)) return false;
       if (option.dataset.commandTrigger) insertSlashCommand(option, input);
       else if (option.dataset.completionKind === "file") insertFileCompletion(option, input);
@@ -192,13 +192,13 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
       }
       const send = composerSubmitKey(event);
       const expand = event.key === "Enter" && event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey;
-      const treeCommand = input.closest(".composer")?.querySelector('[data-agent-completions-target="catalog"] [data-completion-kind="application-command"][data-command-trigger="/tree"]');
+      const treeCommand = input.closest(".composer")?.querySelector('[data-agent-completions-target="catalog"] [data-completion-kind="builtin"][data-command-trigger="/tree"]');
       if (event.key === "Enter" && input.value.trim() === "/tree" && treeCommand) {
         event.preventDefault();
         event.stopImmediatePropagation();
         actions.setInputValue("");
         actions.close();
-        showApplicationCommandNotice(input, treeComingSoonMessage);
+        showBuiltinSlashCommandNotice(input, treeComingSoonMessage);
         return true;
       }
       if (handleAgentTreeKeydown(event, input, actions)) return true;
@@ -207,7 +207,7 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
         if (active?.dataset.commandTrigger) actions.select(active);
         if (send || !/^\/[^/\s]+(?:\s+[\s\S]*)?$/.test(input.value.trim())) return false;
         event.preventDefault();
-        void expandedPromptTemplate(url, input.value)
+        void expandedSlashCommand(url, input.value)
           .then((expanded) => {
             actions.setInputValue(expanded);
             actions.close();
@@ -223,44 +223,44 @@ export function createAgentCompletionsController(Controller: StimulusControllerC
   });
 
   return class AgentCompletionsController extends HtmlAutocompleteController {
-    static targets = [...HtmlAutocompleteController.targets, "quickLaunches"];
+    static targets = [...HtmlAutocompleteController.targets, "promptTemplateButtons"];
     declare readonly catalogTarget: HTMLElement;
-    declare readonly quickLaunchesTarget: HTMLElement;
-    declare readonly hasQuickLaunchesTarget: boolean;
+    declare readonly promptTemplateButtonsTarget: HTMLElement;
+    declare readonly hasPromptTemplateButtonsTarget: boolean;
     private catalogObserver?: MutationObserver;
 
     connect(): void {
       super.connect();
-      this.catalogObserver = new MutationObserver(() => { this.renderQuickLaunches(); this.input(); });
+      this.catalogObserver = new MutationObserver(() => { this.renderPromptTemplateButtons(); this.input(); });
       this.catalogObserver.observe(this.catalogTarget, { childList: true });
-      if (this.hasQuickLaunchesTarget) this.quickLaunchesTarget.addEventListener("click", this.quickLaunch);
-      this.renderQuickLaunches();
+      if (this.hasPromptTemplateButtonsTarget) this.promptTemplateButtonsTarget.addEventListener("click", this.promptTemplateButton);
+      this.renderPromptTemplateButtons();
       this.input();
     }
 
     disconnect(): void {
       this.catalogObserver?.disconnect();
-      if (this.hasQuickLaunchesTarget) this.quickLaunchesTarget.removeEventListener("click", this.quickLaunch);
+      if (this.hasPromptTemplateButtonsTarget) this.promptTemplateButtonsTarget.removeEventListener("click", this.promptTemplateButton);
       super.disconnect();
     }
 
-    /** Quick launches always sit in the composer, so its height never changes late. */
-    private renderQuickLaunches(): void {
-      if (!this.hasQuickLaunchesTarget) return;
-      const html = labelPromptTemplateShortcuts(quickLaunchHtml(this.catalogTarget.innerHTML), hooks);
-      if (this.quickLaunchesTarget.innerHTML === html) return;
+    /** Prompt template buttons always sit in the composer, so its height never changes late. */
+    private renderPromptTemplateButtons(): void {
+      if (!this.hasPromptTemplateButtonsTarget) return;
+      const html = labelPromptTemplateShortcuts(promptTemplateButtonHtml(this.catalogTarget.innerHTML), hooks);
+      if (this.promptTemplateButtonsTarget.innerHTML === html) return;
       changeLayout(() => {
-        this.quickLaunchesTarget.innerHTML = html;
+        this.promptTemplateButtonsTarget.innerHTML = html;
         this.element.dispatchEvent(new Event("agent-composer:resize", { bubbles: true }));
       });
     }
 
-    private readonly quickLaunch = (event: MouseEvent): void => {
-      const option = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-agent-quick-launch]") : null;
+    private readonly promptTemplateButton = (event: MouseEvent): void => {
+      const option = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-agent-prompt-template-button]") : null;
       if (!option) return;
       const input = this.inputTarget;
       const initialValue = input.value;
-      void expandedPromptTemplate(this.urlValue, option.dataset.commandTrigger!).then((expanded) => {
+      void expandedSlashCommand(this.urlValue, option.dataset.commandTrigger!).then((expanded) => {
         if (input.value !== initialValue || composerIsTranscribing(input)) return;
         // A draft is never discarded: the template follows it.
         setTextInputValue(input, initialValue.trim() ? `${initialValue.trimEnd()}\n\n${expanded}` : expanded);

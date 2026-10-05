@@ -2,68 +2,66 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
-import { expandPromptTemplateText, loadPromptTemplatesFromRoot, parseCompactCommand, parseAgentNameCommand } from "../../src/server/prompt-templates.ts";
+import { expandPromptTemplateText, loadPromptTemplatesFromRoot } from "../../src/server/prompt-templates.ts";
 
 describe("prompt templates", () => {
   test("loads .agents-in-the-cloud and .pi prompt templates", async () => {
     const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
     await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
     await mkdir(join(root, ".pi/prompts"), { recursive: true });
-    await writeFile(join(root, ".agents-in-the-cloud/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\nquick-launch: true\nshortcut: L\n---\ncommit to ${"$"}{1:-main}`);
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/land.md"), `---\ndescription: Land the workspace\nargument-hint: "[branch]"\ncomposer-button: true\nshortcut: L\n---\ncommit to ${"$"}{1:-main}`);
     await writeFile(join(root, ".pi/prompts/review.md"), "---\nshortcut: command-r\n---\nReview $ARGUMENTS");
 
     const templates = await loadPromptTemplatesFromRoot(root);
-    expect(templates.map((template) => template.trigger)).toEqual(["/compact", "/land", "/name", "/new", "/park", "/review"]);
-    expect(templates.find((template) => template.name === "land")).toMatchObject({ argumentHint: "[branch]", quickLaunch: true, shortcut: "l" });
+    expect(templates.map((template) => template.trigger)).toEqual(["/land", "/review"]);
+    expect(templates.find((template) => template.name === "land")).toMatchObject({ argumentHint: "[branch]", composerButton: true, shortcut: "l" });
     expect(templates.find((template) => template.name === "review")?.shortcut).toBeUndefined();
-    const nameCommand = templates.find((template) => template.name === "name");
-    expect(nameCommand).toMatchObject({
-      trigger: "/name",
-      argumentHint: "[agent-name]",
-      prompt: "/name",
-    });
-    expect(expandPromptTemplateText("/name my-custom-name", templates)).toBe("/name my-custom-name");
+
   });
 
-  test("reads shortcuts from older prompt files", async () => {
+  test("reads settings from older prompt files", async () => {
     const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
     await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
-    await writeFile(join(root, ".agents-in-the-cloud/prompts/legacy.md"), "---\nhotkey: L\n---\nLegacy prompt");
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/legacy.md"), "---\nhotkey: L\nquick-launch: true\n---\nLegacy prompt");
 
     const templates = await loadPromptTemplatesFromRoot(root);
     const template = templates.find((template) => template.name === "legacy");
-    expect(template?.shortcut).toBe("l");
+    expect(template).toMatchObject({ shortcut: "l", composerButton: true });
+    expect(template).not.toHaveProperty("quickLaunch");
     expect(template).not.toHaveProperty("hotkey");
+  });
+
+  test("composer buttons are opt-in", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
+    await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/disabled.md"), "---\ncomposer-button: false\n---\nDisabled button");
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/plain.md"), "No button setting");
+
+    const templates = await loadPromptTemplatesFromRoot(root);
+    expect(templates.find((template) => template.name === "disabled")?.composerButton).toBe(false);
+    expect(templates.find((template) => template.name === "plain")?.composerButton).toBeUndefined();
   });
 
   test("includes builtin land template when repository does not provide one", async () => {
     const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
 
     const templates = await loadPromptTemplatesFromRoot(root);
-    expect(templates.map((template) => template.trigger)).toEqual(["/compact", "/land", "/name", "/new", "/park"]);
-    expect(templates[0]).toMatchObject({ trigger: "/compact", argumentHint: "[instructions]", prompt: "/compact", preserveArguments: true });
-    expect(templates[1]?.prompt).toBe("Commit and push your work, rebasing when necessary. When successful, delete this workspace.");
-    expect(templates[2]).toMatchObject({ trigger: "/name", description: "Rename this Agent, using AI when no name is provided.", prompt: "/name" });
-    expect(templates[3]).toMatchObject({ trigger: "/new", description: "Start a fresh Agent session.", prompt: "/new" });
-    expect(templates[4]).toMatchObject({ trigger: "/park", description: "Park this workspace.", prompt: "/park" });
+    expect(templates.map((template) => template.trigger)).toEqual(["/land"]);
+    expect(templates[0]?.prompt).toBe("Commit and push your work, rebasing when necessary. When successful, delete this workspace.");
+  });
+
+  test("keeps built-in Slash commands out of the template loader", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-prompts-"));
+    await mkdir(join(root, ".agents-in-the-cloud/prompts"), { recursive: true });
+    await writeFile(join(root, ".agents-in-the-cloud/prompts/new.md"), "Do not replace the built-in action");
+    const templates = await loadPromptTemplatesFromRoot(root);
+    expect(templates.map((template) => template.trigger)).toEqual(["/land"]);
   });
 
   test("expands triggers with arguments", () => {
     const templates = [{ name: "land", trigger: "/land", description: "Land", argumentHint: "[branch]", prompt: 'push to ${1:-main}: $@' }];
     expect(expandPromptTemplateText("/land", templates)).toBe("push to main: ");
     expect(expandPromptTemplateText("/land release candidate", templates)).toBe("push to release: release candidate");
-  });
-
-  test("parses compaction commands with optional custom instructions", () => {
-    expect(parseCompactCommand("/compact")).toEqual({});
-    expect(parseCompactCommand(" /compact   Preserve exact test commands. ")).toEqual({ customInstructions: "Preserve exact test commands." });
-    expect(parseCompactCommand("/compactness")).toBeUndefined();
-  });
-
-  test("parses AI and manual Agent name commands", () => {
-    expect(parseAgentNameCommand("/name")).toEqual({});
-    expect(parseAgentNameCommand(" /name   my-custom-name ")).toEqual({ title: "my-custom-name" });
-    expect(parseAgentNameCommand("/names")).toBeUndefined();
   });
 
   test("leaves normal prompts unchanged", () => {

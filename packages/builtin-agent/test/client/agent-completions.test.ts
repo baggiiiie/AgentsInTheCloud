@@ -81,7 +81,7 @@ describe("agent prompt history", () => {
 });
 
 describe("agent prompt completion activation", () => {
-  test("quick launches appear only before the user types", () => {
+  test("prompt template buttons appear only before the user types", () => {
     expect(agentCompletionRequest(input(""))).toBeUndefined();
     expect(agentCompletionRequest(input(" "))).toBeUndefined();
     expect(agentCompletionRequest(input("draft"))).toBeUndefined();

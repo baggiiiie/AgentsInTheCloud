@@ -101,7 +101,7 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
         ${renderComposerBody({
           draft: { id: draftId, rowId: ids.attachRow(ctx), attachments: options.attachments },
           collapsible: true,
-          quickLaunches: true,
+          promptTemplateButtons: true,
           inputHtml: renderAgentPanePromptInput(ctx, options.initialText ?? ""),
           sendHtml: renderComposerActions(actions),
         })}

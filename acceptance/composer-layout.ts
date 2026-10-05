@@ -228,11 +228,11 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
   await resetComposerText();
   await page.tap(sel.input);
   await Bun.sleep(300);
-  const launches = '.agent-composer-pane .composer-quick-launches [data-agent-quick-launch]';
-  const hadLaunches = await page.visible(launches);
-  // The buttons set the empty composer's height, so the text field simply takes the quick launches' place.
+  const promptTemplateButtons = '.agent-composer-pane .composer-prompt-template-buttons [data-agent-prompt-template-button]';
+  const hadPromptTemplateButtons = await page.visible(promptTemplateButtons);
+  // The buttons set the empty composer's height, so the text field simply takes the prompt template buttons' place.
   await transition(recorder, "first letter", () => page.insertText("L"), { expectChange: false });
-  recorder.add(check("Quick launches hide once something is written", hadLaunches && !await page.visible(launches), hadLaunches ? "shown when empty, hidden after one letter" : "no quick launches staged in this workspace"));
+  recorder.add(check("Prompt template buttons hide once something is written", hadPromptTemplateButtons && !await page.visible(promptTemplateButtons), hadPromptTemplateButtons ? "shown when empty, hidden after one letter" : "no prompt template buttons staged in this workspace"));
   await page.insertText("ine 1");
   await Bun.sleep(200);
   const heights: number[] = [];
@@ -274,9 +274,9 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
     const row = pane.querySelector(".agent-attach-row");
     const chip = row.querySelector(".agent-chip");
     const input = pane.querySelector(".composer-input");
-    // The text field never gets shorter than the buttons beside it (less the quick launches under it).
-    const launches = pane.querySelector(".composer-quick-launches");
-    const beside = pane.querySelector(".composer-buttons").getBoundingClientRect().height - (launches && launches.checkVisibility() ? launches.getBoundingClientRect().height : 0);
+    // The text field never gets shorter than the buttons beside it (less the prompt template buttons under it).
+    const promptTemplateButtons = pane.querySelector(".composer-prompt-template-buttons");
+    const beside = pane.querySelector(".composer-buttons").getBoundingClientRect().height - (promptTemplateButtons && promptTemplateButtons.checkVisibility() ? promptTemplateButtons.getBoundingClientRect().height : 0);
     return { rowHeight: row.getBoundingClientRect().height, chipHeight: chip.getBoundingClientRect().height, scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, chips: row.children.length, composer: pane.querySelector(":scope > .composer").getBoundingClientRect().height, input: input.getBoundingClientRect().height, inputMin: Math.max(Number.parseFloat(getComputedStyle(input).minHeight), beside) };
   })()`);
   await recorder.file("attachments.png", await page.screenshot());
@@ -284,7 +284,7 @@ await scenario("mobile-H1-H7-height", "H1–H7 with the keyboard down: line-by-l
     check("H7: thumbnails sit in one row", row.rowHeight <= row.chipHeight + 12, `row ${row.rowHeight}px for chips of ${row.chipHeight}px (${row.chips} chips)`),
     check("H7: the row scrolls sideways", row.scrollWidth > row.clientWidth, `scrollWidth ${row.scrollWidth} > clientWidth ${row.clientWidth}`),
     // The text field gets what is left under the max, never less than its own min height (H2: the button column).
-    check("H7: thumbnails count toward the max height; the text field gets what's left", close(row.input, Math.max(row.inputMin, max - (row.composer - row.input)), 1) && (close(row.composer, max, 2) || close(row.input, row.inputMin, 1)), `composer ${row.composer} (max ${max}); text field ${row.input}, its min ${row.inputMin}, thumbnails/quick launches/footer ${Math.round(row.composer - row.input)}${row.composer > max + 2 ? " — the fixed rows plus the text field's min exceed the max, so the min wins (H2)" : ""}`),
+    check("H7: thumbnails count toward the max height; the text field gets what's left", close(row.input, Math.max(row.inputMin, max - (row.composer - row.input)), 1) && (close(row.composer, max, 2) || close(row.input, row.inputMin, 1)), `composer ${row.composer} (max ${max}); text field ${row.input}, its min ${row.inputMin}, thumbnails/prompt template buttons/footer ${Math.round(row.composer - row.input)}${row.composer > max + 2 ? " — the fixed rows plus the text field's min exceed the max, so the min wins (H2)" : ""}`),
   );
   await page.key("a", { ctrl: true });
   await page.key("Backspace");

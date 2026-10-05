@@ -68,7 +68,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
                 ${renderComposerBody({
                   draft: { id: draftId, rowId, attachments: await listStagedAttachments(draftId) },
                   collapsible: true,
-                  quickLaunches: true,
+                  promptTemplateButtons: true,
                   inputHtml: `<textarea class="composer-input" name="text" rows="2" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-controller="composer-send-hint" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
                 })}
               </form>

@@ -1,3 +1,4 @@
+import { builtinSlashCommands } from "./builtin-slash-commands.ts";
 import { readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { isNotFoundError } from "@agents-in-the-cloud/core";
@@ -9,15 +10,14 @@ export interface PromptTemplate {
   description: string;
   argumentHint?: string;
   prompt: string;
-  quickLaunch?: boolean;
+  composerButton?: boolean;
   shortcut?: string;
-  preserveArguments?: boolean;
 }
 
 interface PromptFrontmatter {
   description?: string;
   argumentHint?: string;
-  quickLaunch?: boolean;
+  composerButton?: boolean;
   shortcut?: string;
 }
 
@@ -29,31 +29,6 @@ interface ParsedPromptFrontmatter {
 const promptDirs = [".agents-in-the-cloud/prompts", ".pi/prompts"] as const;
 
 const builtinLandPrompt = "Commit and push your work, rebasing when necessary. When successful, delete this workspace.";
-const builtinApplicationCommands: PromptTemplate[] = [{
-  name: "compact",
-  trigger: "/compact",
-  description: "Compact the conversation context, optionally with custom instructions.",
-  argumentHint: "[instructions]",
-  prompt: "/compact",
-  preserveArguments: true,
-}, {
-  name: "name",
-  trigger: "/name",
-  description: "Rename this Agent, using AI when no name is provided.",
-  argumentHint: "[agent-name]",
-  prompt: "/name",
-  preserveArguments: true,
-}, {
-  name: "new",
-  trigger: "/new",
-  description: "Start a fresh Agent session.",
-  prompt: "/new",
-}, {
-  name: "park",
-  trigger: "/park",
-  description: "Park this workspace.",
-  prompt: "/park",
-}];
 
 function parseFrontmatter(markdown: string): ParsedPromptFrontmatter {
   if (!markdown.startsWith("---\n")) return { frontmatter: {}, body: markdown };
@@ -70,7 +45,8 @@ function parseFrontmatter(markdown: string): ParsedPromptFrontmatter {
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
     if (key === "description") frontmatter.description = value;
     if (key === "argument-hint") frontmatter.argumentHint = value;
-    if (key === "quick-launch" && (value === "true" || value === "false")) frontmatter.quickLaunch = value === "true";
+    // Older prompt files named this setting "quick-launch".
+    if ((key === "composer-button" || key === "quick-launch") && (value === "true" || value === "false")) frontmatter.composerButton = value === "true";
     // Older prompt files named this setting "hotkey".
     if ((key === "shortcut" || key === "hotkey") && /^[A-Za-z]$/.test(value)) frontmatter.shortcut = value.toLowerCase();
   }
@@ -153,7 +129,7 @@ export async function loadPromptTemplatesFromRoot(root: string): Promise<PromptT
         description: frontmatter.description || fallbackDescription(body),
         argumentHint: frontmatter.argumentHint,
         prompt: body,
-        quickLaunch: frontmatter.quickLaunch,
+        composerButton: frontmatter.composerButton,
         shortcut: frontmatter.shortcut,
       });
     }
@@ -161,8 +137,8 @@ export async function loadPromptTemplatesFromRoot(root: string): Promise<PromptT
   if (!byName.has("land")) {
     byName.set("land", { name: "land", trigger: "/land", description: builtinLandPrompt, prompt: builtinLandPrompt });
   }
-  // Application commands are not overridable prompt templates.
-  for (const command of builtinApplicationCommands) byName.set(command.name, command);
+  // Built-in Slash commands cannot be replaced by repository Prompt templates.
+  for (const command of builtinSlashCommands) byName.delete(command.name);
   return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -176,24 +152,5 @@ export function expandPromptTemplateText(text: string, templates: readonly Promp
   if (!match) return text;
   const template = templates.find((candidate) => candidate.trigger === match[1]);
   if (!template) return text;
-  if (template.preserveArguments) return trimmed;
   return expandBody(template.prompt, splitArgs(match[2] ?? ""));
-}
-
-export async function expandPromptTemplate(workspaceId: string, text: string): Promise<string> {
-  return expandPromptTemplateText(text, await listPromptTemplates(workspaceId));
-}
-
-export function parseCompactCommand(text: string): { customInstructions?: string } | undefined {
-  const match = text.trim().match(/^\/compact(?:\s+([\s\S]+))?$/);
-  if (!match) return undefined;
-  const customInstructions = match[1]?.trim();
-  return customInstructions ? { customInstructions } : {};
-}
-
-export function parseAgentNameCommand(text: string): { title?: string } | undefined {
-  const match = text.trim().match(/^\/name(?:\s+([\s\S]+))?$/);
-  if (!match) return undefined;
-  const title = match[1]?.trim();
-  return title ? { title } : {};
 }

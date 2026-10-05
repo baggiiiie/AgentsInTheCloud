@@ -60,6 +60,20 @@ _Avoid_: Agent composer, in-pane composer, prompt box, chat input
 The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model and thinking level with which the Workspace starts.
 _Avoid_: Launch form, launch prompt, new-workspace composer
 
+**Slash command**:
+An invocation beginning with `/` in an Agent’s composer. Slash commands may perform a built-in action, expand a Prompt template, or explicitly invoke a Skill; not every Slash command is a Prompt template.
+
+**Prompt template**:
+A named, reusable prompt for an Agent, optionally expanded with arguments. It can be invoked by its slash command and may have a Keyboard shortcut or Prompt template button.
+
+**Skill**:
+A named bundle of reusable, task-specific instructions and optional supporting files that an Agent can load when relevant or when explicitly invoked. Unlike a Prompt template, a Skill supplies guidance for performing a task rather than a reusable prompt to insert or send.
+_Avoid_: Agent skill (as an app term)
+
+**Prompt template button**:
+An optional button in the AgentPaneComposer that inserts a Prompt template into the draft for review and editing without sending it. Buttons are shown while the composer is empty and are independent of Keyboard shortcuts.
+_Avoid_: Quick launch, quick insert
+
 **Keyboard shortcut**:
 A key combination that invokes an AgentsInTheCloud command, shortened to “Shortcut” when the context is clear. A Prompt template’s shortcut sends it directly to the active Agent rather than inserting it into a draft.
 _Avoid_: Hotkey
@@ -73,11 +87,11 @@ The contextual region that slides in when needed to show files, terminals, brows
 _Avoid_: Right tab, preview tab
 
 **Work view**:
-A closable, reorderable destination inside the Work pane, such as a Terminal, Browser, File, or Files view. Only one Work view is active and visible at a time; Work views are not split into additional layout groups.
+A closable, reorderable destination inside the Work pane, such as a Terminal, Browser, or Files view. Only one Work view is active and visible at a time; Work views are not split into additional layout groups.
 _Avoid_: Workspace group, preview group
 
 **Resource Work view**:
-A Work view representing an independently open resource or running session, such as a File, Browser, Terminal, or VS Code view.
+A Work view representing an independently open resource or running session, such as a Browser, Desktop, Terminal, or VS Code view.
 _Avoid_: Document view, permanent view
 
 **Contextual Work view**:
@@ -91,6 +105,14 @@ _Avoid_: Preview browser, browser preview
 **Browser view**:
 A Resource Work view displaying a webpage through Browser, with its own address and navigation. A Workspace may contain multiple Browser views.
 _Avoid_: Browser tab, preview view, Browser Work view
+
+**Desktop**:
+A Workspace’s remote graphical environment for interacting with graphical apps, including its visible Chromium browser. It is distinct from Browser, which opens webpages directly in a Browser view.
+_Avoid_: VNC view (as a feature name)
+
+**Desktop view**:
+A Resource Work view for viewing and controlling a Workspace’s Desktop. A Workspace has at most one Desktop view; closing it does not stop Desktop.
+_Avoid_: Desktop tab, VNC view
 
 **Review**:
 A contextual Work view for inspecting a Workspace’s uncommitted Git changes and drafting Review comments for an Agent. It includes staged, unstaged, and untracked changes; it is not a pull-request approval workflow.
@@ -109,7 +131,7 @@ The Review diff layout that places deletions and additions in separate columns n
 _Avoid_: Split diff, split layout
 
 **Mobile destination**:
-A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.
+A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open Browser and Terminal views are directly reachable; Files and VS Code views are found through More.
 _Avoid_: Mobile tab, mobile Work pane
 
 **AgentsInTheCloud bar**:
@@ -129,7 +151,7 @@ An AgentsInTheCloud navigation action that opens the Workspace that has been req
 _Avoid_: Next unread, next Agent
 
 **More**:
-The user-facing phone destination that opens a bottom sheet with separate sections for Work views not configured for direct mobile access and launchers that create or reveal Work views. Singleton utility launchers such as Files remain available when their live Work views are closed. Selecting a Work view from More leaves the stable bottom destination bar unchanged, and More remains highlighted while a secondary Work view is visible. “Work” remains domain language and is not exposed as the name of this mobile affordance.
+The user-facing phone destination that opens a bottom sheet with separate sections for Work views not configured for direct mobile access and launchers that create or reveal Work views. Work-view launchers such as Files remain available when their live Work views are closed. Selecting a Work view from More leaves the stable bottom destination bar unchanged, and More remains highlighted while a secondary Work view is visible. “Work” remains domain language and is not exposed as the name of this mobile affordance.
 _Avoid_: Work, overflow
 
 **Work view reference**:
@@ -180,9 +202,17 @@ Opening a Workspace makes its oldest requesting-attention Agent visible and, on 
 **Preload state**:
 A browser-local state indicating whether a Workspace is preloaded, preloading, or neither. It does not affect busy or requesting-attention state. Workspace attention indicators are dimmed until preloading finishes.
 
-**File view**:
-A Work pane view for reading and, when writable, editing one Workspace file. A file has at most one open File view within a Workspace.
-_Avoid_: File tab, editor tab
+**Files**:
+The feature for navigating Workspace files and viewing or editing a selected file. Files combines file navigation and editing rather than creating a separate Work view for each file.
+_Avoid_: File browser, file explorer
+
+**Files view**:
+A Work view combining file navigation with viewing or editing its selected file. A Workspace may have multiple Files views with independent selections, including multiple views of the same file.
+_Avoid_: File view, file tab, Files Work view
+
+**Files navigator**:
+The collapsible file-navigation region within a Files view, containing its file tree, filter, and upload controls. It is part of that Files view, not a separate Work view or the surrounding Work pane.
+_Avoid_: Files pane, Files side view
 
 **Persistent Work view state**:
 The server-restorable identity, order, and type-specific resource state of an open Work view. Its durability follows the view type rather than whether the user or agent created it, and remains until the view is explicitly closed.

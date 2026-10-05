@@ -2,9 +2,9 @@ import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { describe, expect, test } from "bun:test";
 import { agentsInTheCloudServerModule } from "../src/server/index.ts";
-import { createFilesView, deleteFilesViewState, filesDiskGeneration, listFilesViews, setFilesViewFile } from "../src/server/state.ts";
+import { closeFilesView, createFilesView, deleteFilesViewState, filesDiskGeneration, listFilesViews, setFilesViewFile } from "../src/server/state.ts";
 
-describe("Files Work view integration", () => {
+describe("Files view integration", () => {
   test("embed-style links select the file in the default Files view", async () => {
     const request = new Request("http://test.local/workspaces/workspace-progressive/files-view/open?path=%2Fwork%2Fnew.ts");
     let opened: WorkspaceWorkViewReference | undefined;
@@ -38,6 +38,23 @@ describe("Files Work view integration", () => {
     const created = listFilesViews("workspace-command").find((view) => view.id === result.createdWorkView?.id);
     expect(created?.path).toBeUndefined();
     deleteFilesViewState("workspace-command");
+  });
+
+  test("Files views retain independent selections, including the same file", () => {
+    const workspaceId = "workspace-independent-files";
+    try {
+      const first = createFilesView(workspaceId);
+      const second = createFilesView(workspaceId);
+      setFilesViewFile(workspaceId, first.id, "/work/README.md", { line: 1 });
+      setFilesViewFile(workspaceId, second.id, "/work/README.md", { line: 9 });
+      expect(listFilesViews(workspaceId).find((view) => view.id === first.id)).toMatchObject({ path: "/work/README.md", line: 1 });
+      expect(listFilesViews(workspaceId).find((view) => view.id === second.id)).toMatchObject({ path: "/work/README.md", line: 9 });
+      setFilesViewFile(workspaceId, first.id, "/work/other.ts");
+      closeFilesView(workspaceId, first.id);
+      expect(listFilesViews(workspaceId).find((view) => view.id === second.id)).toMatchObject({ path: "/work/README.md", line: 9 });
+    } finally {
+      deleteFilesViewState(workspaceId);
+    }
   });
 
   test.each([undefined, "/work/example.ts"])("refreshes Files after an agent turn with selected path %s", async (path) => {

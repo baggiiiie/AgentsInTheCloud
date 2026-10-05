@@ -129,7 +129,7 @@
 }
 
 @media (max-width: 700px) {
-  [data-agent-quick-launch]::after { display: none; }
+  [data-agent-prompt-template-button]::after { display: none; }
 }
 
 .agent-completion-menu-host { position: absolute; z-index: 20; }
@@ -138,16 +138,16 @@
   pointer-events: auto;
 }
 .agent-completion-menu-host[hidden] { display: none; }
-.agent-quick-launches { display: flex; flex-wrap: wrap; gap: 6px; }
-[data-agent-quick-launch] { gap: 7px; }
-[data-agent-quick-launch]::after { content: attr(data-agent-quick-launch-shortcut); }
-[data-agent-quick-launch].shortcut-conflict::after { color: var(--warning); }
+.agent-prompt-template-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+[data-agent-prompt-template-button] { gap: 7px; }
+[data-agent-prompt-template-button]::after { content: attr(data-agent-prompt-template-button-shortcut); }
+[data-agent-prompt-template-button].shortcut-conflict::after { color: var(--warning); }
 .agent-completion-menu { max-height: 260px; overflow: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-surface); }
 .agent-completion-menu.empty { padding: 8px 8px; color: var(--text-muted); }
 .agent-completion-spinner { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: agent-spin .75s linear infinite; }
 @keyframes agent-spin { to { transform: rotate(360deg); } }
-.agent-template-preview { margin: 0; padding: 12px; white-space: pre-wrap; font-family: var(--font-mono); line-height: var(--leading-standard); color: var(--text-bright); background: var(--panel); }
-.agents-in-the-cloud-fullscreen-html .agent-template-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
+.agent-slash-command-preview { margin: 0; padding: 12px; white-space: pre-wrap; font-family: var(--font-mono); line-height: var(--leading-standard); color: var(--text-bright); background: var(--panel); }
+.agents-in-the-cloud-fullscreen-html .agent-slash-command-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
 .agent-stat { height: 24px; display: inline-flex; align-items: center; gap: 4px; line-height: 24px; white-space: nowrap; }
 .agent-stat b { color: inherit; font: inherit; }
 .agent-stat[title="Tokens up (input)"], .agent-stat[title="Tokens down (output)"] { display: none; }

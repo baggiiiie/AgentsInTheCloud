@@ -386,7 +386,7 @@ export const entries: CatalogueEntry[] = [
           buttonGroupHtml({
             semantics: "group", label: "Quick actions", orientation: "horizontal",
             itemsHtml: buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add grouped item" } }) +
-              buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "/quick-launch" } }),
+              buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "/land" } }),
           }),
       },
       {

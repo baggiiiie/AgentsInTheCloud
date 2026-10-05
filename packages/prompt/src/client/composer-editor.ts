@@ -14,11 +14,11 @@ export function sizeComposer(composer: HTMLElement, maxComposer: number): void {
   if (!composer.checkVisibility()) return;
   const area = input.parentElement!;
   const buttons = area.querySelector<HTMLElement>(":scope > .composer-buttons")!;
-  const launches = area.querySelector<HTMLElement>(":scope > .composer-quick-launches");
+  const promptTemplateButtons = area.querySelector<HTMLElement>(":scope > .composer-prompt-template-buttons");
   const height = (element: HTMLElement | null): number => element?.checkVisibility() ? element.getBoundingClientRect().height : 0;
   // Everything but the input area: thumbnails, status, footer.
   const chrome = composer.getBoundingClientRect().height - area.getBoundingClientRect().height;
-  // Quick launches make way as soon as there is something written.
+  // Prompt template buttons make way as soon as there is something written.
   const hadText = composer.classList.contains("composer-has-text");
   const hasText = /\S/.test(input.value);
   // Measure without letting the pane reflow: the input area keeps its size,
@@ -29,7 +29,7 @@ export function sizeComposer(composer: HTMLElement, maxComposer: number): void {
   composer.classList.toggle("composer-has-text", hasText);
   input.style.height = "0px";
   const content = Math.ceil(input.scrollHeight);
-  const below = height(launches);
+  const below = height(promptTemplateButtons);
   // Buttons beside the text set its minimum; send floating over it (while typing) doesn't.
   const beside = getComputedStyle(buttons).position === "absolute" ? 0 : height(buttons);
   const minimum = Math.max(Number.parseFloat(getComputedStyle(input).minHeight) || 0, beside - below);

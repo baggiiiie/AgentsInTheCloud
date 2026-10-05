@@ -15,8 +15,8 @@ If you want to start a new dev server, terminate the old tmux session if it's no
 AgentsInTheCloud gives the user a Browser view. It's an iframe that runs in the users browser, and is able to reach through to your dev server in your workspace.
 This Browser view gives the user the best / most local / least laggy experience. You can open it with present(kind=browser). Prefer it when possible.
 
-You also have access to a chrome browser that runs inside your workspace. use "agents-in-the-cloud-desktop start" to start it. it will return a cdpUrl to the browser it starts.
-You can present this browser to the user by calling present(kind=desktop). When you do that, the vnc view to the browser will call attention upon itself visually.
+Desktop contains a visible Chromium browser that runs inside your Workspace. Use "agents-in-the-cloud-desktop start" to start it. it will return a cdpUrl to the browser it starts.
+You can present this browser to the user by calling present(kind=desktop). When you do that, the Desktop view will call attention upon itself visually.
 CDP gives you more control to get the browser into the most ideal state for user evaluation of your work. The Browser view only supports navigating to url's.
 
 To link to an editable text file anywhere in the workspace container's filesystem, use Markdown with an AgentsInTheCloud file URL, optionally including a line and column:

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { expandWorkspaceSkillCommand, workspaceSkillsFromFiles } from "../../src/server/skills.ts";
 
 describe("workspace skills", () => {
-  test("loads Agent Skills metadata for Pi's progressive-disclosure prompt", async () => {
+  test("loads Skill metadata for Pi's progressive-disclosure prompt", async () => {
     const result = await workspaceSkillsFromFiles([{
       path: "/work/.agents/skills/review/SKILL.md",
       content: "---\nname: careful-review\ndescription: Review changes carefully\ndisable-model-invocation: true\n---\nFull instructions",

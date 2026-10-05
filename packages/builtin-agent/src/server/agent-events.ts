@@ -4,7 +4,7 @@ import type { AgentWorkspaceParameters } from "@agents-in-the-cloud/shared";
 import { agentAttachmentDraftId, moveAttachmentDraft, validDraftId } from "@agents-in-the-cloud/prompt/server";
 import { stageInitialPrompt } from "./initial-prompt-draft.ts";
 import { parseModelRef, getAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
-import { expandPromptTemplate } from "@agents-in-the-cloud/agent/server/prompt-templates";
+import { expandSlashCommand } from "@agents-in-the-cloud/agent/server/slash-command-input";
 import { getWorkspaceAgentController, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, stopWorkspaceAgentRuntimes } from "./runtime.ts";
 import { resumeInterruptedAgentSessions } from "./restart-recovery.ts";
 import { ensureDefaultWorkspaceAgent } from "./agent-store.ts";
@@ -46,7 +46,7 @@ async function initializeWorkspaceAgent(workspaceId: string, context: AgentWorks
     return;
   }
 
-  const prompt = await expandPromptTemplate(workspaceId, input.text);
+  const prompt = await expandSlashCommand(workspaceId, input.text);
   const { images, attachmentNotes } = input;
   if (!prompt.trim() && images.length === 0 && attachmentNotes.length === 0) return;
 
