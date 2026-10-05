@@ -112,7 +112,7 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
 
 export type TranscriptItem =
   | (TranscriptItemBase & { type: "extension"; render(ctx: AgentRenderContext): string })
-  | (TranscriptItemBase & { type: "user"; text: string; images: SessionImageRef[]; steering?: boolean; pending?: boolean })
+  | (TranscriptItemBase & { type: "user"; text: string; images: SessionImageRef[]; steering?: boolean; pending?: boolean; queuedSubmissionId?: string })
   | (TranscriptItemBase & { type: "inherited-context"; source: string; messageCount: number; items: TranscriptItem[] })
   | WorkingTranscriptItem
   | (TranscriptItemBase & { type: "thinking"; text: string; live?: boolean })

@@ -409,6 +409,14 @@ export async function openDurableAgentRuntime(
           await configure({ model });
         });
       },
+      /** Withdraw only this inbox input; consumption and cancellation race atomically. */
+      cancelQueuedInput(submissionId: string) {
+        return command(async () => {
+          const inbox = await harness.snapshot(InboxDoc, conversation.id, context);
+          const input = inbox?.items.find(item => String(item.id) === submissionId && item.mode === "steer");
+          return input ? await harness.abortSubmission(input.id, context, conversation.id) === "aborted" : false;
+        });
+      },
       /** Cancel one live tool and its owned work, without withdrawing the turn or queued input. */
       abortTool(callId: string) {
         return command(async () => {

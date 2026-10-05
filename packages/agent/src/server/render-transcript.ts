@@ -1,7 +1,9 @@
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { renderStreamingMarkdownSnapshot } from "@agents-in-the-cloud/markdown";
 import type { ModelRef } from "@agents-in-the-cloud/llm/server";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
+import { agentPath, commentaryContext, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
 import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, renderMarkdownRow, transcriptActionItemHtml, transcriptRow } from "./render-markup.ts";
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";
 import { formatDuration, formatTokens, type TranscriptItem, type WorkingTranscriptItem } from "./transcript.ts";
@@ -45,7 +47,9 @@ export function renderModelContextDetailFrame(ctx: AgentRenderContext, modelCont
 function renderUserMessage(ctx: AgentRenderContext, user: Extract<TranscriptItem, { type: "user" }>): string {
   const images = user.images.length ? `<div class="agent-user-attachments">${user.images.map((image) => `<img${fullscreenAttributes("attachment", "media")} src="${escapeHtml(sessionImageUrl(ctx, image))}" alt="attachment" loading="lazy">`).join("")}</div>` : "";
   const label = user.pending ? "Queued · awaiting consumption" : user.steering ? "Steering" : "";
-  return transcriptRow(`<div class="agent-user" data-agent-user-text="${escapeHtml(user.text)}"><div class="agent-user-bubble markdown">${label ? `<div class="agent-user-label">${label}</div>` : ""}${markdown(ctx, user.text)}${images}</div></div>`);
+  const cancel = user.queuedSubmissionId && !ctx.readOnly
+    ? `<form method="post" action="${escapeHtml(agentPath(ctx, `/queued-inputs/${encodeURIComponent(user.queuedSubmissionId)}/cancel`))}">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Cancel queued message" } })}</form>` : "";
+  return transcriptRow(`<div class="agent-user" data-agent-user-text="${escapeHtml(user.text)}"><div class="agent-user-bubble markdown">${label ? `<div class="agent-user-label">${label}${cancel}</div>` : ""}${markdown(ctx, user.text)}${images}</div></div>`);
 }
 
 function renderStreamingTextBody(ctx: AgentRenderContext, key: string, text: string, className: string): string {
