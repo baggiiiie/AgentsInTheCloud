@@ -11,6 +11,7 @@ import { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } fr
 export { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } from "./default-image.ts";
 import { pruneSupersededWorkspaceImages, workspaceImageKindLabel, type WorkspaceImageKind } from "./prune.ts";
 import { dockerImageStoreQueue, workspaceImageStoreWaitReporter } from "./image-store-queue.ts";
+import { repositoryBuildCommand, repositoryBuildNetworkArgs, systemDockerHost } from "./build-network.ts";
 import { dockerServerPlatform, nativeImageExists as imageExists, reuseDefaultWorkspaceImage } from "./local-images.ts";
 
 interface WorkspaceImageBuildTask {
@@ -68,8 +69,9 @@ async function reportImageProgress(events: AgentsInTheCloudEventBus | undefined,
 
 async function dockerBuildArgs(tag: string, kind: WorkspaceImageKind, dockerfile: string, contextDir: string, options: ResolveWorkspaceImageOptions): Promise<string[]> {
   return [
+    ...(kind === "repository" ? ["--host", systemDockerHost] : []),
     "build",
-    ...await workloadBuildArgs(),
+    ...await (kind === "repository" ? repositoryBuildNetworkArgs() : workloadBuildArgs()),
     ...(options.buildOutput === "inherit" ? ["--progress=plain"] : []),
     ...(process.env.ATELIER_WORKSPACE_IMAGE_NO_CACHE === "1" ? ["--no-cache"] : []),
     "--label", `${workspaceImageKindLabel}=${kind}`,
@@ -90,15 +92,16 @@ function startBuildTask(tag: string, modules: string[], kind: WorkspaceImageKind
   }, async () => {
     const buildStartedAt = new Date();
     const args = await dockerBuildArgs(tag, kind, dockerfile, contextDir, options);
+    const buildCommand = kind === "repository" ? repositoryBuildCommand(args) : ["docker", ...args];
     if (options.buildOutput === "inherit") {
-      const proc = Bun.spawn(["docker", ...args], { cwd: contextDir, env: { ...process.env, DOCKER_BUILDKIT: "1" }, stdout: "inherit", stderr: "inherit", stdin: "inherit" });
+      const proc = Bun.spawn(buildCommand, { cwd: contextDir, env: { ...process.env, DOCKER_BUILDKIT: "1" }, stdout: "inherit", stderr: "inherit", stdin: "inherit" });
       const exitCode = await proc.exited;
       if (exitCode !== 0) throw new Error(`docker build failed with exit code ${exitCode}`);
     } else {
       const result = await runHostObservableCommand({
         session: `agents-in-the-cloud-provision-image-${crypto.randomUUID().slice(0, 8)}`,
         cwd: contextDir,
-        command: `echo "Starting Docker image build..."\nDOCKER_BUILDKIT=1 docker ${args.map(shellQuote).join(" ")}`,
+        command: `echo "Starting Docker image build..."\nDOCKER_BUILDKIT=1 ${buildCommand.map(shellQuote).join(" ")}`,
         onSessionStarted: async (session) => {
           task.session = session;
           await reportImageProgress(options.events, options.workspaceId, task);

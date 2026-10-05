@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chown, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chown, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 const GiB = 1024 ** 3;
 export function resourcePolicy(memory: number, pids: number) {
@@ -67,6 +67,7 @@ export async function initializeResources() {
   const management = join(root, "management");
   const workloads = join(root, "workloads");
   const processes = join(management, "processes");
+  const dockerProcesses = join(management, "docker");
   await mkdir(processes, { recursive: true });
   // docker exec can race bootstrap. Once PID 1 has moved, new execs follow it;
   // drain any exec that started against the old root before enabling controllers.
@@ -92,6 +93,7 @@ export async function initializeResources() {
     }
   }
   await writeFile(join(management, "cgroup.subtree_control"), controllers);
+  await mkdir(dockerProcesses, { recursive: true });
   await mkdir(workloads, { recursive: true });
   await writeFile(join(workloads, "cgroup.subtree_control"), controllers);
   for (const [group, weight] of [
@@ -121,22 +123,34 @@ export async function initializeResources() {
   }
   await writeFile(join(workloads, "pids.max"), String(policy.pids));
   await mkdir(join(workloads, "commands"), { recursive: true });
+  const buildClients = join(workloads, "build-clients");
+  await mkdir(buildClients, { recursive: true });
   // The app runs as uid 1000. cgroup v2 migration requires destination and
   // common-ancestor cgroup.procs permissions; no controller files are delegated.
   await chown(join(root, "cgroup.procs"), 1000, 1000);
+  // Observable build commands start in workloads/commands and migrate to its sibling.
+  await chown(join(workloads, "cgroup.procs"), 1000, 1000);
   await chown(join(workloads, "commands", "cgroup.procs"), 1000, 1000);
+  await chown(join(buildClients, "cgroup.procs"), 1000, 1000);
   const result = {
     workloadsCgroupParent: `${relative}/workloads`,
+    dockerCgroupParent: `${relative}/management/docker`,
+    dockerProcesses,
+    buildClients,
+    buildClientsCgroupParent: `${relative}/workloads/build-clients`,
     managementCgroupParent: `${relative}/management/apps`,
     commandsCgroup: join(workloads, "commands"),
     policy,
     effectiveMemory: memory,
   };
   await mkdir("/run/agents-in-the-cloud-system", { recursive: true });
+  // The same wrapper runs in the app (bind mount) and the Host service (System).
+  await symlink(buildClients, "/run/agents-in-the-cloud-system/build-client-processes");
   await writeFile("/run/agents-in-the-cloud-system/resources.json", JSON.stringify(result));
   const config = JSON.parse(await readFile("/etc/docker/daemon.json", "utf8"));
   config["cgroup-parent"] = result.workloadsCgroupParent;
   config["exec-opts"] = ["native.cgroupdriver=cgroupfs"];
+  config.builder = { ...config.builder, entitlements: { "network-host": false, "security-insecure": false, device: false } };
   await writeFile("/run/agents-in-the-cloud-system/daemon.json", JSON.stringify(config));
   return result;
 }

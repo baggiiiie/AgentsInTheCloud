@@ -9,7 +9,7 @@ import { PullProgress } from "./pull-progress.ts";
 import { prepareChannelUpdate } from "./channel-update.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { installWorkspaceFirewall } from "./firewall.ts";
+import { installWorkspaceFirewall, resolverAddresses } from "./firewall.ts";
 import { filesystemFailure } from "./filesystems.ts";
 import { initializeResources } from "./resources.ts";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -293,6 +293,8 @@ async function replace(request: Replacement) {
       "host",
       "--mount",
       `type=bind,src=${resources.commandsCgroup},dst=/run/agents-in-the-cloud-system/workload-processes`,
+      "--mount",
+      `type=bind,src=${resources.buildClients},dst=/run/agents-in-the-cloud-system/build-client-processes`,
       "--mount",
       "type=bind,src=/run/agents-in-the-cloud-system/resources.json,dst=/run/agents-in-the-cloud-system/resources.json,readonly",
       "--mount",
@@ -671,7 +673,7 @@ async function initialize() {
   resources = await initializeResources();
   await startHostService({ root: dirname(dirname(resources.commandsCgroup)), effectiveMemory: resources.effectiveMemory });
   await chown(hostSocketPath, 1000, 1000);
-  await installWorkspaceFirewall();
+  await installWorkspaceFirewall([resources.dockerCgroupParent, resources.buildClientsCgroupParent], resolverAddresses(await readFile("/etc/resolv.conf", "utf8")));
   // Privileged containers only copy device nodes the host /dev already has; some
   // VMs lack loop-control until first use. Opening it autoloads the loop driver.
   if (!existsSync("/dev/loop-control")) await command(["mknod", "-m", "0660", "/dev/loop-control", "c", "10", "237"]);
@@ -688,7 +690,9 @@ async function initialize() {
     30000,
     "containerd",
   );
-  daemon(["dockerd", "--config-file", "/run/agents-in-the-cloud-system/daemon.json"]);
+  // Move the daemon before exec: BuildKit's HTTP/git sources and outbound
+  // network proxies inherit the filtered cgroup, unlike the management app.
+  daemon(["sh", "-ec", 'echo $$ > "$1/cgroup.procs"; shift; exec "$@"', "agents-in-the-cloud-dockerd", resources.dockerProcesses, "dockerd", "--config-file", "/run/agents-in-the-cloud-system/daemon.json"]);
   await waitFor(
     async () => {
       try {
@@ -701,6 +705,10 @@ async function initialize() {
     60000,
     "Docker",
   );
+  // Publish only after firewall installation and daemon startup have succeeded.
+  // Tie the attestation to this daemon; another Docker context is not protected.
+  const daemonId = (await docker("info", "--format", "{{.ID}}")).trim();
+  await writeFile("/run/agents-in-the-cloud-system/resources.json", JSON.stringify({ ...resources, buildNetworkPolicy: { version: 1, daemonId } }));
   if (uninstalling) { initialized = true; return; }
   for (const id of persisted.runningContainers ?? []) await docker("start", id);
   persisted.runningContainers = [];
