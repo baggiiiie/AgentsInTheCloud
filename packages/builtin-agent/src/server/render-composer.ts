@@ -109,7 +109,7 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
       <div class="agent-completion-menu-host" data-agent-completions-target="menu" hidden></div>
       ${renderAgentCompletionCatalog(ctx, options.completionCatalogHtml)}
       <form id="${ids.abortForm(ctx)}" method="post" action="${escapeHtml(agentPath(ctx, "/abort"))}" hidden></form>
-      <div class="composer-footer" id="${ids.stats(ctx)}">${renderAgentPaneComposerFooter(ctx, stats)}</div>
+      <div class="composer-footer" data-controller="agent-footer" id="${ids.stats(ctx)}">${renderAgentPaneComposerFooter(ctx, stats)}</div>
     </div>
   </div>`;
 }
@@ -156,9 +156,11 @@ function renderComposerActions(sendHtml: string): string {
 
 export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: AgentStatsView): string {
   const percent = stats.contextPercent;
+  const contextTitle = stats.nativeBranchUsage ? "Estimated context window used" : "Context window used";
   const meter = percent === null
     ? ""
-    : `<span class="agent-stat" title="${stats.nativeBranchUsage ? "Estimated context window used" : "Context window used"}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
+    : `<span class="agent-stat" data-footer-drop="4" title="${contextTitle}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span></span>
+<span class="agent-stat" data-footer-drop="3" title="${contextTitle}"><b>${percent.toFixed(0)}%</b></span>`;
   const models = stats.models.length > 0 ? stats.models : [{ provider: "", id: "", name: stats.modelName ?? "no model", selected: true, available: false }];
   const formPrefix = `${ids.stats(ctx)}_selection`;
   const modelFormId = `${formPrefix}_model`;
@@ -167,9 +169,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
 ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingLevelFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking-level"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
-<span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
-<span class="agent-stat" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+<span class="agent-stat" data-footer-drop="1" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
+<span class="agent-stat" data-footer-drop="1" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
+<span class="agent-stat" data-footer-drop="2" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

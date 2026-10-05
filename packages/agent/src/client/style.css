@@ -150,18 +150,15 @@
 .agents-in-the-cloud-fullscreen-html .agent-slash-command-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
 .agent-stat { height: 24px; display: inline-flex; align-items: center; gap: 4px; line-height: 24px; white-space: nowrap; }
 .agent-stat b { color: inherit; font: inherit; }
-.agent-stat[title="Tokens up (input)"], .agent-stat[title="Tokens down (output)"] { display: none; }
-.agent-stat[title="Session cost"]::before { content: "cost"; color: var(--text-muted); font: inherit; }
 .agent-ctx-meter { width: 46px; height: 4px; overflow: hidden; border-radius: var(--radius-indicator); background: var(--line); }
 .agent-ctx-meter i { display: block; height: 100%; border-radius: var(--radius-indicator); background: var(--text-muted); }
 
-/* Keep shared Composer selections available before secondary AgentPaneComposer statistics. */
-@container (max-width: 500px) {
-  .agent-stat[title="Session cost"] { display: none; }
-}
-@container (max-width: 300px) {
-  .agent-stat[title="Context window used"] { display: none; }
-}
+/* Footer items keep their natural widths; the controller drops lower priorities first. */
+[data-controller~="agent-footer"] .agent-stat { flex: none; }
+[data-controller~="agent-footer"] .composer-selections { flex: none; }
+[data-controller~="agent-footer"] .composer-selections > :not(.composer-selection-field) { flex: none; }
+[data-controller~="agent-footer"] .button__caption { white-space: nowrap; overflow-wrap: normal; }
+[data-controller~="agent-footer"] :is(.agent-stat, .composer-selection-field)[hidden] { display: none; }
 
 .agent-media-img, .agent-media-frame { border-color: var(--line); border-radius: var(--radius-surface); }
 
