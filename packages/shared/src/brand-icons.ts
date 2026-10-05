@@ -2,6 +2,7 @@
 // Source: https://github.com/simple-icons/simple-icons
 // Most icons: develop branch fetched 2026-06-30. OpenAI: simple-icons 14.0.0.
 // Exception: `pi` is the colored mark from https://pi.dev, normalized to the 24×24 viewBox.
+// Exception: `radius` is the mark from https://radius.earendil.com, normalized to the 24×24 viewBox.
 
 import { escapeHtml } from "./html.ts";
 
@@ -50,6 +51,7 @@ const brandIcons: BrandIconRegistry = {
     { path: "M6 24H0V6h6v6h6v6H6v6Z", fill: "#4D9ABF" },
     { path: "M24 24h-6V12h6v12Z", fill: "#F1BE58" },
   ] },
+  radius: { title: "radius", path: "M24 6h-3c0 3.0557-.9171 5.9014-2.4857 8.2714l5.4857 5.4857-4.2429 4.2429-5.4857-5.4857A14.9143 14.9143 0 0 1 6 21v3H0V6h6V0h18zM6 6v9c4.9714 0 9-4.0286 9-9z" },
   opencode: { title: "opencode", path: "M22 24H2V0h20zM17 4.8H7v14.4h10z" },
   x: { title: "x", path: "M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z" },
 };
@@ -94,6 +96,7 @@ const providerIconAliases: BrandStringRegistry = {
   "ant-ling": "alibabacloud",
   ollama: "ollama",
   pi: "pi",
+  radius: "radius",
 };
 
 const monogramLabels: BrandStringRegistry = {

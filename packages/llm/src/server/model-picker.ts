@@ -36,13 +36,13 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
       kind: "single",
       label: { kind: "text", text: model.name },
       description: model.unavailableReason,
-      leadingHtml: providerBrandIconHtml(model.provider, model.name),
+      leadingHtml: providerBrandIconHtml(model.provider),
       element: { tag: "button", attributesHtml: `type="submit" name="model" value="${escapeHtml(`${model.provider}::${model.id}`)}" form="${escapeHtml(formId)}" role="menuitemradio" aria-checked="${model.selected}"${model.available === false ? " disabled" : ""}` },
     });
   }).join("");
   if (!hasAvailableModel) return buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: connectedProvider ? "Choose models" : "Connect a model" }, attributesHtml: setupAction });
   return popupHtml({ id: menuId, label: "Model", placement: "above",
-    trigger: { variant: "secondary", content: { kind: "caption", caption: selected?.name ?? "Model" } },
+    trigger: { variant: "secondary", content: { kind: "caption", caption: selected?.name ?? "Model", iconHtml: selected ? providerBrandIconHtml(selected.provider) : undefined } },
     contentHtml: `${configure}<hr class="popup-menu__separator">${modelItems}`,
   });
 }
