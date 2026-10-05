@@ -158,6 +158,7 @@ export function createWorkspaceRegistry(options: WorkspaceRegistryOptions = {}):
   }
   function requestAttention(id: string): void {
     const entry = requireEntry(id);
+    if (entry.phase.deletion?.status === "deleting") return;
     if (visible(id) || entry.requestingAttention) return;
     unpark(entry);
     entry.requestingAttention = true;

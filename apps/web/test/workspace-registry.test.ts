@@ -40,6 +40,27 @@ describe("phase-owned workspace activity", () => {
     expect(registry.get("a")!.phase.busy).toBe(false);
     expect(() => registry.setAgentBusy("a", "terminal:one", true)).toThrow("Not an agent");
   });
+  test.each([
+    { status: "blocked", fingerprint: "changes" },
+    { status: "failed", operation: "deleting", forced: false, error: "disk" },
+  ] as const)("active destruction rejects attention until deletion becomes $status", async (decision) => {
+    const { registry, attentionStore } = await setup();
+    registry.setAgentBusy("a", "agent:first", true);
+    registry.setDeletion("a", { status: "deleting", forced: false });
+
+    // Agent teardown still ends its turn; deletion owns workspace activity.
+    registry.setAgentBusy("a", "agent:first", false);
+    registry.requestAttention("a");
+    expect(registry.get("a")!.phase.busy).toBe(true);
+    expect(registry.get("a")!.requestingAttention).toBe(false);
+    expect(registry.get("a")!.attentionAt).toBeUndefined();
+    expect((await attentionStore.load()).workspaces).toEqual({});
+
+    registry.setDeletion("a", decision);
+    expect(registry.get("a")!.phase.busy).toBe(false);
+    expect(registry.get("a")!.requestingAttention).toBe(true);
+    expect((await attentionStore.load()).workspaces.a).toBeDefined();
+  });
   test("deletion exclusively owns busy state even with busy agents", async () => {
     const { registry } = await setup();
     registry.setAgentBusy("a", "agent:first", true);
