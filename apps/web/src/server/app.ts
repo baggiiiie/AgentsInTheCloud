@@ -510,10 +510,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const workspaceTemplateId = isGitWorkspaceTemplateInit(entry.init) ? entry.init.projectId : undefined;
     const snapshot = provisioning.snapshot(entry.id);
     const failed = entry.phase.kind === "provisioningPhase" && entry.phase.status === "failed";
-    // Deleting is a recovery decision; offer it only once provisioning has stopped progressing.
-    const stalled = failed || (!!snapshot && snapshot.status !== "running");
+    // Waiting means a step failed and needs a recovery decision; done is not a failure.
+    const needsRecovery = failed || snapshot?.status === "failed" || snapshot?.status === "waiting";
     const deleteButton = buttonHtml({ type: "submit", variant: "danger", content: { kind: "caption", caption: "Delete workspace" } });
-    const deleteAction = stalled ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
+    const deleteAction = needsRecovery ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
     const sourceFailure = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
     const sourceError = `${sourceFailure?.output ?? ""}\n${sourceFailure?.error ?? ""}`;
     const needsSshKey = !!sourceFailure?.error && isSshAuthenticationFailure(sourceFailure.error);
