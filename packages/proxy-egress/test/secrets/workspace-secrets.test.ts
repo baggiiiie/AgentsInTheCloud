@@ -140,15 +140,17 @@ describe("workspace secrets", () => {
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe(customRequest().url);
   });
 
-  test("egress permits LAN and tailnet destinations but still blocks loopback and link-local", async () => {
+  test("egress reaches only public internet destinations", async () => {
     const context = await createWorkspaceSecretContext("test-workspace");
-    for (const ip of ["127.0.0.1", "169.254.169.254", "::1"]) {
+    for (const ip of ["127.0.0.1", "169.254.169.254", "::1", "0.0.0.0", "224.0.0.1", "fe80::1", "::ffff:127.0.0.1"]) {
       expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(false);
     }
-    for (const ip of ["10.200.0.2", "192.168.1.1", "100.64.0.1", "fd00::1", "fd7a:115c:a1e0::2"]) {
-      expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(true);
+    for (const ip of ["10.200.0.2", "192.168.1.1", "172.17.0.1", "100.64.0.1", "100.100.100.100", "fd00::1", "fd7a:115c:a1e0::2", "2001:db8::1"]) {
+      expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(false);
     }
-    expect(await context.hooks.isIpAllowed!({ hostname: "example.com", ip: "93.184.215.14", family: 4, port: 443, protocol: "https" })).toBe(true);
+    for (const ip of ["93.184.215.14", "8.8.8.8", "2606:4700:10::6814:179a"]) {
+      expect(await context.hooks.isIpAllowed!({ hostname: "example.com", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(true);
+    }
   });
 
   test("passes an inherited placeholder onward for nested AgentsInTheCloud", async () => {

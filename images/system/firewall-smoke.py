@@ -44,12 +44,20 @@ def create_worker(number):
  until(lambda:sysquery(f'http://{info["IPAddress"]}:8080')==worker)
  return worker,info
 try:
- # Failure must stop System before Docker can restore any workspaces.
+ # A firewall-install failure must leave System inert: the failure is reported,
+ # and no Docker daemon ever starts, so no workspace can be restored without the firewall.
  with tempfile.TemporaryDirectory(prefix='agents-in-the-cloud-firewall-') as directory:
   executable=pathlib.Path(directory)/'nft'
   executable.write_text('#!/bin/sh\necho simulated-nft-failure >&2\nexit 23\n');executable.chmod(0o755)
-  failed=docker('run','--rm','--privileged','--cgroupns=host','--tmpfs','/run','--mount',f'type=bind,src={executable},dst=/usr/sbin/nft,readonly',image,'--app-image','agents-in-the-cloud-test:v2',check=False)
-  assert failed.returncode==1 and b'Could not install workspace firewall: simulated-nft-failure' in failed.stdout+failed.stderr
+  failed_name=name+'-firewall-failure'
+  docker('run','-d','--privileged','--cgroupns=host','--tmpfs','/run','--mount',f'type=bind,src={executable},dst=/usr/sbin/nft,readonly','--name',failed_name,image,'--app-image','agents-in-the-cloud-test:v2')
+  def failure_reported():
+   logs=run('docker','logs',failed_name,check=False)
+   return b'Could not install workspace firewall: simulated-nft-failure' in logs.stdout+logs.stderr
+  until(failure_reported,60)
+  daemon_info=docker('exec',failed_name,'docker','info',check=False)
+  assert daemon_info.returncode!=0,'dockerd must not start without the workspace firewall'
+  docker('rm','-f',failed_name)
  print('PASS firewall install failure stops System explicitly',flush=True)
  docker('network','create','--ipv6','--subnet','11.200.0.0/24','--subnet','2001:4860:ffff:dead::/64',uplink)
  docker('run','-d','--name',endpoint,'--network',uplink,'--ip','11.200.0.2','--ip6','2001:4860:ffff:dead::2','--cap-add','NET_ADMIN','--entrypoint','bun',image,'-e',serve_script('external'))
@@ -85,7 +93,7 @@ try:
   for ip in (peer['IPAddress'],peer['GlobalIPv6Address']):query(worker,f'http://[{ip}]:8080' if ':' in ip else f'http://{ip}:8080',False)
   for ip in ('10.200.0.2','100.64.0.2','fd99::2','fd7a:115c:a1e0::2'):
    url=f'http://[{ip}]:8080' if ':' in ip else f'http://{ip}:8080'
-   assert sysquery(url)=='external';assert query(worker,url)=='external'
+   assert sysquery(url)=='external';query(worker,url,False)
   assert sysquery(f'http://{info["IPAddress"]}:8080')==worker
   assert sysquery(f'http://[{info["GlobalIPv6Address"]}]:8080')==worker
   result=inner('exec',worker,'bun','-e','console.log(await(await fetch("http://parent",{unix:"/run/agents-in-the-cloud-parent/parent.sock"})).text())').stdout.decode().strip()
@@ -93,7 +101,7 @@ try:
   assert drops()>start,'denials must hit AgentsInTheCloud rules, not merely Docker bridge isolation'
  checks(a,ai,bi);checks(b,bi,ai)
  c,ci=create_worker(3);checks(c,ci,ai);assert policy()==before
- print('PASS IPv4/IPv6 public egress, DNS/NAT, gateway replies, Unix sockets; private/tailnet allowed; System/peer blocked; third bridge automatically isolated',flush=True)
+ print('PASS IPv4/IPv6 public egress, DNS/NAT, gateway replies, Unix sockets; private/tailnet blocked; System/peer blocked; third bridge automatically isolated',flush=True)
  # A daemon failure causes supervised System restart; rules reinstall before children start.
  started=json.loads(docker('inspect',name).stdout)[0]['State']['StartedAt']
  system('bun','-e','for(const p of new Bun.Glob("/proc/[0-9]*/comm").scanSync()){if((await Bun.file(p).text()).trim()==="dockerd")process.kill(Number(p.split("/")[2]),"SIGTERM")}',check=False)

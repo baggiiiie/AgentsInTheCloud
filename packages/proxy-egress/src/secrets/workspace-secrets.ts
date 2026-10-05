@@ -2,7 +2,7 @@ import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverH
 import { isGitWorkspaceTemplateInit, revealWorkspaceTemplateSecrets, onWorkspaceTemplateStoreChanged, workspaceTemplateSecretPlaceholder, workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath } from "@agents-in-the-cloud/workspace-templates";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { matchHostname } from "./patterns.ts";
-import { isWorkspaceDestinationAllowed } from "./workspace-destinations.ts";
+import { isWorkspaceEgressAddress } from "@agents-in-the-cloud/shared/egress-policy";
 import { createHttpHooks, type RequestTransformHttpHooks, type SecretRequestTransform, type SecretDefinition } from "./placeholder-hooks.ts";
 
 export const githubTokenEnvVar = "GH_TOKEN";
@@ -104,7 +104,7 @@ function buildContext(workspaceId: string, secrets: Record<string, SecretDefinit
   const hooks = createHttpHooks({
     allowedHosts: ["*"],
     blockInternalRanges: false,
-    isIpAllowed: ({ ip }) => isWorkspaceDestinationAllowed(ip),
+    isIpAllowed: ({ ip }) => isWorkspaceEgressAddress(ip),
     replaceSecretsInQuery: false,
     secrets,
     onRequest: async (request, registerSecret) => {

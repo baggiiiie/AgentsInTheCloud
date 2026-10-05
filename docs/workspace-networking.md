@@ -13,6 +13,25 @@ AgentsInTheCloud -> gateway -> workspace 127.0.0.1:<requested-app-port>
 
 Workspace containers publish only their authenticated gateway port on the Docker host loopback interface. AgentsInTheCloud allocates and pins that host port in Docker’s container configuration, so both controlled and automatic restarts retain the same ingress endpoint. VS Code and browser previews both use that gateway. AgentsInTheCloud never connects to workspace container IPs, Docker DNS names, Docker bridge addresses, or `host.docker.internal` for workspace app ingress.
 
+## Workspace egress
+
+Outbound traffic from workspaces follows one invariant:
+
+```text
+Over IP, a workspace may reach global unicast destinations (the public internet) and nothing else.
+```
+
+Two layers enforce the same policy, generated from one definition in `packages/shared/src/egress-policy.ts` so they cannot drift:
+
+- The System nftables table (`images/system/src/firewall.ts`) drops workspace-bridge traffic to every special-purpose range: RFC1918, CGNAT/tailnet, loopback, link-local, multicast, documentation ranges, and non-global IPv6. It also isolates the System itself (input chain), peer workspaces, and workspace-to-workspace forwarding. This is the real boundary: it applies to every packet, not only to traffic that respects `HTTP(S)_PROXY`.
+- The workspace egress proxy (`packages/proxy-egress`) applies the same address policy to proxied HTTP, CONNECT and WebSocket traffic.
+
+Private destinations (LAN, VPN, tailnet, Docker bridges) were briefly allowed and are closed again: nothing in the codebase depended on it, and it exposed every unauthenticated AgentsInTheCloud instance on the same networks. When a workspace legitimately needs an internal host, allow that exact host through the proxy's hook layer rather than reopening a range.
+
+Non-System deployment shapes (a host app on macOS, `bun run web` on a Linux host, AgentsInTheCloud nested in a workspace) are trusted-workload development setups and do not install the firewall; do not run untrusted agents in workspaces there.
+
+Restricting workspaces to egress **through the proxy only** (never direct) remains a deliberate one-line firewall change away—drop all forwarding from `atw-*`—but it would break non-HTTP protocols such as git over SSH and QUIC, so it stays deferred.
+
 ## Supported shapes
 
 Docker-on-macOS is not a supported deployment shape for this model. Docker Desktop's host networking is not equivalent to Linux host networking: it lets a container reach services in the Docker Desktop Linux VM host namespace, but it does not reliably expose services listening in that host-networked container back to the macOS host, and Docker discards `-p` port publishing when `--network host` is used. Supporting Docker-on-macOS would require an additional UI forwarding sidecar or a separate `host.docker.internal`-based workspace access path, which would reintroduce the split networking model this design avoids.

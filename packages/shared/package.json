@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./egress-policy": "./src/egress-policy.ts",
     "./http": "./src/http.ts",
     "./theme": "./src/theme-setting.ts"
   },
