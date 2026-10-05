@@ -88,30 +88,3 @@ describe.skip("System terminal lifecycle over private socket", () => {
     expect(await call({ operation: "list" })).toEqual([]);
   });
 });
-
-test("direct privileged browser requests must carry AgentsInTheCloud's exact public origin", async () => {
-  const { hostOriginAllowed } = await import("./server/authorization.ts");
-  expect(hostOriginAllowed(new Request("https://agents-in-the-cloud.example/host/sample", { headers: { origin: "https://agents-in-the-cloud.example" } }))).toBe(true);
-  expect(hostOriginAllowed(new Request("https://agents-in-the-cloud.example/host/sample", { headers: { origin: "https://attacker.example" } }))).toBe(false);
-  expect(hostOriginAllowed(new Request("https://agents-in-the-cloud.example/host/sample"))).toBe(false);
-  expect(hostOriginAllowed(new Request("https://agents-in-the-cloud.example/host/sample", { headers: { origin: "null" } }))).toBe(false);
-});
-
-test("parent ingress attestation authorizes translated origins, not foreign localhost coincidences", async () => {
-  const { hostOriginAllowed } = await import("./server/authorization.ts");
-  const headers = {
-    origin: "http://localhost:3000",
-    "x-agents-in-the-cloud-public-origin": "https://preview.example",
-    "x-agents-in-the-cloud-origin-context": "http://localhost:3000",
-  };
-  for (const path of ["/host/terminals", `/host/terminals/host-${crypto.randomUUID()}/ws`]) {
-    const request = new Request(`http://localhost:3000${path}`, { headers });
-    expect(hostOriginAllowed(request, true)).toBe(true);
-    expect(hostOriginAllowed(request, false)).toBe(false);
-    expect(hostOriginAllowed(new Request(request, { headers: { ...headers, "x-agents-in-the-cloud-origin-context": "null" } }), true)).toBe(false);
-    expect(hostOriginAllowed(new Request(request, { headers: { ...headers, origin: "https://foreign.example" } }), true)).toBe(false);
-    const missingOrigin = new Headers(headers);
-    missingOrigin.delete("origin");
-    expect(hostOriginAllowed(new Request(request, { headers: missingOrigin }), true)).toBe(false);
-  }
-});

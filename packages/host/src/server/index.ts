@@ -1,5 +1,4 @@
 import { hostDiagnosticGroups } from "../diagnostics.ts";
-import { hostOriginAllowed } from "./authorization.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
@@ -61,7 +60,6 @@ function renderTerminals(terminals: HostTerminal[], selected?: string): string {
 }
 async function handle(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
   if (url.pathname !== "/host" && !url.pathname.startsWith("/host/")) return;
-  if (request.method === "POST" && !hostOriginAllowed(request)) return new Response("Forbidden origin", { status: 403 });
   const json = requestAcceptsJson(request);
   if (url.pathname === "/host" && request.method === "GET") {
     if (json) return Response.json({ available: hostAvailable(), url: "/host", boundary: "AgentsInTheCloud System", shellUser: "root" });

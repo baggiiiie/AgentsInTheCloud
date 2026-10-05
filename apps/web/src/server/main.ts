@@ -10,6 +10,7 @@ import {
   createWorkspaceIngressSockets,
   detectParentOriginPublisher,
   defaultPublicOriginPortRange,
+  managementOriginRejection,
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
 import { agentsInTheCloudName, errorMessage, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
@@ -332,11 +333,15 @@ const server = Bun.serve<SocketData>({
   idleTimeout: 255,
   async fetch(request, server) {
     const url = new URL(request.url);
-    const canonical = await handleCanonicalProxyRequest(url);
-    if (canonical) return canonical;
-
+    // MCP has a separate bearer-token boundary; it is not a management route.
     const mcpResponse = await handleAgentMcpRequest(request);
     if (mcpResponse) return mcpResponse;
+
+    const originRejection = managementOriginRejection(request, server.requestIP(request)?.address);
+    if (originRejection) return originRejection;
+
+    const canonical = await handleCanonicalProxyRequest(url);
+    if (canonical) return canonical;
 
     if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
       const socketData = await validateSocket(request, url);

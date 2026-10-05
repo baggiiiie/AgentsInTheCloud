@@ -59,7 +59,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
     info: {
       title: "AgentsInTheCloud automation interface",
       version: "1.0.0",
-      description: "JSON representations of AgentsInTheCloud's content-negotiated UI operations. Send Accept: application/json.",
+      description: "JSON representations of AgentsInTheCloud's content-negotiated UI operations. Send Accept: application/json. Mutations and WebSocket upgrades require Origin to match the public destination origin (scheme, hostname, and port). Missing, null, or foreign origins receive a plain-text 403. No origin allowlist or management authentication is required.",
     },
     paths: {
       "/agent-types": { get: { summary: "List available agent types, default first", responses: jsonResponse("Agent types and installation-wide default", { type: "object", properties: { defaultAgentTypeId: { type: "string" }, agentTypes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" } } } } } }) } },
