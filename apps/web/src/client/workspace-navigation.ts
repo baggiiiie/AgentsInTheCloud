@@ -3,53 +3,77 @@ import { Controller } from "@hotwired/stimulus";
 import { registerWorkspaceControllers, residencyController } from "./workspace-controller-registry.ts";
 import { markActiveWorkspaceRow } from "./workspace-presentation.ts";
 
-class EmptyWorkspaceOnboardingController extends Controller<HTMLElement> {
+/** Points from the artwork to the first-workspace action. */
+class FirstWorkspaceGuideController extends Controller<HTMLElement> {
   static targets = ["origin", "svg", "path"];
-  static values = { destination: String };
-
   declare readonly originTarget: HTMLElement;
   declare readonly svgTarget: SVGSVGElement;
   declare readonly pathTarget: SVGPathElement;
-  declare readonly destinationValue: "first-workspace";
-
-  private observer: MutationObserver | undefined;
-  private resizeObserver: ResizeObserver | undefined;
+  private resizeObserver?: ResizeObserver;
+  private observer?: MutationObserver;
+  private frame?: number;
+  private dismissed = false;
 
   connect(): void {
-    window.addEventListener("resize", this.draw);
-    window.addEventListener("workspace-pane:slide-changed", this.draw);
-    const empty = this.element.closest(".workspace-detail-empty")!;
-    this.observer = new MutationObserver(this.draw);
-    this.observer.observe(empty, { attributes: true, attributeFilter: ["hidden"] });
-    this.observer.observe(this.element.closest(".fixed-shell-app")!, { attributes: true, attributeFilter: ["class"] });
-    // Draws once the welcome text has a layout, and again whenever it moves.
-    this.resizeObserver = new ResizeObserver(this.draw);
+    this.resizeObserver = new ResizeObserver(this.scheduleDraw);
     this.resizeObserver.observe(this.originTarget);
+    // Live shell morphs can clear the client-drawn path or replace the button.
+    this.observer = new MutationObserver(this.scheduleDraw);
+    this.observer.observe(this.element.closest(".fixed-shell-app")!, {
+      subtree: true, childList: true, attributes: true,
+      attributeFilter: ["hidden", "class", "inert", "d"],
+    });
+    window.addEventListener("resize", this.scheduleDraw);
+    window.addEventListener("workspace-pane:slide-changed", this.scheduleDraw);
+    window.addEventListener("workspace-pane:first-template-chosen", this.dismiss);
+    this.scheduleDraw();
   }
 
   disconnect(): void {
-    window.removeEventListener("resize", this.draw);
-    window.removeEventListener("workspace-pane:slide-changed", this.draw);
-    this.observer?.disconnect();
     this.resizeObserver?.disconnect();
+    this.observer?.disconnect();
+    window.removeEventListener("resize", this.scheduleDraw);
+    window.removeEventListener("workspace-pane:slide-changed", this.scheduleDraw);
+    window.removeEventListener("workspace-pane:first-template-chosen", this.dismiss);
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame);
   }
 
+  private dismiss = (): void => {
+    this.dismissed = true;
+    this.scheduleDraw();
+  };
+
+  private scheduleDraw = (): void => {
+    if (this.frame !== undefined) cancelAnimationFrame(this.frame);
+    this.frame = requestAnimationFrame(this.draw);
+  };
+
   private draw = (): void => {
+    this.frame = undefined;
     const origin = this.originTarget.getBoundingClientRect();
-    if (origin.width === 0) return;
-    const start = { x: origin.left + origin.width / 2, y: origin.bottom + 12 };
-    const destinationElement = document.querySelector<HTMLElement>(`[data-empty-workspace-onboarding-destination="${this.destinationValue}"]`)!;
+    const destinations = [...document.querySelectorAll<HTMLElement>("[data-first-workspace-destination]")];
+    const destinationElement = destinations.find(element => !element.closest("[inert]"));
+    for (const element of destinations) {
+      const highlighted = !this.dismissed && element === destinationElement;
+      if (element.classList.contains("is-first-workspace-destination") !== highlighted) element.classList.toggle("is-first-workspace-destination", highlighted);
+    }
+    this.svgTarget.style.opacity = this.dismissed ? "0" : "1";
+    if (this.dismissed) return;
+    if (!destinationElement) {
+      this.svgTarget.style.visibility = "hidden";
+      return;
+    }
     const destination = destinationElement.getBoundingClientRect();
-    // The destination slides away while someone is already choosing what to put in the workspace.
-    const hidden = destination.width === 0 || Boolean(destinationElement.closest("[inert]"));
+    const hidden = origin.width === 0 || destination.width === 0;
     this.svgTarget.style.visibility = hidden ? "hidden" : "";
     if (hidden) return;
+    // Anchor just left of the A robot's face in the 2400 × 1260 artwork.
+    const start = { x: origin.left + origin.width * 490 / 2400, y: origin.top + origin.height * 150 / 1260 };
     const end = { x: destination.right + 5, y: destination.top + destination.height / 2 };
-    const horizontalDirection = end.x >= start.x ? 1 : -1;
-    const horizontalBend = Math.min(180, Math.max(40, Math.abs(end.x - start.x) * 0.7));
-    const verticalBend = Math.min(150, Math.max(70, Math.abs(end.y - start.y) * 0.45));
+    const bend = Math.min(180, Math.max(40, Math.abs(start.x - end.x) * 0.7));
     this.svgTarget.setAttribute("viewBox", `0 0 ${window.innerWidth} ${window.innerHeight}`);
-    this.pathTarget.setAttribute("d", `M ${start.x} ${start.y} C ${start.x} ${start.y + verticalBend}, ${end.x - horizontalDirection * horizontalBend} ${end.y}, ${end.x} ${end.y}`);
+    const path = `M ${start.x} ${start.y} C ${start.x - bend} ${start.y}, ${end.x + bend} ${end.y}, ${end.x} ${end.y}`;
+    if (this.pathTarget.getAttribute("d") !== path) this.pathTarget.setAttribute("d", path);
   };
 }
 
@@ -87,6 +111,10 @@ class WorkspacePaneController extends Controller<HTMLElement> {
   openPicker(): void {
     const active = this.element.querySelector<HTMLElement>("[data-workspace-entry-id][aria-current='page']");
     this.showPicker(this.hasAddFirstTarget ? undefined : active?.dataset.workspaceTemplateId ?? "");
+  }
+
+  addFirstTemplate(): void {
+    window.dispatchEvent(new CustomEvent("workspace-pane:first-template-chosen"));
   }
 
   /** A row's template icon starts from that row's template. */
@@ -289,7 +317,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
 export function registerWorkspaceNavigationControllers(): void {
   registerWorkspaceControllers({
-    "empty-workspace-onboarding": EmptyWorkspaceOnboardingController,
+    "first-workspace-guide": FirstWorkspaceGuideController,
     "workspace-navigation": WorkspaceNavigationController,
     "workspace-pane": WorkspacePaneController,
   });

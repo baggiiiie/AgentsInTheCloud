@@ -46,6 +46,7 @@ import { renderWorkspaceLaunchPrompt, renderWorkspaceProvisioning } from "@agent
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { createAgentPaneHost } from "./agent-pane-host.ts";
+import { welcomeBrandHtml } from "./brand/welcome-brand.ts";
 import { agentContentId, selectAgentTurboStream } from "./agent-pane.ts";
 import { agentProvider, defaultAgentProvider, orderedAgentProviders, registeredAgentProviders, rememberAgentProvider } from "./agent-providers.ts";
 import { openWorkspaceFile } from "./file-navigation.ts";
@@ -63,7 +64,7 @@ import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
 import { workspaceModules } from "./workspace-modules.generated.ts";
-import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workspacePaneOnboardingState, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneWorkspaceTemplate } from "./workspace-presentation.ts";
+import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneWorkspaceTemplate } from "./workspace-presentation.ts";
 import type { WorkspaceDeletionState, WorkspaceEntry, WorkspaceRegistry } from "./workspace-registry.ts";
 import { workspaceWarnings, type WorkspaceWarning } from "./workspace-warnings.ts";
 
@@ -139,7 +140,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return [...workspacePaneCollectionsRegions(pane), ...[...globalRegions.values()].flat(),
       { target: "global_sidebar_contributions", html: renderGlobalSidebarContributions() },
       { target: "workspace_residents", html: workspaceMounts() },
-      { target: emptyWorkspaceOnboardingId, html: emptyWorkspaceOnboardingHtml(pane), action: "replace" as const },
+      { target: "workspace_empty_artwork", html: emptyWorkspaceArtworkHtml(pane), action: "replace" as const },
       { target: themeRegionId, html: themeRegionHtml() },
     ];
   }, regions => regions, reportPresentationError);
@@ -532,22 +533,15 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${renderWorkspaceLaunchPrompt(provisioningPrompts.get(entry.id))}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
   }
 
-  const emptyWorkspaceOnboardingId = "workspace_empty_onboarding";
-
-  function emptyWorkspaceOnboardingHtml(pane: WorkspacePanePresentation): string {
-    const state = workspacePaneOnboardingState(pane);
-    const copy = state === "first-workspace"
-      ? '<h1>Welcome to your AgentsInTheCloud!</h1><p>Create your <strong data-empty-workspace-onboarding-target="origin">first workspace</strong> to get started!</p>'
-      : '<h1>Welcome to your AgentsInTheCloud</h1><p><strong data-empty-workspace-onboarding-target="origin">Select a workspace</strong> to get started.</p>';
-    const welcome = `<section class="workspace-empty-welcome" data-empty-workspace-state="${state}">${copy}</section>`;
-    if (state === "workspaces") return `<div id="${emptyWorkspaceOnboardingId}">${welcome}</div>`;
-    return `<div id="${emptyWorkspaceOnboardingId}" data-controller="empty-workspace-onboarding" data-empty-workspace-onboarding-destination-value="${state}">
-      ${welcome}
-      <svg class="workspace-empty-onboarding-arrow" aria-hidden="true" data-empty-workspace-onboarding-target="svg">
+  function emptyWorkspaceArtworkHtml(pane: WorkspacePanePresentation): string {
+    const firstWorkspace = pane.workspaces.length === 0;
+    return `<section id="workspace_empty_artwork" class="workspace-empty-artwork"${firstWorkspace ? ' data-controller="first-workspace-guide"' : ""}>
+      <div${firstWorkspace ? ' data-first-workspace-guide-target="origin"' : ""}>${welcomeBrandHtml()}</div>
+      ${firstWorkspace ? `<svg class="workspace-empty-arrow" aria-hidden="true" data-first-workspace-guide-target="svg">
         <defs><marker id="workspace-empty-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 10 5 0 10z"></path></marker></defs>
-        <path data-empty-workspace-onboarding-target="path" marker-end="url(#workspace-empty-arrowhead)"></path>
-      </svg>
-    </div>`;
+        <path data-first-workspace-guide-target="path" marker-end="url(#workspace-empty-arrowhead)"></path>
+      </svg>` : ""}
+    </section>`;
   }
 
   function workspaceMounts(selectedId?: string, selectedHtml = "", selection?: FixedWorkspacePresentation["initialSelection"]): string {
@@ -563,7 +557,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       ? renderWorkspacePresentation(state.presentation)
       : state.regions.map(region => region.html).join("");
     return `<div id="workspace_detail" class="workspace-detail-host" data-controller="workspace-residency" data-workspace-residency-max-resident-value="5">
-      <div class="workspace-detail-empty" data-workspace-residency-target="empty"${selectedId ? " hidden" : ""}>${emptyWorkspaceOnboardingHtml(pane)}</div>
+      <div class="workspace-detail-empty" data-workspace-residency-target="empty"${selectedId ? " hidden" : ""}>${emptyWorkspaceArtworkHtml(pane)}</div>
       <div class="workspace-detail-loading" data-workspace-residency-target="loading" hidden><div class="workspace-detail-loading-status" role="status"><span class="status-spinner" aria-hidden="true"></span> Loading workspace…</div></div>
       <div id="workspace_residents" style="display:contents">${workspaceMounts(selectedId, selectedHtml, state?.kind === "workspace" ? state.presentation.initialSelection : initialSelection)}</div>
     </div>`;

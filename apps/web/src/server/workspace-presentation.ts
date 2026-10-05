@@ -64,12 +64,6 @@ export interface WorkspacePanePresentation {
   workspaces: readonly WorkspacePaneEntry[];
 }
 
-export type WorkspacePaneOnboardingState = "first-workspace" | "workspaces";
-
-export function workspacePaneOnboardingState(presentation: WorkspacePanePresentation): WorkspacePaneOnboardingState {
-  return presentation.workspaces.length ? "workspaces" : "first-workspace";
-}
-
 export interface WorkspacePresentation {
   initialSelection?: { agent?: string; workView?: string };
   workspace: Pick<WorkspacePaneEntry, "id" | "title">;
@@ -148,12 +142,12 @@ function workspaceRows(presentation: WorkspacePanePresentation): Array<{ id: str
 }
 
 function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string {
-  const onboarding = workspacePaneOnboardingState(presentation) === "first-workspace" ? ' data-empty-workspace-onboarding-destination="first-workspace"' : "";
+  const guide = presentation.workspaces.length ? "" : ' data-first-workspace-destination="new-workspace"';
   return actionItemHtml({
     kind: "single",
     leadingHtml: `<span class="workspace-pane-new-workspace-icon">${addBadgeHtml()}</span>`,
     label: { kind: "text", text: "New workspace" },
-    element: { tag: "button", attributesHtml: `type="button" data-workspace-pane-target="newWorkspace" data-action="workspace-pane#openPicker"${onboarding}` },
+    element: { tag: "button", attributesHtml: `type="button" data-workspace-pane-target="newWorkspace" data-action="workspace-pane#openPicker"${guide}` },
   });
 }
 
@@ -184,7 +178,7 @@ function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation)
       label: { kind: "text", text: "A repo I haven’t added yet…" },
       element: { tag: "a", attributesHtml: `href="/workspace-templates/new" ${workspaceTemplateDialogTarget}` },
     })
-    : `<a class="workspace-template-first" href="/workspace-templates/new" ${workspaceTemplateDialogTarget} data-workspace-pane-target="addFirst">${addBadgeHtml()}<span><strong>Add your first template</strong><span>Point us at a git repo once. Every new workspace can start as a fresh clone of it.</span></span></a>`;
+    : `<a class="workspace-template-first" href="/workspace-templates/new" ${workspaceTemplateDialogTarget} data-workspace-pane-target="addFirst" data-action="click->workspace-pane#addFirstTemplate"${presentation.workspaces.length ? "" : ' data-first-workspace-destination="first-template"'}>${addBadgeHtml()}<span><strong>Add your first template</strong><span>Point us at a git repo once. Every new workspace can start as a fresh clone of it.</span></span></a>`;
   return `<div id="${workspaceTemplateOptionsDomId}" class="workspace-template-options action-list" role="radiogroup" aria-labelledby="workspace_template_question">
     <p class="workspace-template-question" id="workspace_template_question">What should we put in your new workspace?</p>
     ${addWorkspaceTemplate}
