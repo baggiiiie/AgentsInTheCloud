@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addWorkspaceTemplate, createWorkspaceTemplateSecret, createWorkspaceTemplateSshKey, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, createWorkspaceTemplateSecret, createWorkspaceTemplateSshKey, listWorkspaceTemplates, listWorkspaceTemplateSecrets, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceDockerPlan } from "../src/types.ts";
 import { applySeedConfigManifest } from "../src/seed-config.ts";
 
@@ -30,7 +30,7 @@ async function seedPlan(projectsJson = join(nested, "projects.json")): Promise<W
   const plan: WorkspaceDockerPlan = { preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
   await applySeedConfigManifest({ version: 1, seedAgentsInTheCloudConfig: { projectsJson } }, plan, {
     agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1",
-  });
+  }, join(directory, "seed-config"));
   return plan;
 }
 
@@ -46,7 +46,7 @@ async function installPlan(plan: WorkspaceDockerPlan): Promise<void> {
   }
 }
 
-test("seeding a catalogue also seeds its encryption key so nested secrets and SSH keys work", async () => {
+test("catalogue seeding strips encrypted secrets and SSH keys before entering the workspace", async () => {
   const catalogue = join(host, "projects.json");
   const key = join(host, "project-secrets.key");
   const template = (await addWorkspaceTemplate("https://github.com/example/fixture.git", catalogue)).workspaceTemplate;
@@ -56,12 +56,34 @@ test("seeding a catalogue also seeds its encryption key so nested secrets and SS
   const privateKey = await readFile(privateKeyFile, "utf8");
   await createWorkspaceTemplateSshKey(template.id, privateKey, catalogue, key);
 
+  const originalCatalogue = await readFile(catalogue, "utf8");
+  const originalKey = await readFile(key, "utf8");
   const plan = await seedPlan();
+  expect(plan.containerFiles).toHaveLength(1);
+  expect(plan.containerFiles[0]!.source).not.toBe(catalogue);
+  const staged = await readFile(plan.containerFiles[0]!.source, "utf8");
+  expect(staged).not.toContain("encryptedSecret");
+  expect(staged).not.toContain("encryptedPrivateKey");
+  expect(staged).not.toContain("sshKeys");
+  expect(staged).not.toContain("fixture-token");
+  expect(staged).not.toContain("OPENSSH PRIVATE KEY");
+  expect(staged).not.toContain(originalKey.trim());
+  const expectedCatalogue = JSON.parse(originalCatalogue);
+  delete expectedCatalogue.projects[0].sshKeys;
+  delete expectedCatalogue.projects[0].secrets[0].encryptedSecret;
+  expect(JSON.parse(staged)).toEqual(expectedCatalogue);
   await installPlan(plan);
+  const nestedCatalogue = join(nested, "projects.json");
   const nestedKey = join(nested, "project-secrets.key");
-  expect((await stat(nestedKey)).mode & 0o777).toBe(0o600);
-  expect(await revealWorkspaceTemplateSecrets(template.id, join(nested, "projects.json"), nestedKey)).toMatchObject([{ secretValue: "fixture-token" }]);
-  expect(await revealWorkspaceTemplateSshKeys(template.id, join(nested, "projects.json"), nestedKey)).toEqual([privateKey]);
+  expect(await Bun.file(nestedKey).exists()).toBe(false);
+  expect((await listWorkspaceTemplates(nestedCatalogue)).workspaceTemplates[0]).toMatchObject({ id: template.id, gitUrl: template.gitUrl, name: template.name });
+  expect(await listWorkspaceTemplateSecrets(template.id, nestedCatalogue)).toMatchObject([{ envName: "API_TOKEN", hostPattern: "api.example.com", configured: false }]);
+  expect(await revealWorkspaceTemplateSecrets(template.id, nestedCatalogue, nestedKey)).toEqual([]);
+  expect(await revealWorkspaceTemplateSshKeys(template.id, nestedCatalogue, nestedKey)).toEqual([]);
+  expect(await readFile(catalogue, "utf8")).toBe(originalCatalogue);
+  expect(await readFile(key, "utf8")).toBe(originalKey);
+  expect(await revealWorkspaceTemplateSecrets(template.id, catalogue, key)).toMatchObject([{ secretValue: "fixture-token" }]);
+  expect(await revealWorkspaceTemplateSshKeys(template.id, catalogue, key)).toEqual([privateKey]);
 });
 
 test("a host with no encrypted values does not need an encryption key", async () => {
@@ -72,16 +94,21 @@ test("a host with no encrypted values does not need an encryption key", async ()
   expect(await Bun.file(join(nested, "project-secrets.key")).exists()).toBe(false);
 });
 
-test("the paired key follows custom catalogue destinations", async () => {
+test("custom catalogue destinations still receive a sanitized copy", async () => {
+  await addWorkspaceTemplate("https://github.com/example/fixture.git", join(host, "projects.json"));
   await writeFile(join(host, "project-secrets.key"), "fixture");
   const destination = join(nested, "custom", "catalogue.json");
   const plan = await seedPlan(destination);
-  expect(plan.initScripts[1]).toContain(join(nested, "custom", "project-secrets.key"));
+  expect(plan.containerFiles).toHaveLength(1);
+  expect(plan.initScripts[0]).toContain(destination);
+  await installPlan(plan);
+  expect(await Bun.file(destination).exists()).toBe(true);
+  expect(await Bun.file(join(nested, "custom", "project-secrets.key")).exists()).toBe(false);
 });
 
 test("a manifest without catalogue seeding does not copy the host encryption key", async () => {
   await writeFile(join(host, "project-secrets.key"), "fixture");
   const plan: WorkspaceDockerPlan = { preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
-  await applySeedConfigManifest({ version: 1 }, plan, { agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1" });
+  await applySeedConfigManifest({ version: 1 }, plan, { agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1" }, join(directory, "seed-config"));
   expect(plan.containerFiles).toEqual([]);
 });
