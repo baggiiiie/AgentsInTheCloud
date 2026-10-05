@@ -7,7 +7,8 @@ export function claudeMcpConfigPath(session: CliAgentSession): string {
 }
 
 export async function prepareClaudeMcp(workspaceId: string, session: CliAgentSession, mcp: { url: string; token: string }): Promise<Record<string, string>> {
-  const config = { mcpServers: { "agents-in-the-cloud": { type: "http", url: mcp.url, headers: { Authorization: `Bearer ${mcp.token}` } } } };
+  // Claude waits for alwaysLoad servers at startup and includes their tools in turn one.
+  const config = { mcpServers: { "agents-in-the-cloud": { type: "http", url: mcp.url, headers: { Authorization: `Bearer ${mcp.token}` }, alwaysLoad: true } } };
   await checkedWorkspaceShell(workspaceId, `umask 077; cat > ${shellQuote(claudeMcpConfigPath(session))}`, JSON.stringify(config));
   return {};
 }
