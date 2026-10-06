@@ -18,7 +18,7 @@ import { expandWorkspaceSkillCommand } from "@agents-in-the-cloud/agent/server/s
 import type { WorkspaceAgentToolOptions } from "@agents-in-the-cloud/agent/server/tools";
 
 const context = BACKGROUND_CONTEXT;
-export const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
+const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
   kind: "agents-in-the-cloud.history-labels", version: 1, scope: "session", initial: () => ({ labels: {} }),
 });
 type AgentIdentity = Omit<DurableAgentRecord, "durableId">;

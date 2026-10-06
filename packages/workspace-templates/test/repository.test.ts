@@ -2,7 +2,9 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, commitIdentitySettingsFile, hasCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { commitIdentitySettingsFile, hasCommitIdentity } from "../src/commit-identity.ts";
+import { listWorkspaceTemplateEnvironmentVariables } from "../src/environment.ts";
 
 describe("Workspace templates", () => {
   test("parseWorkspaceTemplateSpec supports an optional #branch suffix", () => {

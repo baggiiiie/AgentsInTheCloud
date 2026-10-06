@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplates, revealWorkspaceTemplateSecrets, updateWorkspaceTemplate, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, listWorkspaceTemplates, revealWorkspaceTemplateSecrets, updateWorkspaceTemplate, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { listWorkspaceTemplateEnvironmentVariables } from "../src/environment.ts";
 
 let directory: string;
 let file: string;

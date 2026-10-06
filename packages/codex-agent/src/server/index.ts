@@ -5,7 +5,7 @@ import { providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { codexLaunchScript } from "./launch-command.ts";
 import { loadCodexTranscript, loadCodexTranscriptImage, codexResumeId, codexHistoryFiles } from "./transcript.ts";
 
-export const codexModelSettings = createCliModelSettings({
+const codexModelSettings = createCliModelSettings({
   agentTypeId: "codex", provider: "openai-codex", label: "Codex",
   mapThinkingLevel: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level),
 });

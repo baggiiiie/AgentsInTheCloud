@@ -3,7 +3,8 @@ import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promise
 import { createServer, createConnection, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addWorkspaceTemplate, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, workspaceInitFromTemplate, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplateSshKnownHosts, getWorkspaceTemplateSshKnownHosts } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, workspaceInitFromTemplate, setWorkspaceTemplateSshKnownHosts, getWorkspaceTemplateSshKnownHosts } from "@agents-in-the-cloud/workspace-templates";
+import { registerWorkspaceTemplateWorkspaceInitEvents } from "../src/workspace-source.ts";
 import { prepareWorkspaceSshTrust, workspaceGitSshCommand } from "../src/ssh-host-trust.ts";
 import { unknownSshHost, sshHostTrustFailure, scanSshHost, trustScannedSshHost } from "../src/ssh-trust-recovery.ts";
 import { requestWorkspaceSshTrust, workspaceSshTrustRequests, decideWorkspaceSshTrust, onWorkspaceSshTrustChanged } from "../src/ssh-trust-broker.ts";

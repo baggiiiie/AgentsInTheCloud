@@ -9,7 +9,7 @@ import { codeBlockHtml, detailFullscreen, fullscreenAttributes, markdown, render
 import { renderToolCard, renderToolDetail } from "./render-tool.ts";
 import { formatDuration, formatTokens, type TranscriptItem, type WorkingTranscriptItem } from "./transcript.ts";
 
-export interface AgentToolDefinitionView {
+interface AgentToolDefinitionView {
   name: string;
   description: string;
   parameters: unknown;
@@ -83,7 +83,7 @@ export function renderTranscriptItem(ctx: AgentRenderContext, item: TranscriptIt
   return `<div class="agent-item" id="${id}" data-transcript-key="${escapeHtml(item.key)}"${item.anchor ? ` data-transcript-anchor="${escapeHtml(item.anchor)}"` : ""}>${body}</div>`;
 }
 
-export function renderWorkingContent(ctx: AgentRenderContext, section: WorkingTranscriptItem, options: { live?: boolean; open?: boolean } = {}): string {
+function renderWorkingContent(ctx: AgentRenderContext, section: WorkingTranscriptItem, options: { live?: boolean; open?: boolean } = {}): string {
   const content = section.items.map((item) => renderTranscriptItem(ctx, item, options)).join("");
   const finished = section.completedAt !== undefined || section.stoppedAt !== undefined;
   return !content && finished ? '<p class="agent-working-empty">No intermediate activity for this turn.</p>' : content;
@@ -114,7 +114,7 @@ function renderWorkingSection(ctx: AgentRenderContext, section: WorkingTranscrip
   })}<div class="disclosure-content agent-working-commentary" id="${ids.workingItems(commentary, section.key)}">${commentaryHtml}</div></div>`;
 }
 
-export function workingSummary(ctx: AgentRenderContext, section: WorkingTranscriptItem): DisclosureSummary {
+function workingSummary(ctx: AgentRenderContext, section: WorkingTranscriptItem): DisclosureSummary {
   const steeringCount = section.items.filter((item) => item.type === "user" && item.steering).length;
   const endedAt = section.completedAt ?? section.stoppedAt;
   const active = endedAt === undefined;

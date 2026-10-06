@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "typebox";
-import {
-  createAgentsInTheCloudControlTools,
-  executeDeleteCurrentWorkspace,
-  normalizeWorkspacePath,
-  registerWorkspacePresenter,
-} from "../../src/server/tools.ts";
+import { createAgentsInTheCloudControlTools, executeDeleteCurrentWorkspace, registerWorkspacePresenter } from "../../src/server/tools.ts";
+import { normalizeWorkspacePath } from "../../src/server/workspace-file-tools.ts";
 
 describe("workspace agent tools", () => {
   test("normalizes paths under /work", () => {

@@ -1,4 +1,5 @@
-import { agentConnectionShouldRun, forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "../../src/client/index.ts";
+import { agentConnectionShouldRun } from "../../src/client/agent-pane.ts";
+import { forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "../../src/client/terminal-controller.ts";
 import { describe, expect, mock, test } from "bun:test";
 import { type AgentCompletionInput, agentCompletionRequest, agentComposerPrimaryAction, agentComposerTextStorageKey, fileCompletionPrefix, insertSlashCommand, navigatePromptHistory, promptTemplateShortcutConflict } from "@agents-in-the-cloud/agent/client/agent-controllers";
 

@@ -1,15 +1,10 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "bun:test";
-import {
-  createMemoryOriginIdentityStore,
-  createWorkspaceIngress,
-  ensureTailscaleServePortConfig,
-  normalizeDecodedFetchResponse,
-  StoppedWorkspaceError,
-  pruneTailscaleServePortConfig,
-  type ParentOriginPublisher,
-  type TailscaleServeConfig,
-} from "@agents-in-the-cloud/proxy-ingress/server";
+import { createWorkspaceIngress, StoppedWorkspaceError } from "@agents-in-the-cloud/proxy-ingress/server";
+import { createMemoryOriginIdentityStore } from "../src/ingress/origin-identity.ts";
+import { ensureTailscaleServePortConfig, pruneTailscaleServePortConfig, type TailscaleServeConfig } from "../src/ingress/tailscale-serve.ts";
+import { normalizeDecodedFetchResponse } from "../src/ingress/index.ts";
+import { type ParentOriginPublisher } from "../src/ingress/parent.ts";
 import { closeWebSocket } from "../src/ingress/websocket.ts";
 
 async function freePort(): Promise<number> {
@@ -350,7 +345,6 @@ describe("workspace ingress", () => {
     expect(await exhausted.text()).toContain("capacity exhausted");
     await capacity.stopAll();
   });
-
 
 });
 

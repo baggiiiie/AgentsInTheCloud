@@ -2,11 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  createWorkspacePresentationStore,
-  type WorkspaceWorkViewContribution,
-  type WorkspacePresentationStore,
-} from "@agents-in-the-cloud/workspace";
+import { createWorkspacePresentationStore } from "@agents-in-the-cloud/workspace";
+import { type WorkspaceWorkViewContribution, type WorkspacePresentationStore } from "../src/presentation.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 

@@ -6,7 +6,7 @@ import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { builtinSlashCommands, type BuiltinSlashCommand } from "./builtin-slash-commands.ts";
 import type { PromptTemplate } from "./prompt-templates.ts";
 
-export type SlashCommand = BuiltinSlashCommand | {
+type SlashCommand = BuiltinSlashCommand | {
   kind: "prompt-template";
   trigger: string;
   description: string;

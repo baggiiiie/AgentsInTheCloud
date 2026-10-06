@@ -11,7 +11,7 @@ import { cliComposerRoutes } from "./composer-routes.ts";
 import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
 export type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
-export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
+export type { CliAgentSession } from "./adapter.ts";
 
 function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string {
   return terminal.ended ? `Session ended${terminal.exitCode ? ` (exit ${terminal.exitCode}). See terminal output for details.` : ""}` : "";

@@ -2,7 +2,6 @@ import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { DeleteCurrentWorkspaceResult, WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { Type, type TSchema } from "typebox";
 import { defineWorkspaceTool, type WorkspaceTool } from "./workspace-tool.ts";
-export { normalizeWorkspacePath } from "./workspace-file-tools.ts";
 
 export interface WorkspaceAgentToolOptions {
   events?: AgentsInTheCloudEventBus;

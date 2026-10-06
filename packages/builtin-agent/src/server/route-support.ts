@@ -19,7 +19,7 @@ export async function invalidateAgentView(options: AgentRouteOptions, workspaceI
   await options.events?.emit("workspace_agent_view_invalidated", { workspaceId, agentId });
 }
 
-export async function resolveAgentPresentation(agent: WorkspaceAgentInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentPresentation> {
+async function resolveAgentPresentation(agent: WorkspaceAgentInfo, options: AgentRouteOptions): ReturnType<typeof getWorkspaceAgentPresentation> {
   return await (options.getPresentation ?? getWorkspaceAgentPresentation)(agent, { events: options.events });
 }
 

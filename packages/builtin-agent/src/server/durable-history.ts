@@ -5,7 +5,7 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { AgentsInTheCloudCoreError, getAgentsInTheCloudRuntimeContext, isNotFoundError } from "@agents-in-the-cloud/core";
-import { sessionShareDir, workspaceSessionShareKey } from "./agent-store.ts";
+import { sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server/session-share";
 import { durableJournalDirectory } from "./durable-storage.ts";
 import { retainedDurableWorkspaceOwner } from "./runtime.ts";
 import { projectDurableTranscript } from "./durable-transcript.ts";

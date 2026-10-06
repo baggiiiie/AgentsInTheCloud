@@ -1,9 +1,7 @@
 export {
   createAgentsInTheCloudEventBus,
   type AgentsInTheCloudEventBus,
-  type AgentsInTheCloudEventHandler,
   type AgentsInTheCloudEventMap,
-  type AgentSystemPromptPrepareEvent,
 } from "./events.ts";
 
 export {
@@ -11,7 +9,6 @@ export {
   runDocker,
   runDockerBuffer,
   withManagedDockerCommand,
-  type CommandBufferResult,
   type CommandInput,
   type CommandResult,
 } from "./docker.ts";
@@ -19,7 +16,6 @@ export {
 export {
   AgentsInTheCloudCoreError,
   invalidArguments,
-  type AgentsInTheCloudError,
 } from "./errors.ts";
 
 export {
@@ -48,7 +44,6 @@ export {
   agentsInTheCloudDataPath,
   dockerHostAgentsInTheCloudDataPath,
   getAgentsInTheCloudRuntimeContext,
-  resetAgentsInTheCloudRuntimeContextForTests,
   type AgentsInTheCloudRuntimeContext,
 } from "./runtime-context.ts";
 

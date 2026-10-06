@@ -49,7 +49,7 @@ interface SessionAssistantTextPart {
   textSignature?: string;
 }
 
-export function sessionContentImages(entry: { id: string; message?: { content?: unknown } }): SessionImageRef[] {
+function sessionContentImages(entry: { id: string; message?: { content?: unknown } }): SessionImageRef[] {
   if (!Array.isArray(entry.message?.content)) return [];
   const images: SessionImageRef[] = [];
   entry.message.content.forEach((part, contentIndex) => {
@@ -67,7 +67,7 @@ function entryTimestamp(entry: { timestamp?: string }): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" }>): string {
+function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" }>): string {
   const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
   const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
   const note = entry.note ? ` (${entry.note})` : "";
@@ -151,4 +151,3 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
   }
   return records;
 }
-

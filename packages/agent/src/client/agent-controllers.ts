@@ -11,8 +11,8 @@ import { createAgentThinkingController } from "./thinking-controller.ts";
 import { createAgentStreamingTextController } from "./streaming-text-controller.ts";
 import { createAgentLazyDetailController, createAgentTailFrameController } from "./transcript-detail-controllers.ts";
 
-export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator, type PromptHistoryState } from "./composer-state.ts";
-export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
+export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator } from "./composer-state.ts";
+export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput } from "./completion-input.ts";
 export { promptTemplateShortcutConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 

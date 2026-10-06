@@ -2,9 +2,9 @@ import { PopupPosition } from "@agents-in-the-cloud/design-system/popup/position
 import { notifyInputListeners, setTextInputValue, type WorkspaceClientControllerConstructor as StimulusControllerConstructor } from "@agents-in-the-cloud/shared";
 import { agentTreeOwnsMenu } from "./session-tree.ts";
 
-export type HtmlAutocompleteRequest = { query: string; params?: Record<string, string>; debounceMs?: number };
+type HtmlAutocompleteRequest = { query: string; params?: Record<string, string>; debounceMs?: number };
 
-export type HtmlAutocompleteOptions = {
+type HtmlAutocompleteOptions = {
   optionSelector: string;
   request(input: HTMLInputElement | HTMLTextAreaElement, force?: boolean): HtmlAutocompleteRequest | undefined;
   loadHtml?(request: HtmlAutocompleteRequest, host: HTMLElement): string | Promise<string> | undefined;
@@ -18,7 +18,7 @@ export type HtmlAutocompleteOptions = {
   menuEvent?(event: Event, input: HTMLInputElement | HTMLTextAreaElement): boolean | void;
 };
 
-export type HtmlAutocompleteActions = {
+type HtmlAutocompleteActions = {
   readonly open: boolean;
   readonly hasOptions: boolean;
   activeOption(): HTMLElement | undefined;
@@ -263,4 +263,3 @@ export function createHtmlAutocompleteController(Controller: StimulusControllerC
     }
   };
 }
-

@@ -4,10 +4,10 @@ import { escapeHtml } from "./html.ts";
 import type { WorkspaceGateway } from "./workspace-gateway.ts";
 export * from "./workspace-gateway.ts";
 
-export { providerBadgeHtml, providerBrandColor, providerBrandIconHtml } from "./brand-icons.ts";
+export { providerBadgeHtml, providerBrandIconHtml } from "./brand-icons.ts";
 export { escapeHtml } from "./html.ts";
 export { errorMessage, formatBytes } from "./format.ts";
-export { hopByHopHeaderNames, isHopByHopHeader, stripHopByHopHeaders } from "./proxy-headers.ts";
+export { isHopByHopHeader, stripHopByHopHeaders } from "./proxy-headers.ts";
 
 export const agentsInTheCloudName = "AgentsInTheCloud" as const;
 
@@ -51,7 +51,7 @@ export function looksLikeWorkspaceTemplateSpec(value: string): boolean {
   return /^(https?:\/\/|git@|ssh:\/\/|\/|\.\/|\.\.\/|[A-Za-z]:\\|github\.com\/)/i.test(value.trim());
 }
 
-export type TurboStreamAction = "append" | "prepend" | "before" | "replace" | "update" | "remove";
+type TurboStreamAction = "append" | "prepend" | "before" | "replace" | "update" | "remove";
 
 export function turboStream(action: TurboStreamAction, target: string, html = "", options: { targets?: boolean; method?: "morph" } = {}): string {
   const targetAttribute = options.targets ? "targets" : "target";
@@ -68,7 +68,7 @@ export function turboStreamResponse(body: string, init: ResponseInit = {}): Resp
   return new Response(body, { ...init, headers });
 }
 
-export interface WorkspaceAttachContext {
+interface WorkspaceAttachContext {
   workspaceId: string;
   init?: unknown;
   events?: AgentsInTheCloudEventBus;
@@ -107,7 +107,7 @@ export interface WorkspaceWorkViewReference extends JsonObject {
   type: string;
 }
 
-export type WorkspaceWorkViewAvailability =
+type WorkspaceWorkViewAvailability =
   | { phase: "opening"; detail?: string }
   | { phase: "live" }
   | { phase: "reconnecting"; detail?: string }
@@ -126,7 +126,7 @@ export interface WorkspaceModuleWorkViewAdapter<Reference extends WorkspaceWorkV
   close?(context: { workspaceId: string; reference: Reference }): Promise<void> | void;
 }
 
-export interface WorkspaceCommandUiSurface {
+interface WorkspaceCommandUiSurface {
   iconHtml?: string;
   /** Related command whose shortcut opens this view (when launching and opening differ). */
   shortcutCommandId?: string;
@@ -135,16 +135,16 @@ export interface WorkspaceCommandUiSurface {
   label?: string;
 }
 
-export interface WorkspaceCommandShortcutSurface {
+interface WorkspaceCommandShortcutSurface {
   defaultBinding: string;
 }
 
-export interface WorkspaceCommandSurfaces {
+interface WorkspaceCommandSurfaces {
   ui?: WorkspaceCommandUiSurface;
   shortcut?: WorkspaceCommandShortcutSurface;
 }
 
-export type WorkspaceCommandScope = "global" | "workspace" | "agent" | "work-view";
+type WorkspaceCommandScope = "global" | "workspace" | "agent" | "work-view";
 
 export interface WorkspaceCommandContribution<Input = Record<string, never>> {
   id: string;
@@ -175,7 +175,7 @@ export interface WorkspaceModuleCommandResult {
   streamHtml?: string;
 }
 
-export interface WorkspaceModuleCommandContext<Input = unknown> {
+interface WorkspaceModuleCommandContext<Input = unknown> {
   workspaceId: string;
   events?: AgentsInTheCloudEventBus;
   input: Input;
@@ -248,7 +248,7 @@ export interface WorkspaceHttpAppBackend {
   adaptResponse?(response: Response, request: Request): Promise<Response> | Response;
 }
 
-export interface WorkspaceFetchAppBackend {
+interface WorkspaceFetchAppBackend {
   kind: "fetch";
   fetch(request: Request): Promise<Response> | Response;
 }
@@ -275,7 +275,7 @@ export interface GlobalSidebarContributionRegistry {
   set(contributionId: string, html?: string, regions?: readonly import("./live-presentation.ts").LiveRegion[]): void;
 }
 
-export interface SettingsActionContext {
+interface SettingsActionContext {
   request: Request;
   url: URL;
 }
@@ -465,7 +465,7 @@ export interface WorkspaceClientHooks {
   registerCommandProvider(provider: () => WorkspaceClientCommand[]): void;
 }
 
-export interface WorkspaceClientModuleContext {
+interface WorkspaceClientModuleContext {
   application: WorkspaceClientApplication;
   Controller: WorkspaceClientControllerConstructor;
   hooks: WorkspaceClientHooks;
@@ -493,7 +493,7 @@ export {
   setTextInputValue
 } from "./text-input.ts";
 
-export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking, isTextEntry, softwareKeyboardArranged, softwareKeyboardEvent, softwareKeyboardStorageKey } from "./software-keyboard.ts";
+export { focusLikelyOpensSoftwareKeyboard, installSoftwareKeyboardTracking, isTextEntry, softwareKeyboardArranged } from "./software-keyboard.ts";
 export { anchorScrollBottom, changeLayout, layoutAfterEvent, layoutBeforeEvent } from "./layout-transaction.ts";
 export { isApplePlatform } from "./platform.ts";
 

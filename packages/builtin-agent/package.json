@@ -5,8 +5,8 @@
   "exports": {
     ".": "./src/server/index.ts",
     "./server": "./src/server/index.ts",
-    "./server/*": "./src/server/*.ts",
-    "./client/*": "./src/client/*.ts",
+    "./server/durable-lifecycle": "./src/server/durable-lifecycle.ts",
+    "./server/durable-runtime": "./src/server/durable-runtime.ts",
     "./client": "./src/client/index.ts"
   },
   "dependencies": {

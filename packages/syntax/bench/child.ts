@@ -2,6 +2,7 @@
 import { spyOn } from "bun:test";
 import { performance } from "node:perf_hooks";
 import * as realSyntax from "../src/index.ts";
+import type { HighlightedCode, HighlightRequest } from "../src/highlight.ts";
 import { prefixes, source, type Fixture, type HighlightPath, type Sample } from "./cases.ts";
 
 // SAFETY: Only measure.ts launches this child, with typed fixture/path values.
@@ -12,7 +13,7 @@ let calls = 0;
 let characters = 0;
 let maxHighlightMs = 0;
 let observing = false;
-function observe(code: string, operation: () => realSyntax.HighlightedCode): realSyntax.HighlightedCode {
+function observe(code: string, operation: () => HighlightedCode): HighlightedCode {
   // Count the public request once if one observed entrypoint calls the other.
   if (observing) return operation();
   const start = performance.now();
@@ -25,7 +26,7 @@ function observe(code: string, operation: () => realSyntax.HighlightedCode): rea
     return result;
   } finally { observing = false; }
 }
-function highlight(request: realSyntax.HighlightRequest): realSyntax.HighlightedCode {
+function highlight(request: HighlightRequest): HighlightedCode {
   return observe(request.code, () => realHighlight(request));
 }
 // Observe the real implementation without changing production code or checking markup.

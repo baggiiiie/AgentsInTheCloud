@@ -24,7 +24,7 @@ interface WorkspaceImageBuildTask {
   promise: Promise<void>;
 }
 
-export interface ResolveWorkspaceImageOptions {
+interface ResolveWorkspaceImageOptions {
   workspaceId?: string;
   events?: AgentsInTheCloudEventBus;
   sourcePath?: string;

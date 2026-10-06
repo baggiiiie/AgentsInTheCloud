@@ -6,7 +6,7 @@ import type { GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/w
 import { isGitWorkspaceTemplateInit } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 
-export const projectlessSessionShareKey = "projectless";
+const projectlessSessionShareKey = "projectless";
 export const sessionShareMountPath = "/agents-in-the-cloud/session-share";
 
 function workspaceMetadataInitPath(workspaceId: string, dataDir = getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir): string {

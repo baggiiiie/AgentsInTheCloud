@@ -25,7 +25,7 @@ const diffOperationSchema = Type.Object({
   newText: Type.String(),
 });
 
-export function statusHtml(status: ToolView["status"], readOnly = false): string {
+function statusHtml(status: ToolView["status"], readOnly = false): string {
   const state = status === "streaming" || status === "running" ? "running" : status === "error" ? "danger" : "success";
   return `<span class="status-dot ${state}${state === "running" && readOnly ? " static" : ""}" aria-label="${state === "running" ? "In progress" : state === "danger" ? "Failed" : "Complete"}"></span>`;
 }
@@ -65,12 +65,12 @@ function toolSummaryText(tool: ToolView): string {
   return [tool.name || "tool", toolSummaryHtml(tool)].filter(Boolean).join(" · ");
 }
 
-export interface ToolPresentation {
+interface ToolPresentation {
   showsDetail: boolean;
   autoOpenOnReveal: boolean;
 }
 
-export function toolPresentation(tool: ToolView): ToolPresentation {
+function toolPresentation(tool: ToolView): ToolPresentation {
   const active = tool.status === "streaming" || tool.status === "running";
   const showsDetail = !(active && (tool.name === "read" || tool.name === "edit"));
   return { showsDetail, autoOpenOnReveal: showsDetail && tool.name === "edit" };

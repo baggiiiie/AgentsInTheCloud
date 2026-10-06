@@ -1,3 +1,4 @@
+import { sessionShareDir, sessionShareKeySlug } from "@agents-in-the-cloud/agent/server/session-share";
 import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,8 +9,6 @@ import {
   ensureDefaultWorkspaceAgent as ensureNativeAgent,
   listWorkspaceAgents,
   setWorkspaceAgentTitle,
-  sessionShareDir,
-  sessionShareKeySlug,
 } from "../../src/server/agent-store.ts";
 
 let dir: string | undefined;
@@ -106,7 +105,6 @@ test("new agents explicitly select durable storage without a legacy transcript",
   await removeClosedWorkspaceAgent(renamed);
   expect(await listWorkspaceAgents("native")).toEqual([]);
 });
-
 
 test("previous Agent metadata preserves IDs and titles and writes only the new vocabulary", async () => {
   const root = await dataDir();

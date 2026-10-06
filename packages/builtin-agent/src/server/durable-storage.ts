@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext, invalidArguments } from "@agents-in-the-cloud/core";
-import { sessionShareDir, sessionShareMountPath, workspaceSessionShareKey } from "./agent-store.ts";
+import { sessionShareDir, sessionShareMountPath, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server/session-share";
 
 const journalsDirectory = "builtin-durable";
 

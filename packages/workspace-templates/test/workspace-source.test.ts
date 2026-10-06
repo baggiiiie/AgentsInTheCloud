@@ -5,7 +5,8 @@ import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { clearGitHubToken, createAgentsInTheCloudEventBus, setGitHubToken } from "@agents-in-the-cloud/core";
-import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplateSeedConfigEnabled, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, setWorkspaceTemplateSeedConfigEnabled, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
+import { prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents } from "../src/workspace-source.ts";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {

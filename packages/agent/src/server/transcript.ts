@@ -7,7 +7,7 @@ import type { StopReason } from "@earendil-works/pi-ai";
 import { Value } from "typebox/value";
 import { isJsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 
-export interface ImageRef {
+interface ImageRef {
   mimeType: string;
   data: string;
 }
@@ -25,9 +25,9 @@ type AssistantPart =
   | { type: "text"; text: string; textSignature?: string }
   | { type: "toolCall"; callId: string; name: string; args: unknown };
 
-export type AssistantTextPhase = "commentary" | "final_answer";
+type AssistantTextPhase = "commentary" | "final_answer";
 
-export function assistantTextPhase(textSignature?: string): AssistantTextPhase | undefined {
+function assistantTextPhase(textSignature?: string): AssistantTextPhase | undefined {
   if (!textSignature?.startsWith("{")) return undefined;
   try {
     const parsed = JSON.parse(textSignature);
@@ -48,11 +48,11 @@ export type TranscriptRecord =
   | { kind: "note"; id?: string; text: string; tone: NoteTone; timestamp?: number };
 
 // Shared by live completion and persisted transcript reconstruction.
-export function assistantErrorText(message: { stopReason: string; errorMessage?: string }): string | undefined {
+function assistantErrorText(message: { stopReason: string; errorMessage?: string }): string | undefined {
   return message.errorMessage || (message.stopReason === "aborted" ? "Run aborted" : message.stopReason === "error" ? "Provider request failed" : undefined);
 }
 
-export type NoteTone = "system" | "summary" | "warning" | "error";
+type NoteTone = "system" | "summary" | "warning" | "error";
 
 const toolViewDetailsSchema = Type.Object({
   aborted: Type.Optional(Type.Boolean()),
@@ -64,7 +64,7 @@ const toolViewDetailsSchema = Type.Object({
   workspaceId: Type.Optional(Type.String()),
 });
 
-export type ToolViewDetails = Static<typeof toolViewDetailsSchema> & { [key: string]: JsonValue | undefined };
+type ToolViewDetails = Static<typeof toolViewDetailsSchema> & { [key: string]: JsonValue | undefined };
 
 export function isToolViewDetails(value: unknown): value is ToolViewDetails {
   if (!Value.Check(toolViewDetailsSchema, value)) return false;
@@ -132,7 +132,7 @@ export function findTranscriptItem(items: TranscriptItem[], key: string): Transc
   return undefined;
 }
 
-export function isFinalAssistantStopReason(reason: StopReason): boolean {
+function isFinalAssistantStopReason(reason: StopReason): boolean {
   return reason === "stop" || reason === "length" || reason === "deferred";
 }
 

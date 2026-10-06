@@ -1,14 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import {
-  buildAttachArgs,
-  buildListSessionsCommand,
-  buildObservableSessionCommand,
-  normalizeCarriageReturns,
-  observableTerminalCols,
-  observableTerminalRows,
-  stripObservablePaneFraming,
-  stripTerminalControls,
-} from "../../src/server/index.ts";
+import { buildListSessionsCommand, buildObservableSessionCommand, normalizeCarriageReturns, observableTerminalCols, observableTerminalRows, stripObservablePaneFraming, stripTerminalControls } from "../../src/server/index.ts";
+import { buildAttachArgs } from "../../src/server/attach.ts";
 
 describe("observable terminal normalization", () => {
   test("collapses carriage-return progress repaints", () => {

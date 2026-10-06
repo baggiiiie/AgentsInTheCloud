@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
-import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, workspaceInitFromTemplate, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplatePreloadImages } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, workspaceInitFromTemplate, setWorkspaceTemplatePreloadImages } from "@agents-in-the-cloud/workspace-templates";
+import { registerWorkspaceTemplateWorkspaceInitEvents } from "../src/workspace-source.ts";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 describe("Workspace template environment", () => {
