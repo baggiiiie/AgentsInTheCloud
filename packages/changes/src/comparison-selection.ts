@@ -8,14 +8,11 @@ export interface ComparisonSelection {
   start: string | null;
   end: string;
   implicitStart: boolean;
-  connection: "connected" | "disconnected" | "unknown";
-  complete: boolean;
   /** ALL nodes on directed routes from Start to End, excluding Start. */
   path: string[];
   /** Real parent edges from loaded path nodes, including edges INTO Start. */
   trace: AncestryEdge[];
   selectedRows: string[];
-  roles: { id: string; dot: "end" | "path" | "ordinary"; rowSelected: boolean }[];
 }
 function reachable(start: string, next: (id: string) => readonly string[]): Set<string> {
   const visited = new Set<string>(), stack = [start];
@@ -67,11 +64,6 @@ export function selectComparison(commits: readonly ComparisonCommit[], endpoints
     children.set(parent, descendants);
   }
   const connected = start === null || ancestors.has(start);
-  const incomplete = [...ancestors].some(id => !byId.has(id));
-  const connection = connected ? "connected" : incomplete ? "unknown" : "disconnected";
-  // A known topological prefix contains every route to a known baseline. An
-  // unloaded baseline may have unknown alternative arms, even with one proven edge.
-  const complete = connection !== "unknown" && (start === null ? !incomplete : byId.has(start) || ![...ancestors].some(id => id !== start && !byId.has(id)));
   const descendants = start === null ? ancestors : reachable(start, id => children.get(id) ?? []);
   const corridor = new Set(connected ? [...ancestors].filter(id => descendants.has(id)) : []);
   const path = commits.filter(commit => corridor.has(commit.id) && commit.id !== start).map(commit => commit.id);
@@ -80,6 +72,5 @@ export function selectComparison(commits: readonly ComparisonCommit[], endpoints
     ? commit.parents.filter(parent => corridor.has(parent)).map(parent => ({ from: commit.id, to: parent })) : []);
   // An inferred parent defines the diff and path, not an explicit user selection.
   const selectedRows = loaded.filter(id => id === end || (endpoints.start !== undefined && id === start));
-  const roles = loaded.map(id => ({ id, dot: id === end ? "end" as const : pathIds.has(id) ? "path" as const : "ordinary" as const, rowSelected: selectedRows.includes(id) }));
-  return { start, end, implicitStart: endpoints.start === undefined, connection, complete, path, trace, selectedRows, roles };
+  return { start, end, implicitStart: endpoints.start === undefined, path, trace, selectedRows };
 }

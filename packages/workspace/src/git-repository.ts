@@ -77,25 +77,21 @@ export function createWorkspaceRepository(
   };
 }
 
-export async function gitResult(root: Repository, args: string[]): Promise<GitResult> {
-  return root.gitResult(args);
-}
-
 export async function git(root: Repository, args: string[], allowFailure = false): Promise<Buffer> {
-  const result = await gitResult(root, args);
+  const result = await root.gitResult(args);
   if (result.exitCode !== 0 && !allowFailure) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
   return result.exitCode === 0 ? result.stdout : Buffer.alloc(0);
 }
 
 /** Root and initialized nested submodules, expressed as workspace-relative paths. */
 export async function repositoryPaths(root: Repository): Promise<string[]> {
-  const inside = await gitResult(root, ["rev-parse", "--is-inside-work-tree"]);
+  const inside = await root.gitResult(["rev-parse", "--is-inside-work-tree"]);
   if (inside.exitCode !== 0) {
     if (inside.stderr.includes("not a git repository")) return [];
     throw new Error(inside.stderr.trim() || "could not inspect workspace repository");
   }
   if (inside.stdout.toString("utf8").trim() !== "true") return [];
-  const submodules = await gitResult(root, ["submodule", "foreach", "--quiet", "--recursive", "printf '%s\\0' \"$displaypath\""]);
+  const submodules = await root.gitResult(["submodule", "foreach", "--quiet", "--recursive", "printf '%s\\0' \"$displaypath\""]);
   if (submodules.exitCode !== 0) throw new Error(submodules.stderr || "could not enumerate workspace submodules");
   return ["", ...submodules.stdout.toString("utf8").split("\0").filter(Boolean)];
 }

@@ -4,7 +4,6 @@
 .changes-summary span { margin-inline-start: 8px; }
 .changes-controls { display: flex; align-items: center; gap: 4px; width: 100%; }
 .changes-controls > .changes-summary { margin-inline-end: auto; }
-.changes-controls form { margin: 0; }
 .changes-expand-icon { display: none; }
 [aria-pressed="true"] .changes-collapse-icon { display: none; }
 [aria-pressed="true"] .changes-expand-icon { display: inline-flex; }
@@ -35,18 +34,7 @@
 .changes-body {
   position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
   container: changes-view / size;
-  --changes-branch-0: light-dark(#7751b2, #c9a6ff);
-  --changes-branch-1: light-dark(#087a83, #64d9d0);
-  --changes-branch-2: light-dark(#297a3e, #a4d879);
-  --changes-branch-3: light-dark(#2869b1, #83baff);
-  --changes-branch-4: light-dark(#b04a3b, #ffac92);
-  --changes-branch-5: light-dark(#8a6411, #edca72);
-  --changes-branch-6: light-dark(#ae397c, #f2a2cc);
-  --changes-branch-7: light-dark(#5355b9, #a4b0ff);
-}
-/* Endpoint comparisons reserve a 180° sector around the accent's opposite hue.
-   Ordinary dots remain at least 90° away from the path hue in every theme. */
-.changes-comparison-graph {
+  /* Ordinary graph colors stay at least 90° away from the selected path hue. */
   --changes-branch-0: light-dark(oklch(from var(--accent) .5 .14 calc(h + 90)), oklch(from var(--accent) .76 .13 calc(h + 90)));
   --changes-branch-1: light-dark(oklch(from var(--accent) .5 .14 calc(h + 115)), oklch(from var(--accent) .76 .13 calc(h + 115)));
   --changes-branch-2: light-dark(oklch(from var(--accent) .5 .14 calc(h + 140)), oklch(from var(--accent) .76 .13 calc(h + 140)));
@@ -67,10 +55,8 @@
   flex: none; display: flex; min-height: 0; border-bottom: 1px solid var(--line);
   height: min(60%, calc(min(var(--changes-history-rows, 1), 10) * 36px + var(--changes-history-chrome, 64px)));
 }
-.changes-history-scroll { height: 100%; }
-.changes-history-scroll { min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
+.changes-history-scroll { height: 100%; min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
 .changes-history-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--text-code); }
-.changes-history-content { position: relative; }
 .changes-history-table tbody tr { --changes-history-row-background: transparent; height: 36px; cursor: default; outline: none; }
 .changes-history-table td { padding: 0 8px; height: 36px; border-top: 1px solid transparent; border-bottom: 1px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .changes-history-table td[data-col] { color: var(--text-muted); }
@@ -93,7 +79,6 @@
 .changes-description { touch-action: none; }
 .changes-history-more { display: flex; align-items: center; justify-content: center; height: 64px; padding: 8px; }
 .changes-loading { position: absolute; inset: var(--changes-comparison-top, 49px) 0 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); background: var(--bg); }
-.changes-spinner[hidden] { display: none; }
 .changes-spinner { width: 18px; height: 18px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: changes-spin 800ms linear infinite; }
 @keyframes changes-spin { to { transform: rotate(360deg); } }
 .changes-range-error { position: absolute; inset: auto 8px 8px; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--panel); border: 1px solid var(--danger); border-radius: var(--radius-control); color: var(--danger); box-shadow: var(--shadow); font-size: var(--text-code); }

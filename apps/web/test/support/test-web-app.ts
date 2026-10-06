@@ -1,10 +1,11 @@
 import type { AgentsInTheCloudEventBus, JsonObject } from "@agents-in-the-cloud/core";
-import type { WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
+import type { WorkspaceDeletionReview, WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
+import { workspaceModules } from "../../src/server/workspace-modules.generated.ts";
 import { createWebApp } from "../../src/server/app.ts";
 import { createWorkspaceRegistry } from "../../src/server/workspace-registry.ts";
 
@@ -43,12 +44,31 @@ function deletionReview(inspect: (id: string) => Promise<string[]>): WorkspaceDe
   };
 }
 
+// App contract fixtures have no containers. Exercise Git behavior through the
+// repository tests, rather than attaching live Git-backed modules to fake IDs.
+function gitWorkViewFixture(type: string, label: string): WorkspaceModule {
+  const reference = { type };
+  return {
+    id: type,
+    workViews: [{ type, parseReference: () => reference, identity: () => "workspace", render: () => "" }],
+    commands: [{ id: `${type}.open`, execute: () => ({ createdWorkView: reference }) }],
+    attachToWorkspace: () => ({
+      workViews: [{ reference, sourceKey: `${type}:workspace`, label, kind: "contextual", availability: { phase: "live" }, initiallyOpen: false }],
+      commands: [{ id: `${type}.open`, label, scope: "workspace" }],
+    }),
+  };
+}
+
+const testWorkspaceModules = workspaceModules.map(module => module.id === "review" ? gitWorkViewFixture("review", "Review")
+  : module.id === "changes" ? gitWorkViewFixture("changes", "Changes") : module);
+
 export function createTestApp(options: TestAppOptions = {}) {
   const registry = createWorkspaceRegistry({
     activityStore: { load: async () => ({}), save: async () => {} },
   });
   const app = createWebApp({
     registry,
+    workspaceModules: testWorkspaceModules,
     events: options.events,
     provisionWorkspace: options.provision ?? (async () => {}),
     deletionReview: deletionReview(options.inspect ?? (async () => [])),

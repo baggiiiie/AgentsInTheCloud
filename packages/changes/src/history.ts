@@ -1,5 +1,5 @@
-import { selectComparison, type ComparisonEndpoints, type ComparisonCommit } from "./comparison-selection.ts";
-import { workingTree, stagedChanges, type ChangesCommit, type ChangesRange, type ChangesRef, type HistoryGraph, type GraphNode, type GraphEdge, type HistoryModel } from "./history-model.ts";
+import { selectComparison, type ComparisonEndpoints, type ComparisonCommit, type ComparisonSelection } from "./comparison-selection.ts";
+import { workingTree, stagedChanges, type ChangesCommit, type ChangesRef, type HistoryGraph, type GraphNode, type GraphEdge, type HistoryModel } from "./history-model.ts";
 export * from "./history-model.ts";
 
 export const rowHeight = 36;
@@ -56,13 +56,12 @@ export function endpointName(model: Pick<HistoryModel, "references">, id: string
   return refs.find(ref => ref.kind === "local")?.name ?? refs.find(ref => ref.kind === "remote")?.name ?? refs.find(ref => ref.kind === "tag")?.name ?? id.slice(0, 7);
 }
 
-export function rangeDescription(model: HistoryModel, range: ChangesRange): string {
-  const selected = selectComparison(model.topology, range, model.commits.map(commit => commit.id));
+export function rangeDescription(model: HistoryModel, selected: ComparisonSelection): string {
   if (model.unpushed && selected.end === workingTree && selected.start === model.unpushed.base) return `Unpushed changes · ${model.unpushed.count} ${model.unpushed.count === 1 ? "commit" : "commits"}`;
   if (selected.end === workingTree && selected.start === model.head) return "Uncommitted changes";
   if (selected.end === workingTree && selected.start === stagedChanges) return "Unstaged changes";
   if (selected.end === stagedChanges && selected.start === (model.head ?? null)) return "Staged changes";
-  if (range.start === undefined) {
+  if (selected.implicitStart) {
     const commit = model.commits.find(commit => commit.id === selected.end)!;
     return `${endpointName(model, selected.end)} · ${commit.subject}`;
   }

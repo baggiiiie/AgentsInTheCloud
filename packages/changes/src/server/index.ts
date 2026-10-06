@@ -63,7 +63,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       history.commits.push(...page.commits);
       history.loaded += page.commits.length;
       history.hasMore = page.hasMore;
-      return turboStreamResponse(replace(historyContentId(history), renderHistory(workspaceId, state.snapshot)));
+      return turboStreamResponse(replace(historyContentId(history), renderHistory(state.snapshot)));
     }
     match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/(refresh|compare)$/);
     if (!match) return undefined;
@@ -93,8 +93,10 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (ticket !== state.request) return new Response(null, { status: 204 });
     state.snapshot = next;
     invalidateWorkspace(workspaceId);
-    if (match[1] === "refresh") state.clients.clear();
-    if (match[1] === "refresh") return turboStreamResponse(replace(changesBodyId(workspaceId, previous.history.id), renderChanges(workspaceId, next, data.get("pickerOpen") === "true")));
+    if (match[1] === "refresh") {
+      state.clients.clear();
+      return turboStreamResponse(replace(changesBodyId(workspaceId, previous.history.id), renderChanges(workspaceId, next, data.get("pickerOpen") === "true")));
+    }
     return turboStreamResponse(replace(comparisonId(workspaceId, previous.history.id), renderComparison(workspaceId, next, true)) + replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id)));
   } }],
   initialize(context) {

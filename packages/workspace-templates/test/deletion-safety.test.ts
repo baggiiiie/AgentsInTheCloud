@@ -50,7 +50,7 @@ test("deletion checks use local remote refs, including other branches and detach
   const detached = await commit(repo, "detached");
   const issues = await inspect();
   expect(issues).toHaveLength(1);
-  expect(issues[0]!.unpushedCommits).toEqual(expect.arrayContaining([{ hash: side, subject: "side" }, { hash: detached, subject: "detached" }]));
+  expect(issues[0]!.unpushedCommits).toEqual(expect.arrayContaining([{ hash: side, subject: "side", branches: ["side"] }, { hash: detached, subject: "detached", branches: [] }]));
   expect(issues[0]!.unpushedCommits).toHaveLength(2);
 });
 

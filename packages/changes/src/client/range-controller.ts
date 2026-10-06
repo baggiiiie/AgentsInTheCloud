@@ -1,5 +1,6 @@
 import { setActionItemLabel } from "@agents-in-the-cloud/design-system/action-item/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
+import { selectComparison } from "../comparison-selection.ts";
 import { endpointName, workingTree, historyGraph, rangeDescription, comparisonGraph, rowHeight, type ChangesRange, type HistoryGraph, type HistoryModel } from "../history.ts";
 
 type ComparisonModel = { range: ChangesRange; label: string; baseLabel: string; endLabel: string };
@@ -14,7 +15,6 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     declare readonly openValue: boolean;
     declare readonly diffTarget: HTMLElement;
     declare readonly triggerTarget: HTMLButtonElement;
-    declare readonly hasTriggerTarget: boolean;
     declare readonly refreshTarget: HTMLButtonElement;
     declare readonly pickerTarget: HTMLElement;
     declare readonly hasPickerTarget: boolean;
@@ -86,7 +86,6 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     private openPicker(): void {
       if (!this.hasPickerTarget) return;
       this.isOpen = true;
-      this.element.classList.add("changes-range-open");
       this.pickerTarget.hidden = false;
       this.triggerTarget.setAttribute("aria-expanded", "true");
       this.paint();
@@ -103,7 +102,6 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); }
       this.clearHover();
       this.isOpen = false;
-      this.element.classList.remove("changes-range-open");
       this.pickerTarget.hidden = true;
       this.triggerTarget.setAttribute("aria-expanded", "false");
       this.syncAvailability();
@@ -129,7 +127,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     private choose(id: string, extend: boolean): void {
       if (!extend) this.anchor = id;
       const candidate: ChangesRange = !extend || id === this.anchor ? { end: id } : { end: id, start: this.anchor! };
-      const selected = comparisonGraph(this.graph!, candidate, this.model!.topology);
+      const selected = selectComparison(this.model!.topology, candidate, this.model!.commits.map(commit => commit.id));
       this.range = candidate.start === undefined ? { end: selected.end } : { end: selected.end, start: selected.start };
       this.paint();
     }
@@ -212,8 +210,6 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
         const id = row.dataset.commit!;
         row.dataset.path = String(selected.selectedRows.includes(id));
         row.dataset.hovered = String(id === this.hoveredCommit);
-        row.dataset.top = String(id === selected.end);
-        row.dataset.bottom = String(id === selected.start);
         row.setAttribute("aria-selected", row.dataset.path);
       }
       for (const dot of this.graphTarget.querySelectorAll<SVGCircleElement>("[data-dot]")) {
@@ -226,7 +222,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       }
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
       const applied = this.comparison?.range.end === range.end && this.comparison.range.start === range.start;
-      const description = applied ? this.comparison!.label : rangeDescription(model, range);
+      const description = applied ? this.comparison!.label : rangeDescription(model, selected);
       setActionItemLabel(this.triggerTarget, description);
       this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.endLabel}` : `${endpointName(model, selected.start ?? undefined)} → ${endpointName(model, selected.end)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
@@ -278,20 +274,10 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       data.set("pickerOpen", String(this.isOpen));
       try {
         const result = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/changes/${operation}`, { method: "POST", body: data, signal: request.signal, headers: { Accept: "text/vnd.turbo-stream.html" } });
-        let html = await result.text();
+        const html = await result.text();
         if (request.signal.aborted) return;
         if (!result.headers.get("Content-Type")?.includes("text/vnd.turbo-stream.html")) throw new Error(html || "The comparison could not be generated.");
         this.failed = !result.ok;
-        if (result.ok && operation === "refresh") {
-          // Preserve browser-owned presentation state, including closing the picker while refreshing.
-          const document = new DOMParser().parseFromString(html, "text/html");
-          const template = document.querySelector<HTMLTemplateElement>("turbo-stream template")!;
-          const shell = template.content.querySelector<HTMLElement>(".changes-body")!;
-          shell.dataset.changesRangeOpenValue = String(this.isOpen);
-          shell.dataset.changesLayout = this.element.dataset.changesLayout ?? "unified";
-          shell.dataset.changesWrap = this.element.dataset.changesWrap ?? "false";
-          html = document.body.innerHTML;
-        }
         window.Turbo!.renderStreamMessage(html);
         // Turbo inserts the stream synchronously; rendering its targets occurs in the next task.
         await new Promise(resolve => setTimeout(resolve, 0));

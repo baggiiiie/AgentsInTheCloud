@@ -36,6 +36,7 @@ import {
   type WorkspaceAttachment,
   type WorkspaceCommandContribution,
   type WorkspaceDeletionReview,
+  type WorkspaceModule,
   type WorkspaceModuleCommandHandler,
   type WorkspaceModuleCommandResult,
   type WorkspaceModuleRouteHandler,
@@ -64,7 +65,7 @@ import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
 import { createWorkspaceDeletion } from "./workspace-deletion.ts";
-import { workspaceModules } from "./workspace-modules.generated.ts";
+import { workspaceModules as defaultWorkspaceModules } from "./workspace-modules.generated.ts";
 import { dismissWorkspaceParkConfirmationTurboStream, presentWorkViewTurboStream, renderAgentsInTheCloudBar, renderMobileWorkspaceBar, renderWorkspaceDeletionPresentation, renderWorkspacePane, renderWorkspaceParkConfirmation, renderWorkspacePresentation, workspacePaneCollectionsRegions, workContentId, type WorkspacePresentation as FixedWorkspacePresentation, type WorkPaneContribution, type WorkspacePanePresentation, type WorkspacePaneWorkspaceTemplate } from "./workspace-presentation.ts";
 import type { WorkspaceDeletionState, WorkspaceEntry, WorkspaceRegistry } from "./workspace-registry.ts";
 import { workspaceWarnings, type WorkspaceWarning } from "./workspace-warnings.ts";
@@ -72,6 +73,7 @@ import { workspaceWarnings, type WorkspaceWarning } from "./workspace-warnings.t
 const jsonStringSchema = Type.String();
 export interface WebAppDeps {
   registry: WorkspaceRegistry;
+  workspaceModules?: WorkspaceModule[];
   /** Event bus passed through to the agent module routes. */
   events?: AgentsInTheCloudEventBus;
   devReload?: boolean;
@@ -109,6 +111,7 @@ function selectWorkspaceTurboStream(workspaceId: string): string {
 
 export function createWebApp(deps: WebAppDeps): WebApp {
   const { registry } = deps;
+  const workspaceModules = deps.workspaceModules ?? defaultWorkspaceModules;
   const logError = deps.logError ?? ((message: string) => console.error(message));
   // SAFETY: This value is validated or constructed by the server boundary immediately surrounding this use.
   const workViewAdapters = workspaceModules.flatMap((module) => module.workViews ?? []) as WorkspaceModuleWorkViewAdapter[];

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "@agents-in-the-cloud/workspace/git";
 import { localRepository } from "../../workspace/test/support/local-repository.ts";
+import { selectComparison } from "../src/comparison-selection.ts";
 import { captureChanges, commitHistory, InvalidChangesRange, workingTree as uncommitted, stagedChanges } from "../src/server/snapshot.ts";
 
 const roots: string[] = [];
@@ -317,7 +318,6 @@ test("detached HEAD remains reachable and no upstream does not imply unpublished
 });
 
 test("connecting paths exclude Start and side work merged from below Start", async () => {
-  const { comparisonGraph, historyGraph } = await import("../src/history.ts");
   const root = await repository();
   const base = await commit(root, "Base");
   await git(localRepository(root), ["checkout", "-b", "side"]);
@@ -336,7 +336,7 @@ test("connecting paths exclude Start and side work merged from below Start", asy
   const unrelated = await commit(root, "Unrelated");
   await git(localRepository(root), ["checkout", "feature"]);
   const snapshot = await captureChanges(localRepository(root), { end: uncommitted, start: main });
-  const coverage = comparisonGraph(historyGraph(snapshot.history.commits), snapshot.range, snapshot.history.topology).path;
+  const coverage = selectComparison(snapshot.history.topology, snapshot.range).path;
   expect(coverage.filter(id => id !== uncommitted).sort()).toEqual([feature, merge].sort());
   expect(coverage).not.toContain(base);
   expect(coverage).not.toContain(unrelated);
@@ -458,8 +458,7 @@ test("repository read commands disable configured fsmonitor and diff callbacks",
   await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-test("range graph follows End ancestry, not the later merge containing both endpoints", async () => {
-  const { historyGraph, comparisonGraph } = await import("../src/history.ts");
+test("comparison follows End ancestry, not the later merge containing both endpoints", async () => {
   const root = await repository();
   const start = await commit(root, "Start");
   const fork = await commit(root, "Fork");
@@ -470,24 +469,7 @@ test("range graph follows End ancestry, not the later merge containing both endp
   for (let number = 0; number < 3; number++) later.push(await commit(root, `Later main ${number}`));
   await git(localRepository(root), ["merge", "--no-ff", "side", "-m", "Enclosing merge"]);
   const history = (await captureChanges(localRepository(root))).history;
-  const selected = comparisonGraph(historyGraph(history.commits), { end: end, start: start });
+  const selected = selectComparison(history.topology, { end, start });
   expect(selected.path.sort()).toEqual([end, fork].sort());
-  for (const id of later) {
-    expect(selected.path).not.toContain(id);
-
-  }
-});
-
-test("cross-branch comparisons do not draw a forward ancestry trace", async () => {
-  const { historyGraph, comparisonGraph } = await import("../src/history.ts");
-  const root = await repository();
-  const base = await commit(root, "Base");
-  const start = await commit(root, "Main endpoint");
-  await git(localRepository(root), ["checkout", "-b", "side", base]);
-  const end = await commit(root, "Side endpoint");
-  const history = (await captureChanges(localRepository(root))).history;
-  const graph = historyGraph(history.commits);
-  expect(comparisonGraph(graph, { end: end, start: start }).route).toBe("");
-  expect(comparisonGraph(graph, { end: start, start: end }).route).toBe("");
-  expect(comparisonGraph(graph, { end: end, start: base }).route).not.toBe("");
+  for (const id of later) expect(selected.path).not.toContain(id);
 });

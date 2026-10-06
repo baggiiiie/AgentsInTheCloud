@@ -14,7 +14,7 @@ export const comparisonId = (workspaceId: string, historyId: string) => domId("c
 export const historyContentId = (history: ChangesHistory) => domId("changes", history.id, "history");
 export const errorId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "error");
 const json = <Value>(value: Value) => JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("&", "\\u0026");
-export const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, topology: history.topology, references: history.references, range: snapshot.range, head: history.head, branch: history.branch, upstream: history.upstream, hasStaged: history.hasStaged, unpushed: history.unpushed });
+const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, topology: history.topology, references: history.references, range: snapshot.range, head: history.head, upstream: history.upstream, unpushed: history.unpushed });
 
 export function renderChangesTitle(snapshot: ChangesSnapshot): string {
   const additions = snapshot.stats.reduce((sum, file) => sum + file.additions, 0);
@@ -22,7 +22,7 @@ export function renderChangesTitle(snapshot: ChangesSnapshot): string {
   return snapshot.index.phase === "ready" ? `Changes +${additions} −${deletions}` : "Changes";
 }
 
-export function renderHistory(workspaceId: string, snapshot: ChangesSnapshot): string {
+export function renderHistory(snapshot: ChangesSnapshot): string {
   const history = snapshot.history;
   const more = history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-range#loadMore" data-changes-range-target="more"' })}</div>` : "";
   const model = historyModel(history, snapshot);
@@ -40,7 +40,7 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
     kind: "single", label: { kind: "text", text: snapshot.label }, leadingHtml: Icons.Disclosure,
     element: { tag: "button", attributesHtml: `type="button" data-action="changes-range#togglePicker" data-changes-range-target="trigger" aria-expanded="${pickerOpen}" aria-controls="${pickerId}"` },
   }) : '<strong>Changes</strong>';
-  const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-range-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-range-target="historyScroll">${renderHistory(workspaceId, snapshot)}</div></div>` : "";
+  const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-range-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-range-target="historyScroll">${renderHistory(snapshot)}</div></div>` : "";
   // History is the permanent shell; live comparisons replace only the Pierre island underneath it.
   return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-range" data-changes-range-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-range-history-id-value="${history.id}" data-changes-range-open-value="${pickerOpen}" data-action="live:before-stream-render@document->changes-range#preservePresentation turbo:before-stream-render@document->changes-range#preservePresentation keydown.esc->changes-range#escape pointermove@window->changes-range#moveSelection">
     <header class="changes-range-header">${header}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh history and diff" }, attributesHtml: 'data-action="changes-range#refresh" data-changes-range-target="refresh"' })}</header>${picker}${renderComparison(workspaceId, snapshot)}

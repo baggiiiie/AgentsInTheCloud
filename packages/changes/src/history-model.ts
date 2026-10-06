@@ -22,9 +22,7 @@ export interface HistoryModel {
   references: (ChangesRef & { id: string })[];
   range: ChangesRange;
   head?: string;
-  branch?: string;
   upstream?: string;
-  hasStaged: boolean;
   unpushed?: UnpushedHistory;
 }
 export interface GraphNode { commit: ChangesCommit; row: number; lane: number }

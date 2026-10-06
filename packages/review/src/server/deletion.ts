@@ -3,7 +3,7 @@ import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-clou
 import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, type ReviewFileStats } from "./diff.ts";
-import { repositoryPaths, workspaceRepository, type Repository, git, gitResult } from "@agents-in-the-cloud/workspace/git";
+import { repositoryPaths, workspaceRepository, type Repository, git } from "@agents-in-the-cloud/workspace/git";
 import { renderFileStats, renderFileSummary, renderReadOnlyReviewFile } from "./render.ts";
 
 type DeletionRepository = {
@@ -29,11 +29,11 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
       const index = await collectReviewIndex(root);
       if (index.phase !== "ready") continue;
       const uncommitted = await collectReviewStats(root, index);
-      const unpushedCommits = await collectUnpushedCommits((args) => gitResult(root, args));
+      const unpushedCommits = await collectUnpushedCommits((args) => root.gitResult(args));
       if (!uncommitted.length && !unpushedCommits.length) continue;
       repositories.push({ relativePath, uncommitted, unpushedCommits });
       if (!uncommitted.length) continue;
-      const head = await gitResult(root, ["rev-parse", "--verify", "HEAD"]);
+      const head = await root.gitResult(["rev-parse", "--verify", "HEAD"]);
       fingerprintMaterial.push(head.exitCode === 0 ? (await git(root, ["diff", "--binary", "HEAD", "--"])).toString("base64") : "no-head");
       for (const file of uncommitted.filter((candidate) => candidate.untracked)) {
         fingerprintMaterial.push(`${file.path}:${(await git(root, ["hash-object", "--no-filters", "--", file.path])).toString("utf8").trim()}`);

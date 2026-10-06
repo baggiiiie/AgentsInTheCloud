@@ -1,7 +1,9 @@
 import { execWorkspaceCommandBuffer } from "./index.ts";
 import { createWorkspaceRepository, type Repository } from "./git-repository.ts";
 
-export { git, gitResult, repositoryPaths } from "./git-repository.ts";
+export { parseGitStatus, parseGitNumstat } from "./git-output.ts";
+export type { GitStatusEntry, GitNumstat } from "./git-output.ts";
+export { git, repositoryPaths } from "./git-repository.ts";
 export type { Repository, GitResult, WorkingFile } from "./git-repository.ts";
 
 /** Repository operations execute only inside the workspace, as its regular user.
