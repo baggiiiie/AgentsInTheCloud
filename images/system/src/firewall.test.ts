@@ -51,3 +51,32 @@ test("DNS exceptions are limited to build clients, not forwarded workloads", () 
   expect(forward).toContain('meta iifkind "bridge" jump public_destinations');
   expect(forward).not.toContain("jump public_egress");
 });
+
+test("family-specific FIB rules avoid the optional inet FIB implementation", () => {
+  const rules = workspaceFirewallRules("/system/workloads/build-clients", ["127.0.0.53", "fd00::53"]);
+  const inet = rules.slice(0, rules.indexOf("add table ip "));
+  expect(inet).not.toContain("fib daddr");
+  for (const family of ["ip", "ip6"]) {
+    expect(rules).toContain(`add table ${family} agents-in-the-cloud_workspaces`);
+    expect(rules).toContain(`flush table ${family} agents-in-the-cloud_workspaces`);
+  }
+  expect(rules.match(/fib daddr type local counter drop/g)).toHaveLength(4);
+  // An accept in the inet table doesn't bypass a later family table. Each
+  // family's output chain must independently exempt configured DNS before FIB.
+  for (const [family, resolver] of [["ip", "127.0.0.53"], ["ip6", "fd00::53"]]) {
+    const table = rules.slice(rules.indexOf(`table ${family} agents-in-the-cloud_workspaces {`));
+    const local = table.slice(table.indexOf("chain local_destinations"));
+    expect(local.indexOf(`${family} daddr ${resolver}`)).toBeLessThan(local.indexOf("fib daddr"));
+  }
+});
+
+test("without NFT_SOCKET only host-side client filtering is omitted", () => {
+  const rules = workspaceFirewallRules("/system/workloads/build-clients", ["127.0.0.53"], false);
+  expect(rules).not.toContain("socket cgroupv2");
+  expect(rules).not.toContain("chain local_destinations");
+  expect(rules.match(/meta iifkind "bridge" fib daddr type local counter drop/g)).toHaveLength(2);
+  expect(rules).toContain('meta iifkind "bridge" counter drop');
+  expect(rules).toContain('meta iifkind "bridge" meta oifkind "bridge" counter drop');
+  expect(rules).toContain('meta iifkind "bridge" jump public_destinations');
+  expect(rules).toContain("ip daddr @non_public_v4 counter drop");
+});

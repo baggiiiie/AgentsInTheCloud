@@ -28,6 +28,16 @@ Two layers enforce the same policy, generated from one definition in `packages/s
 
 Private destinations (LAN, VPN, tailnet, Docker bridges) were briefly allowed and are closed again: nothing in the codebase depended on it, and it exposed every unauthenticated AgentsInTheCloud instance on the same networks. When a workspace legitimately needs an internal host, allow that exact host through the proxy's hook layer rather than reopening a range.
 
+### Docker Desktop firewall compatibility
+
+The firewall uses separate `ip` and `ip6` tables for local-address FIB checks. This avoids requiring `CONFIG_NFT_FIB_INET`, which LinuxKit kernels such as Docker Desktop 4.71.0's 6.12.76 kernel omit. All three family tables are replaced in one atomic nftables batch.
+
+Host-side repository build clients are selected with `socket cgroupv2` only when a kernel capability preflight succeeds. On kernels without `CONFIG_NFT_SOCKET`, those output rules are omitted, without runtime warnings or disabling repository builds. **This is a temporary security gap:** the Docker CLI's registry-auth and credential-helper traffic is not restricted to public destinations on those kernels. The cgroup migration still applies resource limits, but does not itself enforce networking. Bridge-attached workspaces, Docker builds, and helper containers retain their destination and isolation rules. A separate build-client network boundary is still needed to close this gap portably.
+
+System still requires cgroup v2 and the base nftables features used by the bridge policy, including `CONFIG_NFT_FIB_IPV4` and `CONFIG_NFT_FIB_IPV6`. Unexpected preflight errors or failure to install the bridge firewall remain fatal before dockerd starts. There is no Docker Desktop version override; capability detection uses the running kernel. Firewall compatibility does not resolve the separate Docker Desktop ingress limitations described under Supported shapes below.
+
+Run `python3 images/system/firewall-kernel-smoke.py` from the repository root on Linux or macOS with Docker running, Bun, and Python 3 installed. It installs nftables in a disposable privileged Ubuntu container and verifies actual IPv4/IPv6 FIB packet lookup, installation of the no-socket rule set, atomic replacement and rollback, and (when available) cgroup-selected local-address blocking and DNS exceptions. It never uses the host network namespace.
+
 Non-System deployment shapes (a host app on macOS, `bun run web` on a Linux host, AgentsInTheCloud nested in a workspace) are trusted-workload development setups and do not install the firewall; do not run untrusted agents in workspaces there.
 
 Restricting workspaces to egress **through the proxy only** (never direct) remains a deliberate one-line firewall change away—drop all forwarding from `atw-*`—but it would break non-HTTP protocols such as git over SSH and QUIC, so it stays deferred.
