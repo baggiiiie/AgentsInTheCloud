@@ -80,6 +80,7 @@ const workspaceTemplateRecordSchema = Type.Object({
   sshKnownHosts: Type.Optional(Type.String()),
   environment: Type.Optional(Type.Array(workspaceTemplateEnvironmentVariableSchema)),
   privileged: Type.Optional(Type.Boolean()),
+  seedConfigEnabled: Type.Optional(Type.Boolean()),
   dockerfile: Type.Optional(Type.String()),
   preloadImages: Type.Optional(Type.Array(Type.String())),
 });
@@ -180,12 +181,13 @@ export function findWorkspaceTemplateRecord(store: WorkspaceTemplateStore, works
   return workspaceTemplate;
 }
 
-export function workspaceTemplateConfigurationFingerprint(workspaceTemplate: Pick<WorkspaceTemplateRecord, "gitUrl" | "branch" | "dockerfile" | "privileged" | "secrets" | "sshKnownHosts"> & { environment?: Pick<WorkspaceTemplateEnvironmentVariable, "name" | "value">[] }): string {
+export function workspaceTemplateConfigurationFingerprint(workspaceTemplate: Pick<WorkspaceTemplateRecord, "gitUrl" | "branch" | "dockerfile" | "privileged" | "seedConfigEnabled" | "secrets" | "sshKnownHosts"> & { environment?: Pick<WorkspaceTemplateEnvironmentVariable, "name" | "value">[] }): string {
   // Only workspace setup snapshots belong here; SSH keys are authorized live. Renaming a template
   // also changes its session share key, which is not worth warning existing workspaces about.
   const configuration = {
     gitUrl: workspaceTemplate.gitUrl, branch: workspaceTemplate.branch,
     privileged: workspaceTemplate.privileged ?? false,
+    seedConfigEnabled: workspaceTemplate.seedConfigEnabled ?? false,
     dockerfile: workspaceTemplate.dockerfile ?? "",
     environment: (workspaceTemplate.environment ?? []).map(({ name, value }) => ({ name, value })).sort((a, b) => a.name.localeCompare(b.name)),
     secrets: (workspaceTemplate.secrets ?? []).filter((secret) => secret.encryptedSecret).map(({ envName, hostPattern, placeholder, allowInPath, encryptedSecret }) => ({ envName, hostPattern, placeholder, allowInPath, encryptedSecret })).sort((a, b) => a.envName.localeCompare(b.envName)),
@@ -205,6 +207,7 @@ function workspaceTemplateSummary(workspaceTemplate: WorkspaceTemplateRecord): W
     lastWorkspaceCreatedAt: workspaceTemplate.lastWorkspaceCreatedAt,
     lastUsedAt: Math.max(workspaceTemplate.createdAt ?? 0, workspaceTemplate.lastWorkspaceCreatedAt ?? 0) || undefined,
     privileged: workspaceTemplate.privileged ?? false,
+    seedConfigEnabled: workspaceTemplate.seedConfigEnabled ?? false,
     dockerfile: workspaceTemplate.dockerfile,
     preloadImages: [...(workspaceTemplate.preloadImages ?? [])],
     configurationFingerprint: workspaceTemplateConfigurationFingerprint(workspaceTemplate),
@@ -337,6 +340,15 @@ export async function setWorkspaceTemplatePrivileged(id: string, privileged: boo
   return updateWorkspaceTemplateStore(file, (store) => {
     const workspaceTemplate = findWorkspaceTemplateRecord(store, id);
     workspaceTemplate.privileged = privileged;
+    return { workspaceTemplate: workspaceTemplateSummary(workspaceTemplate) };
+  });
+}
+
+/** Only host template settings authorize exporting configuration into a workspace. */
+export async function setWorkspaceTemplateSeedConfigEnabled(id: string, enabled: boolean, file = workspaceTemplatesFile()): Promise<UpdateWorkspaceTemplateResult> {
+  return updateWorkspaceTemplateStore(file, (store) => {
+    const workspaceTemplate = findWorkspaceTemplateRecord(store, id);
+    workspaceTemplate.seedConfigEnabled = enabled;
     return { workspaceTemplate: workspaceTemplateSummary(workspaceTemplate) };
   });
 }

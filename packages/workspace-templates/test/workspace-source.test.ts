@@ -5,7 +5,7 @@ import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/pr
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { clearWorkspaceGitHubToken, createAgentsInTheCloudEventBus, setWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
-import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
+import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplateSeedConfigEnabled, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -294,6 +294,26 @@ describe("workspace source preparation", () => {
     expect(other.mounts[0]!.source).not.toBe(workspaceTemplateAPath);
     expect((await stat(workspaceTemplateAPath)).isDirectory()).toBe(true);
     expect(first.initScripts).toEqual([]);
+  });
+
+  test("only host template settings grant seeding permission to the plan", async () => {
+    const events = createAgentsInTheCloudEventBus();
+    registerWorkspaceTemplateWorkspaceInitEvents(events);
+    const template = (await addWorkspaceTemplate("https://example.test/nested.git")).workspaceTemplate;
+    const other = (await addWorkspaceTemplate("https://example.test/other.git")).workspaceTemplate;
+    const provision = async (projectId?: string) => {
+      const init: GitWorkspaceTemplateInitInstruction | undefined = projectId ? { type: "project.git", projectId, name: "nested", gitUrl: template.gitUrl, branch: null, sessionShareKey: "nested" } : undefined;
+      const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+      await events.emit("workspace_plan_prepare", { workspaceId: "seeding", init, workHostPath: join(dataDir, "workspaces", "seeding", "work"), workContainerPath: "/work", plan });
+      return plan;
+    };
+    expect((await provision(template.id)).seedConfigEnabled).toBe(false);
+    await setWorkspaceTemplateSeedConfigEnabled(template.id, true);
+    expect((await provision(template.id)).seedConfigEnabled).toBe(true);
+    expect((await provision(other.id)).seedConfigEnabled).toBe(false);
+    expect((await provision()).seedConfigEnabled).toBeUndefined();
+    await setWorkspaceTemplateSeedConfigEnabled(template.id, false);
+    expect((await provision(template.id)).seedConfigEnabled).toBe(false);
   });
 
   test("privileged mode follows the project at provisioning and links to its settings", async () => {

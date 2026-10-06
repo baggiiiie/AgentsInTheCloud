@@ -14,14 +14,16 @@ import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWork
 
 export const templateSettingsHostId = "template_settings_host";
 export const templateSettingsFrameId = "template_settings_detail";
-export type TemplateSettingsSection = "index" | "general" | "secrets" | "ssh" | "environment" | "container";
+export type TemplateSettingsSection = "index" | typeof sections[number][0];
 export interface TemplateSettingsLocation { section?: string; editor?: string }
 export interface TemplateSettingsReference { workspaceId: string; title: string }
 
 function sectionFor(value?: string): TemplateSettingsSection | undefined {
   if (value === undefined) return undefined;
+  if (value === "index") return value;
+  const section = sections.find(([section]) => section === value)?.[0];
+  if (section) return section;
   switch (value) {
-    case "index": case "general": case "secrets": case "ssh": case "environment": case "container": return value;
     case "repository": return "general";
     case "danger": return "index";
     case "ssh-keys": return "ssh";
@@ -30,7 +32,7 @@ function sectionFor(value?: string): TemplateSettingsSection | undefined {
   }
 }
 const sections = [
-  ["general", "General"], ["secrets", "Secrets"], ["ssh", "SSH access"], ["environment", "Environment"], ["container", "Container"],
+  ["general", "General"], ["secrets", "Secrets"], ["ssh", "SSH access"], ["environment", "Environment"], ["container", "Container"], ["developer", "Developer Settings"],
 ] as const;
 const captionButton = (caption: string, attributesHtml: string, variant: "secondary" | "primary" = "secondary") => buttonHtml({ type: "button", variant, content: { kind: "caption", caption }, attributesHtml });
 const paragraph = (text: string) => `<p class="template-settings-note">${escapeHtml(text)}</p>`;
@@ -107,8 +109,10 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
   let content = "";
   let backSection: TemplateSettingsSection = "index";
   if (section === "index") {
-    content = `<nav class="action-list" aria-label="Template settings sections">${sections.map(([value, label]) => record(id, value, "", label)).join("")}</nav>`;
+    content = `<nav class="action-list" aria-label="Template settings sections">${sections.map(([value, label]) => value === "developer" ? `<div hidden data-template-settings-target="developer">${record(id, value, "", label)}</div>` : record(id, value, "", label)).join("")}</nav>`;
     content += `<details${location.section === "danger" ? " open" : ""}><summary>Delete template</summary>${references.length ? paragraph(`Delete ${references.length === 1 ? `workspace “${references[0]!.title}”` : `${references.length} workspaces`} first. This template is still in use.`) : removeForm(id, "/delete", section, "Delete template", `Permanently delete template “${t.name}”, including its secrets and SSH keys.`)}</details>`;
+  } else if (section === "developer") {
+    content = form(id, "/seed-config", `${selection("Atelier-in-Atelier seeding", "seedConfigEnabled", String(t.seedConfigEnabled ?? false), [{ value: "false", label: "Off" }, { value: "true", label: "On" }])}${paragraph("Allows this repository’s manifest to copy model-provider credentials and saved template configuration into new workspaces. Only enable for repositories and agents you trust.")}${paragraph("Disabling this does not remove credentials already copied into existing workspaces.")}`, { section, saved });
   } else if (section === "general") {
     content = form(id, "", `${field("Display name", "name", t.name, 'required autofocus autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), 'required')}${paragraph("Repository changes apply to new workspaces. Existing workspaces stay unchanged.")}`, { section, saved });
   } else if (section === "secrets") {
@@ -183,7 +187,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
 export async function renderTemplateSettings(id: string, location: TemplateSettingsLocation, references: TemplateSettingsReference[]): Promise<string> {
   const frame = await renderTemplateSettingsFrame(id, location, references);
   const guard = dialogHtml({ element: { id: "template_settings_discard", attributesHtml: 'data-template-settings-target="discard" data-action="cancel->template-settings#stay"' }, iconHtml: Icons.Settings, titleCaption: "Discard unsaved changes?", bodyHtml: paragraph("Your changes haven’t been saved."), omitCancelButton: true, footerHtml: `${captionButton("Stay", 'data-action="template-settings#stay"')}${captionButton("Discard changes", 'data-action="template-settings#discard"', "primary")}` });
-  return `<div id="${templateSettingsHostId}" class="template-settings-host" data-controller="template-settings" data-action="turbo:frame-missing->template-settings#frameMissing keydown->template-settings#keydown">
+  return `<div id="${templateSettingsHostId}" class="template-settings-host" data-controller="template-settings" data-action="turbo:frame-missing->template-settings#frameMissing keydown->template-settings#keydown keydown@window->template-settings#developerKey keyup@window->template-settings#developerKey blur@window->template-settings#developerKey">
     ${frame}${guard}
   </div>`;
 }

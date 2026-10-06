@@ -26,11 +26,17 @@ beforeEach(async () => {
 });
 afterEach(async () => { await rm(directory, { recursive: true, force: true }); });
 
+function emptyPlan(seedConfigEnabled?: boolean): WorkspaceDockerPlan {
+  return { seedConfigEnabled, preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+}
+
+function hostRuntime() {
+  return { agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1" };
+}
+
 async function seedPlan(projectsJson = join(nested, "projects.json")): Promise<WorkspaceDockerPlan> {
-  const plan: WorkspaceDockerPlan = { preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
-  await applySeedConfigManifest({ version: 1, seedAgentsInTheCloudConfig: { projectsJson } }, plan, {
-    agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1",
-  }, join(directory, "seed-config"));
+  const plan = emptyPlan(true);
+  await applySeedConfigManifest({ version: 1, seedAgentsInTheCloudConfig: { projectsJson } }, plan, hostRuntime(), join(directory, "seed-config"));
   return plan;
 }
 
@@ -108,7 +114,32 @@ test("custom catalogue destinations still receive a sanitized copy", async () =>
 
 test("a manifest without catalogue seeding does not copy the host encryption key", async () => {
   await writeFile(join(host, "project-secrets.key"), "fixture");
-  const plan: WorkspaceDockerPlan = { preloadImages: [], labels: {}, env: {}, mounts: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
-  await applySeedConfigManifest({ version: 1 }, plan, { agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1" }, join(directory, "seed-config"));
+  const plan = emptyPlan();
+  await applySeedConfigManifest({ version: 1 }, plan, hostRuntime(), join(directory, "seed-config"));
   expect(plan.containerFiles).toEqual([]);
+});
+
+for (const enabled of [undefined, false]) {
+  test(`seeding requires host authorization (${enabled}) before touching host files`, async () => {
+    for (const requested of [
+      { seedPiConfig: { authJson: "/nested/auth.json", modelsJson: "/nested/models.json", modelsStoreJson: "/nested/models-store.json" } },
+      { seedAgentsInTheCloudConfig: { projectsJson: "/nested/projects.json" } },
+    ]) {
+      const plan = emptyPlan(enabled);
+      await expect(applySeedConfigManifest({ version: 1, ...requested }, plan, hostRuntime(), join(directory, "seed-config"))).rejects.toMatchObject({ code: "workspace_seed_config_disabled" });
+      expect(plan.containerFiles).toEqual([]);
+      expect(plan.initScripts).toEqual([]);
+      expect(await Bun.file(join(directory, "seed-config", "projects.json")).exists()).toBe(false);
+    }
+  });
+}
+
+test("authorized provider seeding copies the requested host files", async () => {
+  await mkdir(join(host, "pi-config"));
+  for (const name of ["auth.json", "models.json", "models-store.json"]) await writeFile(join(host, "pi-config", name), `fixture-${name}`);
+  const plan = emptyPlan(true);
+  await applySeedConfigManifest({ version: 1, seedPiConfig: { authJson: join(nested, "auth.json"), modelsJson: join(nested, "models.json"), modelsStoreJson: join(nested, "models-store.json") } }, plan, hostRuntime(), join(directory, "seed-config"));
+  expect(plan.containerFiles).toHaveLength(3);
+  await installPlan(plan);
+  for (const name of ["auth.json", "models.json", "models-store.json"]) expect(await readFile(join(nested, name), "utf8")).toBe(`fixture-${name}`);
 });

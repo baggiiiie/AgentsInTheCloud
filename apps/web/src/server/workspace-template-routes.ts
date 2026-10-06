@@ -11,7 +11,7 @@ import {
   getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts,
   listWorkspaceTemplates, parseWorkspaceTemplateSpec, renameWorkspaceTemplateSshKey,
   workspaceTemplateSecretPathPermissionSchema,
-  setWorkspaceTemplateDockerfile, setWorkspaceTemplatePreloadImages, setWorkspaceTemplatePrivileged,
+  setWorkspaceTemplateDockerfile, setWorkspaceTemplatePreloadImages, setWorkspaceTemplatePrivileged, setWorkspaceTemplateSeedConfigEnabled,
   setWorkspaceTemplateSshKnownHosts,
   updateWorkspaceTemplate,
   updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret,
@@ -137,7 +137,7 @@ export function createWorkspaceTemplateRoutes(deps: {
     if (concern !== "preload-images") deps.invalidatePresentation();
     if (requestAcceptsJson(request)) return jsonResponse(result);
     const workspaceTemplateId = decodeURIComponent(url.pathname.split("/")[2]!);
-    const section: TemplateSettingsSection = concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
+    const section: TemplateSettingsSection = concern === "seed-config" ? "developer" : concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
     const deleted = url.pathname.endsWith("/delete");
     const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
     // Save/create remains in the editor, using the persisted record ID and fresh credential fields.
@@ -148,19 +148,23 @@ export function createWorkspaceTemplateRoutes(deps: {
     return turboStreamResponse(replace(templateSettingsFrameId, frame));
   }
 
-  async function updateWorkspaceTemplatePrivilegeEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
-    let privileged: boolean;
+  async function readBooleanSetting(request: Request, name: "privileged" | "seedConfigEnabled"): Promise<boolean> {
     if (requestAcceptsJson(request)) {
-      const body = await readJsonObject(request);
-      if (!Value.Check(jsonBooleanSchema, body.privileged)) throw invalidArguments("privileged must be a boolean");
-      privileged = body.privileged;
-    } else {
-      const value = (await request.formData()).get("privileged");
-      if (value !== "true" && value !== "false") throw invalidArguments("privileged must be true or false");
-      privileged = value === "true";
+      const value = (await readJsonObject(request))[name];
+      if (!Value.Check(jsonBooleanSchema, value)) throw invalidArguments(`${name} must be a boolean`);
+      return value;
     }
-    const result = await setWorkspaceTemplatePrivileged(workspaceTemplateId, privileged);
-    return workspaceTemplateSettingsResponse(request, result);
+    const value = (await request.formData()).get(name);
+    if (value !== "true" && value !== "false") throw invalidArguments(`${name} must be true or false`);
+    return value === "true";
+  }
+
+  async function updateWorkspaceTemplatePrivilegeEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
+    return workspaceTemplateSettingsResponse(request, await setWorkspaceTemplatePrivileged(workspaceTemplateId, await readBooleanSetting(request, "privileged")));
+  }
+
+  async function updateWorkspaceTemplateSeedConfigEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
+    return workspaceTemplateSettingsResponse(request, await setWorkspaceTemplateSeedConfigEnabled(workspaceTemplateId, await readBooleanSetting(request, "seedConfigEnabled")));
   }
 
   async function updateWorkspaceTemplateDockerfileEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
@@ -329,6 +333,7 @@ export function createWorkspaceTemplateRoutes(deps: {
     let params: string[] | undefined;
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/privileged$/)) && request.method === "POST") return await updateWorkspaceTemplatePrivilegeEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateWorkspaceTemplateDockerfileEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/seed-config$/)) && request.method === "POST") return await updateWorkspaceTemplateSeedConfigEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateWorkspaceTemplatePreloadImagesEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)$/)) && request.method === "GET" && requestAcceptsJson(request)) return await workspaceTemplateDetailEndpoint(params[0]!);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)$/)) && request.method === "POST") return await updateWorkspaceTemplateEndpoint(params[0]!, request);

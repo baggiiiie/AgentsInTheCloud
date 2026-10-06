@@ -455,8 +455,9 @@ export async function createWorkspace(options: { id: string; events: AgentsInThe
       activePlan.mounts.push({ type: "volume", target: "/data" });
       activePlan.mounts.push({ type: "bind", source: "/data/erofs-cache", target: "/data/erofs-cache", readonly: true });
       activePlan.mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), target: "/run/agents-in-the-cloud-parent", readonly: true });
-      await applyRepoWorkspaceManifest(id, source.worktreePath, activePlan);
       await events.emit("workspace_plan_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot, plan: activePlan });
+      // Host modules authorize seeding before any repository-requested config is exported.
+      await applyRepoWorkspaceManifest(id, source.worktreePath, activePlan);
       // Gate once, after all modules have contributed their image requests.
       if (!activePlan.privileged) activePlan.preloadImages = [];
       return activePlan;

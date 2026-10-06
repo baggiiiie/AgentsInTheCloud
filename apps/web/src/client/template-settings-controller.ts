@@ -18,7 +18,9 @@ export function restoreTemplateSettingsDestination(): boolean {
 
 /** Browser-owned draft, focus and navigation behavior; all settings markup comes from the server. */
 export class TemplateSettingsController extends Controller<HTMLElement> {
-  static targets = ["form", "discard", "frame", "content"];
+  static targets = ["form", "discard", "frame", "content", "developer"];
+  declare readonly developerTargets: HTMLElement[];
+  private altPressed = false;
   declare readonly formTargets: HTMLFormElement[];
   declare readonly discardTarget: HTMLDialogElement;
   declare readonly frameTarget: HTMLElement;
@@ -76,6 +78,12 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       if (templateSettingsPath.test(location.pathname)) history.replaceState(history.state, "", this.returnUrl);
       if (this.opener?.isConnected) this.opener.focus({ preventScroll: true });
     }
+  }
+
+  developerTargetConnected(target: HTMLElement): void { target.hidden = !this.altPressed; }
+  developerKey(event: KeyboardEvent | FocusEvent): void {
+    this.altPressed = event instanceof KeyboardEvent && event.altKey;
+    for (const target of this.developerTargets) target.hidden = !this.altPressed;
   }
 
   formTargetConnected(form: HTMLFormElement): void {
@@ -205,10 +213,11 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
   }
 
   private readonly navigate = (event: MouseEvent): void => {
-    if (this.bypass || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (this.bypass || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>("a[href], [data-workspace-entry-id]") : null;
     if (!target || target.closest("dialog")) return;
     const inside = this.element.contains(target);
+    if (event.altKey && !(inside && target.closest('[data-template-settings-target="developer"]'))) return;
     // Normal links opening another tab do not abandon the current draft.
     if (target instanceof HTMLAnchorElement && target.target === "_blank") return;
     if (inside) this.focusRecord = target.dataset.templateSettingsFocus;
@@ -222,7 +231,8 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       target.click();
       this.bypass = false;
     };
-    if (this.submissions || this.dirty() || !inside) {
+    // Turbo ignores Alt-clicks; the revealed developer entry uses the same replay path.
+    if (event.altKey || this.submissions || this.dirty() || !inside) {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.guard(action);

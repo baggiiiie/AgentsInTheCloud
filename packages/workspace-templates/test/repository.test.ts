@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setGitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setGitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
 
 describe("projects", () => {
   test("parseProjectSpec supports an optional #branch suffix", () => {
@@ -212,4 +212,18 @@ describe("projects", () => {
       else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
     }
   });
+});
+
+test("seeding permission defaults off for older templates and persists an explicit opt-in", async () => {
+  const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-seed-permission-")), "projects.json");
+  const template = (await addWorkspaceTemplate("https://github.com/org/nested.git", file)).workspaceTemplate;
+  expect(template.seedConfigEnabled).toBe(false);
+  const original = template.configurationFingerprint;
+  const enabled = (await setWorkspaceTemplateSeedConfigEnabled(template.id, true, file)).workspaceTemplate;
+  expect(enabled.seedConfigEnabled).toBe(true);
+  expect(enabled.configurationFingerprint).not.toBe(original);
+  expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.seedConfigEnabled).toBe(true);
+  const disabled = (await setWorkspaceTemplateSeedConfigEnabled(template.id, false, file)).workspaceTemplate;
+  expect(disabled.seedConfigEnabled).toBe(false);
+  expect(disabled.configurationFingerprint).toBe(original);
 });

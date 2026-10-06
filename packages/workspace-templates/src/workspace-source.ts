@@ -389,6 +389,7 @@ export function registerWorkspaceTemplateWorkspaceInitEvents(events: AgentsInThe
     if (isGitWorkspaceTemplateInit(init)) {
       const settings = await getWorkspaceTemplateConfiguration(init.projectId);
       plan.privileged = settings.privileged;
+      plan.seedConfigEnabled = settings.seedConfigEnabled;
       plan.dockerSupportSettingsUrl = `/workspace-templates/${encodeURIComponent(init.projectId)}/settings?section=privileged`;
       plan.preloadImages = [...settings.preloadImages ?? []];
       plan.mounts.push({ type: "bind", ...(await workspaceTemplatePersistentMount(init.projectId)) });

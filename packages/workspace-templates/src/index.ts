@@ -13,6 +13,7 @@ export {
   updateWorkspaceTemplate,
   setWorkspaceTemplateDockerfile,
   setWorkspaceTemplatePrivileged,
+  setWorkspaceTemplateSeedConfigEnabled,
   setWorkspaceTemplatePreloadImages,
   type AddWorkspaceTemplateResult,
   type DeleteWorkspaceTemplateResult,

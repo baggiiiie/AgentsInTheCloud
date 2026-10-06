@@ -1,16 +1,22 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { agentsInTheCloudDataPath, type AgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, agentsInTheCloudDataPath, type AgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import type { RepoWorkspaceManifest } from "./index.ts";
 import type { WorkspaceDockerPlan } from "./types.ts";
 import { seedConfigInstallScript } from "./startup-scripts.ts";
 
 export async function applySeedConfigManifest(manifest: RepoWorkspaceManifest, plan: WorkspaceDockerPlan, runtime: AgentsInTheCloudRuntimeContext, seedDirectory: string): Promise<void> {
-  const entries = [
-    manifest.seedPiConfig?.authJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "auth.json"), staging: "/.agents-in-the-cloud/seed-pi-auth.json", target: manifest.seedPiConfig.authJson } : undefined,
-    manifest.seedPiConfig?.modelsJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "models.json"), staging: "/.agents-in-the-cloud/seed-pi-models.json", target: manifest.seedPiConfig.modelsJson } : undefined,
-    manifest.seedPiConfig?.modelsStoreJson ? { source: agentsInTheCloudDataPath(runtime, "pi-config", "models-store.json"), staging: "/.agents-in-the-cloud/seed-pi-models-store.json", target: manifest.seedPiConfig.modelsStoreJson } : undefined,
-  ].filter((entry): entry is { source: string; staging: string; target: string } => Boolean(entry));
+  if ((manifest.seedPiConfig || manifest.seedAgentsInTheCloudConfig) && !plan.seedConfigEnabled) {
+    throw new AgentsInTheCloudCoreError("workspace_seed_config_disabled", "This repository requests Atelier-in-Atelier seeding. Enable it in the workspace template’s Developer Settings (hold Alt in template settings), then create a new workspace.");
+  }
+  const entries: Array<{ source: string; staging: string; target: string }> = [];
+  for (const [name, target] of [
+    ["auth", manifest.seedPiConfig?.authJson],
+    ["models", manifest.seedPiConfig?.modelsJson],
+    ["models-store", manifest.seedPiConfig?.modelsStoreJson],
+  ] as const) {
+    if (target) entries.push({ source: agentsInTheCloudDataPath(runtime, "pi-config", `${name}.json`), staging: `/.agents-in-the-cloud/seed-pi-${name}.json`, target });
+  }
   const projectsJson = manifest.seedAgentsInTheCloudConfig?.projectsJson;
   if (projectsJson) {
     // Sanitize on the host: neither encrypted credentials nor the master key may
