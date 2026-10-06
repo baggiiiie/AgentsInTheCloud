@@ -34,6 +34,7 @@
 }
 
 .changes-body {
+  --changes-history-more-height: 34px;
   position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
   container: changes-view / size;
   /* Ordinary graph colors stay at least 90° away from the selected path hue. */
@@ -54,7 +55,7 @@
 .changes-diff-endpoints-header [aria-expanded="false"] .disclosure-icon { transform: rotate(-90deg); }
 .changes-picker-host {
   flex: none; display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line);
-  height: min(60%, calc(min(var(--changes-history-rows, 1), 10) * 36px + var(--changes-history-chrome, 64px)));
+  height: min(60%, calc(min(var(--changes-history-rows, 1), 10) * 36px + var(--changes-history-chrome, var(--changes-history-more-height))));
 }
 .changes-history-scroll { height: 100%; min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
 .changes-history-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--text-code); }
@@ -77,7 +78,22 @@
 .changes-history-table tbody tr:focus-visible td:not(.changes-graph-cell) { outline: 1px solid var(--accent); outline-offset: -1px; }
 .changes-history-edges path { opacity: .35; }
 .changes-history-table tbody { touch-action: pan-y; }
-.changes-history-more { display: flex; align-items: center; justify-content: center; height: 64px; padding: 8px; }
+.changes-history-content:has(.changes-history-more) .changes-history-table { margin-bottom: var(--changes-history-more-height); }
+.changes-history-more {
+  position: sticky; bottom: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; height: var(--changes-history-more-height); padding: 4px 8px;
+  margin-top: calc(-1 * var(--changes-history-more-height));
+  isolation: isolate; pointer-events: none;
+}
+.changes-history-more::before {
+  content: ""; position: absolute; inset: -36px 0 0; z-index: -1;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+}
+.changes-history-more > .button { pointer-events: auto; background: var(--panel); }
+@media (max-width: 700px), (pointer: coarse) {
+  .changes-body { --changes-history-more-height: 52px; }
+}
 .changes-loading { position: absolute; inset: var(--changes-comparison-top, 49px) 0 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); background: var(--bg); }
 .changes-spinner { width: 18px; height: 18px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: changes-spin 800ms linear infinite; }
 @keyframes changes-spin { to { transform: rotate(360deg); } }

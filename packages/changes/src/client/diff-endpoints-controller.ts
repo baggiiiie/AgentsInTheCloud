@@ -218,7 +218,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       const description = applied ? this.comparison!.label : diffEndpointsDescription(model, selected);
       setContentRowLabel(this.triggerTarget, this.awaitingEnd ? "Select a second commit for a custom range" : description);
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
-      this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
+      this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "var(--changes-history-more-height)" : "0px");
     }
     private measure(): void {
       const toolbar = this.diffTarget.querySelector<HTMLElement>(".changes-toolbar")!;
