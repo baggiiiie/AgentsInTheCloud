@@ -2,7 +2,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setGitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, commitIdentitySettingsFile, hasCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
 
 describe("Workspace templates", () => {
   test("parseWorkspaceTemplateSpec supports an optional #branch suffix", () => {
@@ -192,17 +192,24 @@ describe("Workspace templates", () => {
     expect(await listWorkspaceTemplates(file)).toEqual({ workspaceTemplates: [second] });
   });
 
-  test("Settings Git identity is stored by the workspace-templates module", async () => {
+  test("Settings Commit identity is stored by the workspace-templates module", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-")), "project-settings.json");
 
-    expect(await hasGitIdentity(file)).toBe(false);
-    await setGitIdentity({ name: " Ada Lovelace ", email: " ada@example.com " }, file);
+    expect(await hasCommitIdentity(file)).toBe(false);
+    await setCommitIdentity({ name: " Ada Lovelace ", email: " ada@example.com " }, file);
 
-    expect(await hasGitIdentity(file)).toBe(true);
-    expect(await getGitIdentity(file)).toEqual({ name: "Ada Lovelace", email: "ada@example.com" });
+    expect(await hasCommitIdentity(file)).toBe(true);
+    expect(await getCommitIdentity(file)).toEqual({ name: "Ada Lovelace", email: "ada@example.com" });
+    expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ gitIdentity: { name: "Ada Lovelace", email: "ada@example.com" } });
   });
 
-  test("Git identity adopts the host global git config when Settings has no saved Git identity", async () => {
+  test("Commit identity reads the existing serialized gitIdentity field", async () => {
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-commit-identity-")), "project-settings.json");
+    await writeFile(file, JSON.stringify({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } }));
+    expect(await getStoredCommitIdentity(file)).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
+  });
+
+  test("Commit identity adopts the host global git config when Settings has no saved Commit identity", async () => {
     const previousDataDir = process.env.ATELIER_DATA_DIR;
     const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
     const dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-"));
@@ -212,9 +219,9 @@ describe("Workspace templates", () => {
     try {
       await writeFile(gitConfig, "[user]\n\tname = Grace Hopper\n\temail = grace@example.com\n", "utf8");
 
-      expect(await getStoredGitIdentity()).toBeUndefined();
-      expect(await getGitIdentity()).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
-      expect(JSON.parse(await readFile(gitIdentitySettingsFile(), "utf8"))).toEqual({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } });
+      expect(await getStoredCommitIdentity()).toBeUndefined();
+      expect(await getCommitIdentity()).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
+      expect(JSON.parse(await readFile(commitIdentitySettingsFile(), "utf8"))).toEqual({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } });
     } finally {
       if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
       else process.env.ATELIER_DATA_DIR = previousDataDir;

@@ -39,7 +39,7 @@ export interface SupervisorView {
   stopping: boolean;
   failure?: string;
   candidate: string;
-  accessMode: string;
+  connectionMode: string;
   connectionState: string;
   connectionProblem?: string;
   connectionAction?: { description: string; url?: string };
@@ -68,14 +68,14 @@ export function supervisorFragment(view: SupervisorView): string {
       <form method="post" action="/retry">${button(view.recoveringHealth ? "Restart AgentsInTheCloud" : "Retry startup")}</form>
     </div>` : "";
 
-  const remote = view.accessMode === "tailscale";
+  const remote = view.connectionMode === "tailscale";
   const accessSummary = remote
-    ? `Via Tailscale — use it from any device on your tailnet.<br>Tailscale: ${escapeHtml(view.connectionState)}`
-    : "This computer only — Tailscale is off.";
+    ? `Devices on your Tailscale network — including the installation computer.<br>Tailscale: ${escapeHtml(view.connectionState)}`
+    : "Installation computer only — Tailscale is off.";
   const accessActions = `
-    ${!remote || (!view.authUrl && view.connectionState !== "Running") ? `<form method="post" action="/connect">${button(remote ? "Retry Tailscale connection" : "Use Tailscale")}</form>` : ""}
-    ${remote && view.connectionState === "Running" ? "<p>Switching to this computer only will disconnect devices using Tailscale.</p>" : ""}
-    ${remote ? `<form method="post" action="/local">${button("Use this computer only")}</form>` : ""}`;
+    ${!remote || (!view.authUrl && view.connectionState !== "Running") ? `<form method="post" action="/connect">${button(remote ? "Retry Tailscale connection" : "Use devices on your Tailscale network")}</form>` : ""}
+    ${remote && view.connectionState === "Running" ? "<p>Switching to installation computer only will disconnect devices using Tailscale.</p>" : ""}
+    ${remote ? `<form method="post" action="/local">${button("Use installation computer only")}</form>` : ""}`;
 
   return `<section aria-label="AgentsInTheCloud System"><h1>${title}</h1>
     <section class="system-checklist" aria-label="AgentsInTheCloud preparation">${view.stopping ? "" : `<ol class="status-list">${checklist}</ol>`}${failureActions}</section>

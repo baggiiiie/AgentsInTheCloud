@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { clearWorkspaceGitHubToken, createAgentsInTheCloudEventBus, setWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
+import { clearGitHubToken, createAgentsInTheCloudEventBus, setGitHubToken } from "@agents-in-the-cloud/core";
 import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplateSeedConfigEnabled, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
@@ -67,7 +67,7 @@ describe("workspace source preparation", () => {
 
   afterEach(async () => {
     await stopWorkspaceTemplateSshAgents();
-    clearWorkspaceGitHubToken();
+    clearGitHubToken();
     if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
     else process.env.ATELIER_DATA_DIR = previousDataDir;
     if (previousGitHubToken === undefined) delete process.env.GH_TOKEN;
@@ -199,7 +199,7 @@ describe("workspace source preparation", () => {
     await chmod(fakeGit, 0o755);
     const previousPath = process.env.PATH;
     process.env.PATH = `${fakeBin}:${previousPath ?? ""}`;
-    setWorkspaceGitHubToken("stored-token");
+    setGitHubToken("stored-token");
     try {
       await prepareWorkspaceSource({ workspaceId: "ws-token", gitUrl: fixture.remote, branch: "main" });
     } finally {

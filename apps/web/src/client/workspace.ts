@@ -12,7 +12,7 @@ import {
 import { createProvisionTerminalController } from "@agents-in-the-cloud/workspace/client";
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import * as Turbo from "@hotwired/turbo";
-import { AccessSettingsController } from "./access-settings.ts";
+import { ConnectionModeSettingsController } from "./connection-mode-settings.ts";
 import { PwaReminderController } from "./pwa-reminder.ts";
 import { registerWorkspaceAppFrameController } from "./workspace-app-frame.ts";
 import { installWorkspaceCable } from "./workspace-cable.ts";
@@ -53,7 +53,7 @@ Turbo.StreamActions["select-workspace"] = function selectWorkspace(this: HTMLEle
 
 for (const module of workspaceClientModules) await module.install({ application, Controller, hooks: clientHooks });
 registerWorkspaceControllers({
-  "access-settings": AccessSettingsController,
+  "connection-mode-settings": ConnectionModeSettingsController,
   "pwa-reminder": PwaReminderController,
   "workspace-presentation": createWorkspacePresentationController(Controller, application, clientHooks),
 });

@@ -15,7 +15,7 @@ AgentsInTheCloud is a self-hosted browser app for working with coding agents in 
 
 The app-level configuration for getting started includes:
 
-- **Git identity**: the name and email used for commits created in workspaces.
+- **Commit identity**: the name and email used for commits created in workspaces.
 - **GitHub**: a token AgentsInTheCloud can use to clone and push private GitHub repositories.
 - **Models**: connect Model providers and enable models for the composers.
 

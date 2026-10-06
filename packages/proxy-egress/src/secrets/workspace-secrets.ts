@@ -1,4 +1,4 @@
-import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
+import { clearGitHubToken as clearStoredGitHubToken, discoverGitHubToken, hasGitHubToken as hasStoredGitHubToken, setGitHubToken as setStoredGitHubToken } from "@agents-in-the-cloud/core";
 import { isGitWorkspaceTemplateInit, workspaceTemplateIdFromInit, revealWorkspaceTemplateSecrets, onWorkspaceTemplateStoreChanged, workspaceTemplateSecretPlaceholder, workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath } from "@agents-in-the-cloud/workspace-templates";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { matchHostname } from "./patterns.ts";
@@ -51,19 +51,19 @@ function invalidateContexts(): void {
 }
 onWorkspaceTemplateStoreChanged(invalidateContexts);
 
-export { discoverHostGitHubToken };
+export { discoverGitHubToken };
 
-export function hasWorkspaceGitHubToken(): boolean {
-  return hasStoredWorkspaceGitHubToken();
+export function hasGitHubToken(): boolean {
+  return hasStoredGitHubToken();
 }
 
-export function setWorkspaceGitHubToken(token: string): void {
-  setStoredWorkspaceGitHubToken(token);
+export function setGitHubToken(token: string): void {
+  setStoredGitHubToken(token);
   invalidateContexts();
 }
 
-export function clearWorkspaceGitHubToken(): void {
-  clearStoredWorkspaceGitHubToken();
+export function clearGitHubToken(): void {
+  clearStoredGitHubToken();
   invalidateContexts();
 }
 
@@ -72,7 +72,7 @@ export async function createWorkspaceSecretContext(workspaceId: string, init?: W
   if (existing) return existing;
 
   const generation = configurationGeneration;
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   const secrets: Record<string, SecretDefinition> = token
     ? { [githubTokenEnvVar]: { value: token, hosts: githubAllowedHosts(), placeholder: workspaceTemplateSecretPlaceholder(githubTokenEnvVar) } }
     : {};

@@ -7,9 +7,10 @@ import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 
+// The System access API and marker retain their existing protocol spelling.
 const managed = () => existsSync("/run/agents-in-the-cloud-system/access-v1");
 const schema = Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), connectionState: Type.String(), authUrl: Type.Optional(Type.String()), error: Type.Optional(Type.String()) });
-export async function renderAccessSettings(source = true): Promise<string> {
+export async function renderConnectionModeSettings(source = true): Promise<string> {
   if (!managed()) return "";
   const status = await fetch("http://127.0.0.1:3001/access");
   if (!status.ok) throw new Error(`System access status: ${status.status}`);
@@ -17,31 +18,31 @@ export async function renderAccessSettings(source = true): Promise<string> {
   const remote = access.mode === "tailscale";
   const modeToggle = toggleHtml({
     variant: "button",
-    label: "Connect to AgentsInTheCloud",
+    label: "Where can you use AgentsInTheCloud?",
     name: "mode",
     value: access.mode,
     form: { action: "/settings/access" },
     options: [
-      { value: "localhost", label: "This computer only" },
-      { value: "tailscale", label: "Tailscale" },
+      { value: "localhost", label: "Installation computer only" },
+      { value: "tailscale", label: "Devices on your Tailscale network" },
     ],
   });
   const connected = remote && access.connectionState === "Running";
   const connectionAction = !remote || connected ? "" : access.authUrl
     ? actionLinkHtml({ href: access.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
     : `<form action="/settings/access" method="post"><input type="hidden" name="mode" value="tailscale">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Retry Tailscale connection" } })}</form>`;
-  return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="access-settings">
+  return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="connection-mode-settings">
     <section class="settings-sec">
-      <div class="settings-choice-row"><h2>Connect to AgentsInTheCloud</h2>${modeToggle}</div>
-      <p>${remote ? "Via Tailscale — use it from any device on your tailnet." : "This computer only — Tailscale is off."}</p>
+      <div class="settings-choice-row"><h2>Where can you use AgentsInTheCloud?</h2>${modeToggle}</div>
+      <p>${remote ? "Use AgentsInTheCloud and Workspace previews from devices on your Tailscale network, including the installation computer." : "Use AgentsInTheCloud and Workspace previews in a browser on the computer where AgentsInTheCloud is installed. Tailscale is off."}</p>
       ${remote && !connected ? "<p>Tailscale isn’t connected yet.</p>" : ""}
-      ${connected ? "<p>Switching to this computer only will disconnect devices using Tailscale.</p>" : ""}
+      ${connected ? "<p>Switching to installation computer only will disconnect devices using Tailscale.</p>" : ""}
       ${access.error ? `<p class="settings-error">${escapeHtml(access.error)}</p>` : ""}
       ${connectionAction}
     </section>
   </turbo-frame>`;
 }
-export async function handleAccessSettings(request: Request, url: URL): Promise<Response | undefined> {
+export async function handleConnectionModeSettings(request: Request, url: URL): Promise<Response | undefined> {
   if (!url.pathname.startsWith("/settings/access")) return;
   if (!managed()) return new Response("System access settings are unavailable", { status: 404 });
   if (url.pathname === "/settings/access/events" && request.method === "GET") {
@@ -56,5 +57,5 @@ export async function handleAccessSettings(request: Request, url: URL): Promise<
     if (!result.ok) throw new Error(`System access setting: ${result.status}: ${await result.text()}`);
     return Response.redirect(new URL("/settings/access", url), 303);
   }
-  if (request.method === "GET") return response(await renderAccessSettings(false));
+  if (request.method === "GET") return response(await renderConnectionModeSettings(false));
 }

@@ -1,4 +1,4 @@
-import { handleAccessSettings } from "./access.ts";
+import { handleConnectionModeSettings } from "./connection-mode.ts";
 import { handleGitHubSettingsRequest } from "./github.ts";
 import { handleModelsRequest } from "@agents-in-the-cloud/llm/server";
 import { finishOnboarding } from "../onboarding/state.ts";
@@ -11,7 +11,7 @@ export async function handleSettingsRequest(
   url: URL,
   options: { forceDeleteAllWorkspaces?: () => Promise<WorkspaceCleanupResult>; renderModelPickerUpdates: () => Promise<string>; themeChanged: () => void },
 ): Promise<Response | undefined> {
-  const response = await handleAccessSettings(request, url)
+  const response = await handleConnectionModeSettings(request, url)
     ?? await handleThemeSettingsRequest(request, url, options.themeChanged)
     ?? await handleSettingsPageRequest(request, url, options)
     ?? await handleGitHubSettingsRequest(request, url)

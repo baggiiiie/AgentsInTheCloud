@@ -53,12 +53,12 @@ export {
 } from "./runtime-context.ts";
 
 export {
-  clearWorkspaceGitHubToken,
-  discoverHostGitHubToken,
+  clearGitHubToken,
+  discoverGitHubToken,
   gitHubCredentialHelperCommand,
   gitHubCredentialHelperShellBody,
-  hasWorkspaceGitHubToken,
-  setWorkspaceGitHubToken,
+  hasGitHubToken,
+  setGitHubToken,
 } from "./github-token.ts";
 
 export { createKeyedOperationQueue } from "./keyed-operation-queue.ts";

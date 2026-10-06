@@ -1,4 +1,4 @@
-import { renderAccessSettings } from "./access.ts";
+import { renderConnectionModeSettings } from "./connection-mode.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
@@ -6,9 +6,9 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { createPiModelRuntime, modelsDialogId, setEnabledModels } from "@agents-in-the-cloud/llm/server";
 import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
-import { clearWorkspaceGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { clearGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
-import { clearGitIdentity, getGitIdentity, setGitIdentity } from "@agents-in-the-cloud/workspace-templates";
+import { clearCommitIdentity, getCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud/workspace-templates";
 import { instanceUrlHtml } from "../instance-url.ts";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
@@ -21,17 +21,17 @@ function devSettingsEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-async function renderGitIdentityForm(error = ""): Promise<string> {
-  const identity = await getGitIdentity();
-  return `<form id="settings_git_identity" class="settings-git-identity" method="post" action="/settings/git-identity" autocomplete="off" data-controller="git-identity" data-action="input->git-identity#queue change->git-identity#save submit->git-identity#submit">
+async function renderCommitIdentityForm(error = ""): Promise<string> {
+  const identity = await getCommitIdentity();
+  return `<form id="settings_commit_identity" class="settings-commit-identity" method="post" action="/settings/commit-identity" autocomplete="off" data-controller="commit-identity" data-action="input->commit-identity#queue change->commit-identity#save submit->commit-identity#submit">
     ${error ? `<p class="settings-error">${escapeHtml(error)}</p>` : ""}
     <label class="settings-field"><span class="settings-field-label">Commit author name</span><input class="settings-input text-field" name="commitAuthorName" value="${escapeHtml(identity?.name ?? "")}" placeholder="Ada Lovelace" autocomplete="off" data-1p-ignore required></label>
     <label class="settings-field"><span class="settings-field-label">Commit author email</span><input class="settings-input text-field" type="email" name="commitAuthorEmail" value="${escapeHtml(identity?.email ?? "")}" placeholder="ada@example.com" autocomplete="off" data-1p-ignore required></label>
   </form>`;
 }
 
-async function renderGitIdentitySettings(): Promise<string> {
-  return `<section class="settings-sec" id="settings-sec-git-identity">${await renderGitIdentityForm()}</section>`;
+async function renderCommitIdentitySettings(): Promise<string> {
+  return `<section class="settings-sec" id="settings-sec-commit-identity"><h2>Commit identity</h2>${await renderCommitIdentityForm()}</section>`;
 }
 
 function renderBuildIdentity(): string {
@@ -72,7 +72,7 @@ function renderResetSettings(): string {
   return `<div class="settings-development-action">
     <div class="settings-development-copy">
       <div>Stored settings</div>
-      <p>Delete the Git identity, GitHub token, and model provider credentials stored by AgentsInTheCloud.</p>
+      <p>Delete the Commit identity, GitHub token, and model provider credentials stored by AgentsInTheCloud.</p>
     </div>
     <div class="settings-development-control"><form method="post" action="/settings/reset" data-turbo="true">${confirmation}</form></div>
   </div>`;
@@ -84,9 +84,9 @@ async function renderDevelopmentSettings(): Promise<string> {
   return `${keypressProbeSettings}<section class="settings-sec settings-sec-development">${destructiveActions}</section>`;
 }
 
-registerSettingsContribution({ id: "access", label: "Access", order: 15, render: renderAccessSettings });
+registerSettingsContribution({ id: "access", label: "Connection mode", order: 15, render: renderConnectionModeSettings });
 registerSettingsContribution({ id: "theme", label: "Theme", order: 10, render: renderThemeSettings });
-registerSettingsContribution({ id: "git-identity", label: "Git identity", order: 20, render: renderGitIdentitySettings });
+registerSettingsContribution({ id: "commit-identity", label: "Commit identity", order: 20, render: renderCommitIdentitySettings });
 for (const module of workspaceModules) {
   for (const contribution of module.settingsContributions ?? []) registerSettingsContribution(contribution);
 }
@@ -108,6 +108,8 @@ function settingsDialogHtml(titleCaption: string, bodyHtml: string, sectionId?: 
 }
 
 export async function renderSettingsDialog(request: Request, sectionId?: string): Promise<string> {
+  // Keep previously published Settings links working without retaining the old app name.
+  if (sectionId === "git-identity") sectionId = "commit-identity";
   const contributions = listSettingsContributions().filter((contribution) => contribution.id !== "keypress-probe");
   if (sectionId && !contributions.some((contribution) => contribution.id === sectionId)) throw invalidArguments(`settings section not found: ${sectionId}`);
   const sections = await Promise.all(contributions.map((contribution) => contribution.render()));
@@ -132,8 +134,8 @@ export async function renderDevelopmentSettingsDialog(): Promise<string> {
 
 async function deleteAllStoredSettings(): Promise<void> {
   await resetOnboarding();
-  clearWorkspaceGitHubToken();
-  await clearGitIdentity();
+  clearGitHubToken();
+  await clearCommitIdentity();
   await setEnabledModels([]);
   const runtime = await createPiModelRuntime();
   for (const credential of await runtime.listCredentials()) await runtime.logout(credential.providerId);
@@ -159,13 +161,14 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
       : { deleted: 0, errors: ["Workspace deletion is not available."] };
     return stream(replace("settings_force_delete_workspaces", renderForceDeleteWorkspaces(result)));
   }
-  if (url.pathname === "/settings/git-identity" && request.method === "POST") {
+  // Retain the old POST URL as an external boundary for existing clients.
+  if ((url.pathname === "/settings/commit-identity" || url.pathname === "/settings/git-identity") && request.method === "POST") {
     const form = await request.formData();
     try {
-      await setGitIdentity({ name: String(form.get("commitAuthorName") ?? ""), email: String(form.get("commitAuthorEmail") ?? "") });
+      await setCommitIdentity({ name: String(form.get("commitAuthorName") ?? ""), email: String(form.get("commitAuthorEmail") ?? "") });
     } catch (error) {
       const message = errorMessage(error);
-      return stream(replace("settings_git_identity", await renderGitIdentityForm(message)));
+      return stream(replace("settings_commit_identity", await renderCommitIdentityForm(message)));
     }
     return stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
   }

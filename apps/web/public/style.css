@@ -345,7 +345,7 @@ button { border: 0; background: none; cursor: pointer; }
 .settings-development-action .settings-error { margin: 8px 0 0; white-space: pre-wrap; }
 .settings-sub { color: var(--text); margin: 2px 0 0; max-width: 620px; }
 .settings-field { display: flex; align-items: center; gap: 16px; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--line); }
-.settings-git-identity .settings-field { border-top: 0; }
+.settings-commit-identity .settings-field { border-top: 0; }
 .settings-field-label { white-space: nowrap; }
 .settings-field p { margin: 2px 0 0; color: var(--text); }
 .settings-select { padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: var(--bg); color: var(--text-bright); font: inherit; }

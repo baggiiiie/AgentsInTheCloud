@@ -84,7 +84,7 @@ class SettingsAutosaveController extends Controller<HTMLFormElement> {
   }
 }
 
-class GitIdentityController extends Controller<HTMLFormElement> {
+class CommitIdentityController extends Controller<HTMLFormElement> {
   private timer: number | undefined;
   private saving = false;
 
@@ -192,7 +192,7 @@ class SshPublicKeyCopyController extends Controller<HTMLElement> {
 export function registerWorkspaceSettingsControllers(): void {
   registerWorkspaceControllers({
     "agents-in-the-cloud-theme": AgentsInTheCloudThemeController,
-    "git-identity": GitIdentityController,
+    "commit-identity": CommitIdentityController,
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
     "template-settings": TemplateSettingsController,

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
-import { discoverHostGitHubToken } from "@agents-in-the-cloud/proxy-egress";
+import { discoverGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { escapeHtml, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
@@ -81,7 +81,7 @@ export async function searchGitHubRepositories(query: string): Promise<GitHubRep
     if (entry.expiresAt <= now) searchCache.delete(key);
   }
 
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   const normalized = query.trim().toLowerCase();
   const credentialKey = token ? createHash("sha256").update(token).digest("hex").slice(0, 16) : "public";
   const cacheKey = `${credentialKey}:${normalized}`;

@@ -9,8 +9,28 @@ The guided flow for getting started with AgentsInTheCloud by connecting GitHub a
 _Avoid_: Initial setup (as the feature name), Workspace setup
 
 **Settings**:
-The app-level surface for AgentsInTheCloud preferences and shared configuration, such as access, theme, Git identity, GitHub, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
+The app-level surface for AgentsInTheCloud preferences and shared configuration, such as Connection mode, theme, Commit identity, GitHub connection, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
 _Avoid_: Preferences, app settings, global settings (as feature names), workspace settings (for this surface)
+
+**Connection mode**:
+The installation-wide choice of where AgentsInTheCloud and Workspace previews can be used: Installation computer only, or Devices on your Tailscale network. The selected mode determines generated preview addresses; Tailscale mode includes the installation computer.
+_Avoid_: App access, Local / Remote (as mode labels)
+
+**Installation computer**:
+The computer where AgentsInTheCloud is installed, which may differ from the device running the user's browser.
+_Avoid_: This computer (when the installation computer is meant), System container (as the computer's identity)
+
+**GitHub connection**:
+The app-wide connection that lets AgentsInTheCloud and Agents access GitHub repositories using a GitHub token. It is shared across Workspaces, not configured separately for each Workspace. It is distinct from Commit identity, which determines the author name and email on commits.
+_Avoid_: GitHub setup (as the feature name), Workspace GitHub connection
+
+**Commit identity**:
+The app-level author name and email used to configure commits in new Workspaces. It is distinct from the GitHub connection and its access credential; choosing a Commit identity does not authenticate with GitHub.
+_Avoid_: Git identity, GitHub identity (for commit authorship)
+
+**GitHub token**:
+The credential used by the GitHub connection. AgentsInTheCloud keeps the token outside Agent sandboxes and supplies repository access without exposing the token to Agents.
+_Avoid_: Workspace GitHub token
 
 **Host**:
 The feature for inspecting AgentsInTheCloud System diagnostics and using privileged terminals outside individual Workspaces. Host access targets the System environment, not necessarily the physical machine running Docker.

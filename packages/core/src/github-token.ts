@@ -20,6 +20,7 @@ echo password="$GH_TOKEN"`;
 
 export const gitHubCredentialHelperCommand = `!f() { ${gitHubCredentialHelperShellBody}; }; f`;
 
+// Keep the existing credential paths so older installations retain their GitHub connection.
 function storedGitHubTokenPath(): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspace", "github-token");
 }
@@ -28,7 +29,7 @@ function disabledHostGitHubTokenPath(): string {
   return join(getAgentsInTheCloudRuntimeContext().agentsInTheCloudDataDir, "workspace", "github-token-disabled");
 }
 
-export function discoverHostGitHubToken(): string | undefined {
+export function discoverGitHubToken(): string | undefined {
   const path = storedGitHubTokenPath();
   const stored = existsSync(path) ? readFileSync(path, "utf8").trim() : undefined;
   if (stored) return stored;
@@ -36,18 +37,18 @@ export function discoverHostGitHubToken(): string | undefined {
   return process.env.GH_TOKEN?.trim() || undefined;
 }
 
-export function hasWorkspaceGitHubToken(): boolean {
-  return Boolean(discoverHostGitHubToken());
+export function hasGitHubToken(): boolean {
+  return Boolean(discoverGitHubToken());
 }
 
-export function setWorkspaceGitHubToken(token: string): void {
+export function setGitHubToken(token: string): void {
   const path = storedGitHubTokenPath();
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${token.trim()}\n`, { mode: 0o600 });
   rmSync(disabledHostGitHubTokenPath(), { force: true });
 }
 
-export function clearWorkspaceGitHubToken(): void {
+export function clearGitHubToken(): void {
   const disabledPath = disabledHostGitHubTokenPath();
   rmSync(storedGitHubTokenPath(), { force: true });
   mkdirSync(dirname(disabledPath), { recursive: true });

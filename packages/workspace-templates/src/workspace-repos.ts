@@ -1,7 +1,7 @@
 import { AgentsInTheCloudCoreError, collectUnpushedCommits, shellQuote, type UnpushedCommit, type AgentsInTheCloudEventBus, type JsonObject } from "@agents-in-the-cloud/core";
 import { execWorkspaceShell, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { isGitWorkspaceTemplateInit, workspaceTemplateIdFromInit, recordWorkspaceCreation } from "./workspace-template.ts";
-import { registerGitIdentityWorkspaceEvents } from "./git-identity.ts";
+import { registerCommitIdentityWorkspaceEvents } from "./commit-identity.ts";
 import { registerWorkspaceTemplateWorkspaceInitEvents } from "./workspace-source.ts";
 
 interface WorkspaceDeleteSafetyIssue extends JsonObject { repo: string; uncommittedPaths: string[]; unpushedCommits: UnpushedCommit[] }
@@ -49,7 +49,7 @@ async function inspectWorkspaceDeleteSafety(id: string): Promise<WorkspaceDelete
 
 export function registerWorkspaceTemplateWorkspaceEvents(events: AgentsInTheCloudEventBus): void {
   registerWorkspaceTemplateWorkspaceInitEvents(events);
-  registerGitIdentityWorkspaceEvents(events);
+  registerCommitIdentityWorkspaceEvents(events);
   events.on("workspace_created", async ({ init }) => {
     if (isGitWorkspaceTemplateInit(init)) await recordWorkspaceCreation(workspaceTemplateIdFromInit(init));
   });

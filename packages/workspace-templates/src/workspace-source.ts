@@ -8,7 +8,7 @@ import {
   runCommand,
   createKeyedOperationQueue,
   AgentsInTheCloudCoreError,
-  discoverHostGitHubToken,
+  discoverGitHubToken,
   dockerHostAgentsInTheCloudDataPath,
   getAgentsInTheCloudRuntimeContext,
   gitHubCredentialHelperCommand,
@@ -104,7 +104,7 @@ async function requireCommand(name: string, args: string[], options: { env?: Rec
 }
 
 async function git(args: string[], options: { errorCode?: string } = {}): Promise<CommandResult> {
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   return await requireCommand("git", ["-c", `credential.helper=${gitHubCredentialHelperCommand}`, ...args], {
     env: token ? { GH_TOKEN: token } : undefined,
     errorCode: options.errorCode ?? "git_error",
@@ -127,7 +127,7 @@ async function ensureTemplate(gitUrl: string, branch: string | null, key: string
   await rm(resolvedCommitPath, { force: true });
 
   const branchNotFoundExitCode = 44;
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   const script = `
 set -euo pipefail
 export GIT_TERMINAL_PROMPT=0

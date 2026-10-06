@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addWorkspaceTemplate, createWorkspaceTemplateSecret, updateWorkspaceTemplateSecret, deleteWorkspaceTemplateSecret, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
-import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearWorkspaceGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setWorkspaceGitHubToken } from "../../src/secrets/workspace-secrets.ts";
+import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setGitHubToken } from "../../src/secrets/workspace-secrets.ts";
 
 function workspaceTemplateInit(workspaceTemplateId: string): GitWorkspaceTemplateInitInstruction {
   return { type: "project.git", projectId: workspaceTemplateId, name: "Project", gitUrl: "https://github.com/org/repo.git", branch: null, sessionShareKey: "Project" };
@@ -23,7 +23,7 @@ describe("workspace secrets", () => {
   });
 
   afterEach(async () => {
-    clearWorkspaceGitHubToken();
+    clearGitHubToken();
     forgetWorkspaceSecretContext("test-workspace");
     if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
     else process.env.ATELIER_DATA_DIR = previousDataDir;
@@ -33,7 +33,7 @@ describe("workspace secrets", () => {
   });
 
   test("uses deterministic placeholders for workspace env secrets", async () => {
-    setWorkspaceGitHubToken("real-secret");
+    setGitHubToken("real-secret");
     const context = await createWorkspaceSecretContext("test-workspace");
 
     expect(context.env.GH_TOKEN).toBe("ATELIER_PROXY_READY_GH_TOKEN");
@@ -114,7 +114,7 @@ describe("workspace secrets", () => {
   });
 
   test("path injection defaults to Telegram only and respects live per-secret overrides", async () => {
-    setWorkspaceGitHubToken("github-credential");
+    setGitHubToken("github-credential");
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/path-secrets.git")).workspaceTemplate;
     const init = workspaceTemplateInit(workspaceTemplate.id);
     const values = { envName: "BOT_TOKEN", hostPattern: "api.telegram.org", secretValue: "123:telegram-credential" };

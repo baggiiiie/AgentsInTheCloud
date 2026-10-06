@@ -561,8 +561,8 @@ case "$action" in
     if [ "$installed" -eq 0 ] && [ -z "$access_mode" ]; then
       if [ "$desktop" -eq 1 ]; then access_mode=localhost; else access_mode=tailscale; fi
       finish_line
-      local_caption="This computer only — Tailscale stays off"
-      remote_caption="Via Tailscale — use AgentsInTheCloud from any device on your tailnet"
+      local_caption="Installation computer only — Tailscale stays off"
+      remote_caption="Devices on your Tailscale network — including the installation computer"
       if [ "$access_mode" = localhost ]; then
         first_caption="$local_caption"; second_caption="$remote_caption"; alternate_mode=tailscale
       else

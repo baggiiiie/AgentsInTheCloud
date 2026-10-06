@@ -6,6 +6,7 @@ import {
   addWorkspaceTemplate,
   createWorkspaceTemplateEnvironmentVariable,
   getWorkspaceTemplateConfiguration,
+  getStoredCommitIdentity,
   isGitWorkspaceTemplateInit,
   listWorkspaceTemplates,
   workspaceInitFromTemplate,
@@ -15,6 +16,7 @@ import {
   createTestApp,
   deferred,
   postJson,
+  postForm,
   temporaryAgentsInTheCloudDataDir,
   type ProvisionWorkspaceOptions,
 } from "./support/test-web-app.ts";
@@ -79,6 +81,17 @@ beforeEach(dataDir.setUp);
 afterEach(dataDir.tearDown);
 
 describe("HTTP contracts", () => {
+  test("Commit identity saves through canonical and existing POST URLs", async () => {
+    const { app, registry } = createTestApp();
+    await registry.seed([]);
+    for (const path of ["/settings/commit-identity", "/settings/git-identity"]) {
+      const author = path.endsWith("/commit-identity") ? "Ada Lovelace" : "Grace Hopper";
+      const response = await app.fetch(postForm(path, new URLSearchParams({ commitAuthorName: author, commitAuthorEmail: "author@example.com" })));
+      expect(response.status).toBe(200);
+      expect(await getStoredCommitIdentity()).toEqual({ name: author, email: "author@example.com" });
+    }
+  });
+
   test("retired agent onboarding endpoints are unavailable and cannot create workspaces", async () => {
     const { app, registry } = createTestApp();
     const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/example/no-agent-setup.git");
