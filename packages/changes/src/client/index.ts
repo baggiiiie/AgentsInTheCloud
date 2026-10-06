@@ -1,3 +1,4 @@
+import { createChangesEditController, syncFileEditButtons } from "./editing-controller.ts";
 import { showButtonConfirmation } from "@agents-in-the-cloud/design-system/button-confirmation/client";
 import { createReviewCopyController } from "./review-copy-controller.ts";
 import { exportReviewComments, type CommentAnnotation, type CommentPlacement } from "../comments.ts";
@@ -7,10 +8,13 @@ import { copyTextToClipboard, type WorkspaceClientModule, type WorkspaceClientCo
 import { createDiffEndpointsController } from "./diff-endpoints-controller.ts";
 import { changesDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
+const viewerCSS = `${wordDiffCSS} [data-diffs-header] { background: var(--bg); }`;
+
 type FileSummary = { path: string };
 
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
+    declare readonly element: HTMLElement;
     static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
     static values = { workspaceId: String, snapshotId: String, collapsed: Boolean };
     declare readonly viewerTarget: HTMLElement;
@@ -95,7 +99,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         enableLineSelection: true,
         enableGutterUtility: true,
         renderGutterUtility: (hovered, context) => {
-          if (context.type !== "diff" || !this.loaded.has(context.item.id)) return null;
+          if (this.element.dataset.codeEditing || context.type !== "diff" || !this.loaded.has(context.item.id)) return null;
           // SAFETY: renderDiff emits a Button as the gutter template’s sole root.
           const button = this.commentGutterTarget.content.firstElementChild!.cloneNode(true) as HTMLElement;
           this.gutters.set(button, { path: context.item.id, hovered });
@@ -109,16 +113,23 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         stickyHeaders: true,
         layout: { paddingTop: 0, paddingBottom: 8, gap: 0 },
         itemMetrics: { diffHeaderHeight: this.headerHeight },
-        unsafeCSS: `${wordDiffCSS} [data-diffs-header] { background: var(--bg); }`,
+        unsafeCSS: viewerCSS,
         onPostRender: (_node, _instance, _phase, context) => {
           void this.loadFile(context.item.id, abort.signal);
-          if (context.type === "diff" && this.loaded.has(context.item.id)) this.revealCommentLines(context.item, context.instance);
+          if (context.type === "diff" && !this.element.dataset.codeEditing && this.loaded.has(context.item.id)) this.revealCommentLines(context.item, context.instance);
         },
         renderCustomHeader: (_file, context) => this.header(context.item.id, context.item.collapsed === true),
       };
       this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
-      this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: this.collapsed })));
+      // SAFETY: The edit controller stores only file disclosure booleans in this presentation model.
+      const disclosure = new Map(Object.entries(JSON.parse(shell.dataset.changesFileCollapse ?? "{}") as Record<string, boolean>));
+      this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: disclosure.get(item.id) ?? this.collapsed })));
+      const scroll = Number(shell.dataset.changesScroll ?? 0);
+      delete shell.dataset.changesFileCollapse;
+      delete shell.dataset.changesScroll;
+      requestAnimationFrame(() => { this.viewerTarget.scrollTop = scroll; });
+      this.syncCollapseControl();
       for (const path of this.loaded) this.updateComments(path);
       this.syncCollapseControl();
     }
@@ -154,6 +165,14 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       if (this.viewer) this.syncCollapseControl();
     }
 
+    shareViewer(event: CustomEvent<{ receive(viewer: CodeView<CommentAnnotation, undefined>, configure: (options: CodeViewOptions<CommentAnnotation, undefined>) => void): void }>): void {
+      event.detail.receive(this.viewer!, options => {
+        if (options.unsafeCSS !== undefined) options = { ...options, unsafeCSS: `${viewerCSS} ${options.unsafeCSS}` };
+        this.options = { ...this.options, ...options };
+        this.viewer!.setOptions(this.options);
+      });
+    }
+
     dismissError(): void { this.errorTarget.hidden = true; }
 
     private header(path: string, collapsed: boolean): HTMLElement {
@@ -163,6 +182,9 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       const button = header.querySelector("button")!;
       button.setAttribute("aria-expanded", String(!collapsed));
       button.setAttribute("aria-label", `${collapsed ? "Expand" : "Collapse"} ${path}`);
+      const edit = header.querySelector<HTMLButtonElement>('[data-action="changes-edit#begin"]');
+      if (edit) edit.dataset.ready = String(this.loaded.has(path));
+      syncFileEditButtons(header, this.element.dataset.codeEditing, false);
       return header;
     }
 
@@ -225,6 +247,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     }
 
     private beginComment(path: string, range: SelectedLineRange): void {
+      if (this.element.dataset.codeEditing) { this.showError("Save or discard your code edit before writing a comment."); return; }
       if (this.draft) {
         if (this.draftInList) { this.orphansOpen = true; this.syncOrphans(); this.listEditorTarget.querySelector("textarea")!.focus(); return; }
         this.viewer!.scrollTo({ type: "line", id: this.draft.path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
@@ -237,6 +260,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         return;
       }
       this.draftInList = false;
+      this.element.dataset.commentDraft = "true";
       this.draft = { revision: 0, id: crypto.randomUUID(), kind: "draft", path, side: range.side ?? "additions", start: Math.min(range.start, range.end), end: Math.max(range.start, range.end), body: "" };
       this.updateComments(path);
       this.viewer!.scrollTo({ type: "line", id: path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
@@ -244,7 +268,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
     private updateComments(path: string): void {
       const item = this.viewer!.getItem(path)!;
-      if (item.type !== "diff" || !this.loaded.has(path)) return;
+      if (this.element.dataset.codeEditing === path || item.type !== "diff" || !this.loaded.has(path)) return;
       const comments = [...this.comments.values()].filter(comment => comment.path === path && (this.draftInList || comment.id !== this.draft?.id));
       if (!this.draftInList && this.draft?.path === path) comments.push(this.draft);
       const signature = JSON.stringify(comments.map(comment => comment.kind === "draft" ? { ...comment, body: "" } : comment));
@@ -328,6 +352,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       try {
         const html = await this.commentRequest("save", data);
         this.draft = undefined;
+        delete this.element.dataset.commentDraft;
         this.listEditorTarget.replaceChildren();
         this.listEditorTarget.hidden = true;
         if (!this.draftInList && this.loaded.has(comment.path)) this.updateComments(comment.path);
@@ -348,17 +373,20 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       if (this.saving) return;
       const path = this.draft!.path;
       this.draft = undefined;
+      delete this.element.dataset.commentDraft;
       this.listEditorTarget.replaceChildren();
       this.listEditorTarget.hidden = true;
       if (!this.draftInList && this.loaded.has(path)) this.updateComments(path);
       this.draftInList = false;
     }
     editComment(event: Event): void {
+      if (this.element.dataset.codeEditing) { this.showError("Save or discard your code edit before writing a comment."); return; }
       if (this.draft) return;
       // SAFETY: These actions are bound to buttons inside owned comment cards.
       const element = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!;
       const comment = this.placements.get(element.dataset.commentId!)!;
       this.draftInList = element.classList.contains("changes-review-entry");
+      this.element.dataset.commentDraft = "true";
       this.draft = { id: comment.id, revision: comment.revision, kind: "draft", path: comment.path, side: comment.side, start: comment.placedStart ?? comment.start, end: comment.placedEnd ?? comment.end, body: comment.body };
       if (this.draftInList) {
         this.orphansOpen = true;
@@ -413,6 +441,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         if (deletingDraft && this.draft) {
           const path = this.draft.path;
           this.draft = undefined;
+          delete this.element.dataset.commentDraft;
           this.listEditorTarget.replaceChildren();
           this.listEditorTarget.hidden = true;
           if (!this.draftInList && this.loaded.has(path)) this.updateComments(path);
@@ -459,5 +488,5 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("review-copy", createReviewCopyController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
+  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-edit", createChangesEditController(Controller)); application.register("review-copy", createReviewCopyController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
 };

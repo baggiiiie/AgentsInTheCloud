@@ -1,7 +1,8 @@
 import { createWorkspaceMetadataState, type WorkspaceMetadataState } from "@agents-in-the-cloud/workspace";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { captureCommentAnchor, locateCommentAnchor, reviewCommentSchema, reviewComparisonKey, sortedComments, type CommentPlacement, type ReviewComment } from "../comments.ts";
+import { captureCommentAnchor, locateCommentAnchor, textLines, reviewCommentSchema, reviewComparisonKey, sortedComments, type CommentPlacement, type ReviewComment } from "../comments.ts";
+import type { EditedCommentRange } from "../editing.ts";
 import type { ChangesSnapshot } from "./snapshot.ts";
 
 const stateSchema = Type.Object({ comments: Type.Array(reviewCommentSchema) });
@@ -58,7 +59,23 @@ export function createReviewCommentStore(options: { dataDir?: string } = {}) {
     const revisions = new Map(versions.map(version => [version.id, version.revision]));
     state.write(workspaceId, { comments: list(workspaceId).map(comment => revisions.get(comment.id) === comment.revision ? { ...comment, copiedRevision: comment.revision } : comment) });
   }
-  return { list, save, remove, removeMany, markCopied, delete: (workspaceId: string) => state.delete(workspaceId) };
+  function relocate(workspaceId: string, snapshot: ChangesSnapshot, path: string, contents: string, ranges: readonly EditedCommentRange[]): void {
+    const positions = new Map(ranges.map(range => [range.id, range]));
+    const count = textLines(contents).length;
+    const key = comparisonKey(snapshot);
+    let changed = false;
+    const comments = list(workspaceId).map(comment => {
+      const range = positions.get(comment.id);
+      if (!range || range.revision !== comment.revision || comment.path !== path || comment.side !== "additions" || comment.comparison.key !== key || !count) return comment;
+      const start = Math.min(range.start, count), end = Math.min(range.end, count);
+      const anchor = captureCommentAnchor(contents, start, end);
+      if (start === comment.start && end === comment.end && JSON.stringify(anchor) === JSON.stringify(comment.anchor)) return comment;
+      changed = true;
+      return { ...comment, start, end, anchor, revision: comment.revision + 1 };
+    });
+    if (changed) state.write(workspaceId, { comments });
+  }
+  return { list, save, remove, removeMany, markCopied, relocate, delete: (workspaceId: string) => state.delete(workspaceId) };
 }
 export type ReviewCommentStore = ReturnType<typeof createReviewCommentStore>;
 export const reviewComments = createReviewCommentStore();

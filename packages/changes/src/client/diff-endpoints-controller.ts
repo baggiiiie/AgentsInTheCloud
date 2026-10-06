@@ -138,16 +138,23 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.secondCommitDeadline = 0;
       if (this.model) this.paint();
     }
+    private withEditGuard(resume: () => void): void {
+      const editor = this.element.querySelector<HTMLElement>('[data-controller~="changes-edit"]');
+      if (!editor || editor.dispatchEvent(new CustomEvent("changes-edit:guard", { cancelable: true, detail: { resume } }))) resume();
+    }
     private selectCommit(id: string): void {
-      const extend = this.awaitingEnd && performance.now() < this.secondCommitDeadline;
-      this.endSecondCommitSelection();
-      if (!extend) {
-        this.awaitingEnd = true;
-        this.secondCommitDeadline = performance.now() + 5000;
-        this.secondCommitTimer = setTimeout(() => this.endSecondCommitSelection(), 5000);
-      }
-      this.choose(id, extend);
-      void this.generate("compare");
+      this.withEditGuard(() => {
+        const extend = this.awaitingEnd && performance.now() < this.secondCommitDeadline;
+        this.endSecondCommitSelection();
+        if (!extend) {
+          this.awaitingEnd = true;
+          this.secondCommitDeadline = performance.now() + 5000;
+          this.secondCommitTimer = setTimeout(() => this.endSecondCommitSelection(), 5000);
+        }
+        this.choose(id, extend);
+        void this.generate("compare");
+      });
+
     }
     selectSnapshot(event: MouseEvent): void {
       if (event.button !== 0) return;
@@ -232,8 +239,12 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       for (const element of this.diffTarget.querySelectorAll<HTMLElement>(".changes-controls")) element.inert = this.busy;
     }
 
-    refresh(): void { void this.generate("refresh"); }
-    retry(): void { if (this.lastOperation === "history") void this.loadMore(); else void this.generate(this.lastOperation); }
+    refresh(): void { this.withEditGuard(() => { void this.generate("refresh"); }); }
+    retry(): void {
+      const operation = this.lastOperation;
+      if (operation === "history") void this.loadMore();
+      else this.withEditGuard(() => { void this.generate(operation); });
+    }
     dismissError(): void { this.errorTarget.hidden = true; }
     private async generate(operation: "compare" | "refresh"): Promise<void> {
       this.request?.abort();

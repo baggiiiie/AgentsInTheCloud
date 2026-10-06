@@ -1,3 +1,5 @@
+import { maxChangesTextBytes, maxChangesTextLines } from "../editing.ts";
+import { changesEdits, EditError } from "./editing.ts";
 import { CommentConflict, InvalidComment, placeReviewComments, reviewComments } from "./comments.ts";
 import { deletionCommentsId, renderDeletionComments, commentsActionsId, commentsModelId, orphanCommentsId, renderCommentActions, renderCommentsModel, renderOrphanComments } from "./comment-render.ts";
 import { domId, type LiveRegion } from "@agents-in-the-cloud/shared";
@@ -10,7 +12,7 @@ import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/
 import { workspaceRepository } from "@agents-in-the-cloud/workspace/git";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory, renderDiff } from "./render.ts";
+import { renderEditModel, changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory, renderDiff } from "./render.ts";
 import type { DiffEndpoints } from "../history.ts";
 import { captureChanges, commitHistory, InvalidDiffEndpoints, type ChangesSnapshot } from "./snapshot.ts";
 
@@ -32,6 +34,8 @@ const replace = (target: string, html: string) => `<turbo-stream action="replace
 const diffEndpointsSchema = Type.Object({ target: Type.String(), base: Type.Optional(Type.Union([Type.String(), Type.Null()])) });
 const requestSchema = Type.Object({ client: Type.String({ minLength: 1, maxLength: 64 }), sequence: Type.Integer({ minimum: 1 }) });
 
+const editedRangesSchema = Type.Array(Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }), revision: Type.Integer({ minimum: 1 }), start: Type.Integer({ minimum: 1, maximum: maxChangesTextLines + 1 }), end: Type.Integer({ minimum: 1, maximum: maxChangesTextLines + 1 }) }), { maxItems: 10000 });
+const editSaveSchema = Type.Object({ token: Type.String({ minLength: 1, maxLength: 64 }), contents: Type.String({ maxLength: maxChangesTextBytes }), ranges: editedRangesSchema });
 const commentSaveSchema = Type.Object({
   id: Type.String({ minLength: 1, maxLength: 64 }), revision: Type.Integer({ minimum: 0 }), body: Type.String({ maxLength: 10000 }),
   path: Type.Optional(Type.String({ minLength: 1 })), side: Type.Optional(Type.Union([Type.Literal("additions"), Type.Literal("deletions")])),
@@ -68,6 +72,42 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
   commands: [{ id: "changes.open", execute: () => ({ createdWorkView: reference }) }],
   staticFiles: { "/deletion.css": { url: new URL("../client/deletion.css", import.meta.url), contentType: "text/css; charset=utf-8" }, "/changes.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   routes: [{ async handle(request, url) {
+    const editRoute = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/edit\/(begin|save|cancel)$/);
+    if (editRoute) {
+      if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
+      const workspaceId = editRoute[0]!, operation = editRoute[1]!, data = await request.formData();
+      try {
+        if (operation === "begin") {
+          const { snapshot } = await current(workspaceId);
+          if (data.get("snapshot") !== snapshot.id) throw new EditError("This comparison changed. Refresh Changes before editing.", 409);
+          const path = data.get("path");
+          if (!Value.Check(Type.String({ minLength: 1, maxLength: 4096 }), path)) throw new EditError("Choose a file to edit.", 400);
+          const model = await changesEdits.begin(workspaceId, workspaceRepository(workspaceId), snapshot, path);
+          return response(renderEditModel(model));
+        }
+        const token = data.get("token");
+        if (!Value.Check(Type.String({ minLength: 1, maxLength: 64 }), token)) throw new EditError("Invalid edit session.", 400);
+        if (operation === "cancel") { changesEdits.cancel(workspaceId, token); return new Response(null, { status: 204 }); }
+        let ranges: unknown;
+        try { ranges = JSON.parse(String(data.get("ranges"))); }
+        catch (error) { if (!(error instanceof SyntaxError)) throw error; throw new EditError("Invalid comment positions.", 400); }
+        const input = { token, contents: data.get("contents"), ranges };
+        if (!Value.Check(editSaveSchema, input) || input.ranges.some(range => range.end < range.start)) throw new EditError("Invalid file edit.", 400);
+        const state = await current(workspaceId);
+        ++state.request;
+        const next = await changesEdits.save(workspaceId, workspaceRepository(workspaceId), input.token, input.contents, input.ranges,
+          (snapshot, path, contents, positions) => reviewComments.relocate(workspaceId, snapshot, path, contents, positions));
+        // The save's response owns this browser's comparison. Never publish an older in-flight capture.
+        ++state.request;
+        state.snapshot = next; state.clients.clear();
+        invalidateWorkspace(workspaceId);
+        const previousId = comparisonId(workspaceId, next.history.id);
+        return turboStreamResponse(replace(previousId, renderComparison(workspaceId, next)) + replace(historyContentId(next.history), renderHistory(next)));
+      } catch (error) {
+        if (!(error instanceof EditError)) throw error;
+        return textResponse(error.message, { status: error.status });
+      }
+    }
     const commentRoute = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/comments\/(save|delete|delete-many|copied)$/);
     if (commentRoute) {
       if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
@@ -115,7 +155,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       const { snapshot } = await current(match[0]!);
       if (url.searchParams.get("snapshot") !== snapshot.id) return textResponse("This comparison has changed. Reopen Changes to load the current snapshot.", { status: 409 });
       const file = snapshot.files.get(url.searchParams.get("path") ?? "");
-      return file ? response(renderChangesFile(file, snapshot.id)) : textResponse("Changed file not found", { status: 404 });
+      return file ? response(renderChangesFile(file, snapshot.id, snapshot.endpoints.target === "working")) : textResponse("Changed file not found", { status: 404 });
     }
     match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/history$/);
     if (match) {
@@ -137,7 +177,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
     const workspaceId = match[0]!, state = await current(workspaceId), previous = state.snapshot;
     const data = await request.formData();
-    if (data.get("history") !== previous.history.id) return textResponse("This history has been refreshed. Reopen Changes.", { status: 409 });
+    if (match[1] !== "refresh" && data.get("history") !== previous.history.id) return textResponse("This history has been refreshed. Reopen Changes.", { status: 409 });
     const order = { client: data.get("client"), sequence: Number(data.get("sequence")) };
     if (!Value.Check(requestSchema, order)) return textResponse("Invalid comparison request", { status: 400 });
     if (order.sequence <= (state.clients.get(order.client) ?? 0)) return new Response(null, { status: 204 });
@@ -183,7 +223,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       const uncopied = reviewComments.list(workspaceId).filter(comment => comment.copiedRevision !== comment.revision);
       if (uncopied.length) issues.push({ kind: "uncopied_review_comments", message: `${uncopied.length} review comments haven’t been copied. Deleting this workspace will delete them.`, count: uncopied.length });
     });
-    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); clearDeletionReview(workspaceId); reviewComments.delete(workspaceId); });
+    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); changesEdits.delete(workspaceId); clearDeletionReview(workspaceId); reviewComments.delete(workspaceId); });
   },
   async attachToWorkspace({ workspaceId }) {
     const { snapshot } = await current(workspaceId);

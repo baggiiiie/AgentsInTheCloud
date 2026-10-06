@@ -116,3 +116,18 @@ test("shared execution policy suppresses hostile hooks, fsmonitor, external diff
   expect(calls.at(-1)!.command[0]).toBe("git");
   expect(await Bun.file(marker).exists()).toBe(false);
 });
+
+test("workspace-owned conditional writes serialize conflicting saves and retain executable permissions", async () => {
+  const { root, repo, calls } = await fixture();
+  await writeFile(join(root, "script"), "before\n");
+  await chmod(join(root, "script"), 0o755);
+  const hash = new Bun.CryptoHasher("sha256").update("before\n").digest("hex");
+  const expected = { hash, mode: "100755" };
+  const results = await Promise.all([repo.writeWorkingFile("script", expected, "first\n"), repo.writeWorkingFile("script", expected, "second\n")]);
+  expect(results).toEqual(["saved", "changed"]);
+  expect(await readFile(join(root, "script"), "utf8")).toBe("first\n");
+  expect((await repo.workingFile("script"))!.mode).toBe("100755");
+  expect(calls.every(call => call.options.user === "agents-in-the-cloud")).toBe(true);
+  await expect(repo.writeWorkingFile(".git/config", expected, "unsafe")).rejects.toThrow("Invalid editable");
+  await expect(repo.writeWorkingFile("../outside", expected, "unsafe")).rejects.toThrow("Invalid editable");
+});

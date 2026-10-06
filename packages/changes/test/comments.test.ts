@@ -183,3 +183,21 @@ describe("Workspace review comment persistence", () => {
   });
 
 });
+
+test("code saves relocate persisted new-side review anchors, preserving old-side and concurrently edited comments", () => {
+  const store = createReviewCommentStore({ dataDir: storeDirectory() });
+  const before = snapshot();
+  const comment = store.save("workspace", newComment, before);
+  const old = store.save("workspace", { ...newComment, id: "old", side: "deletions", start: 1, end: 1 }, before);
+  store.markCopied("workspace", [{ id: comment.id, revision: 1 }]);
+  store.relocate("workspace", before, "example.ts", "prefix\nbefore\nchanged\nafter\n", [{ id: comment.id, revision: 1, start: 3, end: 3 }, { id: old.id, revision: 1, start: 3, end: 3 }]);
+  const saved = store.list("workspace").find(entry => entry.id === comment.id)!;
+  expect(saved).toMatchObject({ body: comment.body, start: 3, end: 3, revision: 2, copiedRevision: 1 });
+  expect(saved.anchor.code).toEqual(["changed"]);
+  expect(store.list("workspace").find(entry => entry.id === old.id)).toEqual(old);
+  expect(placeReviewComments([saved], snapshot("prefix\nbefore\nchanged\nafter\n"))[0]!.status).toBe("inline");
+  store.save("workspace", { id: comment.id, revision: 2, body: "Changed in another tab" }, before);
+  const concurrent = store.list("workspace").find(entry => entry.id === comment.id)!;
+  store.relocate("workspace", before, "example.ts", "different\n", [{ id: comment.id, revision: 2, start: 1, end: 1 }]);
+  expect(store.list("workspace").find(entry => entry.id === comment.id)).toEqual(concurrent);
+});

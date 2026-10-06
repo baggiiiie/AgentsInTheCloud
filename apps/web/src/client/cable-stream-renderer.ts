@@ -18,7 +18,7 @@ export const renderCableStreams: CableStreamRenderer = (html, isCurrent, onAppli
       if (!isCurrent()) return;
       // Ordered Cable delivery bypasses Turbo's deferred stream renderer. Give
       // mounted controllers a chance to retain presentation state before disposal.
-      document.dispatchEvent(new CustomEvent("live:before-stream-render", { detail: { newStream: stream } }));
+      if (!document.dispatchEvent(new CustomEvent("live:before-stream-render", { cancelable: true, detail: { newStream: stream } }))) continue;
       // Permanent islands survive only while their key remains in the parent's
       // snapshot. Turbo itself preserves them even when absent, so dispose those
       // absent keys explicitly before morphing the owning region.
