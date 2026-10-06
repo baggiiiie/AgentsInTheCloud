@@ -295,6 +295,7 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
     for (const command of commands) {
       const button = contentRowElement<HTMLButtonElement>({
         kind: "compact",
+        width: "fill",
         label: { kind: "text", text: command.label },
         trailingHtml: `<kbd class="shortcut-overlay-binding">${escapeHtml(formatShortcutBinding(command.binding))}</kbd>`,
         element: { tag: "button",  attributesHtml: 'type="button"' },
