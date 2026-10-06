@@ -133,12 +133,12 @@ describe("Workspace presentation", () => {
     expect((await presentation.listWorkViews("workspace-1")).map((view) => view.reference)).toEqual(files);
   });
 
-  test("retired Review references are omitted when loading persisted Work views", async () => {
+  test("retired Review and Subagents references are omitted when loading persisted Work views", async () => {
     const metadataDir = join(dataDir, "workspaces", "workspace-1", "metadata");
     await mkdir(metadataDir, { recursive: true });
     await writeFile(join(metadataDir, "presentation.json"), JSON.stringify({
       version: 1,
-      workViews: [{ reference: { type: "review" } }, { reference: { type: "file", path: "/work/README.md" } }],
+      workViews: [{ reference: { type: "review" } }, { reference: { type: "subagents" } }, { reference: { type: "file", path: "/work/README.md" } }],
       dismissedWarnings: { "missing-secrets": "state-one" },
     }));
     expect(await presentation.listWorkViews("workspace-1")).toEqual([{ reference: { type: "file", path: "/work/README.md" } }]);

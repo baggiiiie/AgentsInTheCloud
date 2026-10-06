@@ -14,6 +14,8 @@ export interface DisclosureOptions {
   summary: DisclosureSummary;
   /** Trusted server-rendered contents. Disclosure owns their gutter and spacing. */
   bodyHtml: string;
+  /** Flush block edges for compact row collections; preserves the inline gutter. */
+  bodySpacing?: "regular" | "flush";
   /** Integration attributes on the guttered region, e.g. a stable Turbo target. */
   bodyAttributesHtml?: string;
   open?: boolean;
@@ -24,5 +26,5 @@ export function disclosureHtml(options: DisclosureOptions): string {
   const id = options.element?.id === undefined ? "" : ` id="${escapeHtml(options.element.id)}"`;
   const content: ContentRowContent = { ...options.summary, leadingHtml: `${Icons.Disclosure}${options.summary.leadingHtml ?? ""}` };
   const summary = `<summary class="${contentRowClasses(content, true, true)}"${attributesHtml(options.summary.attributesHtml)}>${contentRowContentHtml(content)}</summary>`;
-  return `<details${id} class="disclosure"${options.open ? " open" : ""}${attributesHtml(options.element?.attributesHtml)}>${summary}<div class="disclosure-content"${attributesHtml(options.bodyAttributesHtml)}>${options.bodyHtml}</div></details>`;
+  return `<details${id} class="disclosure"${options.open ? " open" : ""}${attributesHtml(options.element?.attributesHtml)}>${summary}<div class="disclosure-content${options.bodySpacing === "flush" ? " disclosure-content--flush" : ""}"${attributesHtml(options.bodyAttributesHtml)}>${options.bodyHtml}</div></details>`;
 }

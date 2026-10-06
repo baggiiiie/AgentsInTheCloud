@@ -28,7 +28,7 @@ export function nativeDelegationTranscript(view: ConversationView): AgentTranscr
         { label: "Handling", html: escapeHtml(receipt.handling === "idle-task" ? "Starts a turn" : receipt.handling === "idle-message" ? "Waits for the next turn" : receipt.handling === "waiting" ? "Wakes the agent’s wait" : "Queued for the next model boundary") },
         { label: "Context", html: escapeHtml(state) },
       ]);
-      return transcriptRow(`<div class="agent-communication">${disclosureHtml({ element: { attributesHtml: `data-transcript-anchor="${escapeHtml(receipt.id)}" data-controller="agent-communication" data-agent-communication-key-value="${escapeHtml(receipt.id)}" data-action="toggle->agent-communication#remember"` }, summary: transcriptRowContent({ kind: "text", text: `Incoming ${receipt.kind} from ${receipt.author}` }, { kind: "multiline" }), open: true, bodyHtml: body })}</div>`);
+      return transcriptRow(`<div class="agent-communication">${disclosureHtml({ element: { attributesHtml: `data-transcript-anchor="${escapeHtml(receipt.id)}" data-controller="agent-communication" data-agent-communication-key-value="${escapeHtml(receipt.id)}" data-action="toggle->agent-communication#remember"` }, summary: transcriptRowContent({ kind: "text", text: `Incoming ${receipt.kind} from ${receipt.author}` }), bodyHtml: body })}</div>`);
     },
   })) };
 }

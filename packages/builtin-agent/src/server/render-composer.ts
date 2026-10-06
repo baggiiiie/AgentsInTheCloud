@@ -8,6 +8,7 @@ import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { enabledModelOptionViews, launchComposerThinkingSettings, selectAvailableEnabledModel } from "@agents-in-the-cloud/agent/server/model-state";
 import { agentKey, agentPath, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderAgentNotifications } from "./render-notification.ts";
+import { agentDelegation } from "./delegation.ts";
 import type { WorkspaceAgentInfo } from "./agent-store.ts";
 import { formatCost, formatTokens } from "@agents-in-the-cloud/agent/server/transcript";
 
@@ -42,7 +43,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
   const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.agentId);
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
-  return `<section id="${domId("agent_pane", ctx.workspaceId, agent.agentId)}" data-turbo-permanent class="agent-pane" data-agent-source="${escapeHtml(key)}">
+  return `<section id="${domId("agent_pane", ctx.workspaceId, agent.agentId)}" data-turbo-permanent class="agent-pane builtin-agent-shell" data-agent-source="${escapeHtml(key)}">
     <div class="agent-pane agent-composer-pane" id="${ids.pane(ctx)}"
       ${state.readOnly ? "" : `data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
@@ -50,6 +51,7 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
       ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}`}>
       ${state.readOnly ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
       <div class="agent-transcript-region">
+        ${await agentDelegation?.renderControl(ctx.workspaceId, ctx.agentId) ?? ""}
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
         </div>

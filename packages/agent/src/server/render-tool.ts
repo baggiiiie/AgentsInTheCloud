@@ -101,7 +101,7 @@ export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolV
     trailingHtml: tool.canAbort && !ctx.readOnly ? toolAbortHtml(ctx, key, tool) : undefined,
   };
   const active = tool.status === "streaming" || tool.status === "running";
-  const content = transcriptRowContent(label, { ...labelOptions, kind: isBashTool(tool.name) ? "compact" : "multiline" });
+  const content = transcriptRowContent(label, labelOptions);
   if (!toolPresentation(tool).showsDetail) {
     return `<div class="agent-tool agent-tool-summary-only ${toolClass(tool.name)} active">${contentRowHtml({ ...content, element: { tag: "div" }, primary: false })}</div>`;
   }
