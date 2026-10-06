@@ -8,7 +8,7 @@ type ComparisonModel = { endpoints: DiffEndpoints; label: string; baseLabel: str
 export function createDiffEndpointsController(Controller: WorkspaceClientControllerConstructor) {
   return class DiffEndpointsController extends Controller {
     declare readonly element: HTMLElement;
-    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more"];
+    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more", "selectionHint"];
     static values = { workspaceId: String, historyId: String, open: Boolean };
     declare readonly workspaceIdValue: string;
     declare readonly historyIdValue: string;
@@ -26,13 +26,14 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     declare readonly historyScrollTarget: HTMLElement;
     declare readonly moreTarget: HTMLButtonElement;
     declare readonly hasMoreTarget: boolean;
+    declare readonly selectionHintTarget: HTMLElement;
+    private awaitingEnd = false;
     private model?: HistoryModel;
     private graph?: HistoryGraph;
     private endpoints?: DiffEndpoints;
     private comparison?: ComparisonModel;
     private anchor?: string;
     private hoveredCommit?: string;
-    private gesture?: { pointer: number; last: string; deferred: boolean; extend: boolean };
     private isOpen = false;
     private busy = false;
     private failed = false;
@@ -98,9 +99,8 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     }
     closePicker(): void {
       if (!this.isOpen) return;
-      // Closing during a drag commits its final preview, just like releasing the pointer.
-      if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); }
       this.clearHover();
+      this.awaitingEnd = false;
       this.isOpen = false;
       this.pickerTarget.hidden = true;
       this.triggerTarget.setAttribute("aria-expanded", "false");
@@ -115,7 +115,6 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.closePicker();
     }
 
-    private modified(event: MouseEvent | KeyboardEvent): boolean { return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey; }
     private commitAt(element: Element, clientY: number): string | undefined {
       const dot = element.closest<SVGCircleElement>("[data-dot]");
       if (dot) return dot.dataset.dot;
@@ -131,57 +130,31 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.endpoints = candidate.base === undefined ? { target: selected.target } : { target: selected.target, base: selected.base };
       this.paint();
     }
-    beginSelection(event: PointerEvent): void {
-      if (event.button !== 0) return;
-      // SAFETY: This action is attached to the native history table.
-      const element = event.target as Element;
-      const id = this.commitAt(element, event.clientY);
-      if (!id) return;
-      event.preventDefault();
-      const extend = this.modified(event);
-      // Touching metadata/the graph can scroll. Apply a tap only on release, not on pan cancellation.
-      const deferred = event.pointerType === "touch" && !element.closest(".changes-description");
-      if (!deferred) this.choose(id, extend);
-      this.gesture = { pointer: event.pointerId, last: id, deferred, extend };
-      this.tableTarget.setPointerCapture(event.pointerId);
-    }
-    moveSelection(event: PointerEvent): void {
-      if (!this.gesture || this.gesture.pointer !== event.pointerId || this.gesture.deferred) return;
-      const element = document.elementFromPoint(event.clientX, event.clientY);
-      if (!element || !this.tableTarget.contains(element)) return;
-      const id = this.commitAt(element, event.clientY);
-      if (!id || id === this.gesture.last) return;
-      event.preventDefault();
-      this.gesture.last = id;
-      this.choose(id, true);
-      const rect = this.historyScrollTarget.getBoundingClientRect();
-      if (event.clientY < rect.top + 28) this.historyScrollTarget.scrollTop -= rowHeight;
-      if (event.clientY > rect.bottom - 28) this.historyScrollTarget.scrollTop += rowHeight;
-    }
-    finishSelection(event: PointerEvent): void {
-      if (!this.gesture || this.gesture.pointer !== event.pointerId) return;
-      if (this.gesture.deferred) this.choose(this.gesture.last, this.gesture.extend);
-      else this.moveSelection(event);
-      this.gesture = undefined;
-      this.tableTarget.releasePointerCapture(event.pointerId);
+    private selectCommit(id: string): void {
+      const extend = this.awaitingEnd;
+      this.awaitingEnd = !extend;
+      this.choose(id, extend);
       void this.generate("compare");
     }
-    cancelGesture(): void { if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); } }
+    selectSnapshot(event: MouseEvent): void {
+      if (event.button !== 0) return;
+      // SAFETY: This action is attached to the native history table.
+      const id = this.commitAt(event.target as Element, event.clientY);
+      if (id) this.selectCommit(id);
+    }
 
     navigate(event: KeyboardEvent): void {
       // SAFETY: Only history rows bind this action.
       const row = event.currentTarget as HTMLTableRowElement;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        this.choose(row.dataset.commit!, this.modified(event));
-        void this.generate("compare");
+        this.selectCommit(row.dataset.commit!);
       } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const index = this.rowTargets.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1);
         const next = this.rowTargets[index];
         if (!next) return;
         next.focus();
-        if (this.modified(event)) { this.choose(next.dataset.commit!, true); void this.generate("compare"); }
       }
     }
     hoverRow(event: PointerEvent): void {
@@ -199,6 +172,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
 
     private paint(): void {
       const model = this.model!, endpoints = this.endpoints!, graph = this.graph!;
+      this.selectionHintTarget.textContent = this.awaitingEnd ? "Select the end snapshot" : "Select the start snapshot";
       const selected = comparisonGraph(graph, endpoints, model.topology);
       for (const rect of this.graphTarget.querySelectorAll<SVGRectElement>(".changes-history-row-background")) {
         rect.dataset.path = String(selected.selectedRows.includes(rect.dataset.commit!));
@@ -253,11 +227,8 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     private async generate(operation: "compare" | "refresh"): Promise<void> {
       this.request?.abort();
       if (operation === "refresh") {
+        this.awaitingEnd = false;
         this.paging?.abort();
-        if (this.gesture) {
-          this.tableTarget.releasePointerCapture(this.gesture.pointer);
-          this.gesture = undefined;
-        }
       }
       const request = this.request = new AbortController();
       this.lastOperation = operation;
