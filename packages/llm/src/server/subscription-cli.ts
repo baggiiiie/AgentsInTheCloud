@@ -7,7 +7,7 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { anthropicUsageSource } from "./anthropic-subscription-usage.ts";
 import { SubscriptionUsageError } from "./subscription-usage.ts";
 import { recordSubscriptionInference } from "./recent-subscription-activity.ts";
-import { usesProviderSubscription } from "./subscription.ts";
+import { requireProviderSubscription, usesProviderSubscription } from "./subscription.ts";
 import { codexAccountId } from "./codex-token.ts";
 
 const codexToken = "agents-in-the-cloud-subscription-codex-access";
@@ -122,6 +122,14 @@ ${connected ? `if [ ! -e ${path} ] || grep -qF ${shellQuote(file.marker)} ${path
 fi` : `if [ -f ${path} ] && grep -qF ${shellQuote(file.marker)} ${path}; then rm ${path}; fi`}`]);
     if (result.exitCode !== 0) throw new Error(`Could not configure subscription CLI: ${result.stderr}`);
   }
+}
+
+/** An app-owned Codex home must use the configured subscription, never a workspace login. */
+export async function installCodexSubscriptionAuth(workspaceId: string, codexHome: string, runtime: Pick<ModelRuntime, "listCredentials">): Promise<void> {
+  await requireProviderSubscription(runtime, "openai-codex", "Codex");
+  const file = subscriptionCliFiles().find(file => file.provider === "openai-codex")!;
+  const result = await execWorkspaceCommand(workspaceId, ["sh", "-c", `set -eu\numask 077\nmkdir -p ${shellQuote(codexHome)}\ncat > ${shellQuote(`${codexHome}/auth.json`)}`], { stdin: file.content });
+  if (result.exitCode !== 0) throw new Error(`Could not configure Codex subscription: ${result.stderr}`);
 }
 
 export async function syncSubscriptionClis(runtime: ModelRuntime): Promise<void> {

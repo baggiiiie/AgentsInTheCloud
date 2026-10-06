@@ -105,11 +105,11 @@ function renderWorkingSection(ctx: AgentRenderContext, section: WorkingTranscrip
   const commentary = commentaryContext(ctx);
   const commentaryHtml = workingCommentaryItems(section).map((item) => renderTranscriptItem(commentary, item)).join("");
   const revealing = Boolean(ctx.revealTarget && section.items.some((item) => item.anchor === ctx.revealTarget || item.key === ctx.revealTarget));
-  const attributes = ctx.readOnly ? "" : `data-controller="agent-turn" data-agent-turn-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-turn-agent-id-value="${escapeHtml(ctx.agentId)}" data-agent-turn-turn-id-value="${escapeHtml(section.key)}" data-agent-turn-branch-id-value="${escapeHtml(ctx.branchId ?? "")}"${revealing ? ` data-agent-turn-reveal-value="${escapeHtml(ctx.revealTarget!)}"` : ""} data-action="toggle->agent-turn#toggle"`;
-  const items = ctx.readOnly ? renderWorkingContent(ctx, section) : "";
+  const attributes = ctx.readOnly ? "" : ctx.inlineWorkingItems ? `data-agent-turn-turn-id-value="${escapeHtml(section.key)}"` : `data-controller="agent-turn" data-agent-turn-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-turn-agent-id-value="${escapeHtml(ctx.agentId)}" data-agent-turn-turn-id-value="${escapeHtml(section.key)}" data-agent-turn-branch-id-value="${escapeHtml(ctx.branchId ?? "")}"${revealing ? ` data-agent-turn-reveal-value="${escapeHtml(ctx.revealTarget!)}"` : ""} data-action="toggle->agent-turn#toggle"`;
+  const items = ctx.readOnly || ctx.inlineWorkingItems ? renderWorkingContent(ctx, section) : "";
   return `<div class="agent-working-block" id="${ids.item(ctx, section.key)}">${disclosureHtml({
     element: { attributesHtml: attributes }, summary, open: revealing,
-    bodyAttributesHtml: `id="${ids.workingItems(ctx, section.key)}"${ctx.readOnly ? "" : ' data-agent-turn-target="items" data-turbo-permanent'}`,
+    bodyAttributesHtml: `id="${ids.workingItems(ctx, section.key)}"${ctx.readOnly || ctx.inlineWorkingItems ? "" : ' data-agent-turn-target="items" data-turbo-permanent'}`,
     bodyHtml: items,
   })}<div class="disclosure-content agent-working-commentary" id="${ids.workingItems(commentary, section.key)}">${commentaryHtml}</div></div>`;
 }

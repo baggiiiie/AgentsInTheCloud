@@ -1,8 +1,9 @@
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { execWorkspaceCommand, workspaceRoot } from "@agents-in-the-cloud/workspace";
 
-export async function loadWorkspaceAgentsFiles(workspaceId: string): Promise<Array<{ path: string; content: string }>> {
-  const agentsPaths = [`${workspaceRoot}/AGENTS.md`, `${workspaceRoot}/.agents-in-the-cloud/AGENTS.md`];
+export async function loadWorkspaceAgentsFiles(workspaceId: string, { includeRoot = true }: { includeRoot?: boolean } = {}): Promise<Array<{ path: string; content: string }>> {
+  const agentsPaths = [`${workspaceRoot}/.agents-in-the-cloud/AGENTS.md`];
+  if (includeRoot) agentsPaths.unshift(`${workspaceRoot}/AGENTS.md`);
   const agentsFiles: Array<{ path: string; content: string }> = [];
 
   for (const path of agentsPaths) {

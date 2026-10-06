@@ -25,6 +25,7 @@
         "@agents-in-the-cloud/claude-agent": "workspace:*",
         "@agents-in-the-cloud/cli-agent": "workspace:*",
         "@agents-in-the-cloud/codex-agent": "workspace:*",
+        "@agents-in-the-cloud/codex-app-server-agent": "workspace:*",
         "@agents-in-the-cloud/core": "workspace:*",
         "@agents-in-the-cloud/design-system": "workspace:*",
         "@agents-in-the-cloud/desktop": "workspace:*",
@@ -168,6 +169,20 @@
         "@agents-in-the-cloud/cli-agent": "workspace:*",
         "@agents-in-the-cloud/core": "workspace:*",
         "@agents-in-the-cloud/llm": "workspace:*",
+        "@agents-in-the-cloud/shared": "workspace:*",
+        "@agents-in-the-cloud/workspace": "workspace:*",
+        "typebox": "^1.0.57",
+      },
+    },
+    "packages/codex-app-server-agent": {
+      "name": "@agents-in-the-cloud/codex-app-server-agent",
+      "dependencies": {
+        "@agents-in-the-cloud/agent": "workspace:*",
+        "@agents-in-the-cloud/builtin-agent": "workspace:*",
+        "@agents-in-the-cloud/cli-agent": "workspace:*",
+        "@agents-in-the-cloud/core": "workspace:*",
+        "@agents-in-the-cloud/llm": "workspace:*",
+        "@agents-in-the-cloud/prompt": "workspace:*",
         "@agents-in-the-cloud/shared": "workspace:*",
         "@agents-in-the-cloud/workspace": "workspace:*",
         "typebox": "^1.0.57",
@@ -485,6 +500,7 @@
     "@agents-in-the-cloud/cli-agent": ["@agents-in-the-cloud/cli-agent@workspace:packages/cli-agent"],
 
     "@agents-in-the-cloud/codex-agent": ["@agents-in-the-cloud/codex-agent@workspace:packages/codex-agent"],
+    "@agents-in-the-cloud/codex-app-server-agent": ["@agents-in-the-cloud/codex-app-server-agent@workspace:packages/codex-app-server-agent"],
 
     "@agents-in-the-cloud/core": ["@agents-in-the-cloud/core@workspace:packages/core"],
 

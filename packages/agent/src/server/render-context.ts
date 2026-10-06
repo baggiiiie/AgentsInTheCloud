@@ -16,6 +16,8 @@ export interface AgentRenderContext {
   /** Preserve read-only native branch selection through lazy detail expansion. */
   transcriptQuery?: string;
   readOnly?: boolean;
+  /** Render working items inline instead of subscribing to builtin turn details. */
+  inlineWorkingItems?: boolean;
 }
 
 export function commentaryContext(ctx: AgentRenderContext): AgentRenderContext {

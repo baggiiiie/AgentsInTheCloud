@@ -22,13 +22,15 @@ test("builtin is the initial default and successful choices persist", async () =
   expect((await defaultAgentType()).id).toBe("builtin");
   await rememberAgentType("codex");
   expect(JSON.parse(await Bun.file(join(directory, "default-agent-type.json")).text())).toBe("codex");
-  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["codex", "builtin", "claude", "pi"]);
+  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["codex", "builtin", "claude", "codex-app-server", "pi"]);
   await rememberAgentType("claude");
   expect((await defaultAgentType()).id).toBe("claude");
-  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["claude", "builtin", "codex", "pi"]);
+  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["claude", "builtin", "codex", "codex-app-server", "pi"]);
   await rememberAgentType("pi");
   expect((await defaultAgentType()).id).toBe("pi");
-  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["pi", "builtin", "claude", "codex"]);
+  expect((await orderedAgentTypes()).map(({ id }) => id)).toEqual(["pi", "builtin", "claude", "codex", "codex-app-server"]);
+  await rememberAgentType("codex-app-server");
+  expect((await defaultAgentType()).id).toBe("codex-app-server");
   await rememberAgentType("builtin");
   expect((await defaultAgentType()).id).toBe("builtin");
 });

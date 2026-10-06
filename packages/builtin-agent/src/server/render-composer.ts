@@ -15,9 +15,9 @@ export interface AgentStatsView {
   contextPercent: number | null;
   nativeBranchUsage?: boolean;
   compactAvailable: boolean;
-  inputTokens: number;
-  outputTokens: number;
-  cost: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cost: number | null;
   descendantCost?: number;
   isSubagent?: boolean;
   modelName: string | undefined;
@@ -35,11 +35,11 @@ export interface AgentPaneState {
   stats: AgentStatsView;
 }
 
-export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceAgentInfo, state: AgentPaneState, completionCatalogHtml = ""): Promise<string> {
+export async function renderAgentPane(ctx: AgentRenderContext, agent: Pick<WorkspaceAgentInfo, "agentId">, state: AgentPaneState, completionCatalogHtml = "", presentation: { moduleChannel?: string; notifications?: boolean; initialPromptDraft?: boolean } = {}): Promise<string> {
   const key = agentKey(agent.agentId);
   const draftId = agentAttachmentDraftId(ctx.workspaceId, ctx.agentId);
   const attachments = state.readOnly ? [] : await listStagedAttachments(draftId);
-  const initialPromptDraft = state.readOnly ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.agentId);
+  const initialPromptDraft = state.readOnly || presentation.initialPromptDraft === false ? undefined : await readInitialPromptDraft(ctx.workspaceId, ctx.agentId);
   const initialText = initialPromptDraft?.prompt;
   const attachRowId = ids.attachRow(ctx);
   return `<section id="${domId("agent_pane", ctx.workspaceId, agent.agentId)}" data-turbo-permanent class="agent-pane" data-agent-source="${escapeHtml(key)}">
@@ -47,8 +47,9 @@ export async function renderAgentPane(ctx: AgentRenderContext, agent: WorkspaceA
       ${state.readOnly ? "" : `data-controller="agent-pane agent-attachments agent-composer composer-focus"
       data-agent-pane-workspace-id-value="${escapeHtml(ctx.workspaceId)}"
       data-agent-pane-agent-id-value="${escapeHtml(ctx.agentId)}"
+      ${presentation.moduleChannel ? `data-agent-pane-module-channel-value="${escapeHtml(presentation.moduleChannel)}"` : ""}
       ${composerAttachmentAttributes(draftId, attachRowId, agentComposerActions)}`}>
-      ${state.readOnly ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
+      ${state.readOnly || presentation.notifications === false ? "" : `<div class="agent-body-controls">${renderAgentNotifications(ctx)}</div>`}
       <div class="agent-transcript-region">
         <div class="agent-transcript" tabindex="0" role="region" aria-label="Agent transcript" data-agent-pane-target="transcript">
           <div class="agent-transcript-surface"><div class="agent-transcript-content" id="${ids.transcript(ctx)}" data-agent-pane-target="transcriptContent">${state.transcriptHtml}</div></div>
@@ -169,9 +170,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
 ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingLevelFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking-level"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
-<span class="agent-stat" data-footer-drop="1" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
-<span class="agent-stat" data-footer-drop="1" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" data-footer-drop="2" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+${stats.inputTokens === null ? "" : `<span class="agent-stat" data-footer-drop="1" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>`}
+${stats.outputTokens === null ? "" : `<span class="agent-stat" data-footer-drop="1" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>`}
+${stats.cost === null ? "" : `<span class="agent-stat" data-footer-drop="2" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>`}
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

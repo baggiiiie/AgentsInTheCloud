@@ -32,12 +32,13 @@ export function agentConnectionShouldRun(logicallyVisible: boolean, documentVisi
 
 export function createAgentPaneController(Controller: StimulusControllerConstructor) {
   return class AgentPaneController extends Controller implements AgentPaneControllerInstance {
-    static values = { workspaceId: String, agentId: String };
+    static values = { workspaceId: String, agentId: String, moduleChannel: String };
     static targets = ["transcript", "transcriptContent", "transcriptEnd", "input", "form", "sendStop"];
     declare readonly element: HTMLElement;
     declare readonly application: StimulusApplication;
     declare readonly workspaceIdValue: string;
     declare readonly agentIdValue: string;
+    declare readonly moduleChannelValue: string;
     declare readonly transcriptTarget: HTMLElement;
     declare readonly transcriptContentTarget: HTMLElement;
     declare readonly transcriptEndTarget: HTMLElement;
@@ -182,7 +183,7 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       const message = params.get("agentTarget");
       if (params.get("agent") !== this.agentIdValue || !message || message === this.revealedTranscriptTarget) return;
       this.revealedTranscriptTarget = message;
-      const response = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/agents/${encodeURIComponent(this.agentIdValue)}/reveal/${encodeURIComponent(message)}`, { headers: { Accept: "application/json" } });
+      const response = await fetch(new URL(`reveal/${encodeURIComponent(message)}`, this.formTarget.action), { headers: { Accept: "application/json" } });
       if (!response.ok) throw new Error(`Could not reveal transcript target: ${response.status}`);
       const { turnId } = Value.Parse(Type.Object({ turnId: Type.Union([Type.String(), Type.Null()]) }), await response.json());
       if (turnId !== null) {
@@ -203,7 +204,9 @@ export function createAgentPaneController(Controller: StimulusControllerConstruc
       this.element.dataset.agentPresentationReady = "false";
       if (this.hasBeenReady) this.setReconnecting(true);
       this.cableSubscription = window.AgentsInTheCloudCable?.subscribe(
-        CableTopics.agent(this.workspaceIdValue, this.agentIdValue),
+        this.moduleChannelValue
+          ? CableTopics.module(this.moduleChannelValue, this.workspaceIdValue, { agentId: this.agentIdValue })
+          : CableTopics.agent(this.workspaceIdValue, this.agentIdValue),
         { onReady: this.cableReady, onDisconnected: this.cableDisconnected },
       );
     }
