@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { localRepository } from "../src/server/diff.ts";
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { createDeletionReview } from "../src/server/deletion.ts";
 import { command } from "./support/repository.ts";
 

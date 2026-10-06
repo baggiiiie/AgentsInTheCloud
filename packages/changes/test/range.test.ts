@@ -2,7 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { git, localRepository } from "@agents-in-the-cloud/review/diff";
+import { git } from "@agents-in-the-cloud/workspace/git";
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { captureChanges, commitHistory, InvalidChangesRange, workingTree as uncommitted, stagedChanges } from "../src/server/snapshot.ts";
 
 const roots: string[] = [];

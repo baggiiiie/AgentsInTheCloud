@@ -1,9 +1,6 @@
-import { copyFile, lstat, mkdtemp, readFile, readlink, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { isNotFoundError } from "@agents-in-the-cloud/core";
-import { join, relative, resolve, sep } from "node:path";
-import { decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "./repository-batch.ts";
-import { execWorkspaceCommandBuffer, workspaceRoot } from "@agents-in-the-cloud/workspace";
+import { join, relative, sep } from "node:path";
+import { decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "./git-batch.ts";
+import { workspaceRoot, type WorkspaceCommandOptions } from "./index.ts";
 
 export interface GitResult { stdout: Buffer; stderr: string; exitCode: number }
 export interface WorkingFile { contents: Buffer; mode: string }
@@ -20,7 +17,12 @@ export function safeGitArguments(args: string[]): string[] {
 }
 
 /** All repository-controlled execution and file reads stay in the workspace, as its regular user. */
-export function workspaceRepository(workspaceId: string, path = ""): Repository {
+export function createWorkspaceRepository(
+  workspaceId: string,
+  path: string,
+  execute: (workspaceId: string, command: string[], options: WorkspaceCommandOptions) => Promise<GitResult>,
+): Repository {
+  if (path.startsWith("/")) throw new Error("Repository path must be workspace-relative");
   const workdir = join(workspaceRoot, path);
   const within = relative(workspaceRoot, workdir);
   if (within === ".." || within.startsWith(`..${sep}`)) throw new Error("Repository path escapes workspace");
@@ -33,13 +35,13 @@ export function workspaceRepository(workspaceId: string, path = ""): Repository 
     try {
       // Avoid runner startup for operations such as a single history page.
       if (batch.length === 1 && batch[0]!.request.kind === "git") {
-        const result = await execWorkspaceCommandBuffer(workspaceId, safeGitArguments(batch[0]!.request.args), { workdir });
+        const result = await execute(workspaceId, safeGitArguments(batch[0]!.request.args), { workdir, user: "agents-in-the-cloud" });
         batch[0]!.resolve(result);
         return;
       }
       const requests = batch.map(({ request }) => request.kind === "git" ? { ...request, args: safeGitArguments(request.args) }
         : request.kind === "index-tree" ? { ...request, args: safeGitArguments(["rev-parse", "--git-path", "index"]), writeArgs: safeGitArguments(["write-tree"]) } : request);
-      const result = await execWorkspaceCommandBuffer(workspaceId, ["bun", "--no-env-file", "--config=/dev/null", "--eval", repositoryBatchRunner], { workdir, stdin: JSON.stringify(requests) });
+      const result = await execute(workspaceId, ["bun", "--no-env-file", "--config=/dev/null", "--eval", repositoryBatchRunner], { workdir, user: "agents-in-the-cloud", stdin: JSON.stringify(requests) });
       if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Workspace repository batch failed");
       const results = decodeRepositoryBatch(result.stdout, batch.length);
       batch.forEach((request, index) => request.resolve(results[index]!));
@@ -57,6 +59,7 @@ export function workspaceRepository(workspaceId: string, path = ""): Repository 
   return {
     gitResult: args => enqueue({ kind: "git", args }),
     async workingFile(path) {
+      if (path.startsWith("/")) throw new Error("File path must be repository-relative");
       const within = relative(workdir, join(workdir, path));
       if (within === ".." || within.startsWith(`..${sep}`)) throw new Error("File path escapes repository");
       const result = await enqueue({ kind: "working-file", path });
@@ -74,43 +77,25 @@ export function workspaceRepository(workspaceId: string, path = ""): Repository 
   };
 }
 
-/** Explicitly trusted host repositories for local tools and domain fixtures; application workspaces never use this adapter. */
-export function localRepository(root: string): Repository {
-  const repository: Repository = {
-    async gitResult(args) {
-      try { await stat(root); }
-      catch (error) {
-        if (!isNotFoundError(error)) throw error;
-        return { exitCode: 128, stderr: "Repository directory not found", stdout: Buffer.alloc(0) };
-      }
-      const process = Bun.spawn(safeGitArguments(args), { cwd: root, stdout: "pipe", stderr: "pipe" });
-      const [stdout, stderr, exitCode] = await Promise.all([new Response(process.stdout).arrayBuffer(), new Response(process.stderr).text(), process.exited]);
-      return { stdout: Buffer.from(stdout), stderr, exitCode };
-    },
-    async workingFile(path) {
-      const absolute = join(root, path), within = relative(root, absolute);
-      if (within === ".." || within.startsWith(`..${sep}`)) throw new Error("File path escapes repository");
-      try {
-        const info = await lstat(absolute);
-        if (info.isSymbolicLink()) return { contents: Buffer.from(await readlink(absolute)), mode: "120000" };
-        if (!info.isFile()) return undefined;
-        return { contents: await readFile(absolute), mode: info.mode & 0o111 ? "100755" : "100644" };
-      } catch (error) { if (isNotFoundError(error)) return undefined; throw error; }
-    },
-    async captureIndexTree() {
-      const directory = await mkdtemp(join(tmpdir(), "changes-index-"));
-      const index = join(directory, "index");
-      try {
-        const result = await repository.gitResult(["rev-parse", "--git-path", "index"]);
-        if (result.exitCode !== 0) throw new Error(result.stderr);
-        try { await copyFile(resolve(root, result.stdout.toString().trim()), index); }
-        catch (error) { if (!isNotFoundError(error)) throw error; }
-        const process = Bun.spawn(safeGitArguments(["write-tree"]), { cwd: root, env: { ...Bun.env, GIT_INDEX_FILE: index }, stdout: "pipe", stderr: "pipe" });
-        const [stdout, stderr, exitCode] = await Promise.all([new Response(process.stdout).arrayBuffer(), new Response(process.stderr).text(), process.exited]);
-        if (exitCode !== 0) throw new Error(stderr.trim());
-        return Buffer.from(stdout);
-      } finally { await rm(directory, { recursive: true, force: true }); }
-    },
-  };
-  return repository;
+export async function gitResult(root: Repository, args: string[]): Promise<GitResult> {
+  return root.gitResult(args);
+}
+
+export async function git(root: Repository, args: string[], allowFailure = false): Promise<Buffer> {
+  const result = await gitResult(root, args);
+  if (result.exitCode !== 0 && !allowFailure) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
+  return result.exitCode === 0 ? result.stdout : Buffer.alloc(0);
+}
+
+/** Root and initialized nested submodules, expressed as workspace-relative paths. */
+export async function repositoryPaths(root: Repository): Promise<string[]> {
+  const inside = await gitResult(root, ["rev-parse", "--is-inside-work-tree"]);
+  if (inside.exitCode !== 0) {
+    if (inside.stderr.includes("not a git repository")) return [];
+    throw new Error(inside.stderr.trim() || "could not inspect workspace repository");
+  }
+  if (inside.stdout.toString("utf8").trim() !== "true") return [];
+  const submodules = await gitResult(root, ["submodule", "foreach", "--quiet", "--recursive", "printf '%s\\0' \"$displaypath\""]);
+  if (submodules.exitCode !== 0) throw new Error(submodules.stderr || "could not enumerate workspace submodules");
+  return ["", ...submodules.stdout.toString("utf8").split("\0").filter(Boolean)];
 }

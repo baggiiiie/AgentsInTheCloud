@@ -1,4 +1,4 @@
-import { localRepository } from "@agents-in-the-cloud/review/diff";
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

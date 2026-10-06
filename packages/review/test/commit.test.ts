@@ -1,8 +1,9 @@
-import { localRepository } from "../src/server/diff.ts";
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmod, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { collectCommitReviewFile, collectCommitReviewStats, git } from "../src/server/diff.ts";
+import { collectCommitReviewFile, collectCommitReviewStats } from "../src/server/diff.ts";
+import { git } from "@agents-in-the-cloud/workspace/git";
 import { command, createReviewRepository } from "./support/repository.ts";
 
 let root: string;

@@ -1,8 +1,6 @@
 import { isUtf8 } from "node:buffer";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
-import type { Repository, GitResult, WorkingFile } from "./repository.ts";
-export { workspaceRepository, localRepository } from "./repository.ts";
-export type { Repository, GitResult } from "./repository.ts";
+import { git, gitResult, type Repository, type WorkingFile } from "@agents-in-the-cloud/workspace/git";
 import type { ReviewSide } from "../model.ts";
 
 const maxRenderedBytes = 1_000_000;
@@ -39,16 +37,6 @@ interface StatusEntry {
   code: string;
   path: string;
   previousPath?: string;
-}
-
-export async function gitResult(root: Repository, args: string[]): Promise<GitResult> {
-  return root.gitResult(args);
-}
-
-export async function git(root: Repository, args: string[], allowFailure = false): Promise<Buffer> {
-  const result = await gitResult(root, args);
-  if (result.exitCode !== 0 && !allowFailure) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
-  return result.exitCode === 0 ? result.stdout : Buffer.alloc(0);
 }
 
 function parseStatus(output: Buffer): StatusEntry[] {

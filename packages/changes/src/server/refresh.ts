@@ -1,4 +1,4 @@
-import type { Repository } from "@agents-in-the-cloud/review/diff";
+import type { Repository } from "@agents-in-the-cloud/workspace/git";
 import { isUnpushedRange, type ChangesRange } from "../history.ts";
 import { captureChanges, captureHistory, commitHistory, stagedChanges, workingTree, type ChangesSnapshot } from "./snapshot.ts";
 
