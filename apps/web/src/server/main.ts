@@ -11,6 +11,7 @@ import {
   detectParentOriginPublisher,
   defaultPublicOriginPortRange,
   managementOriginRejection,
+  handleCanonicalWorkspaceRequest,
   StoppedWorkspaceError,
 } from "@agents-in-the-cloud/proxy-ingress/server";
 import { agentsInTheCloudName, errorMessage, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
@@ -252,33 +253,6 @@ const ingressSockets = createWorkspaceIngressSockets(workspaceIngress, join(runt
 agentsInTheCloudEvents.on("workspace_plan_prepare", ({ workspaceId }) => ingressSockets.ensure(workspaceId));
 agentsInTheCloudEvents.on("workspace_deleted", ({ workspaceId }) => ingressSockets.remove(workspaceId));
 
-async function handleCanonicalProxyRequest(url: URL): Promise<Response | undefined> {
-  const appMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/apps\/([^/]+)(\/.*)?$/);
-  if (appMatch) {
-    const workspaceId = decodeURIComponent(appMatch[1] ?? "");
-    const appKey = decodeURIComponent(appMatch[2] ?? "");
-    const path = `${appMatch[3] || "/"}${url.search}`;
-    return await workspaceIngress.openCanonical({ workspaceId, appKey }, path);
-  }
-
-  const portMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ports\/(\d+)(\/.*)?$/);
-  if (portMatch) {
-    const workspaceId = decodeURIComponent(portMatch[1] ?? "");
-    const port = Number(portMatch[2]);
-    const path = `${portMatch[3] || "/"}${url.search}`;
-    return await workspaceIngress.openCanonical({ workspaceId, appKey: `port-${port}` }, path);
-  }
-
-  const fileMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/files(\/.*)$/);
-  if (fileMatch) {
-    const workspaceId = decodeURIComponent(fileMatch[1] ?? "");
-    const path = `${decodeURIComponent(fileMatch[2] ?? "/")}${url.search}`;
-    return await workspaceIngress.openCanonical({ workspaceId, appKey: "file" }, path);
-  }
-
-  return undefined;
-}
-
 async function validateSocket(request: Request, url: URL): Promise<SocketData | undefined> {
   const cableData = cableServer.validate(request, url);
   if (cableData) return cableData;
@@ -340,7 +314,7 @@ const server = Bun.serve<SocketData>({
     const originRejection = managementOriginRejection(request, server.requestIP(request)?.address);
     if (originRejection) return originRejection;
 
-    const canonical = await handleCanonicalProxyRequest(url);
+    const canonical = await handleCanonicalWorkspaceRequest(request, workspaceIngress);
     if (canonical) return canonical;
 
     if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
