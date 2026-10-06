@@ -527,7 +527,6 @@ export const entries: CatalogueEntry[] = [
   },
   {
     id: "content-row",
-    compareButtonSizes: true,
     title: "Content row",
     when: "Menu items, navigation entries, action rows, tree entries, standalone information and disclosure summaries. Compact is a single-line pill; multiline is an intrinsic-height soft rectangle. Both share selection, keyboard focus and quiet directional lighting.",
     contract:

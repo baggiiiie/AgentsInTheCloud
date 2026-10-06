@@ -11,7 +11,7 @@ export function createDeletionReviewController(Controller: WorkspaceClientContro
     requestFile(event: Event): void {
       if (!(event.currentTarget instanceof HTMLDetailsElement)) throw new Error("Deletion review loading requires details");
       if (!event.currentTarget.open) return;
-      const frame = event.currentTarget.querySelector<HTMLElement>(":scope > turbo-frame[data-src]")!;
+      const frame = event.currentTarget.querySelector<HTMLElement>(":scope > .disclosure-content > turbo-frame[data-src]")!;
       if (!frame.hasAttribute("src")) frame.setAttribute("src", frame.dataset.src!);
     }
 

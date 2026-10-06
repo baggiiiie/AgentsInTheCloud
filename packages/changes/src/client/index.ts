@@ -103,7 +103,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
     private header(path: string, collapsed: boolean): HTMLElement {
       const template = Array.from(this.element.querySelectorAll<HTMLTemplateElement>("template[data-changes-header]")).find((entry) => entry.dataset.changesHeader === path)!;
-      // SAFETY: Header templates contain one server-rendered div with an Action Item button.
+      // SAFETY: Header templates contain one server-rendered div with an Content row button.
       const header = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
       const button = header.querySelector("button")!;
       button.setAttribute("aria-expanded", String(!collapsed));

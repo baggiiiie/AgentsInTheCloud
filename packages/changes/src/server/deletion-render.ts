@@ -1,5 +1,5 @@
-import { actionItemHtml, type ActionItemLabel } from "@agents-in-the-cloud/design-system/action-item";
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import type { ContentRowLabel } from "@agents-in-the-cloud/design-system/content-row";
+import type { DisclosureSummary } from "@agents-in-the-cloud/design-system/disclosure";
 import { preloadDiffHTML } from "@pierre/diffs/ssr";
 import { escapeHtml, formatBytes } from "@agents-in-the-cloud/shared";
 import type { ChangesFile, ChangesFileStats } from "./diff.ts";
@@ -16,18 +16,17 @@ function renderSpecialFile(file: ChangesFile): string {
   return `<div class="deletion-special-file" role="note"><span class="deletion-special-file__visual" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h6l4 4V20.5H7zM13 3.5v4h4M9.5 15.5l2-2 1.5 1.5 1.5-1.5"/></svg></span><div class="deletion-special-file__content"><strong>${escapeHtml(file.detail ?? "Preview unavailable")}</strong><span>${description}</span></div></div>`;
 }
 
-export function renderFileSummary(label: ActionItemLabel, metaHtml: string, title?: string): string {
-  return actionItemHtml({
-    kind: "single",
-    leadingHtml: Icons.Disclosure,
+export function deletionFileSummary(label: ContentRowLabel, metaHtml: string, title?: string): DisclosureSummary {
+  return {
+    kind: "multiline",
     label: {
       ...label,
 
       attributesHtml: title ? `title="${escapeHtml(title)}"` : undefined,
     },
-    trailingHtml: `<span class="action-item__status deletion-file-meta">${metaHtml}</span>`,
-    element: { tag: "summary", attributesHtml: 'data-linear-navigation-target="item"' },
-  });
+    trailingHtml: `<span class="content-row__status deletion-file-meta">${metaHtml}</span>`,
+    attributesHtml: 'data-linear-navigation-target="item"',
+  };
 }
 
 export function renderFileStats(counts: ChangesFileStats): string {

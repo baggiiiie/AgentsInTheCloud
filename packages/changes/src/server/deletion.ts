@@ -1,10 +1,11 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { createHash } from "node:crypto";
 import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
 import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import { collectCommitChangesFile, collectCommitChangesStats, collectChangesFile, collectChangesIndex, collectChangesStats, type ChangesFileStats } from "./diff.ts";
 import { repositoryPaths, workspaceRepository, type Repository, git } from "@agents-in-the-cloud/workspace/git";
-import { renderFileStats, renderFileSummary, renderDeletionFile } from "./deletion-render.ts";
+import { renderFileStats, deletionFileSummary, renderDeletionFile } from "./deletion-render.ts";
 
 type DeletionRepository = {
   relativePath: string;
@@ -69,12 +70,12 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
   function fileSummary(workspaceId: string, fingerprint: string, repository: string, file: ChangesFileStats, commit = ""): string {
     const frameId = fileFrameId(workspaceId, fingerprint, repository, file.path, commit);
     const query = new URLSearchParams({ fingerprint, repository, path: file.path, commit });
-    const summary = renderFileSummary(
+    const summary = deletionFileSummary(
       { kind: "text", text: file.path },
       `<span class="deletion-git-stats">${renderFileStats(file)}</span>`,
       file.path,
     );
-    return `<details class="deletion-file" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/file?${query}`)}</details>`;
+    return `<div class="deletion-file">${disclosureHtml({ element: { attributesHtml: 'data-action="toggle->deletion-review#requestFile"' }, summary, bodyHtml: lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/file?${query}`) })}</div>`;
   }
 
   function fileList(workspaceId: string, fingerprint: string, repository: string, files: ChangesFileStats[], commit = ""): string {
@@ -83,13 +84,13 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
 
   function commitSummary(workspaceId: string, fingerprint: string, repository: string, commit: UnpushedCommit): string {
     const branches = commit.branches.length ? commit.branches.join(", ") : "Detached HEAD";
-    const summary = renderFileSummary(
+    const summary = deletionFileSummary(
       { kind: "text", text: commit.subject },
       `<span class="workspace-deletion-commit-branches" title="${escapeHtml(branches)}">${escapeHtml(branches)}</span><code title="${escapeHtml(commit.hash)}">${escapeHtml(commit.hash.slice(0, 12))}</code>`,
     );
     const query = new URLSearchParams({ fingerprint, repository, commit: commit.hash });
     const frameId = commitFrameId(workspaceId, fingerprint, repository, commit.hash);
-    return `<details class="deletion-file workspace-deletion-change-group" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/commit?${query}`)}</details>`;
+    return `<div class="deletion-file">${disclosureHtml({ element: { attributesHtml: 'data-action="toggle->deletion-review#requestFile"' }, summary, bodyHtml: lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/commit?${query}`) })}</div>`;
   }
 
   function renderEvidence(workspaceId: string): string {
@@ -97,7 +98,7 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
     if (!assessment) throw new Error("Deletion review assessment is no longer current");
     return `<div data-controller="deletion-review"><p>You might lose:</p>${assessment.details.repositories.map((repository) => {
       const { fingerprint } = assessment;
-      const working = repository.uncommitted.length ? `<details class="deletion-file workspace-deletion-change-group" open>${renderFileSummary({ kind: "text", text: "Uncommitted changes" }, "")}${fileList(workspaceId, fingerprint, repository.relativePath, repository.uncommitted)}</details>` : "";
+      const working = repository.uncommitted.length ? disclosureHtml({ open: true, summary: { kind: "compact", label: { kind: "text", text: "Uncommitted changes" }, attributesHtml: 'data-linear-navigation-target="item"' }, bodyHtml: fileList(workspaceId, fingerprint, repository.relativePath, repository.uncommitted) }) : "";
       const commits = repository.unpushedCommits.length ? `<div class="action-list">${repository.unpushedCommits.map((commit) => commitSummary(workspaceId, fingerprint, repository.relativePath, commit)).join("")}</div>` : "";
       const repositoryHeading = repository.relativePath ? `<h2>${escapeHtml(repository.relativePath)}</h2>` : "";
       return `<section class="workspace-deletion-repository">${repositoryHeading}${working}${commits}</section>`;

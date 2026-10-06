@@ -160,9 +160,7 @@ turbo-frame { display: contents; }
 .workspace-deletion-evidence > div > p { margin-bottom: 24px; }
 .workspace-deletion-repository + .workspace-deletion-repository { border-top: 1px solid var(--fixed-shell-border); }
 .workspace-deletion-repository > h2 { margin: 0 0 16px; color: var(--text); font: inherit; }
-.workspace-deletion-change-group > .deletion-files,
-.workspace-deletion-change-group > turbo-frame > .deletion-files { padding: 8px 0 8px 20px; }
-.workspace-deletion-empty { margin: 8px 28px; }
+.workspace-deletion-empty { margin: 0; }
 .workspace-deletion-state .deletion-special-file__content strong { font-weight: 400; }
 .workspace-deletion-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 20px; border-top: 1px solid var(--fixed-shell-border); }
 .workspace-deletion-actions form { display: flex; margin: 0; }

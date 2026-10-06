@@ -1,4 +1,4 @@
-import { setActionItemLabel } from "@agents-in-the-cloud/design-system/action-item/client";
+import { setContentRowLabel } from "@agents-in-the-cloud/design-system/content-row/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { selectComparison } from "../comparison-selection.ts";
 import { endpointName, workingTree, historyGraph, rangeDescription, comparisonGraph, rowHeight, type ChangesRange, type HistoryGraph, type HistoryModel } from "../history.ts";
@@ -223,7 +223,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
       const applied = this.comparison?.range.end === range.end && this.comparison.range.start === range.start;
       const description = applied ? this.comparison!.label : rangeDescription(model, selected);
-      setActionItemLabel(this.triggerTarget, description);
+      setContentRowLabel(this.triggerTarget, description);
       this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.endLabel}` : `${endpointName(model, selected.start ?? undefined)} → ${endpointName(model, selected.end)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
       this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");

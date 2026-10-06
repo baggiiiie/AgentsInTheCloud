@@ -4,13 +4,7 @@
   gap: 12px;
 }
 
-.deletion-files { padding: 16px; }
-
 .deletion-file { min-width: 0; scroll-margin-top: 54px; }
-
-.deletion-file > summary { box-sizing: border-box; list-style: none; }
-
-.deletion-file > summary::-webkit-details-marker { display: none; }
 
 .deletion-file-meta { justify-content: flex-end; white-space: nowrap; }
 
@@ -25,7 +19,6 @@
 .deletion-deletions { color: var(--danger); font-family: var(--font-mono); font-size: var(--text-code); font-weight: var(--weight-semibold); }
 
 .deletion-file-diff {
-  margin-top: 8px;
   overflow: clip;
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
@@ -35,7 +28,6 @@
 
 .deletion-file-loading {
   min-height: 96px;
-  margin-top: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -77,10 +69,6 @@
 .deletion-special-file__content span { line-height: var(--leading-copy); }
 
 @media (max-width: 700px) {
-
-.deletion-files { padding: 8px; }
-
-.deletion-file > summary { flex-wrap: nowrap; }
 
 .deletion-file-meta { flex: 0 0 auto; }
 
