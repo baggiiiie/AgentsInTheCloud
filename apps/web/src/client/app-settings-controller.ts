@@ -84,7 +84,9 @@ export class AppSettingsController extends Controller<HTMLElement> {
     });
   }
   private readonly frameLoaded = (event: Event): void => {
-    if (event.target === this.frameTarget) this.focusDestination();
+    const target = event.target;
+    const anchorId = this.frameTarget.querySelector<HTMLElement>("[data-app-settings-location]")!.dataset.appSettingsAnchor;
+    if (target === this.frameTarget || target instanceof HTMLElement && anchorId && target.querySelector(`#${CSS.escape(anchorId)}`)) this.focusDestination();
   };
   private readonly beforeFrameRender = (event: Event): void => {
     if (event.target instanceof HTMLElement && event.target.id === "launch_composer") this.dismissForNavigation();

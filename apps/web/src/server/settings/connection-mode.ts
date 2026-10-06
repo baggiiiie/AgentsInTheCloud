@@ -10,7 +10,7 @@ import { response } from "@agents-in-the-cloud/shared/http";
 // The System access API and marker retain their existing protocol spelling.
 const managed = () => existsSync("/run/agents-in-the-cloud-system/access-v1");
 const schema = Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), connectionState: Type.String(), authUrl: Type.Optional(Type.String()), error: Type.Optional(Type.String()) });
-export async function renderConnectionModeSettings(source = true): Promise<string> {
+export async function renderConnectionModeSettings(): Promise<string> {
   if (!managed()) return "";
   const status = await fetch("http://127.0.0.1:3001/access");
   if (!status.ok) throw new Error(`System access status: ${status.status}`);
@@ -31,7 +31,7 @@ export async function renderConnectionModeSettings(source = true): Promise<strin
   const connectionAction = !remote || connected ? "" : access.authUrl
     ? actionLinkHtml({ href: access.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
     : `<form action="/settings/access" method="post"><input type="hidden" name="mode" value="tailscale">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Retry Tailscale connection" } })}</form>`;
-  return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="connection-mode-settings">
+  return `<turbo-frame id="settings_access" data-controller="connection-mode-settings">
     <section class="settings-sec" id="settings-sec-access">
       <div class="settings-choice-row"><h2>Where can you use AgentsInTheCloud?</h2>${modeToggle}</div>
       <p>${remote ? "Use AgentsInTheCloud and Workspace previews from devices on your Tailscale network, including the installation computer." : "Use AgentsInTheCloud and Workspace previews in a browser on the computer where AgentsInTheCloud is installed. Tailscale is off."}</p>
@@ -57,5 +57,5 @@ export async function handleConnectionModeSettings(request: Request, url: URL): 
     if (!result.ok) throw new Error(`System access setting: ${result.status}: ${await result.text()}`);
     return Response.redirect(new URL("/settings/access", url), 303);
   }
-  if (request.method === "GET") return response(await renderConnectionModeSettings(false));
+  if (request.method === "GET") return response(await renderConnectionModeSettings());
 }

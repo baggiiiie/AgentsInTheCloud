@@ -528,4 +528,5 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
   .app-settings-content .settings-sec-dictation > form { flex-basis: auto; }
 }
 
-.app-settings-disclosure-frame { display: block; }
+.app-settings-section-frame { display: block; min-width: 0; }
+.app-settings-overview > .app-settings-section-frame:empty { display: none; }

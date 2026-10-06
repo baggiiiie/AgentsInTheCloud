@@ -10,7 +10,7 @@ import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { agentsInTheCloudUrl } from "@agents-in-the-cloud/proxy-ingress";
-import { clearCommitIdentity, getCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud/workspace-templates";
+import { clearCommitIdentity, getStoredCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud/workspace-templates";
 import { agentsInTheCloudUrlHtml } from "../agents-in-the-cloud-url.ts";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
@@ -24,7 +24,7 @@ function forceDeleteWorkspacesEnabled(): boolean {
 }
 
 export async function renderCommitIdentityForm(error = ""): Promise<string> {
-  const identity = await getCommitIdentity();
+  const identity = await getStoredCommitIdentity();
   return `<form id="settings_commit_identity" class="settings-commit-identity" method="post" action="/settings/commit-identity" autocomplete="off" data-controller="commit-identity" data-action="input->commit-identity#queue change->commit-identity#save submit->commit-identity#submit">
     ${error ? `<p class="settings-error">${escapeHtml(error)}</p>` : ""}
     <label class="settings-field"><span class="settings-field-label">Commit author name</span><input class="settings-input text-field" name="commitAuthorName" value="${escapeHtml(identity?.name ?? "")}" placeholder="Ada Lovelace" autocomplete="off" data-1p-ignore required></label>
@@ -95,27 +95,30 @@ for (const module of workspaceModules) {
 export const appSettingsFrameId = "app_settings_frame";
 
 const disclosureSections = new Set(["models", "host", "developer-tools"]);
-const disclosureFrameId = (id: string) => `app_settings_section_${id}`;
+const sectionFrameId = (id: string) => `app_settings_section_${id}`;
 
-async function renderSettingsDisclosureFrame(id: string): Promise<string> {
+async function renderSettingsSectionFrame(id: string): Promise<string> {
   const section = listSettingsContributions().find(contribution => contribution.id === id);
-  if (!disclosureSections.has(id)) throw invalidArguments(`settings disclosure not found: ${id}`);
+  if (!section && id !== "developer-tools") throw invalidArguments(`settings section not found: ${id}`);
   const content = id === "developer-tools"
     ? `${await renderDeveloperTools()}${actionLinkHtml({ href: "/design-system-catalogue.html", variant: "secondary", content: { kind: "caption", caption: "Design system catalogue" }, attributesHtml: 'data-turbo="false"' })}${renderBuildIdentity()}`
     : await section!.render();
-  return `<turbo-frame class="app-settings-disclosure-frame" id="${disclosureFrameId(id)}"><div class="app-settings-expanded">${content}</div></turbo-frame>`;
+  return `<turbo-frame class="app-settings-section-frame" id="${sectionFrameId(id)}">${disclosureSections.has(id) ? `<div class="app-settings-expanded">${content}</div>` : content}</turbo-frame>`;
 }
 
 export async function renderSettingsFrame(request: Request, sectionId?: string): Promise<string> {
   if (sectionId === "git-identity") sectionId = "commit-identity";
   const contributions = listSettingsContributions();
   if (sectionId && !contributions.some(contribution => contribution.id === sectionId) && sectionId !== "developer-tools" && sectionId !== "url") throw invalidArguments(`settings section not found: ${sectionId}`);
-  const inline = new Map(await Promise.all(contributions.filter(contribution => !disclosureSections.has(contribution.id)).map(async contribution => [contribution.id, await contribution.render()] as const)));
+  // Opening the panel never waits for a contribution's I/O. Each section owns its request.
+  const inline = new Map(contributions
+    .filter(contribution => !disclosureSections.has(contribution.id))
+    .map(({ id, label }) => [id, `<turbo-frame class="app-settings-section-frame" id="${sectionFrameId(id)}" src="/settings/sections/${id}"><section class="settings-sec" id="settings-sec-${id}"><span role="status">Loading ${escapeHtml(label)}…</span></section></turbo-frame>`]));
   const take = (...ids: string[]) => ids.map(id => { const html = inline.get(id) ?? ""; inline.delete(id); return html; }).join("");
   const disclosure = (id: string, label: string) => disclosureHtml({
     element: { id: `settings-sec-${id}`, attributesHtml: id === "developer-tools" ? 'hidden data-app-settings-target="developer"' : undefined }, open: sectionId === id,
     summary: { kind: "compact", width: "fit", label: { kind: "text", text: label } },
-    bodyHtml: `<turbo-frame class="app-settings-disclosure-frame" id="${disclosureFrameId(id)}" src="/settings/sections/${id}" loading="lazy"><span role="status">Loading…</span></turbo-frame>`,
+    bodyHtml: `<turbo-frame class="app-settings-section-frame" id="${sectionFrameId(id)}" src="/settings/sections/${id}" loading="lazy"><span role="status">Loading…</span></turbo-frame>`,
   });
   const content = `<div class="app-settings-overview">
     ${take("theme", "dictation", "commit-identity", "github", "update-channel", "update", "access")}
@@ -145,8 +148,8 @@ async function deleteAllStoredSettings(): Promise<void> {
 }
 
 export async function handleSettingsPageRequest(request: Request, url: URL, options: { forceDeleteAllWorkspaces?: () => Promise<WorkspaceCleanupResult>; renderModelPickerUpdates: () => Promise<string> }): Promise<Response | undefined> {
-  const disclosureMatch = url.pathname.match(/^\/settings\/sections\/(models|host|developer-tools)$/);
-  if (disclosureMatch && request.method === "GET") return response(await renderSettingsDisclosureFrame(disclosureMatch[1]!));
+  const sectionMatch = url.pathname.match(/^\/settings\/sections\/([^/]+)$/);
+  if (sectionMatch && request.method === "GET") return response(await renderSettingsSectionFrame(sectionMatch[1]!));
   if (url.pathname === "/settings" && request.method === "GET") {
     const section = url.searchParams.get("section") ?? undefined;
     if (request.headers.get("turbo-frame") === appSettingsFrameId) return response(await renderSettingsFrame(request, section));
