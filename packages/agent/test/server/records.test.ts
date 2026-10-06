@@ -141,3 +141,34 @@ test("persisted run starts survive reconstruction before and after the summary",
   ]);
   expect(buildTranscript(completed)[1]).toMatchObject({ key: "start:working", completedAt: 3000, timing: { outputTokens: 4 } });
 });
+
+test("validates persisted entry fields and assistant parts before projection", () => {
+  const records = recordsFromSessionEntries([
+    null,
+    { type: "message", id: "invalid", message: { role: "user", content: 42 } },
+    { type: "future-entry", id: "future" },
+    { type: "message", id: "assistant", message: { role: "assistant", stopReason: "toolUse", content: [
+      { type: "text", text: "Checking", textSignature: 42 },
+      { type: "toolCall", id: "call", name: "read", arguments: { path: "file.ts" } },
+      { type: "toolCall", id: 42, name: "read", arguments: {} },
+      { type: "future-part", text: "Ignored" },
+    ] } },
+  ]);
+  expect(records).toEqual([{
+    kind: "assistant", id: "assistant", timestamp: 0, stopReason: "toolUse", errorMessage: undefined,
+    parts: [{ type: "text", text: "Checking" }, { type: "toolCall", callId: "call", name: "read", args: { path: "file.ts" } }],
+  }]);
+});
+
+test("projects supported notices without requiring unrelated SDK metadata", () => {
+  expect(recordsFromSessionEntries([
+    { type: "usage", id: "usage", kind: "cache_warm", note: "prefill", usage: { input: 10, cacheRead: 20, cacheWrite: 30, cost: { total: 0.01 } } },
+    { type: "message", id: "bash", message: { role: "bashExecution", command: "pwd", output: "/work" } },
+    { type: "custom_message", id: "notice", content: [{ type: "text", text: "Note" }], display: true },
+    { type: "message", id: "hidden", message: { role: "custom", content: "Hidden", display: false } },
+  ])).toMatchObject([
+    { kind: "note", id: "usage", text: "Cache warmed (prefill) · 60 tokens · $0.010", tone: "system" },
+    { kind: "note", id: "bash", text: "`$ pwd`\n\n```\n/work\n```", tone: "system" },
+    { kind: "note", id: "notice", text: "Note", tone: "summary" },
+  ]);
+});
