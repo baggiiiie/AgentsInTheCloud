@@ -1,10 +1,26 @@
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import type * as Protocol from "../protocol.ts";
 
-// The executable and generated types are pinned together; only stable RPCs are used.
+// The executable and generated types are pinned together. Experimental catalog APIs are negotiated during initialize.
 export const codexVersion = "0.160.1";
 export interface Requests {
   initialize: [Protocol.InitializeParams, Protocol.InitializeResponse];
+  "thread/compact/start": [Protocol.ThreadCompactStartParams, Protocol.ThreadCompactStartResponse];
+  "review/start": [Protocol.ReviewStartParams, Protocol.ReviewStartResponse];
+  "thread/fork": [Protocol.ThreadForkParams, Protocol.ThreadForkResponse];
+  "thread/list": [Protocol.ThreadListParams, Protocol.ThreadListResponse];
+  "thread/goal/get": [Protocol.ThreadGoalGetParams, Protocol.ThreadGoalGetResponse];
+  "thread/goal/set": [Protocol.ThreadGoalSetParams, Protocol.ThreadGoalSetResponse];
+  "thread/goal/clear": [Protocol.ThreadGoalClearParams, Protocol.ThreadGoalClearResponse];
+  "skills/list": [Protocol.SkillsListParams, Protocol.SkillsListResponse];
+  "mcpServerStatus/list": [Protocol.ListMcpServerStatusParams, Protocol.ListMcpServerStatusResponse];
+  "hooks/list": [Protocol.HooksListParams, Protocol.HooksListResponse];
+  "plugin/install": [Protocol.PluginInstallParams, Protocol.PluginInstallResponse];
+  "plugin/uninstall": [Protocol.PluginUninstallParams, Protocol.PluginUninstallResponse];
+  "skills/config/write": [Protocol.SkillsConfigWriteParams, Protocol.SkillsConfigWriteResponse];
+  "config/value/write": [Protocol.ConfigValueWriteParams, Protocol.ConfigWriteResponse];
+  "plugin/list": [Protocol.PluginListParams, Protocol.PluginListResponse];
+  "app/list": [Protocol.AppsListParams, Protocol.AppsListResponse];
   "model/list": [Protocol.ModelListParams, Protocol.ModelListResponse];
   "thread/start": [Protocol.ThreadStartParams, Protocol.ThreadStartResponse];
   "thread/resume": [Protocol.ThreadResumeParams, Protocol.ThreadResumeResponse];

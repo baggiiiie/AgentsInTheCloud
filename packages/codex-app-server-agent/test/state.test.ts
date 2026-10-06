@@ -52,3 +52,18 @@ test("replacing native history discards completion flags from the previous sessi
   expect(state.completedItems.size).toBe(0);
   expect(state.activeTurn?.id).toBe("fresh");
 });
+
+test("inline review mode owns nested worker turns and completes their lifecycle", () => {
+  const state = new CodexState();
+  state.receive({ method: "item/completed", params: { threadId: "thread", turnId: "review", item: { type: "enteredReviewMode", id: "review-mode", review: "current changes" }, completedAtMs: 100000 } });
+  expect(state.activeTurn?.id).toBe("review");
+  state.receive({ method: "turn/started", params: { threadId: "thread", turn: turn("worker") } });
+  state.receive({ method: "item/completed", params: { threadId: "thread", turnId: "worker", item: { ...message("Findings"), id: "worker-answer" }, completedAtMs: 102000 } });
+  state.receive({ method: "turn/completed", params: { threadId: "thread", turn: { ...turn("review"), status: "completed", completedAt: 103, durationMs: 3000 } } });
+  expect(state.activeTurn).toBeUndefined();
+  expect(state.turns.map(value => value.status)).toEqual(["completed", "completed"]);
+  expect(state.turns[1]?.durationMs).toBe(3000);
+  expect(state.completedItems.has("worker-answer")).toBe(true);
+  state.receive({ method: "turn/started", params: { threadId: "thread", turn: turn("ordinary") } });
+  expect(state.activeTurn?.id).toBe("ordinary");
+});

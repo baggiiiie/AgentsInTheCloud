@@ -1,13 +1,15 @@
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
+import { builtinAgentIconHtml } from "@agents-in-the-cloud/design-system/icons";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import type { Skill } from "@earendil-works/pi-coding-agent";
-import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { builtinSlashCommands, type BuiltinSlashCommand } from "./builtin-slash-commands.ts";
+import { escapeHtml, providerBrandIconHtml } from "@agents-in-the-cloud/shared";
+import { builtinSlashCommands, type BuiltinSlashCommand, type SlashCommandSource } from "./builtin-slash-commands.ts";
 import type { PromptTemplate } from "./prompt-templates.ts";
 
 export type SlashCommand = BuiltinSlashCommand | {
   kind: "prompt-template";
+  source: SlashCommandSource;
   trigger: string;
   description: string;
   argumentHint?: string;
@@ -15,16 +17,19 @@ export type SlashCommand = BuiltinSlashCommand | {
   shortcut?: string;
 } | {
   kind: "skill";
+  source: SlashCommandSource;
   trigger: string;
   description: string;
   argumentHint?: never;
 };
 
-export function slashCommands(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], mode: "builtin" | "cli" = "builtin"): SlashCommand[] {
+export function slashCommands(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], mode: "builtin" | "cli" = "builtin", additionalCommands: readonly BuiltinSlashCommand[] = []): SlashCommand[] {
   const commands: SlashCommand[] = [
-    ...builtinSlashCommands.filter((command) => mode === "builtin" || command.trigger !== "/compact"),
-    ...templates.filter((template) => template.trigger !== "/tree").map((template) => ({
+    ...builtinSlashCommands.filter((command) => (mode === "builtin" || command.trigger !== "/compact") && !additionalCommands.some(extra => extra.trigger === command.trigger)),
+    ...additionalCommands,
+    ...templates.filter((template) => template.trigger !== "/tree" && !additionalCommands.some(command => command.trigger === template.trigger)).map((template) => ({
       kind: "prompt-template" as const,
+      source: "agents-in-the-cloud" as const,
       trigger: template.trigger,
       description: template.description,
       argumentHint: template.argumentHint,
@@ -33,15 +38,15 @@ export function slashCommands(templates: readonly PromptTemplate[], skills: read
     })),
   ];
   return [
-    ...(mode === "builtin" ? [{ kind: "builtin" as const, name: "tree", trigger: "/tree", description: "Coming soon." }] : []),
+    ...(mode === "builtin" ? [{ kind: "builtin" as const, source: "agents-in-the-cloud" as const, name: "tree", trigger: "/tree", description: "Coming soon." }] : []),
     ...commands.sort((left, right) => left.trigger.localeCompare(right.trigger)),
-    ...skills.map((skill) => ({ kind: "skill" as const, trigger: `/skill:${skill.name}`, description: skill.description })),
+    ...skills.map((skill) => ({ kind: "skill" as const, source: "agents-in-the-cloud" as const, trigger: `/skill:${skill.name}`, description: skill.description })),
   ];
 }
 
-export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], mode: "builtin" | "cli" = "builtin"): string {
-  const commands = slashCommands(templates, skills, mode);
-  const promptTemplateButtons = templates.filter((template) => template.composerButton).map((template) => {
+export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], skills: readonly Pick<Skill, "name" | "description">[], mode: "builtin" | "cli" = "builtin", additionalCommands: readonly BuiltinSlashCommand[] = []): string {
+  const commands = slashCommands(templates, skills, mode, additionalCommands);
+  const promptTemplateButtons = templates.filter((template) => template.composerButton && !additionalCommands.some(command => command.trigger === template.trigger)).map((template) => {
     const shortcut = template.shortcut;
     const shortcutData = shortcut ? ` data-prompt-template-shortcut="${escapeHtml(shortcut)}"` : "";
     return buttonHtml({
@@ -56,9 +61,12 @@ export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], 
     // Keep existing previews for built-in actions without modelling them as Prompt templates.
     const preview = command.kind === "prompt-template" ? command.prompt : command.kind === "builtin" && command.trigger !== "/tree" ? command.trigger : undefined;
     const hasPreview = preview !== undefined;
+    const sourceLabel = command.source === "codex" ? "Codex" : "AgentsInTheCloud";
+    const sourceIcon = command.source === "codex" ? providerBrandIconHtml("openai", "Codex") : builtinAgentIconHtml;
     return contentRowHtml({
       width: "fill",
       kind: "compact",
+      leadingHtml: `<span role="img" aria-label="${sourceLabel}" title="${sourceLabel}"><span class="agent-slash-command-source-icon" aria-hidden="true">${sourceIcon}</span></span>`,
       label: { kind: "text", text: `${command.trigger}${command.argumentHint ? ` ${command.argumentHint}` : ""} — ${command.description}` },
       trailingHtml: preview === undefined ? "" : `<template data-agents-in-the-cloud-fullscreen-target="content"><pre class="agent-slash-command-preview">${escapeHtml(preview)}</pre></template>`,
       element: {

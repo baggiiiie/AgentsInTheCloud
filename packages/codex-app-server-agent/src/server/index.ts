@@ -51,7 +51,16 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     },
   },
   openApiPaths: {
-    "/workspaces/{id}/codex-app-server-agents/{agentId}/messages": { post: { summary: "Send or steer Codex Native", parameters: agentParameters, requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string" } } } } } }, responses: { "202": { description: "Codex accepted the message" } } } },
+    "/workspaces/{id}/codex-app-server-agents/{agentId}/messages": { post: { summary: "Send, steer, or run a native Codex slash command", parameters: agentParameters, requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["text"], properties: { text: { type: "string" }, requestId: { type: "string" } } } } } }, responses: { "200": { description: "Native command result or picker data" }, "202": { description: "Codex accepted the message or command" } } } },
+    "/workspaces/{id}/codex-app-server-agents/{agentId}/commands": {
+      post: {
+        summary: "Run a native Codex slash command", parameters: agentParameters,
+        requestBody: { required: true, content: { "application/json": { schema: {
+          type: "object", required: ["text"], properties: { text: { type: "string" }, argument: { type: "string" }, cursor: { type: "string" }, requestId: { type: "string" } },
+        } } } },
+        responses: { "200": { description: "Native command result or picker data" }, "202": { description: "Native command accepted" } },
+      },
+    },
     "/workspaces/{id}/codex-app-server-agents/{agentId}/abort": { post: { summary: "Interrupt Codex Native's active turn", parameters: agentParameters, responses: { "200": { description: "Interrupt requested" } } } },
     "/workspaces/{id}/codex-app-server-agents/{agentId}/model": { post: { summary: "Choose a model from Codex Native's catalog", parameters: agentParameters, requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["model"], properties: { model: { type: "string" } } } } } }, responses: { "200": { description: "Model selected" }, "422": { description: "Unsupported model or Agent is working" } } } },
     "/workspaces/{id}/codex-app-server-agents/{agentId}/thinking-level": { post: { summary: "Choose Codex Native's reasoning effort", parameters: agentParameters, requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["thinkingLevel"], properties: { thinkingLevel: { type: "string" } } } } } }, responses: { "200": { description: "Reasoning effort selected" }, "422": { description: "Unsupported effort or Agent is working" } } } },

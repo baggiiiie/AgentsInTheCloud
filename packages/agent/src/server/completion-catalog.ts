@@ -1,12 +1,13 @@
+import type { BuiltinSlashCommand } from "./builtin-slash-commands.ts";
 import { listPromptTemplates } from "./prompt-templates.ts";
 import { loadWorkspaceSkills } from "./skills.ts";
 import { renderSlashCommandCatalog } from "./slash-commands.ts";
 
-export async function renderWorkspaceCompletionCatalog(workspaceId: string, mode: "builtin" | "cli" = "builtin"): Promise<string> {
+export async function renderWorkspaceCompletionCatalog(workspaceId: string, mode: "builtin" | "cli" = "builtin", additionalCommands: readonly BuiltinSlashCommand[] = []): Promise<string> {
   if (mode === "cli") {
     const templates = await listPromptTemplates(workspaceId);
-    return renderSlashCommandCatalog(templates, [], "cli");
+    return renderSlashCommandCatalog(templates, [], "cli", additionalCommands);
   }
   const [templates, { skills }] = await Promise.all([listPromptTemplates(workspaceId), loadWorkspaceSkills(workspaceId)]);
-  return renderSlashCommandCatalog(templates, skills);
+  return renderSlashCommandCatalog(templates, skills, mode, additionalCommands);
 }

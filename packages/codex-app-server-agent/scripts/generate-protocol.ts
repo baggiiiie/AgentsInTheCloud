@@ -16,6 +16,8 @@ const roots = [
   "v2/TurnStartedNotification", "v2/TurnCompletedNotification",
   "v2/AgentMessageDeltaNotification", "v2/PlanDeltaNotification", "v2/ErrorNotification", "v2/ReasoningSummaryTextDeltaNotification",
   "v2/CommandExecutionOutputDeltaNotification",
+  ...["ThreadCompactStart", "ReviewStart", "ThreadFork", "ThreadList", "ThreadGoalGet", "ThreadGoalSet", "ThreadGoalClear", "SkillsList", "ListMcpServerStatus", "HooksList", "PluginList", "PluginInstall", "PluginUninstall", "SkillsConfigWrite", "AppsList"].flatMap(name => [`v2/${name}Params`, `v2/${name}Response`]),
+  "v2/ConfigValueWriteParams", "v2/ConfigWriteResponse",
 ];
 try {
   const install = Bun.spawn(["npm", "install", "--prefix", temporary, "--no-audit", "--no-fund", `@openai/codex@${codexVersion}`], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });

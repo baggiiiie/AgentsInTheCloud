@@ -1,4 +1,7 @@
+export type SlashCommandSource = "agents-in-the-cloud" | "codex";
+
 export interface BuiltinSlashCommand {
+  source: SlashCommandSource;
   kind: "builtin";
   name: string;
   trigger: string;
@@ -9,6 +12,7 @@ export interface BuiltinSlashCommand {
 
 export const builtinSlashCommands: readonly BuiltinSlashCommand[] = [{
   kind: "builtin",
+  source: "agents-in-the-cloud",
   name: "compact",
   trigger: "/compact",
   description: "Compact the conversation context, optionally with custom instructions.",
@@ -16,6 +20,7 @@ export const builtinSlashCommands: readonly BuiltinSlashCommand[] = [{
   preserveArguments: true,
 }, {
   kind: "builtin",
+  source: "agents-in-the-cloud",
   name: "name",
   trigger: "/name",
   description: "Rename this Agent, using AI when no name is provided.",
@@ -23,11 +28,13 @@ export const builtinSlashCommands: readonly BuiltinSlashCommand[] = [{
   preserveArguments: true,
 }, {
   kind: "builtin",
+  source: "agents-in-the-cloud",
   name: "new",
   trigger: "/new",
   description: "Start a fresh Agent session.",
 }, {
   kind: "builtin",
+  source: "agents-in-the-cloud",
   name: "park",
   trigger: "/park",
   description: "Park this workspace.",

@@ -137,6 +137,8 @@
 .agent-completion-menu.empty { padding: 8px 8px; color: var(--text-muted); }
 .agent-completion-spinner { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: agent-spin .75s linear infinite; }
 @keyframes agent-spin { to { transform: rotate(360deg); } }
+.content-row__icon .agent-slash-command-source-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
+.content-row__icon .agent-slash-command-source-icon :is(img, svg) { width: 20px; height: 20px; }
 .agent-slash-command-preview { margin: 0; padding: 12px; white-space: pre-wrap; font-family: var(--font-mono); line-height: var(--leading-standard); color: var(--text-bright); background: var(--panel); }
 .agents-in-the-cloud-fullscreen-html .agent-slash-command-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
 .agent-stat { height: 24px; display: inline-flex; align-items: center; gap: 4px; line-height: 24px; white-space: nowrap; }

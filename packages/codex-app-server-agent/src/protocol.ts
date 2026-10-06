@@ -129,6 +129,12 @@ export type InputModality = "text" | "image" | "audio";
  */
 export type LegacyAppPathString = string;
 
+// Source: McpServerInfo.ts
+/**
+ * Presentation metadata advertised by an initialized MCP server.
+ */
+export type McpServerInfo = { name: string, title: string | null, version: string, description: string | null, icons: Array<JsonValue> | null, websiteUrl: string | null, };
+
 // Source: MessagePhase.ts
 /**
  * Classifies an assistant message as interim commentary or final answer text.
@@ -164,6 +170,18 @@ export type ReasoningEffort = string;
  */
 export type ReasoningSummary = "auto" | "concise" | "detailed" | "none";
 
+// Source: Resource.ts
+/**
+ * A known resource that the server is capable of reading.
+ */
+export type Resource = { annotations?: JsonValue, description?: string, mimeType?: string, name: string, size?: number, title?: string, uri: string, icons?: Array<JsonValue>, _meta?: JsonValue, };
+
+// Source: ResourceTemplate.ts
+/**
+ * A template description for resources available on the server.
+ */
+export type ResourceTemplate = { annotations?: JsonValue, uriTemplate: string, name: string, title?: string, description?: string, mimeType?: string, };
+
 // Source: serde_json/JsonValue.ts
 export type JsonValue = number | string | boolean | Array<JsonValue> | { [key in string]?: JsonValue } | null;
 
@@ -190,11 +208,44 @@ export type SubAgentSource = "review" | "compact" | { "thread_spawn": { parent_t
  */
 export type ThreadId = string;
 
+// Source: Tool.ts
+/**
+ * Definition for a tool the client can call.
+ */
+export type Tool = { name: string, title?: string, description?: string, inputSchema: JsonValue, outputSchema?: JsonValue, annotations?: JsonValue, icons?: Array<JsonValue>, _meta?: JsonValue, };
+
 // Source: v2/AgentMessageDelivery.ts
 export type AgentMessageDelivery = "async";
 
 // Source: v2/AgentMessageDeltaNotification.ts
 export type AgentMessageDeltaNotification = { threadId: string, turnId: string, itemId: string, delta: string, };
+
+// Source: v2/AppBranding.ts
+/**
+ * EXPERIMENTAL - app metadata returned by app-list APIs.
+ */
+export type AppBranding = { category: string | null, developer: string | null, website: string | null, privacyPolicy: string | null, termsOfService: string | null, isDiscoverableApp: boolean, };
+
+// Source: v2/AppInfo.ts
+/**
+ * EXPERIMENTAL - app metadata returned by app-list APIs.
+ */
+export type AppInfo = { id: string, name: string, description: string | null, logoUrl: string | null, logoUrlDark: string | null, iconAssets: { [key in string]?: string } | null, iconDarkAssets: { [key in string]?: string } | null, distributionChannel: string | null, branding: AppBranding | null, appMetadata: AppMetadata | null, labels: { [key in string]?: string } | null, installUrl: string | null, isAccessible: boolean,
+/**
+ * Whether this app is enabled in config.toml.
+ * Example:
+ * ```toml
+ * [apps.bad_app]
+ * enabled = false
+ * ```
+ */
+isEnabled: boolean, pluginDisplayNames: Array<string>, };
+
+// Source: v2/AppMetadata.ts
+export type AppMetadata = { review: AppReview | null, categories: Array<string> | null, subCategories: Array<string> | null, seoDescription: string | null, screenshots: Array<AppScreenshot> | null, developer: string | null, version: string | null, versionId: string | null, versionNotes: string | null, firstPartyRequiresInstall: boolean | null, showInComposerWhenUnlinked: boolean | null, };
+
+// Source: v2/AppReview.ts
+export type AppReview = { status: string, };
 
 // Source: v2/ApprovalsReviewer.ts
 /**
@@ -205,6 +256,48 @@ export type AgentMessageDeltaNotification = { threadId: string, turnId: string, 
  * decision framework before approving or denying the request.
  */
 export type ApprovalsReviewer = "user" | "auto_review" | "guardian_subagent";
+
+// Source: v2/AppScreenshot.ts
+export type AppScreenshot = { url: string | null, fileId: string | null, userPrompt: string, };
+
+// Source: v2/AppsListParams.ts
+/**
+ * EXPERIMENTAL - list available apps/connectors.
+ */
+export type AppsListParams = {
+/**
+ * Opaque pagination cursor returned by a previous call.
+ */
+cursor?: string | null,
+/**
+ * Optional page size; defaults to a reasonable server-side value.
+ */
+limit?: number | null,
+/**
+ * Optional thread id used to evaluate app feature gating from that thread's config.
+ */
+threadId?: string | null,
+/**
+ * When true, bypass app caches and fetch the latest data from sources.
+ */
+forceRefetch?: boolean, };
+
+// Source: v2/AppsListResponse.ts
+/**
+ * EXPERIMENTAL - app list response.
+ */
+export type AppsListResponse = { data: Array<AppInfo>,
+/**
+ * Opaque cursor to pass to the next call to continue after the last item.
+ * If None, there are no more items to return.
+ */
+nextCursor: string | null, };
+
+// Source: v2/AppSummary.ts
+/**
+ * EXPERIMENTAL - app metadata summary for plugin responses.
+ */
+export type AppSummary = { id: string, name: string, description: string | null, installUrl: string | null, category: string | null, };
 
 // Source: v2/AskForApproval.ts
 export type AskForApproval = "untrusted" | "on-request" | { "granular": { sandbox_approval: boolean, rules: boolean, skill_approval: boolean, request_permissions: boolean, mcp_elicitations: boolean, } } | "never";
@@ -248,6 +341,55 @@ export type CommandExecutionSource = "agent" | "userShell" | "unifiedExecStartup
 // Source: v2/CommandExecutionStatus.ts
 export type CommandExecutionStatus = "inProgress" | "completed" | "failed" | "declined";
 
+// Source: v2/ConfigLayerMetadata.ts
+export type ConfigLayerMetadata = { name: ConfigLayerSource, version: string, };
+
+// Source: v2/ConfigLayerSource.ts
+export type ConfigLayerSource = { "type": "packagedDefaults",
+/**
+ * Path to the packaged default configuration file.
+ */
+file: AbsolutePathBuf, } | { "type": "mdm", domain: string, key: string, } | { "type": "system",
+/**
+ * This is the path to the system config.toml file, though it is not
+ * guaranteed to exist.
+ */
+file: AbsolutePathBuf, } | { "type": "enterpriseManaged",
+/**
+ * Stable identifier for the delivered layer.
+ */
+id: string,
+/**
+ * Admin-facing name for the delivered layer. This is surfaced in
+ * diagnostics so users know which cloud layer needs administrator
+ * attention.
+ */
+name: string, } | { "type": "user",
+/**
+ * This is the path to the user's config.toml file, though it is not
+ * guaranteed to exist.
+ */
+file: AbsolutePathBuf,
+/**
+ * Name of the selected profile-v2 config layered on top of the base
+ * user config, when this layer represents one.
+ */
+profile: string | null, } | { "type": "project", dotCodexFolder: AbsolutePathBuf, } | { "type": "sessionFlags" } | { "type": "legacyManagedConfigTomlFromFile", file: AbsolutePathBuf, } | { "type": "legacyManagedConfigTomlFromMdm" };
+
+// Source: v2/ConfigValueWriteParams.ts
+export type ConfigValueWriteParams = { keyPath: string, value: JsonValue, mergeStrategy: MergeStrategy,
+/**
+ * Path to the config file to write; defaults to the user's `config.toml` when omitted.
+ */
+filePath?: string | null, expectedVersion?: string | null, };
+
+// Source: v2/ConfigWriteResponse.ts
+export type ConfigWriteResponse = { status: WriteStatus, version: string,
+/**
+ * Canonical path to the config file that was written.
+ */
+filePath: AbsolutePathBuf, overriddenMetadata: OverriddenMetadata | null, };
+
 // Source: v2/CyberAccessProgram.ts
 /**
  * Requested cyber treatment for a ChatGPT-authenticated Codex turn.
@@ -270,8 +412,41 @@ export type FileUpdateChange = { path: string, kind: PatchChangeKind, diff: stri
 // Source: v2/GitInfo.ts
 export type GitInfo = { sha: string | null, branch: string | null, originUrl: string | null, };
 
+// Source: v2/HookErrorInfo.ts
+export type HookErrorInfo = { path: string, message: string, };
+
+// Source: v2/HookEventName.ts
+export type HookEventName = "preToolUse" | "permissionRequest" | "postToolUse" | "preCompact" | "postCompact" | "sessionStart" | "sessionEnd" | "userPromptSubmit" | "subagentStart" | "subagentStop" | "stop" | "interrupt";
+
+// Source: v2/HookMetadata.ts
+export type HookMetadata = { key: string, eventName: HookEventName, matcher: string | null, timeoutSec: bigint, statusMessage: string | null,
+/**
+ * Configured `additionalContext` spill threshold.
+ * `null` uses 2,500 tokens; `0` disables spilling.
+ */
+additionalContextLimit: number | null, sourcePath: AbsolutePathBuf, source: HookSource, pluginId: string | null, displayOrder: bigint, enabled: boolean, isManaged: boolean, currentHash: string, trustStatus: HookTrustStatus, } & ({ "handlerType": "command", command: string, async: boolean, } | { "handlerType": "mcpTool", server: string, tool: string, } | { "handlerType": "prompt", } | { "handlerType": "agent", });
+
 // Source: v2/HookPromptFragment.ts
 export type HookPromptFragment = { text: string, hookRunId: string, };
+
+// Source: v2/HooksListEntry.ts
+export type HooksListEntry = { cwd: string, hooks: Array<HookMetadata>, warnings: Array<string>, errors: Array<HookErrorInfo>, };
+
+// Source: v2/HooksListParams.ts
+export type HooksListParams = {
+/**
+ * When empty, defaults to the current session working directory.
+ */
+cwds?: Array<string>, };
+
+// Source: v2/HooksListResponse.ts
+export type HooksListResponse = { data: Array<HooksListEntry>, };
+
+// Source: v2/HookSource.ts
+export type HookSource = "system" | "user" | "project" | "mdm" | "sessionFlags" | "plugin" | "cloudRequirements" | "cloudManagedConfig" | "legacyManagedConfigFile" | "legacyManagedConfigMdm" | "unknown";
+
+// Source: v2/HookTrustStatus.ts
+export type HookTrustStatus = "managed" | "untrusted" | "trusted" | "modified";
 
 // Source: v2/ItemCompletedNotification.ts
 export type ItemCompletedNotification = { item: ThreadItem, threadId: string, turnId: string,
@@ -287,6 +462,40 @@ export type ItemStartedNotification = { item: ThreadItem, threadId: string, turn
  */
 startedAtMs: number, };
 
+// Source: v2/ListMcpServerStatusParams.ts
+export type ListMcpServerStatusParams = {
+/**
+ * Opaque pagination cursor returned by a previous call.
+ */
+cursor?: string | null,
+/**
+ * Optional page size; defaults to a server-defined value.
+ */
+limit?: number | null,
+/**
+ * Controls how much MCP inventory data to fetch for each server.
+ * Defaults to `Full` when omitted.
+ */
+detail?: McpServerStatusDetail | null, threadId?: string | null,
+/**
+ * Limit discovery to one server. With a thread ID, reuse that thread's MCP connection.
+ */
+serverName?: string | null, };
+
+// Source: v2/ListMcpServerStatusResponse.ts
+export type ListMcpServerStatusResponse = { data: Array<McpServerStatus>,
+/**
+ * Opaque cursor to pass to the next call to continue after the last item.
+ * If None, there are no more items to return.
+ */
+nextCursor: string | null, };
+
+// Source: v2/MarketplaceInterface.ts
+export type MarketplaceInterface = { displayName: string | null, };
+
+// Source: v2/MarketplaceLoadErrorInfo.ts
+export type MarketplaceLoadErrorInfo = { marketplacePath: AbsolutePathBuf, message: string, };
+
 // Source: v2/McpAppDisplayMode.ts
 export type McpAppDisplayMode = "inline" | "fullscreen";
 
@@ -295,6 +504,36 @@ export type McpAppDisplayMode = "inline" | "fullscreen";
  * UI resource and display preference for model invocations, captured from the tool descriptor.
  */
 export type McpAppUi = { resourceUri: string, preferredModelDisplayMode: McpAppDisplayMode, };
+
+// Source: v2/McpAuthStatus.ts
+export type McpAuthStatus = "unknown" | "unsupported" | "notLoggedIn" | "bearerToken" | "oAuth";
+
+// Source: v2/McpServerConnectionStatus.ts
+export type McpServerConnectionStatus = "notStarted" | "starting" | "connected" | "authenticationRequired" | "failed" | "cancelled" | "disabled";
+
+// Source: v2/McpServerStatus.ts
+export type McpServerStatus = { name: string,
+/**
+ * Current thread-runtime connection state; null when unavailable or the configuration changed.
+ */
+runtimeStatus: McpServerConnectionStatus | null, pluginId: string | null,
+/**
+ * HTTP origin of the effective configured endpoint, including plugin servers.
+ * Excludes credentials, path, query, and fragment; null for non-HTTP transports.
+ */
+httpOrigin: string | null, serverInfo: McpServerInfo | null,
+/**
+ * Capabilities advertised by the initialized MCP server; null when unavailable.
+ */
+serverCapabilities: JsonValue | null, tools: { [key in string]?: Tool },
+/**
+ * Tool discovery failed and no catalog was returned.
+ * Null when a catalog is returned, including cached or empty catalogs.
+ */
+toolsError: string | null, resources: Array<Resource>, resourceTemplates: Array<ResourceTemplate>, authStatus: McpAuthStatus, };
+
+// Source: v2/McpServerStatusDetail.ts
+export type McpServerStatusDetail = "full" | "toolsAndAuthOnly";
 
 // Source: v2/McpToolCallAppContext.ts
 export type McpToolCallAppContext = { connectorId: string, linkId: string | null, resourceUri: string | null, appName: string | null, actionName: string | null, };
@@ -313,6 +552,9 @@ export type MemoryCitation = { entries: Array<MemoryCitationEntry>, threadIds: A
 
 // Source: v2/MemoryCitationEntry.ts
 export type MemoryCitationEntry = { path: string, lineStart: number, lineEnd: number, note: string, };
+
+// Source: v2/MergeStrategy.ts
+export type MergeStrategy = "replace" | "upsert";
 
 // Source: v2/MisalignmentErrorDetails.ts
 export type MisalignmentErrorDetails = {
@@ -413,6 +655,9 @@ export type NetworkAccess = "restricted" | "enabled";
 // Source: v2/NonSteerableTurnKind.ts
 export type NonSteerableTurnKind = "review" | "compact";
 
+// Source: v2/OverriddenMetadata.ts
+export type OverriddenMetadata = { message: string, overridingLayer: ConfigLayerMetadata, effectiveValue: JsonValue, };
+
 // Source: v2/PatchApplyStatus.ts
 export type PatchApplyStatus = "inProgress" | "completed" | "failed" | "declined";
 
@@ -426,11 +671,208 @@ export type PatchChangeKind = { "type": "add" } | { "type": "delete" } | { "type
  */
 export type PlanDeltaNotification = { threadId: string, turnId: string, itemId: string, delta: string, };
 
+// Source: v2/PluginAuthPolicy.ts
+export type PluginAuthPolicy = "ON_INSTALL" | "ON_USE";
+
+// Source: v2/PluginAvailability.ts
+export type PluginAvailability = "AVAILABLE" | "DISABLED_BY_ADMIN";
+
+// Source: v2/PluginDisabledReason.ts
+export type PluginDisabledReason = "disabled_by_admin" | "plan_not_eligible" | "required_app_unavailable" | "unknown";
+
+// Source: v2/PluginInstallParams.ts
+export type PluginInstallParams = { marketplacePath?: AbsolutePathBuf | null, remoteMarketplaceName?: string | null,
+/**
+ * Client-generated identifier used to correlate one installation attempt.
+ */
+installAttemptId?: string | null, pluginName: string, };
+
+// Source: v2/PluginInstallPolicy.ts
+export type PluginInstallPolicy = "NOT_AVAILABLE" | "AVAILABLE" | "INSTALLED_BY_DEFAULT";
+
+// Source: v2/PluginInstallPolicySource.ts
+export type PluginInstallPolicySource = "WORKSPACE_SETTING" | "IMPLICIT_CANONICAL_APP";
+
+// Source: v2/PluginInstallResponse.ts
+export type PluginInstallResponse = { authPolicy: PluginAuthPolicy, appsNeedingAuth: Array<AppSummary>, };
+
+// Source: v2/PluginInterface.ts
+export type PluginInterface = { displayName: string | null, shortDescription: string | null, longDescription: string | null, developerName: string | null, category: string | null, capabilities: Array<string>, websiteUrl: string | null, privacyPolicyUrl: string | null, termsOfServiceUrl: string | null,
+/**
+ * Starter prompts for the plugin. Capped at 3 entries with a maximum of
+ * 128 characters per entry.
+ */
+defaultPrompt: Array<string> | null, brandColor: string | null,
+/**
+ * Local composer icon path, resolved from the installed plugin package.
+ */
+composerIcon: AbsolutePathBuf | null,
+/**
+ * Remote composer icon URL from the plugin catalog.
+ */
+composerIconUrl: string | null,
+/**
+ * Local logo path, resolved from the installed plugin package.
+ */
+logo: AbsolutePathBuf | null,
+/**
+ * Local dark-mode logo path, resolved from the installed plugin package.
+ */
+logoDark: AbsolutePathBuf | null,
+/**
+ * Remote logo URL from the plugin catalog.
+ */
+logoUrl: string | null,
+/**
+ * Remote dark-mode logo URL from the plugin catalog.
+ */
+logoUrlDark: string | null,
+/**
+ * Local screenshot paths, resolved from the installed plugin package.
+ */
+screenshots: Array<AbsolutePathBuf>,
+/**
+ * Remote screenshot URLs from the plugin catalog.
+ */
+screenshotUrls: Array<string>, };
+
+// Source: v2/PluginListMarketplaceKind.ts
+export type PluginListMarketplaceKind = "local" | "vertical" | "workspace-directory" | "shared-with-me" | "created-by-me-remote";
+
+// Source: v2/PluginListParams.ts
+export type PluginListParams = {
+/**
+ * Optional working directories used to discover repo marketplaces. When omitted,
+ * only home-scoped marketplaces and the official curated marketplace are considered.
+ */
+cwds?: Array<AbsolutePathBuf> | null,
+/**
+ * Optional marketplace kind filter. When omitted, only local marketplaces are queried, plus
+ * the default remote catalog when enabled by feature flag.
+ */
+marketplaceKinds?: Array<PluginListMarketplaceKind> | null,
+/**
+ * Whether the client requests a fresh remote plugin catalog fetch.
+ */
+forceRefetch?: boolean, };
+
+// Source: v2/PluginListResponse.ts
+export type PluginListResponse = { marketplaces: Array<PluginMarketplaceEntry>, marketplaceLoadErrors: Array<MarketplaceLoadErrorInfo>, featuredPluginIds: Array<string>, };
+
+// Source: v2/PluginMarketplaceEntry.ts
+export type PluginMarketplaceEntry = { name: string,
+/**
+ * Local marketplace file path when the marketplace is backed by a local file.
+ * Remote-only catalog marketplaces do not have a local path.
+ */
+path: AbsolutePathBuf | null, interface: MarketplaceInterface | null, plugins: Array<PluginSummary>, };
+
+// Source: v2/PluginShareContext.ts
+export type PluginShareContext = { remotePluginId: string,
+/**
+ * Version of the remote shared plugin release when available.
+ */
+remoteVersion: string | null, discoverability: PluginShareDiscoverability | null, shareUrl: string | null, creatorAccountUserId: string | null, creatorName: string | null, sharePrincipals: Array<PluginSharePrincipal> | null, canPublishToWorkspace: boolean | null, };
+
+// Source: v2/PluginShareDiscoverability.ts
+export type PluginShareDiscoverability = "LISTED" | "UNLISTED" | "PRIVATE";
+
+// Source: v2/PluginSharePrincipal.ts
+export type PluginSharePrincipal = { principalType: PluginSharePrincipalType, principalId: string, role: PluginSharePrincipalRole, name: string, };
+
+// Source: v2/PluginSharePrincipalRole.ts
+export type PluginSharePrincipalRole = "reader" | "editor" | "owner";
+
+// Source: v2/PluginSharePrincipalType.ts
+export type PluginSharePrincipalType = "user" | "group" | "workspace";
+
+// Source: v2/PluginSource.ts
+export type PluginSource = { "type": "local", path: AbsolutePathBuf, } | { "type": "git", url: string, path: string | null, refName: string | null, sha: string | null, } | { "type": "npm", package: string,
+/**
+ * Optional npm version or version range.
+ */
+version: string | null,
+/**
+ * Optional HTTPS registry URL. Authentication stays in the user's npm config.
+ */
+registry: string | null, } | { "type": "remote" };
+
+// Source: v2/PluginSummary.ts
+export type PluginSummary = { id: string,
+/**
+ * Backend remote plugin identifier when available.
+ */
+remotePluginId: string | null,
+/**
+ * Version advertised by the remote marketplace backend when available.
+ */
+version: string | null,
+/**
+ * Version of the locally materialized plugin package when available.
+ */
+localVersion: string | null, name: string,
+/**
+ * Remote sharing context associated with this plugin when available.
+ */
+shareContext: PluginShareContext | null, source: PluginSource, installed: boolean,
+/**
+ * Unix timestamp in seconds when the remote plugin was installed, when available.
+ */
+installedAt: number | null, enabled: boolean, installPolicy: PluginInstallPolicy, installPolicySource: PluginInstallPolicySource | null, mustShowInstallationInterstitial: boolean | null, authPolicy: PluginAuthPolicy,
+/**
+ * Availability state for installing and using the plugin.
+ */
+availability: PluginAvailability,
+/**
+ * Why the remote plugin is unavailable, when provided by plugin-service.
+ */
+disabledReason: PluginDisabledReason | null,
+/**
+ * Raw plugin-service plan identifiers eligible to install the plugin.
+ */
+eligiblePlanTypes: Array<string> | null, interface: PluginInterface | null, keywords: Array<string>, };
+
+// Source: v2/PluginUninstallParams.ts
+export type PluginUninstallParams = { pluginId: string, };
+
+// Source: v2/PluginUninstallResponse.ts
+export type PluginUninstallResponse = Record<string, never>;
+
 // Source: v2/ReasoningEffortOption.ts
 export type ReasoningEffortOption = { reasoningEffort: ReasoningEffort, description: string, };
 
 // Source: v2/ReasoningSummaryTextDeltaNotification.ts
 export type ReasoningSummaryTextDeltaNotification = { threadId: string, turnId: string, itemId: string, delta: string, summaryIndex: number, };
+
+// Source: v2/ReviewDelivery.ts
+export type ReviewDelivery = "inline" | "detached";
+
+// Source: v2/ReviewStartParams.ts
+export type ReviewStartParams = { threadId: string, target: ReviewTarget,
+/**
+ * Where to run the review: inline (default) on the current thread or
+ * detached on a new thread (returned in `reviewThreadId`).
+ * Detached delivery is deprecated and emits `deprecationNotice`.
+ * Use `thread/start` followed by an inline review for a separate review thread.
+ */
+delivery?: ReviewDelivery | null, };
+
+// Source: v2/ReviewStartResponse.ts
+export type ReviewStartResponse = { turn: Turn,
+/**
+ * Identifies the thread where the review runs.
+ *
+ * For inline reviews, this is the original thread id.
+ * For detached reviews, this is the id of the new review thread.
+ */
+reviewThreadId: string, };
+
+// Source: v2/ReviewTarget.ts
+export type ReviewTarget = { "type": "uncommittedChanges" } | { "type": "baseBranch", branch: string, } | { "type": "commit", sha: string,
+/**
+ * Optional human-readable label (e.g., commit subject) for UIs.
+ */
+title: string | null, } | { "type": "custom", instructions: string, };
 
 // Source: v2/SandboxMode.ts
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
@@ -440,6 +882,74 @@ export type SandboxPolicy = { "type": "dangerFullAccess" } | { "type": "readOnly
 
 // Source: v2/SessionSource.ts
 export type SessionSource = "cli" | "vscode" | "exec" | "appServer" | { "custom": string } | { "subAgent": SubAgentSource } | "unknown";
+
+// Source: v2/SkillDependencies.ts
+export type SkillDependencies = { tools: Array<SkillToolDependency>, };
+
+// Source: v2/SkillErrorInfo.ts
+export type SkillErrorInfo = { path: string, message: string, };
+
+// Source: v2/SkillInterface.ts
+export type SkillInterface = { displayName?: string, shortDescription?: string, iconSmall?: AbsolutePathBuf, iconLarge?: AbsolutePathBuf,
+/**
+ * Remote small icon URL from the plugin catalog.
+ */
+iconSmallUrl: string | null,
+/**
+ * Remote large icon URL from the plugin catalog.
+ */
+iconLargeUrl: string | null, brandColor?: string, defaultPrompt?: string, };
+
+// Source: v2/SkillMetadata.ts
+export type SkillMetadata = { name: string, description: string,
+/**
+ * Legacy short_description from SKILL.md. Prefer SKILL.json interface.short_description.
+ */
+shortDescription?: string, interface?: SkillInterface, dependencies?: SkillDependencies, path: AbsolutePathBuf, scope: SkillScope, enabled: boolean,
+/**
+ * Owning plugin ID, matching `PluginSummary.id`, when known.
+ */
+pluginId: string | null, };
+
+// Source: v2/SkillsConfigWriteParams.ts
+export type SkillsConfigWriteParams = {
+/**
+ * Path-based selector.
+ */
+path?: AbsolutePathBuf | null,
+/**
+ * Name-based selector.
+ */
+name?: string | null, enabled: boolean, };
+
+// Source: v2/SkillsConfigWriteResponse.ts
+export type SkillsConfigWriteResponse = { effectiveEnabled: boolean, };
+
+// Source: v2/SkillScope.ts
+export type SkillScope = "user" | "repo" | "system" | "admin";
+
+// Source: v2/SkillsListEntry.ts
+export type SkillsListEntry = { cwd: string, skills: Array<SkillMetadata>, errors: Array<SkillErrorInfo>, };
+
+// Source: v2/SkillsListParams.ts
+export type SkillsListParams = {
+/**
+ * When empty, defaults to the current session working directory.
+ */
+cwds?: Array<string>,
+/**
+ * When true, bypass the skills cache and re-scan skills from disk.
+ */
+forceReload?: boolean, };
+
+// Source: v2/SkillsListResponse.ts
+export type SkillsListResponse = { data: Array<SkillsListEntry>, };
+
+// Source: v2/SkillToolDependency.ts
+export type SkillToolDependency = { type: string, value: string, description?: string, transport?: string, command?: string, url?: string, };
+
+// Source: v2/SortDirection.ts
+export type SortDirection = "asc" | "desc";
 
 // Source: v2/SubAgentActivityKind.ts
 export type SubAgentActivityKind = "started" | "interacted" | "interrupted" | "completed";
@@ -551,6 +1061,88 @@ turns: Array<Turn>};
 // Source: v2/ThreadActiveFlag.ts
 export type ThreadActiveFlag = "waitingOnApproval" | "waitingOnUserInput";
 
+// Source: v2/ThreadCompactStartParams.ts
+export type ThreadCompactStartParams = { threadId: string, };
+
+// Source: v2/ThreadCompactStartResponse.ts
+export type ThreadCompactStartResponse = Record<string, never>;
+
+// Source: v2/ThreadForkParams.ts
+/**
+ * There are two ways to fork a thread:
+ * 1. By thread_id: load the thread from disk by thread_id and fork it into a new thread.
+ * 2. By path: load the thread from disk by path and fork it into a new thread.
+ *
+ * If using a non-empty path, the thread_id param will be ignored.
+ * Empty string path values are treated as absent.
+ *
+ * Prefer using thread_id whenever possible.
+ */
+export type ThreadForkParams = {threadId: string, /**
+ * Optional last turn id to fork through, inclusive.
+ *
+ * When specified, turns after `last_turn_id` are omitted from the fork.
+ * The referenced turn cannot be in progress.
+ */
+lastTurnId?: string | null, /**
+ * Configuration overrides for the forked thread, if any.
+ */
+model?: string | null, modelProvider?: string | null, serviceTier?: string | null | null, cwd?: string | null, approvalPolicy?: AskForApproval | null, /**
+ * Override where approval requests are routed for review on this thread
+ * and subsequent turns.
+ */
+approvalsReviewer?: ApprovalsReviewer | null, sandbox?: SandboxMode | null, config?: { [key in string]?: JsonValue } | null, baseInstructions?: string | null, developerInstructions?: string | null, ephemeral?: boolean, /**
+ * Optional client-supplied analytics source classification for this forked thread.
+ */
+threadSource?: ThreadSource | null, /**
+ * When true, return only thread metadata and live fork state without
+ * populating `thread.turns`. This is useful when the client plans to call
+ * `thread/turns/list` immediately after forking. Full-history hydration
+ * is deprecated for paginated threads; use this with `thread/turns/list`
+ * and `thread/items/list` instead.
+ */
+excludeTurns?: boolean};
+
+// Source: v2/ThreadForkResponse.ts
+export type ThreadForkResponse = {thread: Thread, model: string, modelProvider: string, serviceTier: string | null, /**
+ * Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.
+ */
+disabledPluginIds: Array<string>, cwd: AbsolutePathBuf, /**
+ * Environment-native paths to instruction source files currently loaded for this thread.
+ */
+instructionSources: Array<LegacyAppPathString>, approvalPolicy: AskForApproval, /**
+ * Reviewer currently used for approval requests on this thread.
+ */
+approvalsReviewer: ApprovalsReviewer, /**
+ * Legacy sandbox policy retained for compatibility. Experimental clients
+ * should prefer `activePermissionProfile` for profile provenance.
+ */
+sandbox: SandboxPolicy, reasoningEffort: ReasoningEffort | null};
+
+// Source: v2/ThreadGoal.ts
+export type ThreadGoal = { threadId: string, objective: string, status: ThreadGoalStatus, tokenBudget: number | null, tokensUsed: number, timeUsedSeconds: number, createdAt: number, updatedAt: number, };
+
+// Source: v2/ThreadGoalClearParams.ts
+export type ThreadGoalClearParams = { threadId: string, };
+
+// Source: v2/ThreadGoalClearResponse.ts
+export type ThreadGoalClearResponse = { cleared: boolean, };
+
+// Source: v2/ThreadGoalGetParams.ts
+export type ThreadGoalGetParams = { threadId: string, };
+
+// Source: v2/ThreadGoalGetResponse.ts
+export type ThreadGoalGetResponse = { goal: ThreadGoal | null, };
+
+// Source: v2/ThreadGoalSetParams.ts
+export type ThreadGoalSetParams = { threadId: string, objective?: string | null, status?: ThreadGoalStatus | null, tokenBudget?: number | null, };
+
+// Source: v2/ThreadGoalSetResponse.ts
+export type ThreadGoalSetResponse = { goal: ThreadGoal, };
+
+// Source: v2/ThreadGoalStatus.ts
+export type ThreadGoalStatus = "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete";
+
 // Source: v2/ThreadHistoryMode.ts
 export type ThreadHistoryMode = "legacy" | "paginated";
 
@@ -647,6 +1239,69 @@ reasoningEffort: ReasoningEffort | null,
  * Last known status of the target agents, when available.
  */
 agentsStates: { [key in string]?: CollabAgentState }, } | { "type": "subAgentActivity", id: string, kind: SubAgentActivityKind, agentThreadId: string, agentPath: string, } | { "type": "webSearch" } & WebSearchItem | { "type": "imageView", id: string, path: LegacyAppPathString, } | { "type": "sleep" } & SleepItem | { "type": "imageGeneration" } & ImageGenerationItem | { "type": "enteredReviewMode", id: string, review: string, } | { "type": "exitedReviewMode", id: string, review: string, } | { "type": "contextCompaction", id: string, };
+
+// Source: v2/ThreadListParams.ts
+export type ThreadListParams = {/**
+ * Opaque pagination cursor returned by a previous call.
+ */
+cursor?: string | null, /**
+ * Optional page size; defaults to a reasonable server-side value.
+ */
+limit?: number | null, /**
+ * Optional sort key; defaults to created_at.
+ */
+sortKey?: ThreadSortKey | null, /**
+ * Optional sort direction; defaults to descending (newest first).
+ */
+sortDirection?: SortDirection | null, /**
+ * Optional provider filter; when set, only sessions recorded under these
+ * providers are returned. When present but empty, includes all providers.
+ */
+modelProviders?: Array<string> | null, /**
+ * Optional source filter; when set, only sessions from these source kinds
+ * are returned. When omitted or empty, defaults to interactive sources.
+ */
+sourceKinds?: Array<ThreadSourceKind> | null, /**
+ * Optional originator allowlist, matching any supplied value exactly.
+ * Supported by hosted backends only; the local app-server rejects a nonempty list.
+ * Omitted or empty lists leave originators unrestricted.
+ */
+originators?: Array<string> | null, /**
+ * Optional archived filter; when set to true, only archived threads are returned.
+ * If false or null, only non-archived threads are returned.
+ */
+archived?: boolean | null, /**
+ * Omit to include every section, set to `null` for unsectioned threads,
+ * or provide a section ID to return only threads in that section.
+ */
+sectionId?: string | null, /**
+ * Optional cwd filter or filters; when set, only threads whose session cwd
+ * exactly matches one of these paths are returned.
+ */
+cwd?: string | Array<string> | null, /**
+ * If true, return from the state DB without scanning JSONL rollouts to
+ * repair thread metadata. Omitted or false preserves scan-and-repair
+ * behavior.
+ */
+useStateDbOnly?: boolean, /**
+ * Optional substring filter for the extracted thread title.
+ */
+searchTerm?: string | null};
+
+// Source: v2/ThreadListResponse.ts
+export type ThreadListResponse = { data: Array<Thread>,
+/**
+ * Opaque cursor to pass to the next call to continue after the last item.
+ * if None, there are no more items to return.
+ */
+nextCursor: string | null,
+/**
+ * Opaque cursor to pass as `cursor` when reversing `sortDirection`.
+ * This is only populated when the page contains at least one thread.
+ * Use it with the opposite `sortDirection`; for timestamp sorts it anchors
+ * at the start of the page timestamp so same-second updates are not skipped.
+ */
+backwardsCursor: string | null, };
 
 // Source: v2/ThreadReadParams.ts
 export type ThreadReadParams = { threadId: string,
@@ -753,8 +1408,14 @@ appearance: ThreadSectionAppearance | null, };
  */
 export type ThreadSectionAppearance = { icon: string | null, color: string | null, };
 
+// Source: v2/ThreadSortKey.ts
+export type ThreadSortKey = "created_at" | "updated_at" | "recency_at" | "section_position";
+
 // Source: v2/ThreadSource.ts
 export type ThreadSource = string;
+
+// Source: v2/ThreadSourceKind.ts
+export type ThreadSourceKind = "cli" | "vscode" | "exec" | "appServer" | "subAgent" | "subAgentReview" | "subAgentCompact" | "subAgentThreadSpawn" | "subAgentOther" | "unknown";
 
 // Source: v2/ThreadStartParams.ts
 export type ThreadStartParams = {model?: string | null, modelProvider?: string | null, serviceTier?: string | null | null, cwd?: string | null, approvalPolicy?: AskForApproval | null, /**
@@ -930,6 +1591,9 @@ text_elements: Array<TextElement>, } | { "type": "image", detail?: ImageDetail, 
 
 // Source: v2/WebSearchAction.ts
 export type WebSearchAction = { "type": "search", query: string | null, queries: Array<string> | null, } | { "type": "openPage", url: string | null, } | { "type": "findInPage", url: string | null, pattern: string | null, } | { "type": "other" };
+
+// Source: v2/WriteStatus.ts
+export type WriteStatus = "ok" | "okOverridden";
 
 // Source: WebSearchItem.ts
 export type WebSearchItem = { id: string, query: string, action: WebSearchAction | null,

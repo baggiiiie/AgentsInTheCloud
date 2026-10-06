@@ -4,6 +4,7 @@ import { ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/
 import { renderAgentPane, renderAgentPaneComposerFooter, renderPromptActions, type AgentStatsView } from "@agents-in-the-cloud/builtin-agent/server/render-composer";
 import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
 import type { LiveRegion } from "@agents-in-the-cloud/shared";
+import { codexSlashCommands } from "./commands.ts";
 import { projectCodexTurns } from "./transcript.ts";
 import type { CodexRuntime } from "./runtime.ts";
 
@@ -17,7 +18,7 @@ export function transcriptItems(runtime: CodexRuntime) {
 function stats(runtime: CodexRuntime): AgentStatsView {
   const usage = runtime.state.usage;
   const selection = runtime.selection;
-  return { contextPercent: usage?.modelContextWindow ? usage.last.totalTokens / usage.modelContextWindow * 100 : null, compactAvailable: false, inputTokens: usage?.total.inputTokens ?? null, outputTokens: usage?.total.outputTokens ?? null, cost: null, modelName: runtime.record.model ? parseModelRef(runtime.record.model)?.id : undefined, thinkingLevel: runtime.record.thinkingLevel ?? "", thinkingLevels: selection.thinkingLevels, models: selection.models, connectedProvider: true };
+  return { contextPercent: usage?.modelContextWindow ? usage.last.totalTokens / usage.modelContextWindow * 100 : null, compactAvailable: !runtime.isBusy, inputTokens: usage?.total.inputTokens ?? null, outputTokens: usage?.total.outputTokens ?? null, cost: null, modelName: runtime.record.model ? parseModelRef(runtime.record.model)?.id : undefined, thinkingLevel: runtime.record.thinkingLevel ?? "", thinkingLevels: selection.thinkingLevels, models: selection.models, connectedProvider: true };
 }
 export function transcriptHtml(runtime: CodexRuntime) {
   return renderTranscript(renderContext(runtime), transcriptItems(runtime), { systemPrompt: runtime.instructions, tools: [] });
@@ -32,5 +33,5 @@ export function liveRegions(runtime: CodexRuntime): LiveRegion[] {
 }
 export async function paneHtml(runtime: CodexRuntime) {
   const ctx = renderContext(runtime);
-  return renderAgentPane(ctx, { agentId: runtime.agentId }, { transcriptHtml: transcriptHtml(runtime), busy: runtime.isBusy, stats: stats(runtime) }, await renderWorkspaceCompletionCatalog(runtime.workspaceId, "cli"), { moduleChannel: channelName, notifications: false, initialPromptDraft: false });
+  return renderAgentPane(ctx, { agentId: runtime.agentId }, { transcriptHtml: transcriptHtml(runtime), busy: runtime.isBusy, stats: stats(runtime) }, await renderWorkspaceCompletionCatalog(runtime.workspaceId, "cli", codexSlashCommands), { moduleChannel: channelName, notifications: false, initialPromptDraft: false });
 }

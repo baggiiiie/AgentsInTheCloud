@@ -7,9 +7,11 @@ import { agentAttachmentDraftId, deliverAttachmentDraft, removeStagedAttachments
 import { findTranscriptItem } from "@agents-in-the-cloud/agent/server/transcript";
 import { renderModelContextDetailFrame, renderTranscriptItemDetailFrame } from "@agents-in-the-cloud/agent/server/render-transcript";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { turboStream, workspaceModuleModalFrameId, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { nativeImageResponse } from "@agents-in-the-cloud/cli-agent/server";
 import type { CodexAgents } from "./runtime.ts";
+import { parseCodexCommand } from "./commands.ts";
+import { renderCommandDialog } from "./render-command.ts";
 import { renderContext, transcriptItems } from "./render.ts";
 
 export function codexRoutes(agents: CodexAgents) {
@@ -26,6 +28,29 @@ export function codexRoutes(agents: CodexAgents) {
     const success = (accepted = false, headers: Record<string, string> = {}) => json
       ? Response.json({ agent: { agentId, state: runtime.isBusy ? "running" : "idle" } }, { status: accepted ? 202 : 200, headers })
       : turboStreamResponse("", { headers });
+    if ((operation === "messages" || operation === "commands") && request.method === "POST") {
+      const argument = String(value("argument") ?? "").trim();
+      const text = [String(value("text") ?? ""), argument].filter(Boolean).join(" ");
+      const command = parseCodexCommand(text);
+      if (command) {
+        const requestId = value("requestId") ?? crypto.randomUUID();
+        if (!Value.Check(Type.String({ pattern: "^[a-zA-Z0-9_-]{1,128}$" }), requestId)) throw invalidArguments("Invalid request ID");
+        if (command.kind === "resume" && !command.threadId && value("cursor") != null) {
+          const cursor = value("cursor");
+          if (!Value.Check(Type.String({ maxLength: 10000 }), cursor)) throw invalidArguments("Invalid conversation cursor");
+          command.cursor = cursor;
+        }
+        if (command.kind === "skills" && command.name && value("skillPath") != null) {
+          const path = value("skillPath");
+          if (!Value.Check(Type.String({ maxLength: 4096 }), path)) throw invalidArguments("Invalid skill path");
+          command.path = path;
+        }
+        const result = await runtime.command(command, requestId);
+        return json ? Response.json({ agent: { agentId, state: runtime.isBusy ? "running" : "idle" }, command: result }, { status: result.kind === "done" ? 202 : 200 })
+          : turboStreamResponse(turboStream("update", workspaceModuleModalFrameId, result.kind === "done" ? "" : renderCommandDialog(runtime, result)));
+      }
+      if (operation === "commands") throw invalidArguments("Choose a Codex command");
+    }
     if (operation === "messages" && request.method === "POST") {
       const text = String(value("text") ?? "");
       if (text.trim() === "/new") { await runtime.reset(); return success(); }
@@ -54,7 +79,10 @@ export function codexRoutes(agents: CodexAgents) {
     if (operation === "model" && request.method === "POST") { await runtime.configure({ model: String(value("model") ?? "") }); return success(); }
     if (operation === "thinking-level" && request.method === "POST") { await runtime.configure({ thinkingLevel: String(value("thinkingLevel") ?? "") }); return success(); }
     if (operation === "completions" && request.method === "GET") return response(renderFileCompletionMenu(await listFileCompletions(workspaceId, url.searchParams.get("q") ?? "", url.searchParams.get("mode") === "fuzzy" ? "fuzzy" : "direct")));
-    if (operation === "completions/slash-command-expand" && request.method === "POST") return textResponse(await expandSlashCommand(workspaceId, String(value("text") ?? "")));
+    if (operation === "completions/slash-command-expand" && request.method === "POST") {
+      const text = String(value("text") ?? "");
+      return textResponse(parseCodexCommand(text) ? text.trim() : await expandSlashCommand(workspaceId, text));
+    }
     if (operation.startsWith("transcript-items/") && request.method === "GET") {
       const key = decodeURIComponent(operation.slice("transcript-items/".length));
       const ctx = renderContext(runtime);
