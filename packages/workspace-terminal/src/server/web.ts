@@ -45,7 +45,7 @@ const terminalWorkspaceCommands: WorkspaceCommandContribution[] = [
   },
   {
     id: "terminal.attach",
-    label: "Attach Terminal",
+    label: "Attach to tmux session",
     description: "Open a Terminal view attached to an existing tmux session",
     scope: "workspace",
     surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Terminal } },
@@ -101,11 +101,11 @@ async function renderAttachDialog(workspaceId: string): Promise<string> {
       attributesHtml: 'data-dialog-auto-show',
     },
     iconHtml: Icons.Terminal,
-    titleCaption: "Attach terminal",
+    titleCaption: "Attach to tmux session",
     bodyHtml,
     bodyLayout: "full-bleed",
     footerHtml,
-    closeLabel: "Close attach terminal dialog",
+    closeLabel: "Close attach to tmux session dialog",
   });
 }
 
