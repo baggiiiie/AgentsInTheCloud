@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { workloadBuildArgs } from "@agents-in-the-cloud/core";
+import { workloadCgroupArgs } from "@agents-in-the-cloud/core";
 import { rmSync } from "node:fs";
 import { arch } from "node:os";
 import { imageHasPlatforms } from "../packages/workspace-image/src/local-images.ts";
@@ -235,7 +235,7 @@ const options = parseArgs(process.argv.slice(2));
 if (options.helperContext && (!options.push || !options.builder || !["linux/amd64", "linux/arm64"].includes(options.nativePlatform ?? "") || options.platform !== "linux/amd64,linux/arm64")) {
   fail("--helper-context requires --push, --builder, --native-platform and --platform linux/amd64,linux/arm64");
 }
-const resourceBuildArgs = await workloadBuildArgs();
+const resourceBuildArgs = await workloadCgroupArgs();
 
 async function buildImage(refs: string[], args: string[]): Promise<void> {
   if (!options.helperContext) {

@@ -9,7 +9,7 @@ import {
   type ReviewViewport,
 } from "../model.ts";
 
-const diffLayoutSchema = Type.Union([Type.Literal("unified"), Type.Literal("split")]);
+const diffLayoutSchema = Type.Union([Type.Literal("unified"), Type.Literal("side-by-side")]);
 const settingsSchema = Type.Object({
   mobile: diffLayoutSchema,
   desktop: diffLayoutSchema,
@@ -22,7 +22,7 @@ function settingsPath(): string {
 }
 
 export function isReviewDiffLayout(value: string): value is ReviewDiffLayout {
-  return value === "unified" || value === "split";
+  return value === "unified" || value === "side-by-side";
 }
 
 export function isReviewViewport(value: string): value is ReviewViewport {
@@ -30,7 +30,11 @@ export function isReviewViewport(value: string): value is ReviewViewport {
 }
 
 function parseReviewSettings(settings: JsonObject): ReviewSettings {
-  return { ...defaultReviewSettings, ...Value.Parse(settingsSchema, { ...defaultReviewSettings, ...settings }) };
+  const stored: JsonObject = { ...defaultReviewSettings, ...settings };
+  // Earlier saved settings used the diff library's layout name.
+  if (stored.mobile === "split") stored.mobile = "side-by-side";
+  if (stored.desktop === "split") stored.desktop = "side-by-side";
+  return { ...defaultReviewSettings, ...Value.Parse(settingsSchema, stored) };
 }
 
 export async function readReviewSettings(path = settingsPath()): Promise<ReviewSettings> {

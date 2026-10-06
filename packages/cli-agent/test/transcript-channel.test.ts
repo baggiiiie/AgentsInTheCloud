@@ -11,6 +11,7 @@ function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>)
     id: "review", label: "Review", iconHtml: "",
     requireSetup: async () => {},
     settings: { renderFooter: async () => "", prepare: async () => ({}) },
+    prepareSession: async () => ({}),
     launchScript: () => "true",
     loadTranscript,
   };

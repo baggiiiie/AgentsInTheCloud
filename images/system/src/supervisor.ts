@@ -47,6 +47,7 @@ await Promise.all(
 );
 await mkdir("/run/agents-in-the-cloud-system", { recursive: true });
 await writeFile("/run/agents-in-the-cloud-system/access-v1", "");
+// Retain the serialized accessMode field and external access API spelling.
 type State = { accessMode?: "localhost" | "tailscale"; localPort?: number; currentImage?: string; runningContainers?: string[]; uninstall?: UninstallState };
 const persisted: State = (await Bun.file(`${stateDir}/state.json`).exists())
   ? JSON.parse(await readFile(`${stateDir}/state.json`, "utf8"))
@@ -102,7 +103,7 @@ function connectionProblem() {
 }
 function fragment() {
   return supervisorFragment({ operation, phase, healthy, recoveringHealth, stopping, failure, candidate,
-    accessMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), connectionAction: tailscaleSelected() ? httpsAction : undefined, authUrl: tailscaleSelected() ? authUrl : undefined, logs });
+    connectionMode: persisted.accessMode!, connectionState, connectionProblem: connectionProblem(), connectionAction: tailscaleSelected() ? httpsAction : undefined, authUrl: tailscaleSelected() ? authUrl : undefined, logs });
 }
 function emit(event = "progress", data = fragment()) {
   for (const subscriber of subscribers)
@@ -116,7 +117,7 @@ function accessChanged() {
   emit("access", "changed");
   emit();
 }
-async function setAccessMode(mode: "localhost" | "tailscale") {
+async function setConnectionMode(mode: "localhost" | "tailscale") {
   persisted.accessMode = mode;
   if (mode === "tailscale" && connectionAttempt !== "running") {
     connectionAttempt = "idle";
@@ -391,7 +392,7 @@ const server = Bun.serve({
         const body: unknown = await request.json().catch(() => null);
         if (!Value.Check(Type.Object({ mode: Type.Optional(Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")])), localPort: Type.Optional(Type.Integer({ minimum: 1, maximum: 65535 })) }), body)) return new Response("Invalid access setting", { status: 400 });
         if (body.localPort) persisted.localPort = body.localPort;
-        if (body.mode) await setAccessMode(body.mode);
+        if (body.mode) await setConnectionMode(body.mode);
         else { await persist(); accessChanged(); }
       }
       return Response.json({ mode: persisted.accessMode, localPort: persisted.localPort, connectionState, authUrl, error: connectionFailure ?? networkError });
@@ -454,12 +455,12 @@ const server = Bun.serve({
       if (!allowedOrigin(request))
         return new Response("Forbidden", { status: 403 });
       if (url.pathname === "/local") {
-        await setAccessMode("localhost");
+        await setConnectionMode("localhost");
         return Response.redirect(url.origin, 303);
       }
       if (url.pathname === "/connect") {
         if (stopping) return new Response("System is stopping", { status: 503 });
-        await setAccessMode("tailscale");
+        await setConnectionMode("tailscale");
         return request.headers.get("accept")?.includes("text/html") ? Response.redirect(url.origin, 303) : new Response(null, { status: 202 });
       }
       if (!initialized || stopping)

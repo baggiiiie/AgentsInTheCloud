@@ -43,7 +43,7 @@ export async function openFileInFiles(workspaceId: string, target: WorkspaceFile
   return await openWorkView(workspaceId, { type: "files", id: viewId }, { select: requestedViewId === undefined });
 }
 
-async function markdownPreviewEndpoint(workspaceId: string, request: Request, url: URL): Promise<Response> {
+async function renderMarkdownEndpoint(workspaceId: string, request: Request, url: URL): Promise<Response> {
   if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
   const sourcePath = url.searchParams.get("path");
   const options = sourcePath?.startsWith("/") ? { sourcePath, frontmatter: true } : { frontmatter: true };
@@ -103,18 +103,18 @@ const filesWorkspaceModule: WorkspaceModule = {
   routes: [{
     async handle(request, url, context) {
       try {
-        let match = matchRoute(url, /^\/workspaces\/([^/]+)\/files-view\/(open|content|markdown-preview)$/);
+        let match = matchRoute(url, /^\/workspaces\/([^/]+)\/files-view\/(open|content|render-markdown)$/);
         if (match) {
           const workspaceId = match[0]!;
           if (match[1] === "open") return request.method === "GET" ? await openFileInFiles(workspaceId, parseWorkspaceFileTarget(url.searchParams), context.openWorkView, url.searchParams.get("filesView") ?? undefined) : textResponse("Method not allowed", { status: 405 });
           if (match[1] === "content") return await fileContentEndpoint(workspaceId, request, url);
-          return await markdownPreviewEndpoint(workspaceId, request, url);
+          return await renderMarkdownEndpoint(workspaceId, request, url);
         }
 
         match = matchRoute(url, /^\/workspaces\/([^/]+)\/files$/);
         if (match) return request.method === "GET" ? await filesEndpoint(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
 
-        match = matchRoute(url, /^\/workspaces\/([^/]+)\/file-browser\/(upload|delete)$/);
+        match = matchRoute(url, /^\/workspaces\/([^/]+)\/files-view\/(upload|delete)$/);
         if (!match) return undefined;
         const workspaceId = match[0]!;
         if (match[1] === "upload") return request.method === "POST" ? await uploadEndpoint(workspaceId, request, url) : textResponse("Method not allowed", { status: 405 });

@@ -163,7 +163,7 @@ export function createAgentComposerController(Controller: WorkspaceClientControl
         this.longPress = undefined;
         this.suppressNextClick = true;
         this.setOpen(true);
-        this.element.querySelector<HTMLButtonElement>(':scope > .composer [data-transcription-composer-target="button"]')!.click();
+        this.element.querySelector<HTMLButtonElement>(':scope > .composer [data-dictation-composer-target="button"]')!.click();
         // The release lands wherever the finger is now, possibly on a composer button.
         const swallow = (click: MouseEvent): void => { click.preventDefault(); click.stopImmediatePropagation(); };
         const release = (): void => {

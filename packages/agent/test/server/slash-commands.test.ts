@@ -7,19 +7,19 @@ const skill = {
 };
 
 describe("slash commands", () => {
-  test("renders the complete catalog of application commands, templates, and skills", () => {
+  test("renders the complete catalog of built-in actions, templates, and skills", () => {
     const templates = Array.from({ length: 15 }, (_, index) => ({
       name: `prompt-${index}`,
       trigger: `/prompt-${index}`,
       description: `Prompt ${index}`,
       prompt: `Do ${index}`,
-      quickLaunch: index === 2,
-      hotkey: index === 2 ? "p" : undefined,
+      composerButton: index === 2,
+      shortcut: index === 2 ? "p" : undefined,
     }));
 
     const html = renderSlashCommandCatalog(templates, [skill]);
 
-    expect((html.match(/data-command-trigger=/g) ?? []).length).toBe(18);
+    expect((html.match(/data-command-trigger=/g) ?? []).length).toBe(22);
     expect(html).toContain('data-command-trigger="/tree" data-command-action="notice" data-command-message="/tree feature is coming soon!"');
     expect(html).toContain("/tree — Coming soon.");
     expect(html).toContain('data-completion-kind="prompt-template"');
@@ -27,8 +27,8 @@ describe("slash commands", () => {
     expect(html).toContain('data-completion-kind="skill"');
     expect(html).toContain('data-command-trigger="/skill:careful-review"');
     expect(html).toContain("Review changes carefully");
-    expect(html).toContain('role="group" aria-label="Quick launch"');
-    expect(html).toContain('data-completion-kind="prompt-template" data-command-trigger="/prompt-2" data-prompt-template-hotkey="p"');
-    expect(html.match(/data-completion-kind="quick-launch"/g)).toHaveLength(1);
+    expect(html).toContain('role="group" aria-label="Prompt template buttons"');
+    expect(html).toContain('data-completion-kind="prompt-template" data-command-trigger="/prompt-2" data-prompt-template-shortcut="p"');
+    expect(html.match(/data-completion-kind="prompt-template-button"/g)).toHaveLength(1);
   });
 });

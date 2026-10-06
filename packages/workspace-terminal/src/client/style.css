@@ -2,11 +2,11 @@
 
 .fixed-shell-live-body:has(> .terminal-work-view) { padding: 0; overflow: hidden; background: var(--bg); }
 .terminal-work-view { height: 100%; min-height: 0; }
-.terminal-pane { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 4px; background: var(--bg); color: var(--text); overflow: hidden; }
+.terminal-view { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 4px; background: var(--bg); color: var(--text); overflow: hidden; }
 /* The terminal frame fixes the host's size; the stage clips it while the key row is up. */
 .terminal-stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 /* The key row sits right on the soft keyboard. */
-html.software-keyboard-visible .terminal-pane:has(.gespenst__input:focus:not([readonly]):not(:disabled)) { padding-bottom: 0; }
+html.software-keyboard-visible .terminal-view:has(.gespenst__input:focus:not([readonly]):not(:disabled)) { padding-bottom: 0; }
 .terminal-stage > .observable-terminal-host { position: absolute; left: 0; top: 0; flex: none; }
 /* Overlay the banner: taking rows from the terminal would resize the PTY on every (re)connect. */
 .terminal-stage > .observable-terminal-connection { position: absolute; top: 0; left: 0; right: 0; z-index: 4; }
@@ -15,3 +15,10 @@ html.software-keyboard-visible .terminal-pane:has(.gespenst__input:focus:not([re
 .terminal-session-list { max-height: min(480px, 60vh); padding: 8px; overflow: auto; }
 .terminal-session-activity { flex: 0 0 auto; color: var(--text); white-space: nowrap; }
 .terminal-session-empty { min-height: 120px; }
+
+.terminal-ended[hidden] { display: none; }
+.terminal-ended { flex: 0 0 auto; padding: 12px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.terminal-ended p { margin: 6px 0 12px; color: var(--text-muted); }
+.terminal-ended-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.terminal-is-ended > .terminal-key-bar { display: none !important; }
+.terminal-is-ended .terminal-loading { display: none; }

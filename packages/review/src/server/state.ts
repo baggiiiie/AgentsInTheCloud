@@ -13,20 +13,28 @@ const reviewCommentSchema = Type.Object({
   endLine: Type.Integer({ minimum: 1 }),
   body: Type.String(),
   snippet: Type.String(),
+  unanchored: Type.Optional(Type.Boolean()),
+});
+const reviewStateSchema = Type.Object({ version: Type.Literal(2), comments: Type.Array(reviewCommentSchema) });
+const previousReviewCommentSchema = Type.Object({
+  ...Type.Omit(reviewCommentSchema, ["unanchored"]).properties,
   outdated: Type.Optional(Type.Boolean()),
 });
-const reviewStateSchema = Type.Object({ version: Type.Literal(1), comments: Type.Array(reviewCommentSchema) });
+const previousReviewStateSchema = Type.Object({ version: Type.Literal(1), comments: Type.Array(previousReviewCommentSchema) });
 
 export type ReviewComment = Static<typeof reviewCommentSchema>;
 type ReviewState = Static<typeof reviewStateSchema>;
 
 function parseReviewState(value: JsonValue): ReviewState {
+  if (Value.Check(previousReviewStateSchema, value)) {
+    return { version: 2, comments: value.comments.map(({ outdated, ...comment }) => ({ ...comment, unanchored: outdated })) };
+  }
   if (!Value.Check(reviewStateSchema, value)) throw new Error("invalid persisted Review state");
   return value;
 }
 
 function initialReviewState(): ReviewState {
-  return { version: 1, comments: [] };
+  return { version: 2, comments: [] };
 }
 
 const states = createWorkspaceMetadataState("review.json", parseReviewState, initialReviewState);
@@ -68,25 +76,25 @@ function matchingStarts(lines: string[], snippetLines: string[]): number[] {
 
 export function remapReviewComment(comment: ReviewComment, file: ReviewFile | undefined): ReviewComment {
   const text = comment.side === "additions" ? file?.newContents : file?.oldContents;
-  if (text === undefined) return { ...comment, outdated: true };
+  if (text === undefined) return { ...comment, unanchored: true };
   const lines = text.split("\n");
   const snippetLines = comment.snippet.split("\n");
   const anchored = lines.slice(comment.startLine - 1, comment.endLine).join("\n");
-  if (anchored === comment.snippet) return { ...comment, outdated: undefined };
+  if (anchored === comment.snippet) return { ...comment, unanchored: undefined };
   const starts = matchingStarts(lines, snippetLines);
-  if (starts.length !== 1) return { ...comment, outdated: true };
+  if (starts.length !== 1) return { ...comment, unanchored: true };
   return {
     ...comment,
     startLine: starts[0]!,
     endLine: starts[0]! + snippetLines.length - 1,
-    outdated: undefined,
+    unanchored: undefined,
   };
 }
 
 export function reconcileReviewComments(workspaceId: string, index: ReviewIndex): ReviewComment[] {
   const state = states.read(workspaceId);
   const paths = new Set(index.phase === "ready" ? index.files.map((file) => file.path) : []);
-  state.comments = state.comments.map((comment) => paths.has(comment.path) ? comment : { ...comment, outdated: true });
+  state.comments = state.comments.map((comment) => paths.has(comment.path) ? comment : { ...comment, unanchored: true });
   states.write(workspaceId, state);
   return [...state.comments];
 }
@@ -97,7 +105,7 @@ export function remapReviewFileComments(workspaceId: string, file: ReviewFile) {
   const comments = state.comments.map((comment) => {
     if (comment.path !== file.path) return comment;
     const mapped = remapReviewComment(comment, file);
-    if (mapped.startLine === comment.startLine && mapped.endLine === comment.endLine && mapped.outdated === comment.outdated) return comment;
+    if (mapped.startLine === comment.startLine && mapped.endLine === comment.endLine && mapped.unanchored === comment.unanchored) return comment;
     changed = true;
     return mapped;
   });

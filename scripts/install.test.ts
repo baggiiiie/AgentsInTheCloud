@@ -103,9 +103,17 @@ test("fresh install launches privileged System with persistent named volume and 
   const result = run({}, ["--system-image", "test/system:v1", "--app-image", "test/app:v1"]);
   expect(result.status).toBe(0);
   expect(result.output).toContain("DOCKER pull test/system:v1");
-  expect(result.output).toContain("--name agents-in-the-cloud-system --hostname agents-in-the-cloud-system --privileged --cgroupns=host --restart unless-stopped --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1::3080 test/system:v1 --app-image test/app:v1 --access-mode tailscale");
+  expect(result.output).toContain("--name agents-in-the-cloud-system --hostname agents-in-the-cloud-system --privileged --cgroupns=host --restart unless-stopped --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1:3080:3080 test/system:v1 --app-image test/app:v1 --access-mode tailscale");
   expect(result.output).not.toContain("DOCKER stop");
   expect(result.output).toContain("DOCKER exec agents-in-the-cloud-system bun -e");
+});
+
+test("localhost install publishes a stable loopback port", () => {
+  const result = run({}, ["--access-mode", "localhost"]);
+  expect(result.status).toBe(0);
+  expect(result.output).toContain("--publish 127.0.0.1:3080:3080");
+  expect(result.output).toContain("--access-mode localhost");
+  expect(result.output).not.toContain("--publish 127.0.0.1::3080");
 });
 
 test("replacement downloads before stopping and retains volume", () => {

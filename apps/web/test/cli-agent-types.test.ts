@@ -17,7 +17,7 @@ for (const id of ["codex", "claude", "pi"]) {
         const llm = await import("@agents-in-the-cloud/llm/server");
         const agent = await import("@agents-in-the-cloud/agent/server");
         const revoked = [];
-        mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agent, prepareAgentMcp: async () => ({ url: "http://127.0.0.1:2988/mcp", token: "test-credential" }), revokeAgentMcp: async (...args) => revoked.push(args) }));
+        mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agent, prepareCliAgentConnection: async () => ({ url: "http://127.0.0.1:2988/mcp", token: "test-credential", instructions: "Test AgentsInTheCloud guidance" }), revokeAgentMcp: async (...args) => revoked.push(args) }));
         const calls = [];
         const credentials = [];
         let authChecks = 0;

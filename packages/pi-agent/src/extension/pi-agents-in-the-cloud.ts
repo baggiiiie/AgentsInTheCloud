@@ -3,17 +3,20 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
-const configSchema = Type.Object({ url: Type.String(), token: Type.String(), turnSignalCommand: Type.String() });
-type AgentsInTheCloudMcpConfig = Static<typeof configSchema>;
+const configSchema = Type.Object({ url: Type.String(), token: Type.String(), turnSignalCommand: Type.String(), instructions: Type.String() });
+type AgentsInTheCloudSessionConfig = Static<typeof configSchema>;
 
-/** Pi owns MCP discovery, execution, and instructions; we only wire up the session. */
-export function registerPiAgentsInTheCloud(pi: ExtensionAPI, config: AgentsInTheCloudMcpConfig): void {
+/** Pi owns MCP discovery and execution; we only wire up the session. */
+export function registerPiAgentsInTheCloud(pi: ExtensionAPI, config: AgentsInTheCloudSessionConfig): void {
   pi.registerMcpServer("agents-in-the-cloud", {
     url: config.url,
     headers: { Authorization: `Bearer ${config.token}` },
     exposure: "codemode",
     timeout: 3_600,
   });
+
+  // Append to Pi's assembled prompt so user prompt files and built-in guidance remain intact.
+  pi.on("before_agent_start", (event) => ({ systemPrompt: `${event.systemPrompt}\n\n${config.instructions}` }));
 
   async function signalTurn(boundary: "started" | "finished"): Promise<void> {
     const result = await pi.exec("sh", [config.turnSignalCommand, boundary]);

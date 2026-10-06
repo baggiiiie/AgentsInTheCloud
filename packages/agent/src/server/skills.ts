@@ -94,7 +94,7 @@ export async function workspaceSkillsFromFiles(files: WorkspaceSkillFile[]): Pro
   }
 }
 
-/** Discover Agent Skills without assuming the AgentsInTheCloud server can mount the workspace filesystem. */
+/** Discover Skills without assuming the AgentsInTheCloud server can mount the workspace filesystem. */
 export async function loadWorkspaceSkills(workspaceId: string): Promise<{ skills: WorkspaceSkill[]; diagnostics: ResourceDiagnostic[] }> {
   const script = `set -eu
 for root in ${skillRoots.map((root) => `'${root}'`).join(" ")}; do

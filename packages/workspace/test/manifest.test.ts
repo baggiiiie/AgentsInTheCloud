@@ -26,6 +26,10 @@ describe("workspace manifest config seeding", () => {
     });
   });
 
+  test("repository fields cannot grant host seeding permission", () => {
+    expect(parse({ version: 1, seedConfigEnabled: true, seedPiConfig: { authJson: "/nested/auth.json" } })).toEqual({ version: 1, seedPiConfig: { authJson: "/nested/auth.json" } });
+  });
+
   test("rejects malformed Pi catalogue cache destinations", () => {
     for (const modelsStoreJson of ["", "   ", true, 42]) {
       expectInvalid({ version: 1, seedPiConfig: { modelsStoreJson } }, "seedPiConfig.modelsStoreJson must be a non-empty string");

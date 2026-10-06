@@ -1,7 +1,7 @@
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import { turboStreamResponse, type WorkspaceFileTarget, type WorkspaceModuleRouteContext, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
-import { renderVSCodePane, vscodeViewKey, renderVSCodeNavigationSignal, vscodeFileNavigationStream } from "./render.ts";
+import { renderVSCodeView, vscodeViewKey, renderVSCodeNavigationSignal, vscodeFileNavigationStream } from "./render.ts";
 import { createWorkspaceVSCodeView, deleteWorkspaceVSCodeState, deleteWorkspaceVSCodeView, listWorkspaceVSCodeViews, openFileInConnectedVSCodeWindows, type WorkspaceVSCodeView } from "./workspace-vscode.ts";
 import { patchVSCodeWorkspaceAppResponse, resolveVSCodeWorkspaceAppBackend, vscodeAppKey } from "./proxy.ts";
 import { Type, type Static } from "typebox";
@@ -49,8 +49,8 @@ export const vscodeWorkspaceModule: WorkspaceModule = {
     identity: (reference: { type: "vscode"; title: string }) => reference.title,
     render: ({ workspaceId, reference }: { workspaceId: string; reference: VSCodeWorkViewReference }) => {
       const view = listWorkspaceVSCodeViews(workspaceId).find((candidate) => candidate.title === reference.title);
-      if (!view) throw new Error(`VS Code Work view not found: ${reference.title}`);
-      return renderVSCodePane(workspaceId, view.title);
+      if (!view) throw new Error(`VS Code view not found: ${reference.title}`);
+      return renderVSCodeView(workspaceId, view.title);
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "vscode"; title: string } }) => deleteWorkspaceVSCodeView(workspaceId, reference.title),
   }],

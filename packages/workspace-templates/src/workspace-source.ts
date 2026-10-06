@@ -8,7 +8,7 @@ import {
   runCommand,
   createKeyedOperationQueue,
   AgentsInTheCloudCoreError,
-  discoverHostGitHubToken,
+  discoverGitHubToken,
   dockerHostAgentsInTheCloudDataPath,
   getAgentsInTheCloudRuntimeContext,
   gitHubCredentialHelperCommand,
@@ -20,7 +20,7 @@ import {
 import { runHostObservableCommand, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import { getWorkspaceTemplateConfiguration, listWorkspaceTemplates, isGitWorkspaceTemplateInit } from "./workspace-template.ts";
+import { workspaceTemplateIdFromInit, getWorkspaceTemplateConfiguration, listWorkspaceTemplates, isGitWorkspaceTemplateInit } from "./workspace-template.ts";
 import { workspaceSourceSshEnvironment, stopWorkspaceSshAgent } from "./ssh-agent.ts";
 
 export interface PreparedWorkspaceSource {
@@ -104,7 +104,7 @@ async function requireCommand(name: string, args: string[], options: { env?: Rec
 }
 
 async function git(args: string[], options: { errorCode?: string } = {}): Promise<CommandResult> {
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   return await requireCommand("git", ["-c", `credential.helper=${gitHubCredentialHelperCommand}`, ...args], {
     env: token ? { GH_TOKEN: token } : undefined,
     errorCode: options.errorCode ?? "git_error",
@@ -127,7 +127,7 @@ async function ensureTemplate(gitUrl: string, branch: string | null, key: string
   await rm(resolvedCommitPath, { force: true });
 
   const branchNotFoundExitCode = 44;
-  const token = discoverHostGitHubToken();
+  const token = discoverGitHubToken();
   const script = `
 set -euo pipefail
 export GIT_TERMINAL_PROMPT=0
@@ -317,7 +317,7 @@ async function verifyStandaloneWorktree(worktreePath: string): Promise<void> {
   }
 }
 
-export async function prepareWorkspaceSource(options: { workspaceId: string; gitUrl: string; branch: string | null; worktreePath?: string; projectId?: string; events?: AgentsInTheCloudEventBus }): Promise<PreparedWorkspaceSource> {
+export async function prepareWorkspaceSource(options: { workspaceId: string; gitUrl: string; branch: string | null; worktreePath?: string; workspaceTemplateId?: string; events?: AgentsInTheCloudEventBus }): Promise<PreparedWorkspaceSource> {
   const gitUrl = options.gitUrl.trim();
   if (!gitUrl) throw invalidArguments("missing git URL");
   const branch = options.branch?.trim() || null;
@@ -337,7 +337,7 @@ export async function prepareWorkspaceSource(options: { workspaceId: string; git
 
     try {
       await writeFile(logPath, `Preparing template ${gitUrl}${branch ? `#${branch}` : ""}\n`);
-      const sshEnv = await workspaceSourceSshEnvironment(options.workspaceId, options.projectId);
+      const sshEnv = await workspaceSourceSshEnvironment(options.workspaceId, options.workspaceTemplateId);
       const template = await ensureTemplate(gitUrl, branch, key, { workspaceId: options.workspaceId, events: options.events, logPath, sshEnv });
       await copyWorkspaceTemplate(template.repoPath, tmpWorkPath, sourceRoot());
       await verifyStandaloneWorktree(tmpWorkPath);
@@ -377,21 +377,22 @@ export async function prepareWorkspaceSource(options: { workspaceId: string; git
 export function registerWorkspaceTemplateWorkspaceInitEvents(events: AgentsInTheCloudEventBus): void {
   events.on("workspace_image_configure", async (configuration) => {
     if (!isGitWorkspaceTemplateInit(configuration.init)) return;
-    const workspaceTemplateId = configuration.init.projectId;
+    const workspaceTemplateId = workspaceTemplateIdFromInit(configuration.init);
     configuration.dockerfile = (await listWorkspaceTemplates()).workspaceTemplates.find((workspaceTemplate) => workspaceTemplate.id === workspaceTemplateId)?.dockerfile;
   });
   events.on("workspace_source_prepare", async ({ workspaceId, init, workHostPath }) => {
     if (!isGitWorkspaceTemplateInit(init)) return;
-    await prepareWorkspaceSource({ workspaceId, gitUrl: init.gitUrl, branch: init.branch, projectId: init.projectId, worktreePath: workHostPath, events });
+    await prepareWorkspaceSource({ workspaceId, gitUrl: init.gitUrl, branch: init.branch, workspaceTemplateId: workspaceTemplateIdFromInit(init), worktreePath: workHostPath, events });
   });
 
   events.on("workspace_plan_prepare", async ({ workspaceId, init, plan }) => {
     if (isGitWorkspaceTemplateInit(init)) {
-      const settings = await getWorkspaceTemplateConfiguration(init.projectId);
+      const settings = await getWorkspaceTemplateConfiguration(workspaceTemplateIdFromInit(init));
       plan.privileged = settings.privileged;
-      plan.dockerSupportSettingsUrl = `/workspace-templates/${encodeURIComponent(init.projectId)}/settings?section=privileged`;
+      plan.seedConfigEnabled = settings.seedConfigEnabled;
+      plan.dockerSupportSettingsUrl = `/workspace-templates/${encodeURIComponent(workspaceTemplateIdFromInit(init))}/settings?section=privileged`;
       plan.preloadImages = [...settings.preloadImages ?? []];
-      plan.mounts.push({ type: "bind", ...(await workspaceTemplatePersistentMount(init.projectId)) });
+      plan.mounts.push({ type: "bind", ...(await workspaceTemplatePersistentMount(workspaceTemplateIdFromInit(init))) });
       Object.assign(plan.env, Object.fromEntries(settings.environment.map(({ name, value }) => [name, value])));
     }
 

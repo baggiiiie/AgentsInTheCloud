@@ -131,6 +131,11 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
         responses: { "200": { description: "Notification state updated; JSON or Turbo Stream according to Accept" }, "409": { description: "The requested turn is no longer running" }, "422": { description: "Invalid notification intent or unsupported push service" } },
       },
     },
+    "/workspaces/{id}/agents/{agentId}/queued-inputs/{submissionId}/cancel": { post: {
+      summary: "Cancel one queued steering message without stopping the agent turn",
+      parameters: ["id", "agentId", "submissionId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),
+      responses: { "200": { description: "Input withdrawn; cancelled is false if it is no longer queued. HTML clients receive a Turbo Stream.", content: { "application/json": { schema: { type: "object", properties: { input: { type: "object", required: ["submissionId", "cancelled"], properties: { submissionId: { type: "string" }, cancelled: { type: "boolean" } } } } } } } } },
+    } },
     "/workspaces/{id}/agents/{agentId}/tools/{callId}/abort": { post: {
       summary: "Abort one live tool call and its owned work without stopping the agent turn",
       parameters: ["id", "agentId", "callId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),

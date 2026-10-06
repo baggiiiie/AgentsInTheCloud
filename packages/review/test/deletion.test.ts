@@ -69,8 +69,24 @@ describe("Workspace deletion review", () => {
     expect(assessment).toMatchObject({
       status: "blocked",
       details: { repositories: [{ unpushedCommits: expect.arrayContaining([
-        { hash: expect.any(String), subject: "other branch" },
-        { hash: expect.any(String), subject: "detached commit" },
+        { hash: expect.any(String), subject: "other branch", branches: ["unpublished"] },
+        { hash: expect.any(String), subject: "detached commit", branches: [] },
+      ]) }] },
+    });
+  });
+
+  test("reports every local branch containing an unpushed commit, including ancestors", async () => {
+    const root = await workspaceRepository();
+    await command(root, "git", "checkout", "-qb", "unpublished");
+    await command(root, "git", "commit", "--allow-empty", "-qm", "shared commit");
+    await command(root, "git", "branch", "another-branch");
+    await command(root, "git", "commit", "--allow-empty", "-qm", "later commit");
+    const assessment = await reviewDeletionReview.inspect(workspaceId);
+    expect(assessment).toMatchObject({
+      status: "blocked",
+      details: { repositories: [{ unpushedCommits: expect.arrayContaining([
+        { hash: expect.any(String), subject: "shared commit", branches: ["another-branch", "unpublished"] },
+        { hash: expect.any(String), subject: "later commit", branches: ["unpublished"] },
       ]) }] },
     });
   });
@@ -109,7 +125,7 @@ describe("Workspace deletion review", () => {
     expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked",
       details: { repositories: expect.arrayContaining([
-        { relativePath: "nested", uncommitted: [], unpushedCommits: [{ hash: expect.any(String), subject: "submodule local" }] },
+        expect.objectContaining({ relativePath: "nested", uncommitted: [], unpushedCommits: [expect.objectContaining({ hash: expect.any(String), subject: "submodule local", branches: expect.any(Array) })] }),
       ]) },
     });
   });

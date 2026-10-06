@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createBrowserPresenter } from "../src/server/agent-tool.ts";
 import { createWorkspaceBrowserView, deleteWorkspaceBrowserState } from "../src/server/state.ts";
 
-test("presenting a new URL refreshes an already-open preview browser", async () => {
+test("presenting a new URL refreshes an already-open Browser view", async () => {
   const workspaceId = `browser_presenter_${crypto.randomUUID()}`;
   createWorkspaceBrowserView(workspaceId);
   const presentedUrls: string[] = [];

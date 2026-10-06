@@ -261,12 +261,12 @@ function createFilesViewController(Controller: WorkspaceClientControllerConstruc
     }
 
     expand(): void {
-      this.element.classList.add("is-files-pane-open");
+      this.element.classList.add("is-files-navigator-open");
       this.element.querySelector<FilesTreeFrame>(".files-frame")!.loading = "eager";
     }
 
     collapse(): void {
-      this.element.classList.remove("is-files-pane-open");
+      this.element.classList.remove("is-files-navigator-open");
     }
 
     async focusFilter(): Promise<void> {
@@ -287,7 +287,7 @@ const filesClientModule: WorkspaceClientModule = {
     hooks.registerCommand({
       id: "files.focus-filter",
       label: "Filter files",
-      description: "Open the Files side view and focus its filter box.",
+      description: "Open the Files navigator and focus its filter.",
       scope: "work-view",
       binding: "Meta+Alt+KeyP",
       run: async () => {

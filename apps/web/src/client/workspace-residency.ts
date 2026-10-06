@@ -1,4 +1,5 @@
 import { restoreTemplateSettingsDestination } from "./template-settings-controller.ts";
+import { markActiveWorkspaceRow } from "./workspace-presentation.ts";
 import { phoneLayoutMediaQuery } from "@agents-in-the-cloud/shared";
 import { Controller } from "@hotwired/stimulus";
 import { liveSurfaceReady, prepareLiveSurface, releaseLiveSurface } from "./live-surface.ts";
@@ -88,6 +89,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     if (this.intended !== workspaceId) return;
     this.selection++;
     this.intended = undefined;
+    workspaceNavigationController()?.setActiveWorkspace();
     history.replaceState({}, "", "/");
     this.hideResidents();
     this.emptyTargets.forEach(element => { element.hidden = false; });
@@ -148,9 +150,8 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
   };
   private updateRows(): void {
     const active = this.visibleWorkspaceId();
+    markActiveWorkspaceRow(document, active);
     document.querySelectorAll<HTMLElement>("[data-workspace-entry-id]").forEach(row => {
-      if (row.dataset.workspaceEntryId === active) row.setAttribute("aria-current", "page");
-      else row.removeAttribute("aria-current");
       const resident = this.residentTargets.find(item => item.dataset.workspaceId === row.dataset.workspaceEntryId);
       row.dataset.workspacePreloadState = resident && this.prepared(resident) ? "preloaded" : "unloaded";
     });

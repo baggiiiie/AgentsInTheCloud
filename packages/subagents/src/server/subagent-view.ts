@@ -9,7 +9,7 @@ import { createLivePresentation, escapeHtml as h } from "@agents-in-the-cloud/sh
 import { response } from "@agents-in-the-cloud/shared/http";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { nativeSnapshot, viewPath, type NativeAgentView as SubagentRecord } from "./native-view-state.ts";
+import { nativeSnapshot, viewPath, type NativeSubagentView as SubagentRecord } from "./native-view-state.ts";
 import { durableWorkspaceOwner, WorkspaceAgents } from "@agents-in-the-cloud/builtin-agent/server";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { Delegation } from "./native-state.ts";
@@ -63,7 +63,7 @@ function childrenHtml(workspaceId: string, parentId: string, agents: SubagentRec
   return `<div id="${h(childrenId(workspaceId, parentId))}" class="action-list subagent-list">${agents.filter((agent) => agent.parentId === parentId).map((agent) => branchHtml(workspaceId, agent, agents, open)).join("")}</div>`;
 }
 function emptyHtml(workspaceId: string, empty: boolean): string {
-  return `<div id="subagents-empty-${h(workspaceId)}" class="subagents-empty"${empty ? "" : " hidden"}>No delegated tasks for this agent yet.</div>`;
+  return `<div id="subagents-empty-${h(workspaceId)}" class="subagents-empty"${empty ? "" : " hidden"}>No subagents for this Agent yet.</div>`;
 }
 function unsupportedHtml(workspaceId: string): string {
   return `<div id="subagents-unsupported-${h(workspaceId)}" class="subagents-empty">This Subagents view only works with the Builtin agent.</div>`;

@@ -1,31 +1,37 @@
-/** Private LAN/VPN destinations are allowed; System and peer workspaces remain isolated.
- * One table covers current and future workspace bridges, independent of Docker's rules. */
-const rules = `add table inet agents-in-the-cloud_workspaces
+import { allowedEgressIpv6Range, blockedEgressIpv6Ranges, workspaceEgressNftIpv4Elements } from "../../../packages/shared/src/egress-policy.ts";
+
+/** All bridge-attached workloads (including Docker builds and helper containers)
+ * may reach only global unicast destinations. Match the kernel interface kind,
+ * not bridge names: docker0, workspace bridges, and future/custom-named bridges
+ * all share this boundary without registration or a network-creation race.
+ * The destination policy is shared with the workspace egress proxy. */
+export function workspaceFirewallRules(): string {
+  return `add table inet agents-in-the-cloud_workspaces
 flush table inet agents-in-the-cloud_workspaces
 table inet agents-in-the-cloud_workspaces {
-  set special_v4 {
+  set non_public_v4 {
     type ipv4_addr; flags interval;
-    elements = { 0.0.0.0/8, 127.0.0.0/8,
-      169.254.0.0/16, 192.0.0.0/24, 192.0.2.0/24,
-      198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24,
-      224.0.0.0/4, 240.0.0.0/4 }
+    elements = { ${workspaceEgressNftIpv4Elements()} }
   }
   chain input {
     type filter hook input priority -10; policy accept;
-    iifname "atw-*" ct state established,related counter accept
-    iifname "atw-*" ip6 hoplimit 255 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert } counter accept
-    iifname "atw-*" counter drop
+    meta iifkind "bridge" ct state established,related counter accept
+    meta iifkind "bridge" ip6 hoplimit 255 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert } counter accept
+    meta iifkind "bridge" counter drop
   }
   chain forward {
     type filter hook forward priority -10; policy accept;
-    iifname "atw-*" oifname "atw-*" counter drop
-    iifname "atw-*" ip daddr @special_v4 counter drop
-    iifname "atw-*" ip6 daddr != 2000::/3 ip6 daddr != fc00::/7 counter drop
-    iifname "atw-*" ip6 daddr 2001:db8::/32 counter drop
+    meta iifkind "bridge" meta oifkind "bridge" counter drop
+    meta iifkind "bridge" ip daddr @non_public_v4 counter drop
+    meta iifkind "bridge" ip6 daddr != ${allowedEgressIpv6Range.address}/${allowedEgressIpv6Range.prefix} counter drop
+${blockedEgressIpv6Ranges.map(([address, prefix]) => `    meta iifkind "bridge" ip6 daddr ${address}/${prefix} counter drop`).join("\n")}
   }
 }
 `;
+}
+
 export async function installWorkspaceFirewall() {
+  const rules = workspaceFirewallRules();
   // Atomic batch replacement touches only our table; Docker NAT/filter rules survive.
   const process = Bun.spawn(["nft", "-f", "-"], {
     stdin: new TextEncoder().encode(rules),

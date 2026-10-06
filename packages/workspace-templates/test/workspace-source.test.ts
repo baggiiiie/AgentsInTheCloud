@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { clearWorkspaceGitHubToken, createAgentsInTheCloudEventBus, setWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
-import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
+import { clearGitHubToken, createAgentsInTheCloudEventBus, setGitHubToken } from "@agents-in-the-cloud/core";
+import { addWorkspaceTemplate, cachedWorkspaceTemplateSourcePath, createWorkspaceTemplateSshKey, deleteWorkspaceTemplateSshKey, prepareWorkspaceSource, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplateSeedConfigEnabled, setWorkspaceTemplatePrivileged, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
 async function run(command: string[], options: { cwd?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -67,7 +67,7 @@ describe("workspace source preparation", () => {
 
   afterEach(async () => {
     await stopWorkspaceTemplateSshAgents();
-    clearWorkspaceGitHubToken();
+    clearGitHubToken();
     if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
     else process.env.ATELIER_DATA_DIR = previousDataDir;
     if (previousGitHubToken === undefined) delete process.env.GH_TOKEN;
@@ -157,11 +157,11 @@ describe("workspace source preparation", () => {
     await expect(prepareWorkspaceSource({ workspaceId: "unavailable", gitUrl: join(dataDir, "missing.git"), branch: "main" })).rejects.toMatchObject({ code: "git_error" });
   });
 
-  test("provides the cached project checkout for pre-workspace transcription", async () => {
+  test("provides the cached project checkout for LaunchComposer Dictation", async () => {
     const fixture = await createRemote();
     tempRoots.push(fixture.root);
     const workspaceTemplate = (await addWorkspaceTemplate(`${fixture.remote}#main`)).workspaceTemplate;
-    const contextPath = join(".agents-in-the-cloud", "transcription-context");
+    const contextPath = join(".agents-in-the-cloud", "dictation-context");
     const cachedPath = join(await cachedWorkspaceTemplateSourcePath(workspaceTemplate.id), contextPath);
     expect(await Bun.file(cachedPath).exists()).toBe(false);
 
@@ -199,7 +199,7 @@ describe("workspace source preparation", () => {
     await chmod(fakeGit, 0o755);
     const previousPath = process.env.PATH;
     process.env.PATH = `${fakeBin}:${previousPath ?? ""}`;
-    setWorkspaceGitHubToken("stored-token");
+    setGitHubToken("stored-token");
     try {
       await prepareWorkspaceSource({ workspaceId: "ws-token", gitUrl: fixture.remote, branch: "main" });
     } finally {
@@ -294,6 +294,26 @@ describe("workspace source preparation", () => {
     expect(other.mounts[0]!.source).not.toBe(workspaceTemplateAPath);
     expect((await stat(workspaceTemplateAPath)).isDirectory()).toBe(true);
     expect(first.initScripts).toEqual([]);
+  });
+
+  test("only host template settings grant seeding permission to the plan", async () => {
+    const events = createAgentsInTheCloudEventBus();
+    registerWorkspaceTemplateWorkspaceInitEvents(events);
+    const template = (await addWorkspaceTemplate("https://example.test/nested.git")).workspaceTemplate;
+    const other = (await addWorkspaceTemplate("https://example.test/other.git")).workspaceTemplate;
+    const provision = async (projectId?: string) => {
+      const init: GitWorkspaceTemplateInitInstruction | undefined = projectId ? { type: "project.git", projectId, name: "nested", gitUrl: template.gitUrl, branch: null, sessionShareKey: "nested" } : undefined;
+      const plan: WorkspaceDockerPlan = { labels: {}, env: {}, mounts: [], preloadImages: [], extraArgs: [], initScripts: [], containerFiles: [], cleanup: [] };
+      await events.emit("workspace_plan_prepare", { workspaceId: "seeding", init, workHostPath: join(dataDir, "workspaces", "seeding", "work"), workContainerPath: "/work", plan });
+      return plan;
+    };
+    expect((await provision(template.id)).seedConfigEnabled).toBe(false);
+    await setWorkspaceTemplateSeedConfigEnabled(template.id, true);
+    expect((await provision(template.id)).seedConfigEnabled).toBe(true);
+    expect((await provision(other.id)).seedConfigEnabled).toBe(false);
+    expect((await provision()).seedConfigEnabled).toBeUndefined();
+    await setWorkspaceTemplateSeedConfigEnabled(template.id, false);
+    expect((await provision(template.id)).seedConfigEnabled).toBe(false);
   });
 
   test("privileged mode follows the project at provisioning and links to its settings", async () => {

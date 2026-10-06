@@ -1,0 +1,45 @@
+/* Both layers reserve the larger content's size; only content moves, never the hit target. */
+.button.button-confirmation { display: inline-grid; --button-confirmation-rest-opacity: 1; }
+.button.button-confirmation:disabled { --button-confirmation-rest-opacity: var(--button-disabled-opacity); }
+.button.button-confirmation[aria-busy="true"] { --button-confirmation-rest-opacity: 1; }
+.button-confirmation__content { display: inline-flex; grid-area: 1 / 1; min-width: 0; max-width: 100%; align-items: center; justify-content: center; gap: inherit; }
+.button-confirmation__content[aria-hidden="true"] { visibility: hidden; opacity: 0; }
+.button-confirmation__check { color: var(--success); }
+.button.button-confirmation:disabled:is([aria-busy="true"], [data-button-confirmation-confirmed-value="true"]) { opacity: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .button.button-confirmation[data-button-confirmation-confirmed-value="true"] > .button-confirmation__initial {
+    animation: button-confirmation-out var(--motion-exit) var(--motion-ease-out) both;
+  }
+  .button.button-confirmation[data-button-confirmation-confirmed-value="true"] > .button-confirmation__check {
+    animation: button-confirmation-check-in var(--motion-enter) var(--motion-ease-out) both;
+  }
+  .button.button-confirmation[data-button-confirmation-returning] > .button-confirmation__initial {
+    animation: button-confirmation-caption-in var(--motion-enter) var(--motion-ease-out) both;
+  }
+  .button.button-confirmation[data-button-confirmation-returning] > .button-confirmation__check {
+    animation: button-confirmation-out var(--motion-exit) var(--motion-ease-out) both;
+  }
+  .button.button-confirmation[data-button-confirmation-returning] {
+    animation: button-confirmation-settle calc(var(--motion-enter) + var(--motion-exit)) ease both;
+  }
+}
+
+@keyframes button-confirmation-out {
+  from { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+  to { opacity: 0; visibility: hidden; transform: translateY(-4px) scale(.96); }
+}
+@keyframes button-confirmation-check-in {
+  from { opacity: 0; transform: translateY(4px) scale(.8); }
+  70% { opacity: 1; transform: translateY(0) scale(1.06); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes button-confirmation-caption-in {
+  from { opacity: 0; transform: translateY(4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Restore the caption at full contrast before settling into the clean disabled state. */
+@keyframes button-confirmation-settle {
+  0%, 62.5% { opacity: 1; }
+  to { opacity: var(--button-confirmation-rest-opacity); }
+}

@@ -1,7 +1,7 @@
 import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
-import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentType } from "@agents-in-the-cloud/shared";
 
 /** Host-owned launch composer content. */
@@ -37,8 +37,8 @@ export async function launchComposerContent(options: { draftId: string; agentTyp
   const { draftId } = options;
   const rowId = domId("agent_draft_attach", draftId);
   return {
-    attributesHtml: `data-controller="agent-attachments ${transcriptionComposerController}"${options.workspaceTemplateId ? ` data-transcription-composer-workspace-template-id-value="${escapeHtml(options.workspaceTemplateId)}"` : ""} ${composerAttachmentAttributes(draftId, rowId, "click->launch-composer-dialog#focusText")}`,
-    formAttributesHtml: 'data-action="submit->transcription-composer#submit keydown->submit-shortcut#keydown submit->submit-shortcut#submit turbo:submit-end->launch-composer-dialog#submitted turbo:submit-end->submit-shortcut#submitted"',
+    attributesHtml: `data-controller="agent-attachments ${dictationComposerController}"${options.workspaceTemplateId ? ` data-dictation-composer-workspace-template-id-value="${escapeHtml(options.workspaceTemplateId)}"` : ""} ${composerAttachmentAttributes(draftId, rowId, "click->launch-composer-dialog#focusText")}`,
+    formAttributesHtml: 'data-action="submit->dictation-composer#submit keydown->submit-shortcut#keydown submit->submit-shortcut#submit turbo:submit-end->launch-composer-dialog#submitted turbo:submit-end->submit-shortcut#submitted"',
     bodyHtml: renderComposerBody({
       draft: { id: draftId, rowId },
       inputHtml: `<textarea class="composer-input" name="text" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste"></textarea>`,

@@ -5,6 +5,7 @@ export {
   formatWorkspaceTemplateSpec,
   getWorkspaceTemplateConfiguration,
   isGitWorkspaceTemplateInit,
+  workspaceTemplateIdFromInit,
   listWorkspaceTemplates,
   parseWorkspaceTemplateSpec,
   workspaceTemplatesFile,
@@ -13,6 +14,7 @@ export {
   updateWorkspaceTemplate,
   setWorkspaceTemplateDockerfile,
   setWorkspaceTemplatePrivileged,
+  setWorkspaceTemplateSeedConfigEnabled,
   setWorkspaceTemplatePreloadImages,
   type AddWorkspaceTemplateResult,
   type DeleteWorkspaceTemplateResult,
@@ -56,15 +58,15 @@ export {
 } from "./secrets.ts";
 
 export {
-  clearGitIdentity,
-  getGitIdentity,
-  getStoredGitIdentity,
-  gitIdentitySettingsFile,
-  hasGitIdentity,
-  registerGitIdentityWorkspaceEvents,
-  setGitIdentity,
-  type GitIdentitySettings,
-} from "./git-identity.ts";
+  clearCommitIdentity,
+  getCommitIdentity,
+  getStoredCommitIdentity,
+  commitIdentitySettingsFile,
+  hasCommitIdentity,
+  registerCommitIdentityWorkspaceEvents,
+  setCommitIdentity,
+  type CommitIdentitySettings,
+} from "./commit-identity.ts";
 
 export {
   prepareWorkspaceSource,

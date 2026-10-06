@@ -9,10 +9,10 @@ interface BrowserPresenterDeps {
 export function createBrowserPresenter(workspaceId: string, deps: BrowserPresenterDeps): WorkspacePresenterDefinition<{ kind: "browser"; url: string }> {
   return {
     kind: "browser",
-    description: "Present a URL in AgentsInTheCloud's inline preview browser.",
+    description: "Present a URL in an AgentsInTheCloud Browser view.",
     parameters: {
       url: Type.String({
-        description: "URL to load in the preview browser, written from the network perspective of the workspace container.",
+        description: "URL to load in the Browser view, written from the network perspective of the workspace container.",
       }),
     },
     execute: async (_toolCallId: string, params: { kind: "browser"; url: string }) => {
@@ -22,7 +22,7 @@ export function createBrowserPresenter(workspaceId: string, deps: BrowserPresent
       await deps.presentBrowser(view);
       const details = { workView: { type: "browser", browserId: browserView.key }, url: view.targetUrl };
       return {
-        content: [{ type: "text" as const, text: `Preview browser opened at ${view.targetUrl}` }],
+        content: [{ type: "text" as const, text: `Browser view opened at ${view.targetUrl}` }],
         details,
       };
     },

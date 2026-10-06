@@ -5,6 +5,7 @@ import { CatalogueReloadController } from "./reload-controller.ts";
 import { setTabStatus } from "../src/tab-strip/tab-strip-controller.ts";
 import { Application, Controller } from "@hotwired/stimulus";
 import { registerDesignSystemControllers } from "../src/client.ts";
+import { showButtonConfirmation } from "../src/button-confirmation/button-confirmation-controller.ts";
 import { showTransientFeedback } from "../src/transient-feedback/transient-feedback-controller.ts";
 
 function controlValue(event: Event): string {
@@ -68,6 +69,10 @@ class CatalogueController extends Controller<HTMLElement> {
     this.element
       .querySelector<HTMLDialogElement>(`#${event.params.dialog}`)!
       .showModal();
+  }
+  confirmButton(event: Event): void {
+    // SAFETY: This action is bound only to the server-rendered confirmation buttons.
+    showButtonConfirmation(event.currentTarget as HTMLButtonElement);
   }
   feedback(event: Event): void {
     // SAFETY: Stimulus invokes this action on the feedback button.

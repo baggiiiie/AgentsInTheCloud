@@ -108,7 +108,7 @@ function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspa
     : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
 }
 
-function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
+function renderWorkspaceRow(workspace: WorkspacePaneEntry, index: number): string {
   const { parked, workspaceTemplate } = workspace;
   const id = workspaceRowDomId(workspace.id);
   const attentionAt = workspace.attentionAt === undefined ? "" : ` data-workspace-attention-at="${workspace.attentionAt}"`;
@@ -120,6 +120,7 @@ function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
   const newFromTemplate = workspaceTemplate ? `New workspace from ${workspaceTemplate.title}` : "New empty workspace";
   const row = actionItemHtml({
     kind: "compound",
+    container: parked ? undefined : { attributesHtml: `data-workspace-order="${index}"` },
     label: { kind: "text", text: workspace.title },
     trailingHtml: renderWorkspaceRowStatus(workspace),
     leadingActionsHtml: `<button type="button" class="workspace-template-icon-button" title="${escapeHtml(newFromTemplate)}" aria-label="${escapeHtml(newFromTemplate)}" data-action="workspace-pane#openPickerFor" data-workspace-pane-workspace-template-param="${escapeHtml(workspaceTemplate?.id ?? "")}">${workspaceTemplateIconHtml(workspaceTemplate)}</button>`,
@@ -137,8 +138,19 @@ const workspaceTemplateDialogTarget = 'data-turbo-frame="_top" data-turbo-stream
 
 function workspaceRowDomId(id: string): string { return domId("workspace_row", id); }
 
-function workspaceRows(presentation: WorkspacePanePresentation): Array<{ id: string; html: string }> {
-  return presentation.workspaces.map((workspace) => ({ id: workspaceRowDomId(workspace.id), html: renderWorkspaceRow(workspace) }));
+function renderWorkspaceRows(presentation: WorkspacePanePresentation): string {
+  const active = presentation.workspaces.filter((workspace) => !workspace.parked);
+  const parked = presentation.workspaces.filter((workspace) => workspace.parked);
+  const parkedGroup = parked.length ? `<details id="workspace_pane_parked">
+    ${actionItemHtml({
+      kind: "single",
+      element: { tag: "summary", attributesHtml: "data-workspace-parked" },
+      label: { kind: "text", text: "Parked" },
+      leadingHtml: `<span class="workspace-parked-disclosure">${Icons.Disclosure}</span>`,
+    })}
+    ${parked.map(renderWorkspaceRow).join("")}
+  </details>` : "";
+  return `${active.map(renderWorkspaceRow).join("")}${parkedGroup}`;
 }
 
 function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string {
@@ -217,7 +229,7 @@ export function renderWorkspacePane(presentation: WorkspacePanePresentation, sid
       <section class="workspace-pane-slide" data-workspace-pane-target="workspaces" aria-label="Workspaces">
         <div id="${workspacePaneNewWorkspaceDomId}" class="workspace-pane-new-workspace">${renderNewWorkspaceRow(presentation)}</div>
         <div class="fixed-shell-pane-collections" data-workspace-pane-collections>
-          <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${workspaceRows(presentation).map((row) => row.html).join("")}</div>
+          <div id="${workspacePaneScrollDomId}" class="fixed-shell-workspace-scroll" data-workspace-navigation-target="scroll">${renderWorkspaceRows(presentation)}</div>
           <section id="global_sidebar_contributions">${sidebarContributionsHtml}</section>
         </div>
       </section>
@@ -464,7 +476,7 @@ export function presentWorkViewTurboStream(workspaceId: string, key: string): st
 
 export function workspacePaneCollectionsRegions(presentation: WorkspacePanePresentation): import("@agents-in-the-cloud/shared").LiveRegion[] {
   return [
-    { target: workspacePaneScrollDomId, html: workspaceRows(presentation).map(row => row.html).join("") },
+    { target: workspacePaneScrollDomId, html: renderWorkspaceRows(presentation) },
     { target: workspacePaneNewWorkspaceDomId, html: renderNewWorkspaceRow(presentation) },
     { target: workspaceTemplateOptionsDomId, html: renderWorkspaceTemplateOptions(presentation), action: "replace" },
   ];

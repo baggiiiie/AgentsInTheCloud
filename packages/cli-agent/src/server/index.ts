@@ -1,6 +1,6 @@
 import { registerAgentTurnSettler, renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
-import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
 import { domId, escapeHtml, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import type { AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
@@ -10,6 +10,7 @@ import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
 import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
+export type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
 export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 
 function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string {
@@ -62,13 +63,13 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
           const rowId = domId("cli_attach", workspaceId, agentId);
           const composerUrl = `${url}/composer`;
           const transcriptControls = renderCliTranscriptControls(adapter);
-          const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-transcription-composer-workspace-id-value="${escapeHtml(workspaceId)}">
+          const composer = terminal.exists && !terminal.ended ? `<div class="composer cli-agent-composer" data-controller="agent-completions ${dictationComposerController}" data-action="agent-composer:send-prompt->cli-terminal#sendPrompt" data-agent-completions-url-value="${escapeHtml(composerUrl)}/completions" data-dictation-composer-workspace-id-value="${escapeHtml(workspaceId)}">
             <div class="composer-surface">
-              <form id="${domId("cli_composer_form", workspaceId, agentId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->transcription-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
+              <form id="${domId("cli_composer_form", workspaceId, agentId)}" method="post" action="${escapeHtml(composerUrl)}" data-turbo="false" data-cli-terminal-target="form" data-action="submit->dictation-composer#submit keydown->agent-completions#keydown submit->cli-terminal#submit">
                 ${renderComposerBody({
                   draft: { id: draftId, rowId, attachments: await listStagedAttachments(draftId) },
                   collapsible: true,
-                  quickLaunches: true,
+                  promptTemplateButtons: true,
                   inputHtml: `<textarea class="composer-input" name="text" rows="2" placeholder="Write your prompt here" aria-label="CLI agent prompt" data-controller="composer-send-hint" data-cli-terminal-target="input" data-agent-completions-target="input" data-action="input->agent-completions#input keydown->cli-terminal#inputKeydown paste->agent-attachments#paste"></textarea>`,
                 })}
               </form>
@@ -105,7 +106,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
 }
 
 export { createCliModelSettings, type CliModelSettings } from "./model-settings.ts";
-export { checkedWorkspaceShell } from "./agents.ts";
+export { checkedWorkspaceShell, writeCliSessionFiles } from "./agents.ts";
 export { cliLaunchScript, cliPromptText, emptyAgentInput, writeFileScript } from "./launch-script.ts";
 export { turnSignalArgv, turnSignalShell, type TurnBoundary } from "./turn-signal.ts";
 export { syntaxSlot, transcriptSlot } from "./transcript-palette.ts";

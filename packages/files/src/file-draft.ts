@@ -4,7 +4,7 @@ import type { EditableFileResponse, FileSaveRequest } from "./protocol.ts";
 export type SaveResult = { revision: string } | { conflict: EditableFileResponse };
 type SaveFile = (request: FileSaveRequest) => Promise<SaveResult>;
 
-// A draft belongs to a file, not to an editor element. One writer serializes
+// A File draft belongs to a file, not to a Files view. One writer serializes
 // requests so a later edit always uses the preceding save's revision.
 export class FileDraft {
   content: string;

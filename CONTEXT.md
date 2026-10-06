@@ -4,9 +4,53 @@ AgentsInTheCloud is a workspace interface for collaborating with coding agents w
 
 ## Language
 
+**Onboarding**:
+The guided flow for getting started with AgentsInTheCloud by connecting GitHub and Model providers. Onboarding is app-level, distinct from preparing an individual Workspace.
+_Avoid_: Initial setup (as the feature name), Workspace setup
+
+**Settings**:
+The app-level surface for AgentsInTheCloud preferences and shared configuration, such as Connection mode, theme, Commit identity, GitHub connection, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
+_Avoid_: Preferences, app settings, global settings (as feature names), workspace settings (for this surface)
+
+**Connection mode**:
+The installation-wide choice of where AgentsInTheCloud and Workspace previews can be used: Installation computer only, or Devices on your Tailscale network. The selected mode determines generated preview addresses; Tailscale mode includes the installation computer.
+_Avoid_: App access, Local / Remote (as mode labels)
+
+**Installation computer**:
+The computer where AgentsInTheCloud is installed, which may differ from the device running the user's browser.
+_Avoid_: This computer (when the installation computer is meant), System container (as the computer's identity)
+
+**GitHub connection**:
+The app-wide connection that lets AgentsInTheCloud and Agents access GitHub repositories using a GitHub token. It is shared across Workspaces, not configured separately for each Workspace. It is distinct from Commit identity, which determines the author name and email on commits.
+_Avoid_: GitHub setup (as the feature name), Workspace GitHub connection
+
+**Commit identity**:
+The app-level author name and email used to configure commits in new Workspaces. It is distinct from the GitHub connection and its access credential; choosing a Commit identity does not authenticate with GitHub.
+_Avoid_: Git identity, GitHub identity (for commit authorship)
+
+**GitHub token**:
+The credential used by the GitHub connection. AgentsInTheCloud keeps the token outside Agent sandboxes and supplies repository access without exposing the token to Agents.
+_Avoid_: Workspace GitHub token
+
+**Host**:
+The feature for inspecting AgentsInTheCloud System diagnostics and using privileged terminals outside individual Workspaces. Host access targets the System environment, not necessarily the physical machine running Docker.
+_Avoid_: System panel (as the feature name), Workspace terminal (for Host access), physical host (as an implicit access boundary)
+
+**Updates**:
+The feature for checking for AgentsInTheCloud releases and managing Update operations. Updates is separate from managing packages or agent CLIs inside a Workspace.
+_Avoid_: Upgrades, software updater (as feature names)
+
+**Update**:
+An installation operation that prepares an AgentsInTheCloud release and applies it by restarting the System-managed installation.
+_Avoid_: Upgrade (as the operation name), Workspace package update
+
 **Workspace template**:
 What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
 _Avoid_: Project, workspace folder, repository
+
+**Environment Variables**:
+The Workspace template page for managing environment variables added to new Workspace containers. Passwords and API keys belong in Secrets; changes do not affect existing containers.
+_Avoid_: Environment (as the page name)
 
 **Template icon**:
 The marker that identifies a workspace's template in the Workspace pane. By default it is a **swatch**: a colored square derived from the template id.
@@ -29,8 +73,16 @@ The collapsible navigation region for finding and switching between workspaces.
 _Avoid_: Left sidebar, workspace tab
 
 **Agent**:
-An independently named coding collaborator within a Workspace, with its own AgentPaneComposer and Agent session. A Workspace may contain one or more Agents, with one active at a time; starting a fresh session does not create another Agent.
+A named coding collaborator within a Workspace, with its own Agent session. Agents added directly by the user have an AgentPaneComposer, with one active in the Agent pane at a time; starting a fresh session does not create another Agent.
 _Avoid_: Agent conversation, Agent view, agent tab, chat, thread
+
+**Subagent**:
+A coding collaborator created by an Agent to carry out delegated work within the same Workspace. A Subagent may delegate further work to its own Subagents; it is distinct from an Agent added directly by the user.
+_Avoid_: Sub-agent, child agent, delegated agent (as the name)
+
+**Subagents**:
+The feature for inspecting the active Agent’s Subagents, their activity, and their messages in a contextual Work view.
+_Avoid_: Delegation dashboard, child-agent view
 
 **Agent type**:
 The coding-agent implementation an Agent uses: Builtin, Claude Code, Codex, or Pi. An Agent type is distinct from the Model provider supplying its models.
@@ -60,6 +112,31 @@ _Avoid_: Agent composer, in-pane composer, prompt box, chat input
 The composer used before a Workspace exists to provide its Agent’s initial prompt and select the model and thinking level with which the Workspace starts.
 _Avoid_: Launch form, launch prompt, new-workspace composer
 
+**Inline content**:
+HTML-based explanatory content shown as part of an Agent’s answer using AgentsInTheCloud’s supplied styling and controls. Inline content is distinct from independently styled, standalone outputs.
+
+**Dictation**:
+The feature for turning microphone speech into editable text in an AgentPaneComposer or LaunchComposer. Dictation inserts text into the draft without sending it; it is not a voice conversation with an Agent.
+_Avoid_: Transcription (as the app feature name), voice chat
+
+**Slash command**:
+An invocation beginning with `/` in an Agent’s composer. Slash commands may perform a built-in action, expand a Prompt template, or explicitly invoke a Skill; not every Slash command is a Prompt template.
+
+**Prompt template**:
+A named, reusable prompt for an Agent, optionally expanded with arguments. It can be invoked by its slash command and may have a Keyboard shortcut or Prompt template button.
+
+**Skill**:
+A named bundle of reusable, task-specific instructions and optional supporting files that an Agent can load when relevant or when explicitly invoked. Unlike a Prompt template, a Skill supplies guidance for performing a task rather than a reusable prompt to insert or send.
+_Avoid_: Agent skill (as an app term)
+
+**Prompt template button**:
+An optional button in the AgentPaneComposer that inserts a Prompt template into the draft for review and editing without sending it. Buttons are shown while the composer is empty and are independent of Keyboard shortcuts.
+_Avoid_: Quick launch, quick insert
+
+**Keyboard shortcut**:
+A key combination that invokes an AgentsInTheCloud command, shortened to “Shortcut” when the context is clear. A Prompt template’s shortcut sends it directly to the active Agent rather than inserting it into a draft.
+_Avoid_: Hotkey
+
 **Agent session**:
 An Agent's replaceable interaction history. Starting a fresh Agent session resets the active context while keeping the same Agent, its settings, and its searchable history.
 _Avoid_: Agent, Agent conversation
@@ -69,19 +146,59 @@ The contextual region that slides in when needed to show files, terminals, brows
 _Avoid_: Right tab, preview tab
 
 **Work view**:
-A closable, reorderable destination inside the Work pane, such as a Terminal, Browser, File, or Files view. Only one Work view is active and visible at a time; Work views are not split into additional layout groups.
+A closable, reorderable destination inside the Work pane, such as a Terminal, Browser, or Files view. Only one Work view is active and visible at a time; Work views are not split into additional layout groups.
 _Avoid_: Workspace group, preview group
 
 **Resource Work view**:
-A Work view representing an independently open resource or running session, such as a File, Browser, Terminal, or VS Code view.
+A Work view representing an independently open resource or running session, such as a Browser, Desktop, Terminal, or VS Code view.
 _Avoid_: Document view, permanent view
 
 **Contextual Work view**:
-A workspace-level utility Work view, such as Files.
+A workspace-level utility Work view, such as Files or Review.
 _Avoid_: Permanent view, special view
 
+**Browser**:
+The feature for opening webpages in a Workspace, including apps running in that Workspace. It is distinct from the remote graphical environment shown by Desktop.
+_Avoid_: Preview browser, browser preview
+
+**Browser view**:
+A Resource Work view displaying a webpage through Browser, with its own address and navigation. A Workspace may contain multiple Browser views.
+_Avoid_: Browser tab, preview view, Browser Work view
+
+**Desktop**:
+A Workspace’s remote graphical environment for interacting with graphical apps, including its visible Chromium browser. It is distinct from Browser, which opens webpages directly in a Browser view.
+_Avoid_: VNC view (as a feature name)
+
+**Desktop view**:
+A Resource Work view for viewing and controlling a Workspace’s Desktop. A Workspace has at most one Desktop view; closing it does not stop Desktop.
+_Avoid_: Desktop tab, VNC view
+
+**VS Code**:
+The feature for using browser-based Visual Studio Code inside a Workspace, including its editor tools and extensions.
+_Avoid_: Code server (as the feature name)
+
+**VS Code view**:
+A Resource Work view displaying a Workspace’s VS Code editor. The view is an app destination, distinct from the underlying VS Code server or native window.
+_Avoid_: VS Code pane, VS Code session (for the app destination), VS Code tab, VS Code Work view
+
+**Review**:
+A contextual Work view for inspecting a Workspace’s uncommitted Git changes and drafting Review comments for an Agent. It includes staged, unstaged, and untracked changes; it is not a pull-request approval workflow.
+_Avoid_: Review view, change review, pull-request review
+
+**Review comment**:
+Feedback drafted in Review about changed lines in a Workspace file, which can be copied into an Agent’s composer. It is retained even if later file changes prevent matching its original lines.
+_Avoid_: Review note, feedback note, repository comment
+
+**Unanchored Review comment**:
+A Review comment that can no longer be matched unambiguously to its original lines in the Workspace’s current changes. Its feedback and original snippet are retained; being unanchored does not necessarily mean the feedback is obsolete.
+_Avoid_: Outdated comment, stale comment, comment without an anchor
+
+**Side-by-side**:
+The Review diff layout that places deletions and additions in separate columns next to each other.
+_Avoid_: Split diff, split layout
+
 **Mobile destination**:
-A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open File, Browser, and Terminal views are directly reachable; Files and VS Code views are found through More.
+A top-level phone navigation target for the Workspace pane, an Agent, or a Work view configured for direct mobile access. Every Agent is directly reachable. Open Browser and Terminal views are directly reachable; Files and VS Code views are found through More.
 _Avoid_: Mobile tab, mobile Work pane
 
 **AgentsInTheCloud bar**:
@@ -101,7 +218,7 @@ An AgentsInTheCloud navigation action that opens the Workspace that has been req
 _Avoid_: Next unread, next Agent
 
 **More**:
-The user-facing phone destination that opens a bottom sheet with separate sections for Work views not configured for direct mobile access and launchers that create or reveal Work views. Singleton utility launchers such as Files remain available when their live Work views are closed. Selecting a Work view from More leaves the stable bottom destination bar unchanged, and More remains highlighted while a secondary Work view is visible. “Work” remains domain language and is not exposed as the name of this mobile affordance.
+The user-facing phone destination that opens a bottom sheet with separate sections for Work views not configured for direct mobile access and launchers that create or reveal Work views. Work-view launchers such as Files remain available when their live Work views are closed. Selecting a Work view from More leaves the stable bottom destination bar unchanged, and More remains highlighted while a secondary Work view is visible. “Work” remains domain language and is not exposed as the name of this mobile affordance.
 _Avoid_: Work, overflow
 
 **Work view reference**:
@@ -112,9 +229,13 @@ _Avoid_: Tab key, untyped view ID
 A persistent Work view whose referenced resource cannot currently be loaded. It remains visible as an explicit unavailable state until its resource returns or the user closes it.
 _Avoid_: Broken tab, missing tab
 
+**Terminal**:
+The feature for command-line access inside a Workspace. Terminal is distinct from Host’s privileged terminals in AgentsInTheCloud System.
+_Avoid_: Shell (as the feature name), Host terminal (for Workspace command-line access)
+
 **Terminal view**:
-A Work view connected to a terminal session. It either owns a session created specifically for it or attaches to an independently existing session.
-_Avoid_: Terminal tab
+A Resource Work view connected to a terminal session through Terminal. It either owns a session created specifically for it or attaches to an independently existing session.
+_Avoid_: Terminal tab, Terminal pane, Terminal Work view
 
 **Owned terminal session**:
 A terminal session created specifically for one Terminal view and governed by that view's lifecycle.
@@ -152,9 +273,31 @@ Opening a Workspace makes its oldest requesting-attention Agent visible and, on 
 **Preload state**:
 A browser-local state indicating whether a Workspace is preloaded, preloading, or neither. It does not affect busy or requesting-attention state. Workspace attention indicators are dimmed until preloading finishes.
 
-**File view**:
-A Work pane view for reading and, when writable, editing one Workspace file. A file has at most one open File view within a Workspace.
-_Avoid_: File tab, editor tab
+**Files**:
+The feature for navigating Workspace files and viewing or editing a selected file. Files combines file navigation and editing rather than creating a separate Work view for each file.
+_Avoid_: File browser, file explorer
+
+**Files view**:
+A Work view combining file navigation with viewing or editing its selected file. A Workspace may have multiple Files views with independent selections, including multiple views of the same file.
+_Avoid_: File view, file tab, Files Work view
+
+**File draft**:
+A file’s working text and save state, shared by Files views showing that file in the same browser page. Changes are saved automatically, while unsaved edits are retained when saving fails or encounters a conflict.
+
+**Markdown display mode**:
+The choice of how a Markdown file is displayed within a Files view: Source or Rendered. The mode does not determine whether the file is writable.
+
+**Source**:
+The Markdown display mode showing the file’s Markdown text, editable when the file is writable.
+_Avoid_: Edit mode, raw mode
+
+**Rendered**:
+The Markdown display mode showing the formatted presentation of the file’s current text.
+_Avoid_: Preview mode
+
+**Files navigator**:
+The collapsible file-navigation region within a Files view, containing its file tree, filter, and upload controls. It is part of that Files view, not a separate Work view or the surrounding Work pane.
+_Avoid_: Files pane, Files side view
 
 **Persistent Work view state**:
 The server-restorable identity, order, and type-specific resource state of an open Work view. Its durability follows the view type rather than whether the user or agent created it, and remains until the view is explicitly closed.

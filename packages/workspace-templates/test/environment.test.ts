@@ -5,7 +5,7 @@ import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, workspaceInitFromTemplate, registerWorkspaceTemplateWorkspaceInitEvents, setWorkspaceTemplatePreloadImages } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceDockerPlan } from "@agents-in-the-cloud/workspace";
 
-describe("project environment", () => {
+describe("Workspace template environment", () => {
   let previousDataDir: string | undefined;
   let dataDir: string;
 
@@ -21,7 +21,7 @@ describe("project environment", () => {
     await rm(dataDir, { recursive: true, force: true });
   });
 
-  test("adds saved variables to project workspace container plans", async () => {
+  test("adds saved variables to Workspace template container plans", async () => {
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
     await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "API_URL", value: "https://api.example.com" });
     await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "EMPTY", value: "" });

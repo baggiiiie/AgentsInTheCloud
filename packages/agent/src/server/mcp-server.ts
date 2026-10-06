@@ -28,7 +28,7 @@ export function createAgentMcpServer(options: AgentMcpServerOptions) {
       if (request.method !== "POST") return new Response("MCP initialization required", { status: 400 });
       // Tool visibility is fixed for the workspace lifetime; build definitions once per session.
       const tools = new Map(options.tools(identity).map((tool) => [tool.name, tool]));
-      const server = new Server({ name: "agents-in-the-cloud", version: "1.0.0" }, { capabilities: { tools: {} }, instructions: await options.instructions(identity) });
+      const server = new Server({ name: "agents-in-the-cloud", version: "1.0.0" }, { capabilities: { tools: {} }, instructions: identity.instructionDelivery === "system-prompt" ? undefined : await options.instructions(identity) });
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => crypto.randomUUID(),
         onsessioninitialized: (id) => { sessions.set(id, { identity, server, transport }); },

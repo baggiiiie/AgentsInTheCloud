@@ -2,7 +2,7 @@ import { activityButtonHtml } from "@agents-in-the-cloud/design-system/activity-
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { createPiModelRuntime, hasConnectedModelProvider, modelRefValue, parseModelRef, renderLaunchModelSettings, renderSharedComposerSelections, type ComposerModelOption } from "@agents-in-the-cloud/llm/server";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderFollowLatestButton, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes, type StagedAttachment } from "@agents-in-the-cloud/prompt/server";
-import { transcriptionComposerController } from "@agents-in-the-cloud/transcription/server";
+import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { readInitialPromptDraft } from "./initial-prompt-draft.ts";
 import { enabledModelOptionViews, launchComposerThinkingSettings, selectAvailableEnabledModel } from "@agents-in-the-cloud/agent/server/model-state";
@@ -95,13 +95,13 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
   const { ctx, draftId, stats } = options;
   const formId = `agent_pane_composer_${draftId}`;
   const actions = `<span class="composer-primary-action" id="${ids.actions(ctx)}">${renderPromptActions(ctx, options.busy, options.hasStoppableWork)}</span>`;
-  return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${transcriptionComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-transcription-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
+  return `<div class="composer agent-pane-composer" data-controller="agent-model-setup agent-completions ${dictationComposerController}" data-action="agent-composer:send-prompt->agent-pane#sendPrompt" data-agent-completions-url-value="${escapeHtml(agentPath(ctx, "/completions"))}" data-dictation-composer-workspace-id-value="${escapeHtml(ctx.workspaceId)}">
     <div class="composer-surface">
-      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->transcription-composer#submit turbo:submit-start->agent-pane#submitStarted turbo:submit-end->agent-pane#submitted">
+      <form id="${escapeHtml(formId)}" method="post" action="${escapeHtml(options.action)}" data-agent-pane-target="form" data-action="submit->agent-model-setup#guard keydown->agent-completions#keydown keydown->agent-pane#inputKeydown submit->dictation-composer#submit turbo:submit-start->agent-pane#submitStarted turbo:submit-end->agent-pane#submitted">
         ${renderComposerBody({
           draft: { id: draftId, rowId: ids.attachRow(ctx), attachments: options.attachments },
           collapsible: true,
-          quickLaunches: true,
+          promptTemplateButtons: true,
           inputHtml: renderAgentPanePromptInput(ctx, options.initialText ?? ""),
           sendHtml: renderComposerActions(actions),
         })}
@@ -109,7 +109,7 @@ function renderAgentPaneComposer(options: AgentComposerRenderOptions): string {
       <div class="agent-completion-menu-host" data-agent-completions-target="menu" hidden></div>
       ${renderAgentCompletionCatalog(ctx, options.completionCatalogHtml)}
       <form id="${ids.abortForm(ctx)}" method="post" action="${escapeHtml(agentPath(ctx, "/abort"))}" hidden></form>
-      <div class="composer-footer" id="${ids.stats(ctx)}">${renderAgentPaneComposerFooter(ctx, stats)}</div>
+      <div class="composer-footer" data-controller="agent-footer" id="${ids.stats(ctx)}">${renderAgentPaneComposerFooter(ctx, stats)}</div>
     </div>
   </div>`;
 }
@@ -156,9 +156,11 @@ function renderComposerActions(sendHtml: string): string {
 
 export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: AgentStatsView): string {
   const percent = stats.contextPercent;
+  const contextTitle = stats.nativeBranchUsage ? "Estimated context window used" : "Context window used";
   const meter = percent === null
     ? ""
-    : `<span class="agent-stat" title="${stats.nativeBranchUsage ? "Estimated context window used" : "Context window used"}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span><b>${percent.toFixed(0)}%</b></span>`;
+    : `<span class="agent-stat" data-footer-drop="4" title="${contextTitle}"><span class="agent-ctx-meter"><i style="width:${Math.min(100, Math.max(0, percent)).toFixed(0)}%"></i></span></span>
+<span class="agent-stat" data-footer-drop="3" title="${contextTitle}"><b>${percent.toFixed(0)}%</b></span>`;
   const models = stats.models.length > 0 ? stats.models : [{ provider: "", id: "", name: stats.modelName ?? "no model", selected: true, available: false }];
   const formPrefix = `${ids.stats(ctx)}_selection`;
   const modelFormId = `${formPrefix}_model`;
@@ -167,9 +169,9 @@ export function renderAgentPaneComposerFooter(ctx: AgentRenderContext, stats: Ag
 ${stats.thinkingLevels.length > 0 ? `<form id="${thinkingLevelFormId}" method="post" action="${escapeHtml(agentPath(ctx, "/thinking-level"))}" hidden></form>` : ""}`;
   return `<span data-agent-compact-available="${stats.compactAvailable}" hidden></span>
 ${meter}
-<span class="agent-stat" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
-<span class="agent-stat" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
-<span class="agent-stat" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
+<span class="agent-stat" data-footer-drop="1" title="Tokens up (input)${stats.nativeBranchUsage ? " on this branch" : ""}">↑ <b>${formatTokens(stats.inputTokens)}</b></span>
+<span class="agent-stat" data-footer-drop="1" title="Tokens down (output)${stats.nativeBranchUsage ? " on this branch" : ""}">↓ <b>${formatTokens(stats.outputTokens)}</b></span>
+<span class="agent-stat" data-footer-drop="2" title="${stats.nativeBranchUsage ? `This branch cost, including compaction and recorded attempts.${stats.descendantCost === undefined ? "" : " Plus all descendant branches, excluding inherited usage."} Updated when usage commits.` : `${stats.isSubagent ? "This agent" : "Root agent"} cost${stats.descendantCost === undefined ? "" : " + all subagents and nested subagents combined"}. Updated at agent turn end.`}"><b>${formatCost(stats.cost)}${stats.descendantCost === undefined ? "" : ` + ${formatCost(stats.descendantCost)}`}</b></span>
 ${selectionForms}
 ${renderSharedComposerSelections({
     modelFormId,

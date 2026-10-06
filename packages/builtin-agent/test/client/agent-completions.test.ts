@@ -1,6 +1,6 @@
 import { agentConnectionShouldRun, forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "../../src/client/index.ts";
 import { describe, expect, mock, test } from "bun:test";
-import { type AgentCompletionInput, agentCompletionRequest, agentComposerPrimaryAction, agentComposerTextStorageKey, fileCompletionPrefix, insertSlashCommand, navigatePromptHistory, promptTemplateHotkeyConflict } from "@agents-in-the-cloud/agent/client/agent-controllers";
+import { type AgentCompletionInput, agentCompletionRequest, agentComposerPrimaryAction, agentComposerTextStorageKey, fileCompletionPrefix, insertSlashCommand, navigatePromptHistory, promptTemplateShortcutConflict } from "@agents-in-the-cloud/agent/client/agent-controllers";
 
 function input(value: string, cursor = value.length): AgentCompletionInput {
   return {
@@ -81,7 +81,7 @@ describe("agent prompt history", () => {
 });
 
 describe("agent prompt completion activation", () => {
-  test("quick launches appear only before the user types", () => {
+  test("prompt template buttons appear only before the user types", () => {
     expect(agentCompletionRequest(input(""))).toBeUndefined();
     expect(agentCompletionRequest(input(" "))).toBeUndefined();
     expect(agentCompletionRequest(input("draft"))).toBeUndefined();
@@ -108,16 +108,16 @@ describe("agent prompt completion activation", () => {
     expect(agentCompletionRequest(input("/tmp/bla"), true)).toEqual({ kind: "file", query: "/tmp/bla", mode: "direct" });
   });
 
-  test("rejects prompt-template hotkeys already assigned to AgentsInTheCloud commands", () => {
+  test("rejects prompt-template shortcuts already assigned to AgentsInTheCloud commands", () => {
     const commands = [
       { label: "Open VS Code", binding: "Meta+Alt+KeyV" },
       { label: "New Terminal", binding: "Meta+Alt+KeyT" },
     ];
 
-    expect(promptTemplateHotkeyConflict("v", commands, true)?.label).toBe("Open VS Code");
-    expect(promptTemplateHotkeyConflict("s", commands, true)).toBeUndefined();
-    expect(promptTemplateHotkeyConflict("v", commands, false)).toBeUndefined();
-    expect(promptTemplateHotkeyConflict("v", [{ label: "Paste", binding: "Control+Alt+KeyV" }], false)?.label).toBe("Paste");
+    expect(promptTemplateShortcutConflict("v", commands, true)?.label).toBe("Open VS Code");
+    expect(promptTemplateShortcutConflict("s", commands, true)).toBeUndefined();
+    expect(promptTemplateShortcutConflict("v", commands, false)).toBeUndefined();
+    expect(promptTemplateShortcutConflict("v", [{ label: "Paste", binding: "Control+Alt+KeyV" }], false)?.label).toBe("Paste");
   });
 
   test("a selected prompt template replaces a partial trigger before inline expansion", () => {

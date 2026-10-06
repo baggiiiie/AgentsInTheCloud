@@ -15,13 +15,13 @@ export {
   registerWorkspaceSubscriptionSecrets,
   registerWorkspaceRequestTransform,
   registerWorkspaceResponseTransform,
-  clearWorkspaceGitHubToken,
+  clearGitHubToken,
   createWorkspaceSecretContext,
-  discoverHostGitHubToken,
+  discoverGitHubToken,
   forgetWorkspaceSecretContext,
   getWorkspaceSecretContext,
-  hasWorkspaceGitHubToken,
-  setWorkspaceGitHubToken,
+  hasGitHubToken,
+  setGitHubToken,
   type WorkspaceSecretContext,
 } from "../secrets/workspace-secrets.ts";
 export { HttpRequestBlockedError } from "../secrets/errors.ts";

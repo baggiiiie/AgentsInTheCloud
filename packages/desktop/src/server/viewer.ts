@@ -19,8 +19,8 @@ function viewerAssets() {
 }
 
 function renderDesktopStatus(status: DesktopStatus): string {
-  const label = status.phase === "running" ? "Connecting" : status.phase === "starting" ? "Starting desktop" : status.phase === "failed" ? "Desktop failed" : "Desktop stopped";
-  const detail = status.phase === "failed" ? status.error : status.phase === "stopped" ? "Open Desktop from the Work menu to start it." : "";
+  const label = status.phase === "running" ? "Connecting" : status.phase === "starting" ? "Starting Desktop" : status.phase === "failed" ? "Desktop failed" : "Desktop stopped";
+  const detail = status.phase === "failed" ? status.error : status.phase === "stopped" ? "Open Desktop to start it." : "";
   return `<div data-phase="${status.phase}"><span class="desktop-status-label"><i class="status-dot ${status.phase === "failed" ? "danger" : status.phase === "stopped" ? "" : "running"}" aria-hidden="true"></i>${label}</span>${detail ? `<span class="desktop-status-detail">${escapeHtml(detail)}</span>` : ""}</div>`;
 }
 
@@ -33,6 +33,6 @@ export async function desktopViewerResponse(url: URL, status: () => Promise<Desk
   return response(`<!doctype html><html lang="en" data-theme="${escapeHtml(url.searchParams.get("theme") ?? "")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Desktop</title><style>${(await viewerAssets()).css}</style><script type="module" src="/desktop-client.js"></script></head>
 <body data-controller="desktop" data-action="pagehide@window->desktop#disconnect message@window->desktop#receive">
   <div data-desktop-target="runtime" hidden>${renderDesktopStatus(current)}</div>
-  <div class="desktop-screen" data-desktop-target="screen" aria-label="Workspace desktop"></div>
+  <div class="desktop-screen" data-desktop-target="screen" aria-label="Desktop screen"></div>
 </body></html>`);
 }

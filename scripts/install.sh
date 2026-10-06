@@ -561,8 +561,8 @@ case "$action" in
     if [ "$installed" -eq 0 ] && [ -z "$access_mode" ]; then
       if [ "$desktop" -eq 1 ]; then access_mode=localhost; else access_mode=tailscale; fi
       finish_line
-      local_caption="This computer only — Tailscale stays off"
-      remote_caption="Via Tailscale — use AgentsInTheCloud from any device on your tailnet"
+      local_caption="Installation computer only — Tailscale stays off"
+      remote_caption="Devices on your Tailscale network — including the installation computer"
       if [ "$access_mode" = localhost ]; then
         first_caption="$local_caption"; second_caption="$remote_caption"; alternate_mode=tailscale
       else
@@ -580,7 +580,7 @@ case "$action" in
     fi
     stop_on_failure=1
     run_quiet "Starting AgentsInTheCloud services" docker run -d --name "$system_name" --hostname agents-in-the-cloud-system --privileged --cgroupns=host --restart unless-stopped \
-      --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1::3080 \
+      --stop-timeout 120 --tmpfs /run --mount source=agents-in-the-cloud-system,target=/data --publish 127.0.0.1:3080:3080 \
       "$system_image" --app-image "$app_image" --access-mode "${access_mode:-tailscale}"
     ;;
   connect)

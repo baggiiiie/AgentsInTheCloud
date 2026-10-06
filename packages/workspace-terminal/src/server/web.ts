@@ -7,7 +7,7 @@ import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { domId, escapeHtml, turboStream, type WorkspaceCommandContribution, type WorkspaceModule, type WorkspaceWorkViewPresentation, type WorkspaceWorkViewReference } from "@agents-in-the-cloud/shared";
 import { terminalViewKey } from "../shared.ts";
 import { createTmuxPresenter } from "./agent-tool.ts";
-import { renderTerminalPane } from "./render.ts";
+import { renderTerminalView } from "./render.ts";
 import { createTerminalSocketHandler } from "./sockets.ts";
 import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
 import { attachWorkspaceTerminal, createWorkspaceTerminal, deleteWorkspaceTerminal, listTmuxSessions, listWorkspaceTerminals, type WorkspaceTerminal } from "./workspace-terminals.ts";
@@ -45,7 +45,7 @@ const terminalWorkspaceCommands: WorkspaceCommandContribution[] = [
   },
   {
     id: "terminal.attach",
-    label: "Attach Terminal",
+    label: "Attach to tmux session",
     description: "Open a Terminal view attached to an existing tmux session",
     scope: "workspace",
     surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Terminal } },
@@ -101,11 +101,11 @@ async function renderAttachDialog(workspaceId: string): Promise<string> {
       attributesHtml: 'data-dialog-auto-show',
     },
     iconHtml: Icons.Terminal,
-    titleCaption: "Attach terminal",
+    titleCaption: "Attach to tmux session",
     bodyHtml,
     bodyLayout: "full-bleed",
     footerHtml,
-    closeLabel: "Close attach terminal dialog",
+    closeLabel: "Close attach to tmux session dialog",
   });
 }
 
@@ -117,8 +117,8 @@ export const terminalWorkspaceModule: WorkspaceModule = {
     identity: (reference: { type: "terminal"; terminalId: string }) => reference.terminalId,
     render: async ({ workspaceId, reference }: { workspaceId: string; reference: TerminalWorkViewReference }) => {
       const terminal = (await listWorkspaceTerminals(workspaceId)).find((candidate) => candidate.id === reference.terminalId);
-      if (!terminal) throw new Error(`Terminal Work view not found: ${reference.terminalId}`);
-      return renderTerminalPane(workspaceId, terminal);
+      if (!terminal) throw new Error(`Terminal view not found: ${reference.terminalId}`);
+      return renderTerminalView(workspaceId, terminal);
     },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: { type: "terminal"; terminalId: string } }) => deleteWorkspaceTerminal(workspaceId, reference.terminalId),
   }],

@@ -6,7 +6,7 @@ Choose the simplest format that explains the answer well:
 - Use a normal fenced `mermaid` block when labeled nodes and connections adequately explain a static structure or process. Do not make an HTML file for that diagram.
 - Use an HTML fragment for charts, spatial illustrations, meaningful visual layouts, adjustable inputs, and other interaction.
 - Do not decorate ordinary prose, recreate a Markdown table, or wrap a Mermaid diagram in HTML. Split oversized diagrams instead of relying on fullscreen.
-- Inline content is part of your answer, not a website. Preview independently styled deliverables with `artifact-preview:` and applications with a Browser Work view instead.
+- Inline content is part of your answer, not a website. Preview independently styled deliverables with `artifact-preview:` and applications with a Browser view instead.
 
 ## File-only output
 

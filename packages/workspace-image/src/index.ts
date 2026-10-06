@@ -1,9 +1,8 @@
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { requireDocker, runDocker, waitForCommand, commandSignal, workloadBuildArgs, shellQuote, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { join } from "node:path";
+import { runDocker, waitForCommand, commandSignal, workloadCgroupArgs, shellQuote, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { runHostObservableCommand, tailTerminalText } from "@agents-in-the-cloud/observable-terminal/server";
 import { errorMessage } from "@agents-in-the-cloud/shared";
 import { type WorkspaceImageMetadata } from "./metadata.ts";
@@ -11,7 +10,10 @@ import { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } fr
 export { ensureGeneratedDefaultWorkspaceImage, prepareDefaultWorkspaceImage } from "./default-image.ts";
 import { pruneSupersededWorkspaceImages, workspaceImageKindLabel, type WorkspaceImageKind } from "./prune.ts";
 import { dockerImageStoreQueue, workspaceImageStoreWaitReporter } from "./image-store-queue.ts";
-import { dockerServerPlatform, nativeImageExists as imageExists, reuseDefaultWorkspaceImage } from "./local-images.ts";
+import { buildRepositoryImage } from "./repository-builder.ts";
+import { dockerImageId, dockerServerPlatform, nativeImageExists as imageExists, reuseDefaultWorkspaceImage } from "./local-images.ts";
+
+type WorkspaceImageBuildSource = { kind: "default" } | { kind: "repository"; baseImage: string };
 
 interface WorkspaceImageBuildTask {
   tag: string;
@@ -32,11 +34,7 @@ export interface ResolveWorkspaceImageOptions {
 
 const maxBuildOutputChars = 64 * 1024;
 const buildTasks = new Map<string, WorkspaceImageBuildTask>();
-const defaultImageRefFile = join(repoRoot(), ".agents-in-the-cloud-default-workspace-image");
-
-function repoRoot(): string {
-  return join(dirname(fileURLToPath(import.meta.url)), "../../..");
-}
+const defaultImageRefFile = new URL("../../../.agents-in-the-cloud-default-workspace-image", import.meta.url);
 
 function namespaceSlug(): string {
   return (process.env.ATELIER_NAMESPACE || "host").replaceAll(/[^a-zA-Z0-9_.-]/g, "-");
@@ -69,7 +67,8 @@ async function reportImageProgress(events: AgentsInTheCloudEventBus | undefined,
 async function dockerBuildArgs(tag: string, kind: WorkspaceImageKind, dockerfile: string, contextDir: string, options: ResolveWorkspaceImageOptions): Promise<string[]> {
   return [
     "build",
-    ...await workloadBuildArgs(),
+    ...(kind === "default" ? await workloadCgroupArgs() : []),
+    "--builder", "default",
     ...(options.buildOutput === "inherit" ? ["--progress=plain"] : []),
     ...(process.env.ATELIER_WORKSPACE_IMAGE_NO_CACHE === "1" ? ["--no-cache"] : []),
     "--label", `${workspaceImageKindLabel}=${kind}`,
@@ -79,7 +78,9 @@ async function dockerBuildArgs(tag: string, kind: WorkspaceImageKind, dockerfile
   ];
 }
 
-function startBuildTask(tag: string, modules: string[], kind: WorkspaceImageKind, dockerfile: string, contextDir: string, options: ResolveWorkspaceImageOptions): WorkspaceImageBuildTask {
+function startBuildTask(metadata: WorkspaceImageMetadata, source: WorkspaceImageBuildSource, dockerfile: string, contextDir: string, options: ResolveWorkspaceImageOptions): WorkspaceImageBuildTask {
+  const { kind } = source;
+  const { tag, modules } = metadata;
   const existing = buildTasks.get(tag);
   if (existing) return existing;
 
@@ -90,23 +91,27 @@ function startBuildTask(tag: string, modules: string[], kind: WorkspaceImageKind
   }, async () => {
     const buildStartedAt = new Date();
     const args = await dockerBuildArgs(tag, kind, dockerfile, contextDir, options);
-    if (options.buildOutput === "inherit") {
-      const proc = Bun.spawn(["docker", ...args], { cwd: contextDir, env: { ...process.env, DOCKER_BUILDKIT: "1" }, stdout: "inherit", stderr: "inherit", stdin: "inherit" });
-      const exitCode = await proc.exited;
-      if (exitCode !== 0) throw new Error(`docker build failed with exit code ${exitCode}`);
-    } else {
-      const result = await runHostObservableCommand({
-        session: `agents-in-the-cloud-provision-image-${crypto.randomUUID().slice(0, 8)}`,
-        cwd: contextDir,
-        command: `echo "Starting Docker image build..."\nDOCKER_BUILDKIT=1 docker ${args.map(shellQuote).join(" ")}`,
-        onSessionStarted: async (session) => {
-          task.session = session;
-          await reportImageProgress(options.events, options.workspaceId, task);
-        },
-      });
-      task.output = tailTerminalText(result.output.slice(-maxBuildOutputChars));
-      if (result.exitCode !== 0) throw new Error(`docker build failed with exit code ${result.exitCode}`);
-    }
+    const build = async (dockerCommand: string[]) => {
+      if (options.buildOutput === "inherit") {
+        const proc = Bun.spawn([...dockerCommand, ...args], { cwd: contextDir, env: { ...process.env, DOCKER_BUILDKIT: "1" }, stdout: "inherit", stderr: "inherit", stdin: "ignore", signal: commandSignal() });
+        const exitCode = await proc.exited;
+        if (exitCode !== 0) throw new Error(`docker build failed with exit code ${exitCode}`);
+      } else {
+        const result = await runHostObservableCommand({
+          session: `agents-in-the-cloud-provision-image-${crypto.randomUUID().slice(0, 8)}`,
+          cwd: contextDir,
+          command: `echo "Starting Docker image build..."\nDOCKER_BUILDKIT=1 ${[...dockerCommand, ...args].map(shellQuote).join(" ")}`,
+          onSessionStarted: async (session) => {
+            task.session = session;
+            await reportImageProgress(options.events, options.workspaceId, task);
+          },
+        });
+        task.output = tailTerminalText(result.output.slice(-maxBuildOutputChars));
+        if (result.exitCode !== 0) throw new Error(`docker build failed with exit code ${result.exitCode}`);
+      }
+    };
+    if (source.kind === "repository") await buildRepositoryImage(source.baseImage, tag, build);
+    else await build(["docker"]);
     pruneSupersededWorkspaceImages(kind, buildStartedAt);
   }).finally(() => {
     buildTasks.delete(tag);
@@ -144,13 +149,6 @@ async function inspectDefaultWorkspaceImage(): Promise<string | undefined> {
   finally { await context.dispose(); }
 }
 
-async function ensureBuiltImage(contextDir: string, dockerfile: string, metadata: WorkspaceImageMetadata, kind: WorkspaceImageKind, options: ResolveWorkspaceImageOptions = {}): Promise<string> {
-  if (process.env.ATELIER_WORKSPACE_IMAGE_NO_CACHE !== "1" && await imageExists(metadata.tag)) return metadata.tag;
-  const task = startBuildTask(metadata.tag, metadata.modules, kind, dockerfile, contextDir, options);
-  await waitForBuildTask(task, options);
-  return metadata.tag;
-}
-
 export async function ensureDefaultWorkspaceImage(options: ResolveWorkspaceImageOptions = {}): Promise<string> {
   const baked = await bakedDefaultWorkspaceImageRef();
   if (baked) {
@@ -165,14 +163,9 @@ export async function ensureDefaultWorkspaceImage(options: ResolveWorkspaceImage
         const signature = metadata.tag.slice("agents-in-the-cloud-workspace:".length);
         throw new Error(`Inner AgentsInTheCloud needs a default workspace image with signature ${signature} but that has not been preloaded. Exiting instead of building this image, so we do not flood the outer agents-in-the-cloud with many parallel image builds.`);
       }
-      await waitForBuildTask(startBuildTask(metadata.tag, metadata.modules, "default", dockerfile, contextDir, options), options);
+      await waitForBuildTask(startBuildTask(metadata, { kind: "default" }, dockerfile, contextDir, options), options);
     },
   });
-}
-
-async function assertWorkspaceDockerfileBase(dockerfile: string): Promise<void> {
-  const firstLine = (await readFile(dockerfile, "utf8")).split("\n")[0].trim();
-  if (firstLine !== "FROM agents-in-the-cloud-workspace") throw new Error(`${dockerfile} must start with FROM agents-in-the-cloud-workspace`);
 }
 
 function splitDockerfileInstructions(dockerfile: string): string[] {
@@ -227,25 +220,17 @@ async function optimizedRepoDockerfile(sourcePath: string, dockerfile: string): 
 
 export function repositoryWorkspaceImageTag(baseImage: string, dockerfileContents: string | Uint8Array): string {
   const hash = createHash("sha256");
-  hash.update("agents-in-the-cloud-repo-workspace-dockerfile-v5\n");
+  // Do not reuse repository images produced before builder isolation.
+  hash.update("agents-in-the-cloud-repo-workspace-dockerfile-v6\n");
   hash.update(baseImage); hash.update("\0");
   hash.update(dockerfileContents); hash.update("\0");
   return `agents-in-the-cloud-workspace:${hash.digest("hex").slice(0, 16)}`;
 }
 
 async function repoWorkspaceImageMetadata(dockerfile: string, baseImage: string): Promise<WorkspaceImageMetadata> {
-  await assertWorkspaceDockerfileBase(dockerfile);
-  return { tag: repositoryWorkspaceImageTag(baseImage, await readFile(dockerfile)), modules: ["repo"] };
-}
-
-async function tagAgentsInTheCloudWorkspaceBase(baseImage: string): Promise<void> {
-  const result = await dockerImageStoreQueue.run({ label: "Tagging the workspace base image" }, () => runDocker(["tag", baseImage, "agents-in-the-cloud-workspace"]));
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || `docker tag ${baseImage} agents-in-the-cloud-workspace failed`);
-}
-
-async function dockerImageId(ref: string): Promise<string> {
-  const inspected = await requireDocker(["image", "inspect", "--format", "{{.Id}}", ref]);
-  return inspected.stdout.trim();
+  const contents = await readFile(dockerfile);
+  if (contents.toString("utf8").split("\n")[0].trim() !== "FROM agents-in-the-cloud-workspace") throw new Error(`${dockerfile} must start with FROM agents-in-the-cloud-workspace`);
+  return { tag: repositoryWorkspaceImageTag(baseImage, contents), modules: ["repo"] };
 }
 
 export async function workspaceDockerfile(sourcePath: string, override?: string): Promise<string> {
@@ -282,8 +267,9 @@ export async function resolveWorkspaceImage(options: ResolveWorkspaceImageOption
   if (!(await Bun.file(dockerfile).exists())) return baseImage;
 
   const metadata = await repoWorkspaceImageMetadata(dockerfile, baseImage);
+  if (process.env.ATELIER_WORKSPACE_IMAGE_NO_CACHE !== "1" && await imageExists(metadata.tag)) return metadata.tag;
   const buildDockerfile = await optimizedRepoDockerfile(options.sourcePath, dockerfile);
-  await tagAgentsInTheCloudWorkspaceBase(baseImage);
-  const image = await ensureBuiltImage(options.sourcePath, buildDockerfile, metadata, "repository", options);
-  return image;
+  const task = startBuildTask(metadata, { kind: "repository", baseImage }, buildDockerfile, options.sourcePath, options);
+  await waitForBuildTask(task, options);
+  return metadata.tag;
 }

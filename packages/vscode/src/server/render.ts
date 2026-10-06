@@ -5,10 +5,10 @@ export function vscodeViewKey(title: string): string {
   return `vscode:${title}`;
 }
 
-export function renderVSCodePane(workspaceId: string, title: string): string {
+export function renderVSCodeView(workspaceId: string, title: string): string {
   const key = vscodeViewKey(title);
   const escapedWorkspaceId = escapeHtml(workspaceId);
-  return `<div id="${domId("vscode_pane", workspaceId, title)}" data-turbo-permanent class="vscode-work-view" data-work-view-source="${escapeHtml(key)}">
+  return `<div id="${domId("vscode_view", workspaceId, title)}" data-turbo-permanent class="vscode-work-view" data-work-view-source="${escapeHtml(key)}">
     <div class="vscode-frame-shell vscode-loading">
       <iframe class="vscode-frame" data-controller="workspace-app-frame vscode-starting" data-workspace-app-frame-workspace-id-value="${escapedWorkspaceId}" data-workspace-app-frame-app-key-value="vscode" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen title="VS Code"></iframe>
       <div class="vscode-starting-screen" aria-live="polite">
@@ -22,7 +22,7 @@ export function renderVSCodePane(workspaceId: string, title: string): string {
 }
 
 export function renderVSCodeNavigationSignal(workspaceId: string): string {
-  // Live workspace morphs must not drop a navigation that is still waiting for its pane.
+  // Live workspace morphs must not drop a navigation that is still waiting for its view.
   return `<span id="${domId("vscode_navigation", workspaceId)}" data-turbo-permanent hidden></span>`;
 }
 
@@ -45,5 +45,5 @@ export function vscodeFileNavigationStream(workspaceId: string, title: string, t
   });
   if (gotoLine) query.set("agentsInTheCloudGotoLine", "1");
   return turboStream("update", domId("vscode_navigation", workspaceId),
-    `<span data-controller="vscode-navigate" data-vscode-navigate-pane-id-value="${domId("vscode_pane", workspaceId, title)}" data-vscode-navigate-path-value="${escapeHtml(`/?${query}`)}" data-vscode-navigate-delivered-value="${delivered}"></span>`);
+    `<span data-controller="vscode-navigate" data-vscode-navigate-view-id-value="${domId("vscode_view", workspaceId, title)}" data-vscode-navigate-path-value="${escapeHtml(`/?${query}`)}" data-vscode-navigate-delivered-value="${delivered}"></span>`);
 }

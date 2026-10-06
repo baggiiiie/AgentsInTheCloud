@@ -16,8 +16,8 @@ export async function nativeSnapshot(workspaceId: string) {
   }, context);
   return { agents, messages: Object.values((await owner.harness.snapshot(Delegation, context))?.receipts ?? {}) };
 }
-export type NativeAgentView = Awaited<ReturnType<typeof nativeSnapshot>>["agents"][number];
-export function viewPath(agents: readonly NativeAgentView[], id: string): string {
+export type NativeSubagentView = Awaited<ReturnType<typeof nativeSnapshot>>["agents"][number];
+export function viewPath(agents: readonly NativeSubagentView[], id: string): string {
   const agent = agents.find(item => item.id === id);
   return agent ? `${viewPath(agents, agent.parentId)}/${agent.taskName}` : "/root";
 }

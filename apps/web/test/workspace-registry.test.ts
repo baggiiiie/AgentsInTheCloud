@@ -40,6 +40,27 @@ describe("phase-owned workspace activity", () => {
     expect(registry.get("a")!.phase.busy).toBe(false);
     expect(() => registry.setAgentBusy("a", "terminal:one", true)).toThrow("Not an agent");
   });
+  test.each([
+    { status: "blocked", fingerprint: "changes" },
+    { status: "failed", operation: "deleting", forced: false, error: "disk" },
+  ] as const)("active destruction rejects attention until deletion becomes $status", async (decision) => {
+    const { registry, attentionStore } = await setup();
+    registry.setAgentBusy("a", "agent:first", true);
+    registry.setDeletion("a", { status: "deleting", forced: false });
+
+    // Agent teardown still ends its turn; deletion owns workspace activity.
+    registry.setAgentBusy("a", "agent:first", false);
+    registry.requestAttention("a");
+    expect(registry.get("a")!.phase.busy).toBe(true);
+    expect(registry.get("a")!.requestingAttention).toBe(false);
+    expect(registry.get("a")!.attentionAt).toBeUndefined();
+    expect((await attentionStore.load()).workspaces).toEqual({});
+
+    registry.setDeletion("a", decision);
+    expect(registry.get("a")!.phase.busy).toBe(false);
+    expect(registry.get("a")!.requestingAttention).toBe(true);
+    expect((await attentionStore.load()).workspaces.a).toBeDefined();
+  });
   test("deletion exclusively owns busy state even with busy agents", async () => {
     const { registry } = await setup();
     registry.setAgentBusy("a", "agent:first", true);
@@ -246,4 +267,29 @@ test("parked workspaces sort after active workspaces regardless of attention or 
   expect(registry.list().map(({ id }) => id)).toEqual(["b", "a"]);
   registry.setParked("a", false);
   expect(registry.list().map(({ id }) => id)).toEqual(["a", "b"]);
+});
+
+test("active workspaces without attention sort idle before busy, then by recent activity", async () => {
+  let clock = 100;
+  const registry = createWorkspaceRegistry({ now: () => clock++ });
+  await registry.seed(["idle-old", "idle-new", "busy-old", "busy-new"].map((id) => ({ id, title: id })));
+  for (const id of ["idle-old", "idle-new", "busy-old", "busy-new"]) registry.touch(id);
+  registry.setAgentBusy("busy-old", "agent:first", true);
+  registry.setAgentBusy("busy-new", "agent:first", true);
+  expect(registry.list().map(({ id }) => id)).toEqual(["idle-new", "idle-old", "busy-new", "busy-old"]);
+
+  registry.setAgentBusy("busy-new", "agent:first", false);
+  expect(registry.list().map(({ id }) => id)).toEqual(["busy-new", "idle-new", "idle-old", "busy-old"]);
+
+  registry.requestAttention("busy-old");
+  expect(registry.list().map(({ id }) => id)).toEqual(["busy-old", "busy-new", "idle-new", "idle-old"]);
+});
+
+test("busy-last ordering does not change the order within parked workspaces", async () => {
+  const { registry } = await setup();
+  registry.setAgentBusy("b", "agent:first", true);
+  registry.touch("b");
+  registry.setParked("a", true);
+  registry.setParked("b", true);
+  expect(registry.list().map(({ id }) => id)).toEqual(["b", "a"]);
 });

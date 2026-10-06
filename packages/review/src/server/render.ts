@@ -82,7 +82,7 @@ export function renderFileSummary(label: ActionItemLabel, metaHtml: string, titl
 }
 
 function anchoredCommentsFor(comments: ReviewComment[], path: string): ReviewComment[] {
-  return comments.filter((comment) => comment.path === path && !comment.outdated);
+  return comments.filter((comment) => comment.path === path && !comment.unanchored);
 }
 
 export function reviewFileFrameId(workspaceId: string, path: string): string {
@@ -148,7 +148,7 @@ export async function renderReadOnlyReviewFile(frameId: string, file: ReviewFile
   return `<turbo-frame id="${escapeHtml(frameId)}"><div class="review-file-diff">${body}</div></turbo-frame>`;
 }
 
-function renderUnanchoredComment(workspaceId: string, comment: ReviewComment): string {
+function renderUnanchoredReviewComment(workspaceId: string, comment: ReviewComment): string {
   const deleteButton = buttonHtml({
     type: "submit",
     variant: "secondary",
@@ -157,7 +157,7 @@ function renderUnanchoredComment(workspaceId: string, comment: ReviewComment): s
   return `<div class="review-unanchored-entry"><div class="review-unanchored-context"><strong>${escapeHtml(comment.path)}</strong><pre>${escapeHtml(comment.snippet)}</pre></div><article class="review-inline-comment"><form data-review-comment-close method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/review/comments/${encodeURIComponent(comment.id)}/delete" data-turbo="true">${deleteButton}</form><div class="review-comment-content"><p>${escapeHtml(comment.body)}</p></div></article></div>`;
 }
 
-function reviewUnanchoredId(workspaceId: string): string {
+function unanchoredReviewCommentsId(workspaceId: string): string {
   return domId("review", workspaceId, "unanchored");
 }
 
@@ -165,13 +165,13 @@ function reviewCommentsModelId(workspaceId: string): string {
   return domId("review", workspaceId, "comments_model");
 }
 
-function renderUnanchoredSlot(workspaceId: string, comments: ReviewComment[]): string {
-  const summary = renderFileSummary({ kind: "text", text: "Comments without anchors" }, renderCommentCount(comments.length));
-  const file = comments.length ? `<details class="review-file" data-review-target="file" data-review-path="comments-without-anchors" data-review-comments="${comments.length}" data-action="focusin->review#selectFile focusout->review#deselectFile">
+function renderUnanchoredReviewComments(workspaceId: string, comments: ReviewComment[]): string {
+  const summary = renderFileSummary({ kind: "text", text: "Unanchored Review comments" }, renderCommentCount(comments.length));
+  const file = comments.length ? `<details class="review-file" data-review-target="file" data-review-path="unanchored-review-comments" data-review-comments="${comments.length}" data-action="focusin->review#selectFile focusout->review#deselectFile">
     ${summary}
-    <div class="review-file-diff review-unanchored-comments">${comments.map((comment) => renderUnanchoredComment(workspaceId, comment)).join("")}</div>
+    <div class="review-file-diff review-unanchored-comments">${comments.map((comment) => renderUnanchoredReviewComment(workspaceId, comment)).join("")}</div>
   </details>` : "";
-  return `<div id="${reviewUnanchoredId(workspaceId)}">${file}</div>`;
+  return `<div id="${unanchoredReviewCommentsId(workspaceId)}">${file}</div>`;
 }
 
 function iconButton(label: string, action: string, iconHtml: string, disabled = false): string {
@@ -225,7 +225,7 @@ function toolbar(workspaceId: string, comments: ReviewComment[], settings: Revie
     name: "review-diff-layout",
     value: settings.desktop,
     form: { action: "/review/settings/diff-layout?viewport=desktop", dataAction: "change->review#setDiffLayout" },
-    options: [{ label: "Unified", value: "unified" }, { label: "Side by side", value: "split" }],
+    options: [{ label: "Unified", value: "unified" }, { label: "Side-by-side", value: "side-by-side" }],
   });
   const diffHighlighting = toggleHtml({
     variant: "text-subtle",
@@ -288,9 +288,9 @@ export function renderReviewBody(workspaceId: string, index: ReviewIndex, commen
     return `<section id="${reviewBodyId(workspaceId)}" class="review-body review-empty" data-mobile-diff-layout="${settings.mobile}" data-desktop-diff-layout="${settings.desktop}" data-diff-highlighting="${settings.highlighting}" data-diff-overflow="${settings.overflow}" data-controller="review" data-review-workspace-id-value="${escapeHtml(workspaceId)}"><p>No git repo in /work yet</p></section>`;
   }
 
-  const unanchoredComments = comments.filter((comment) => comment.outdated);
+  const unanchoredComments = comments.filter((comment) => comment.unanchored);
   const content = index.files.length || unanchoredComments.length
-    ? `<div class="review-files action-list" data-controller="linear-navigation" data-action="keydown->review#changeFileDisclosure">${renderReviewFilePage(workspaceId, index, comments, 0, stats)}${renderUnanchoredSlot(workspaceId, unanchoredComments)}</div>`
+    ? `<div class="review-files action-list" data-controller="linear-navigation" data-action="keydown->review#changeFileDisclosure">${renderReviewFilePage(workspaceId, index, comments, 0, stats)}${renderUnanchoredReviewComments(workspaceId, unanchoredComments)}</div>`
     : `<div class="review-no-changes"><p>No changes to review<br>The working tree matches HEAD.</p></div>`;
   return `<section id="${reviewBodyId(workspaceId)}" class="review-body" data-controller="review" data-review-workspace-id-value="${escapeHtml(workspaceId)}" data-mobile-diff-layout="${settings.mobile}" data-desktop-diff-layout="${settings.desktop}" data-diff-highlighting="${settings.highlighting}" data-diff-overflow="${settings.overflow}">${toolbar(workspaceId, comments, settings)}${content}${renderCommentsModel(workspaceId, comments)}</section>`;
 }

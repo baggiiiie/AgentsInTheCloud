@@ -280,6 +280,7 @@ export interface SettingsActionContext {
   url: URL;
 }
 
+/** A section of app-level Settings, distinct from template configuration and per-Agent choices. */
 export interface SettingsContribution {
   id: string;
   label: string;

@@ -24,9 +24,14 @@ Send these headers for JSON operations:
 ```http
 Accept: application/json
 Content-Type: application/json
+Origin: http://localhost:3000
 ```
 
-Errors use `{ "error": { "code": "...", "message": "..." } }`.
+Mutations and WebSocket upgrades require `Origin` to match the destination's public origin (scheme, hostname, and port). Use `http://localhost:3000` when accessing localhost, or your actual Tailscale URL, such as `https://machine.tailnet.ts.net`. Origins are resolved per request; no allowlist is needed. Missing, foreign, and `null` origins return a plain-text `403` before dispatch. Other application errors use `{ "error": { "code": "...", "message": "..." } }`.
+
+The check uses the request URL's hostname and port, not forwarded-host/public-origin metadata. Only loopback connections may supply `X-Forwarded-Proto` (`http` or `https`) for TLS termination. Nested ingress translates same-origin requests and preserves foreign-origin denials.
+
+This is CSRF protection, not authentication. Keep management unreachable from untrusted containers and untrusted HTML on separate origins or opaque-origin sandboxes. Token-authenticated agent MCP and turn-boundary endpoints retain their separate policy.
 
 ## Present a workspace
 
@@ -49,9 +54,9 @@ Workspace template settings has a browser-navigable surface that agents can pass
 /workspace-templates/:workspaceTemplateId/settings?section=environment
 ```
 
-Supported sections are `index`, `general`, `secrets`, `ssh`, `environment`, and `container`. The index lists the five settings sections; each section opens a focused page in the complete AgentsInTheCloud shell. Use `editor=new` or a record ID for Secrets, SSH keys, or Environment, and `editor=docker`, `images`, or `dockerfile` for Container. Legacy section links (`repository`, `ssh-keys`, `privileged`, `dockerfile`, `preload-images`, and `danger`) still resolve to their corresponding pages.
+Supported sections are `index`, `general`, `secrets`, `ssh`, `environment`, and `container`. The index lists the five settings sections; each section opens a focused page in the complete AgentsInTheCloud shell. Use `editor=new` or a record ID for Secrets, SSH keys, or Environment Variables, and `editor=docker`, `images`, or `dockerfile` for Container. Legacy section links (`repository`, `ssh-keys`, `privileged`, `dockerfile`, `preload-images`, and `danger`) still resolve to their corresponding pages.
 
-Use `GET /workspace-templates` with `Accept: application/json` to discover the template ID before constructing the presentation URL.
+Use `GET /workspace-templates` with `Accept: application/json` to discover the template ID before constructing the presentation URL. Template environment-variable, secret, and SSH-key summaries identify their template with `workspaceTemplateId`. Existing storage filenames and serialized formats are unchanged; their older `project` spellings remain at storage boundaries.
 
 Other browser-navigable surfaces are:
 
@@ -60,13 +65,22 @@ Other browser-navigable surfaces are:
 /workspace-templates/:workspaceTemplateId/workspaces/new  # Launch composer for a workspace from a template
 /workspace-templates/new                                  # Add a template
 /models                                 # Models: Model providers, their usage, and enabled models
-/settings                               # AgentsInTheCloud settings
+/settings                               # Settings: app-level preferences and shared configuration
 /settings?section=models                # A specific settings section
 /settings/development                   # Development settings
+/host                                   # Host: System diagnostics and privileged terminals
 /design-system-catalogue.html           # Live component catalogue (HTML)
 ```
 
-The settings section is a registered settings contribution ID, such as `theme`, `git-identity`, `github`, `models`, `transcription`, or `update`.
+Host targets AgentsInTheCloud System, outside individual Workspaces, rather than necessarily the physical machine running Docker. `GET /host` with `Accept: application/json` reports availability and the access boundary; it does not create a terminal.
+
+The `access` section controls **Connection mode** in a System-managed installation: **Installation computer only** or **Devices on your Tailscale network**. The existing access API spelling is unchanged.
+
+**Commit identity** uses section `commit-identity` and POST `/settings/commit-identity` with `commitAuthorName` and `commitAuthorEmail`. Existing `git-identity` section links and POST `/settings/git-identity` remain valid.
+
+The `update` section is **Updates**, the feature for managing AgentsInTheCloud installation Updates. It is separate from Workspace package and agent CLI updates.
+
+Settings is app-level, not configuration for the selected Workspace, a Workspace template, or an individual Agent. The GitHub connection is shared across Workspaces; its GitHub token is distinct from the Commit identity used to author commits. The settings section is a registered settings contribution ID, such as `theme`, `commit-identity`, `github`, `models`, `dictation`, or `update`.
 
 ## Create and wait for a workspace
 
@@ -77,6 +91,7 @@ when AgentsInTheCloud runs behind a TLS-terminating proxy:
 
 ```sh
 created=$(curl -sS -X POST http://localhost:3000/workspaces \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"source":{"type":"empty"},"title":"Evaluation"}')
 id=$(jq -r '.workspace.id' <<<"$created")
@@ -121,18 +136,21 @@ Execute commands using their advertised schema:
 
 ```sh
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/terminal.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"title":"Tests","cwd":"/work","command":"bun test"}'
 
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/browser.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' \
   -d '{"url":"http://localhost:3000/"}'
 
 curl -sS -X POST "http://localhost:3000/workspaces/$id/commands/agent.create" \
+  -H 'Origin: http://localhost:3000' \
   -H 'Accept: application/json' -H 'Content-Type: application/json' -d '{}'
 ```
 
-Navigate an existing Browser Work view with `POST /workspaces/:id/browser/:browserId/navigate` and `{ "url": "..." }`.
+Navigate an existing Browser view with `POST /workspaces/:id/browser/:browserId/navigate` and `{ "url": "..." }`.
 
 ## Arrange Work views
 
@@ -143,10 +161,10 @@ Navigate an existing Browser Work view with `POST /workspaces/:id/browser/:brows
 Open Work-view identity and order are server-persistent. Workspace, agent, and view `requestingAttention` states are independent and server-persistent; each clears only when that destination becomes visible. Workspace `phase` is an object with `kind` and `busy`, plus phase-specific substates. Agent summaries include `busy` and `requestingAttention`. Active destinations, pane visibility, and Work-pane width are browser-local.
 
 The Agent `/park` message responds with a `307` redirect to the workspace park operation.
-Follow redirects while preserving the POST method and Accept header (for example, `curl -L`).
+Follow same-origin redirects while preserving the POST method, Accept, and Origin headers (for example, `curl -L`).
 Confirmation is returned only to that requester; JSON clients receive `409` when confirmation is needed.
 
-Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park, unpark, and delete use the corresponding existing workspace UI routes with `Accept: application/json`.
+Rename with `POST /workspaces/:id/sidebar-title` and `{ "title": "..." }`. Park, unpark, and delete use the corresponding existing workspace UI routes with `Accept: application/json` and a matching `Origin` header.
 
 ## Control an agent
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { clearWorkspaceGitHubToken, discoverHostGitHubToken, gitHubCredentialHelperShellBody, hasWorkspaceGitHubToken, setWorkspaceGitHubToken } from "../src/github-token.ts";
+import { clearGitHubToken, discoverGitHubToken, gitHubCredentialHelperShellBody, hasGitHubToken, setGitHubToken } from "../src/github-token.ts";
 
 async function runCredentialHelper(input: string): Promise<string> {
   const proc = Bun.spawn(["sh", "-c", gitHubCredentialHelperShellBody, "agents-in-the-cloud-git-credential", "get"], {
@@ -32,7 +32,7 @@ describe("GitHub token discovery", () => {
   });
 
   afterEach(async () => {
-    clearWorkspaceGitHubToken();
+    clearGitHubToken();
     if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
     else process.env.ATELIER_DATA_DIR = previousDataDir;
     if (previousGitHubToken === undefined) delete process.env.GH_TOKEN;
@@ -42,29 +42,29 @@ describe("GitHub token discovery", () => {
 
   test("uses stored token before environment token", () => {
     process.env.GH_TOKEN = "env-token";
-    setWorkspaceGitHubToken("stored-token");
+    setGitHubToken("stored-token");
 
-    expect(discoverHostGitHubToken()).toBe("stored-token");
-    expect(hasWorkspaceGitHubToken()).toBe(true);
+    expect(discoverGitHubToken()).toBe("stored-token");
+    expect(hasGitHubToken()).toBe(true);
   });
 
   test("falls back to GH_TOKEN when no token is stored", () => {
     process.env.GH_TOKEN = " env-token ";
 
-    expect(discoverHostGitHubToken()).toBe("env-token");
-    expect(hasWorkspaceGitHubToken()).toBe(true);
+    expect(discoverGitHubToken()).toBe("env-token");
+    expect(hasGitHubToken()).toBe(true);
   });
 
   test("disconnect suppresses a discovered GH_TOKEN until a token is connected again", () => {
     process.env.GH_TOKEN = "env-token";
 
-    clearWorkspaceGitHubToken();
-    expect(discoverHostGitHubToken()).toBeUndefined();
-    expect(hasWorkspaceGitHubToken()).toBe(false);
+    clearGitHubToken();
+    expect(discoverGitHubToken()).toBeUndefined();
+    expect(hasGitHubToken()).toBe(false);
 
-    setWorkspaceGitHubToken("reconnected-token");
-    expect(discoverHostGitHubToken()).toBe("reconnected-token");
-    expect(hasWorkspaceGitHubToken()).toBe(true);
+    setGitHubToken("reconnected-token");
+    expect(discoverGitHubToken()).toBe("reconnected-token");
+    expect(hasGitHubToken()).toBe(true);
   });
 
   test("falls back to GH_TOKEN when stored token file is blank", async () => {
@@ -73,14 +73,14 @@ describe("GitHub token discovery", () => {
     await writeFile(tokenPath, "\n");
     process.env.GH_TOKEN = "env-token";
 
-    expect(discoverHostGitHubToken()).toBe("env-token");
+    expect(discoverGitHubToken()).toBe("env-token");
   });
 
   test("treats blank GH_TOKEN as missing", () => {
     process.env.GH_TOKEN = "  ";
 
-    expect(discoverHostGitHubToken()).toBeUndefined();
-    expect(hasWorkspaceGitHubToken()).toBe(false);
+    expect(discoverGitHubToken()).toBeUndefined();
+    expect(hasGitHubToken()).toBe(false);
   });
 
   test("credential helper supplies the token only to GitHub HTTPS remotes", async () => {

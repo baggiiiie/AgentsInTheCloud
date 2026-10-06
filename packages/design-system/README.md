@@ -32,6 +32,7 @@ Prefer consistency over feature-specific visual preservation.
 | Leading mark for a row that creates something | `add-badge` | [addBadgeHtml](src/add-badge/add-badge-html.ts) |
 | Running, still cancellable | `activity-button` | [ActivityButtonOptions](src/activity-button/activity-button-html.ts) |
 | Running, cannot invoke again | `progress-button` | [ProgressButtonOptions](src/progress-button/progress-button-html.ts) |
+| Completed button action + acknowledgement | `button-confirmation` | [ButtonConfirmationOptions](src/button-confirmation/button-confirmation-html.ts) |
 | Clipboard + acknowledgement | `copy-button` | [CopyButtonOptions](src/copy-button/copy-button-html.ts) |
 | URL as a scannable QR code | `qr-code` | [qrCodeButtonHtml / qrCodeDialogHtml](src/qr-code/qr-code-html.ts) |
 | Destructive form confirmation | `destructive-confirmation` | [DestructiveConfirmationOptions](src/destructive-confirmation/destructive-confirmation-html.ts) |
@@ -78,7 +79,7 @@ a second hard-coded theme or asset server.
 The `styles` export identifies that stylesheet; `assets` describes the logical
 URLs it imports, including its font. Renderer modules never start Stimulus.
 Individual `*/client` exports are available for feature-owned browser state
-(e.g. `setActivityButtonState`, `showTransientFeedback`, `setToggleValue`).
+(e.g. `setActivityButtonState`, `showButtonConfirmation`, `resetButtonConfirmation`, `showTransientFeedback`, `setToggleValue`).
 
 The registration entrypoint installs behavior for server-inserted HTML, including
 Turbo replacements. Native CSS interfaces (select, managed list, copy region)
@@ -98,7 +99,7 @@ For frequently used actions, add `data-popular-button` to the button's
 `attributesHtml` or a containing group (including ButtonGroup's `attributesHtml`).
 At ≤700px or with a coarse pointer, regular icon-only buttons are 42.5px with
 17.85px icons; popular ones are 62.5px with 26.25px icons. Popular caption buttons
-also get a 62.5px minimum height (for example, composer quick launches). Use
+also get a 62.5px minimum height (for example, composer prompt template buttons). Use
 `data-popular-button="touch"` to keep regular desktop sizing while enlarging touch targets. Untagged
 caption button minimum heights are unchanged. Desktop popular controls have fixed sizes: icon buttons are 38.24px with 20.59px icons,
 and caption buttons have a 36.93px minimum height with 18.38px icons. Caption controls,

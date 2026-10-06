@@ -1,3 +1,4 @@
+import { createAgentFooterController } from "./footer-controller.ts";
 import { createUsageControllers } from "./usage-controllers.ts";
 import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 import { createAgentCompletionsController, registerPromptTemplateCommands } from "./completions-controller.ts";
@@ -12,13 +13,14 @@ import { createAgentLazyDetailController, createAgentTailFrameController } from 
 
 export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator, type PromptHistoryState } from "./composer-state.ts";
 export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
-export { promptTemplateHotkeyConflict } from "./completions-controller.ts";
+export { promptTemplateShortcutConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 
 export const agentClientModule: WorkspaceClientModule = {
   id: "agent",
   install({ application, Controller, hooks }) {
     for (const [name, controller] of Object.entries(createUsageControllers(Controller))) application.register(name, controller);
+    application.register("agent-footer", createAgentFooterController(Controller));
     application.register("agent-elapsed", createAgentElapsedController(Controller));
     application.register("agent-edit-diff", createAgentEditDiffController(Controller));
     application.register("agent-thinking", createAgentThinkingController(Controller));

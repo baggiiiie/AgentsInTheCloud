@@ -1,4 +1,4 @@
-import { parseAgentNameCommand } from "./prompt-templates.ts";
+import { parseAgentNameCommand } from "./builtin-slash-commands.ts";
 
 /** AgentsInTheCloud owns /name; providers supply only their conversation context and title store. */
 export async function runAgentNameCommand(text: string, options: {

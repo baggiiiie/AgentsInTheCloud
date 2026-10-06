@@ -1,13 +1,11 @@
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { cliLaunchScript, cliPromptText, turnSignalShell, writeFileScript, type CliAgentSession, type CliModelSettings, type TurnBoundary } from "@agents-in-the-cloud/cli-agent/server";
-import { claudeMcpConfigPath } from "./mcp.ts";
+import { claudeInstructionsPath, claudeMcpConfigPath } from "./session.ts";
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { readThemeSetting } from "@agents-in-the-cloud/shared/theme";
 import { claudeAgentsInTheCloudTheme, claudeThemeName } from "./theme.ts";
-
-export const claudeFileLinkInstructions = "When referring to a file you created or want the user to open, emit a Markdown link with its absolute workspace path, for example [image](/work/output.png). Use links rather than bare or code-formatted paths so the user can tap them in the AgentsInTheCloud transcript. Image links open an image viewer even though the CLI cannot display images.";
 
 function turnBoundaryHooks(turnSignalCommand: string) {
   const hook = (boundary: TurnBoundary) => [{ hooks: [{ type: "command", command: turnSignalShell(turnSignalCommand, boundary) }] }];
@@ -15,18 +13,17 @@ function turnBoundaryHooks(turnSignalCommand: string) {
 }
 
 /** Run inside tmux so installation progress and failures stay visible in the tab. */
-export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings = {}, session?: CliAgentSession, resume = false): string {
+export function claudeLaunchScript(input: WorkspaceAgentInput, imagePaths: string[], settings: CliModelSettings, session: CliAgentSession, resume = false): string {
   // Claude has no --image flag. Its Read tool opens the materialized images.
   const prompt = cliPromptText(input, imagePaths.map((path) => `Read the attached image at ${JSON.stringify(path)}.`));
   const cliSettings = {
     skipDangerousModePermissionPrompt: true,
     theme: `custom:${claudeThemeName}`,
-    hooks: session ? turnBoundaryHooks(session.turnSignalCommand) : undefined,
+    hooks: turnBoundaryHooks(session.turnSignalCommand),
   };
   // Added to whatever MCP servers the user configured; Claude merges both sets.
-  const mcpArgs = session ? ["--mcp-config", claudeMcpConfigPath(session)] : [];
-  const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), "--append-system-prompt", claudeFileLinkInstructions, ...mcpArgs,
-    ...(session ? [resume ? "--resume" : "--session-id", session.id] : []),
+  const args = ["--dangerously-skip-permissions", "--settings", JSON.stringify(cliSettings), "--append-system-prompt-file", claudeInstructionsPath(session), "--mcp-config", claudeMcpConfigPath(session),
+    resume ? "--resume" : "--session-id", session.id,
     ...(settings.model ? ["--model", parseModelRef(settings.model)!.id] : []),
     ...(settings.thinkingLevel ? ["--effort", settings.thinkingLevel] : []), ...(prompt ? ["--", prompt] : [])];
   // The subscription is already connected in AgentsInTheCloud. Preserve other CLI preferences.

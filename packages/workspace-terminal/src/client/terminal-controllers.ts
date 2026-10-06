@@ -28,10 +28,11 @@ function createTerminalSessionPickerController(Controller: WorkspaceClientContro
   };
 }
 
-function createTerminalPaneController(Controller: WorkspaceClientControllerConstructor) {
-  return class TerminalPaneController extends createTerminalKeyBarController(Controller) {
+function createTerminalViewController(Controller: WorkspaceClientControllerConstructor) {
+  return class TerminalViewController extends createTerminalKeyBarController(Controller) {
     static values = { workspaceId: String, id: String };
-    static targets = ["connectionStatus", "host", "stage"];
+    static targets = ["connectionStatus", "host", "stage", "ended"];
+    declare readonly endedTarget: HTMLElement;
     declare readonly hostTarget: HTMLElement;
     declare readonly stageTarget: HTMLElement;
     declare readonly connectionStatusTarget: HTMLElement;
@@ -67,6 +68,14 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
           fontSize: Number.parseFloat(style.getPropertyValue("--text-code")),
           theme: agentsInTheCloudObservableTerminalTheme(),
           connectionStatus: this.connectionStatusTarget,
+          onConnectionStateChange: (state) => {
+            this.endedTarget.hidden = state !== "ended";
+            this.element.classList.toggle("terminal-is-ended", state === "ended");
+            if (state === "ended") {
+              this.connectionStatusTarget.hidden = true;
+              this.resetAccessoryKeys();
+            }
+          },
           transformInput: (data) => this.transformAccessoryInput(data),
         });
       } else {
@@ -145,12 +154,12 @@ function createTerminalPaneController(Controller: WorkspaceClientControllerConst
 export const workspaceTerminalClientModule: WorkspaceClientModule = {
   id: "terminal",
   install({ application, Controller, hooks }) {
-    application.register("terminal-pane", createTerminalPaneController(Controller));
+    application.register("terminal-view", createTerminalViewController(Controller));
     application.register("terminal-session-picker", createTerminalSessionPickerController(Controller));
     const controller = (pane: HTMLElement) => {
-      const element = pane.querySelector<HTMLElement>('[data-controller~="terminal-pane"]');
-      // SAFETY: This element declares the terminal-pane controller registered immediately above.
-      return element ? application.getControllerForElementAndIdentifier(element, "terminal-pane") as { start(): void; stop(): void } | null : null;
+      const element = pane.querySelector<HTMLElement>('[data-controller~="terminal-view"]');
+      // SAFETY: This element declares the terminal-view controller registered immediately above.
+      return element ? application.getControllerForElementAndIdentifier(element, "terminal-view") as { start(): void; stop(): void } | null : null;
     };
     hooks.onBecomeVisible(({ pane }) => controller(pane)?.start());
     hooks.onNoLongerVisible(({ pane }) => controller(pane)?.stop());

@@ -50,19 +50,19 @@ describe("files paths", () => {
 });
 
 
-describe("Files Work view rendering", () => {
-  test("starts with the Files pane expanded when no file is selected", () => {
+describe("Files view rendering", () => {
+  test("starts with the Files navigator expanded when no file is selected", () => {
     const html = renderFilesWorkViewBody("work 1", { id: "workspace" });
-    expect(html).toContain("is-files-pane-open");
-    expect(html).toContain('aria-label="Collapse Files pane"');
+    expect(html).toContain("is-files-navigator-open");
+    expect(html).toContain('aria-label="Collapse Files navigator"');
     expect(html).toContain('loading="lazy"');
     expect(html).not.toContain("Includes concealed files");
   });
 
-  test("renders a selected file in the editor with the Files pane collapsed", () => {
+  test("renders a selected file in the editor with the Files navigator collapsed", () => {
     const html = renderFilesWorkViewBody("work 1", { id: "workspace", path: "/work/src/example.ts", line: 4 });
-    expect(html).not.toContain("is-files-pane-open");
-    expect(html).toContain('aria-label="Expand Files pane"');
+    expect(html).not.toContain("is-files-navigator-open");
+    expect(html).toContain('aria-label="Expand Files navigator"');
     expect(html).toContain('data-file-editor-line-value="4"');
     expect(html).toContain("/work/src/example.ts");
     expect(filesWorkViewPresentation({ id: "workspace", path: "/work/src/example.ts" }).label).toBe("example.ts");

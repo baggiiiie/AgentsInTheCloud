@@ -34,7 +34,7 @@
   max-width: 100%; width: fit-content; margin-left: auto; color: var(--text-bright); background: var(--elev); border: 1px solid var(--line); border-radius: var(--radius-surface);
   padding: 8px 12px;
 }
-.agent-user-label { color: var(--text-muted); font-size: var(--text-code); margin-bottom: 4px; }
+.agent-user-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: var(--text-code); margin-bottom: 4px; }
 .agent-user-attachments { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 .agent-user-attachments img { max-height: 90px; max-width: 160px; border-radius: var(--radius-control); border: 1px solid var(--line); }
 
@@ -129,7 +129,7 @@
 }
 
 @media (max-width: 700px) {
-  [data-agent-quick-launch]::after { display: none; }
+  [data-agent-prompt-template-button]::after { display: none; }
 }
 
 .agent-completion-menu-host { position: absolute; z-index: 20; }
@@ -138,30 +138,27 @@
   pointer-events: auto;
 }
 .agent-completion-menu-host[hidden] { display: none; }
-.agent-quick-launches { display: flex; flex-wrap: wrap; gap: 6px; }
-[data-agent-quick-launch] { gap: 7px; }
-[data-agent-quick-launch]::after { content: attr(data-agent-quick-launch-shortcut); }
-[data-agent-quick-launch].shortcut-conflict::after { color: var(--warning); }
+.agent-prompt-template-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+[data-agent-prompt-template-button] { gap: 7px; }
+[data-agent-prompt-template-button]::after { content: attr(data-agent-prompt-template-button-shortcut); }
+[data-agent-prompt-template-button].shortcut-conflict::after { color: var(--warning); }
 .agent-completion-menu { max-height: 260px; overflow: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: var(--radius-surface); }
 .agent-completion-menu.empty { padding: 8px 8px; color: var(--text-muted); }
 .agent-completion-spinner { display: inline-block; width: 12px; height: 12px; margin-right: 8px; vertical-align: -2px; border-radius: 50%; border: 2px solid var(--line-strong); border-top-color: var(--accent); animation: agent-spin .75s linear infinite; }
 @keyframes agent-spin { to { transform: rotate(360deg); } }
-.agent-template-preview { margin: 0; padding: 12px; white-space: pre-wrap; font-family: var(--font-mono); line-height: var(--leading-standard); color: var(--text-bright); background: var(--panel); }
-.agents-in-the-cloud-fullscreen-html .agent-template-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
+.agent-slash-command-preview { margin: 0; padding: 12px; white-space: pre-wrap; font-family: var(--font-mono); line-height: var(--leading-standard); color: var(--text-bright); background: var(--panel); }
+.agents-in-the-cloud-fullscreen-html .agent-slash-command-preview { max-width: 980px; margin: 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-surface); }
 .agent-stat { height: 24px; display: inline-flex; align-items: center; gap: 4px; line-height: 24px; white-space: nowrap; }
 .agent-stat b { color: inherit; font: inherit; }
-.agent-stat[title="Tokens up (input)"], .agent-stat[title="Tokens down (output)"] { display: none; }
-.agent-stat[title="Session cost"]::before { content: "cost"; color: var(--text-muted); font: inherit; }
 .agent-ctx-meter { width: 46px; height: 4px; overflow: hidden; border-radius: var(--radius-indicator); background: var(--line); }
 .agent-ctx-meter i { display: block; height: 100%; border-radius: var(--radius-indicator); background: var(--text-muted); }
 
-/* Keep shared Composer selections available before secondary AgentPaneComposer statistics. */
-@container (max-width: 500px) {
-  .agent-stat[title="Session cost"] { display: none; }
-}
-@container (max-width: 300px) {
-  .agent-stat[title="Context window used"] { display: none; }
-}
+/* Footer items keep their natural widths; the controller drops lower priorities first. */
+[data-controller~="agent-footer"] .agent-stat { flex: none; }
+[data-controller~="agent-footer"] .composer-selections { flex: none; }
+[data-controller~="agent-footer"] .composer-selections > :not(.composer-selection-field) { flex: none; }
+[data-controller~="agent-footer"] .button__caption { white-space: nowrap; overflow-wrap: normal; }
+[data-controller~="agent-footer"] :is(.agent-stat, .composer-selection-field)[hidden] { display: none; }
 
 .agent-media-img, .agent-media-frame { border-color: var(--line); border-radius: var(--radius-surface); }
 

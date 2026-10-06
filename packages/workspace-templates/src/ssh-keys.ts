@@ -22,8 +22,8 @@ async function publicKeyFromPrivateKey(privateKey: string): Promise<string> {
 }
 
 function summary(key: StoredWorkspaceTemplateSshKey): WorkspaceTemplateSshKeySummary {
-  const { encryptedPrivateKey: _, ...result } = key;
-  return result;
+  const { encryptedPrivateKey: _, projectId: workspaceTemplateId, ...result } = key;
+  return { ...result, workspaceTemplateId };
 }
 
 function findSshKey(workspaceTemplate: WorkspaceTemplateRecord, keyId: string): StoredWorkspaceTemplateSshKey {

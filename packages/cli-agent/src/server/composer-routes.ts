@@ -1,11 +1,11 @@
-import { expandPromptTemplate, listFileCompletions, renderFileCompletionMenu, runAgentNameCommand } from "@agents-in-the-cloud/agent/server";
+import { expandSlashCommand, listFileCompletions, renderFileCompletionMenu, runAgentNameCommand } from "@agents-in-the-cloud/agent/server";
 import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import type { CliAgents } from "./agents.ts";
 
 export function cliComposerRoutes(providerId: string, agents: CliAgents) {
   return async (request: Request, url: URL): Promise<Response | undefined> => {
-    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/composer(?:\/(completions(?:\/prompt-template-expand)?|consumed))?$/);
+    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/([^/]+)-agents\/([^/]+)\/composer(?:\/(completions(?:\/slash-command-expand)?|consumed))?$/);
     if (!match || match[2] !== providerId) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
     const agentId = decodeURIComponent(match[3]!);
@@ -15,9 +15,9 @@ export function cliComposerRoutes(providerId: string, agents: CliAgents) {
       const html = renderFileCompletionMenu(await listFileCompletions(workspaceId, url.searchParams.get("q") ?? "", url.searchParams.get("mode") === "fuzzy" ? "fuzzy" : "direct"));
       return response(html);
     }
-    if (request.method === "POST" && operation === "completions/prompt-template-expand") {
+    if (request.method === "POST" && operation === "completions/slash-command-expand") {
       const form = await request.formData();
-      return textResponse(await expandPromptTemplate(workspaceId, String(form.get("text") ?? "")));
+      return textResponse(await expandSlashCommand(workspaceId, String(form.get("text") ?? "")));
     }
     const draftId = agentAttachmentDraftId(workspaceId, `${providerId}:${agentId}`);
     if (request.method === "POST" && operation === "consumed") {
@@ -44,7 +44,7 @@ export function cliComposerRoutes(providerId: string, agents: CliAgents) {
       if (!attachment) throw new Error(`Attachment not found: ${id}`);
       return attachment;
     }));
-    let text = await expandPromptTemplate(workspaceId, String(form.get("text") ?? ""));
+    let text = await expandSlashCommand(workspaceId, String(form.get("text") ?? ""));
     if (!text.trim() && !attachments.length) return new Response("Enter a prompt or attach a file", { status: 422 });
     const notes: string[] = [];
     for (const attachment of attachments) {

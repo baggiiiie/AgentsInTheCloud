@@ -11,7 +11,7 @@ async function scenario(script: string): Promise<void> {
       import { expect, mock } from "bun:test";
       const workspace = await import("@agents-in-the-cloud/workspace");
       mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async () => ({ stdout: "", stderr: "", exitCode: 0, durationMs: 0 }) }));
-      const { configureAgentMcp, handleAgentMcpRequest, prepareAgentMcp, revokeAgentMcp } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/mcp.ts"))});
+      const { configureAgentMcp, handleAgentMcpRequest, prepareCliAgentConnection, revokeAgentMcp } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/mcp.ts"))});
       const { registerAgentTurnSettler } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/turn-lifecycle.ts"))});
       const { subscribeWorkspaceAgentBusy } = await import(${JSON.stringify(join(import.meta.dir, "../../src/server/workspace-agent-busy.ts"))});
       const log = [];
@@ -25,7 +25,8 @@ async function scenario(script: string): Promise<void> {
         settles.push({ signal, reason, settle: settled.resolve });
         await settled.promise;
       });
-      const { token } = await prepareAgentMcp("workspace", agentId);
+      const { token } = await prepareCliAgentConnection("workspace", agentId);
+      log.length = 0;
       const signal = (boundary) => handleAgentMcpRequest(new Request("http://127.0.0.1:2988/agent-turn-" + boundary, { method: "POST", headers: { Authorization: "Bearer " + token } }), "workspace");
       const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
       ${script}

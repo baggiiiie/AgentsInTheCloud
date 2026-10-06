@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addWorkspaceTemplate, createWorkspaceTemplateSecret, updateWorkspaceTemplateSecret, deleteWorkspaceTemplateSecret, type GitWorkspaceTemplateInitInstruction } from "@agents-in-the-cloud/workspace-templates";
-import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearWorkspaceGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setWorkspaceGitHubToken } from "../../src/secrets/workspace-secrets.ts";
+import { createWorkspaceSecretContext, registerWorkspaceRequestTransform, clearGitHubToken, forgetWorkspaceSecretContext, getWorkspaceSecretContext, setGitHubToken } from "../../src/secrets/workspace-secrets.ts";
 
 function workspaceTemplateInit(workspaceTemplateId: string): GitWorkspaceTemplateInitInstruction {
   return { type: "project.git", projectId: workspaceTemplateId, name: "Project", gitUrl: "https://github.com/org/repo.git", branch: null, sessionShareKey: "Project" };
@@ -23,7 +23,7 @@ describe("workspace secrets", () => {
   });
 
   afterEach(async () => {
-    clearWorkspaceGitHubToken();
+    clearGitHubToken();
     forgetWorkspaceSecretContext("test-workspace");
     if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
     else process.env.ATELIER_DATA_DIR = previousDataDir;
@@ -33,7 +33,7 @@ describe("workspace secrets", () => {
   });
 
   test("uses deterministic placeholders for workspace env secrets", async () => {
-    setWorkspaceGitHubToken("real-secret");
+    setGitHubToken("real-secret");
     const context = await createWorkspaceSecretContext("test-workspace");
 
     expect(context.env.GH_TOKEN).toBe("ATELIER_PROXY_READY_GH_TOKEN");
@@ -44,7 +44,7 @@ describe("workspace secrets", () => {
     });
   });
 
-  test("includes encrypted project secrets with default and custom placeholders", async () => {
+  test("includes encrypted Workspace template secrets with default and custom placeholders", async () => {
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern: "api.example.com, *.example.org", secretValue: "real-secret" });
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "STRICT_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "strict-secret" });
@@ -77,7 +77,7 @@ describe("workspace secrets", () => {
     expect(() => context.hooks.onRequest(new Request("https://other.example.net/", { headers: { authorization: `Bearer ${context.env.API_TOKEN}` } }))).toThrow("secret API_TOKEN not allowed for host: other.example.net");
   });
 
-  test("reloads persisted project secrets when rebuilding context after restart", async () => {
+  test("reloads persisted Workspace template secrets when rebuilding context after restart", async () => {
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "PACKAGE_TOKEN", hostPattern: "registry.example.com", placeholder: "PACKAGE_TOKEN", secretValue: "real-package-secret" });
     const init = workspaceTemplateInit(workspaceTemplate.id);
@@ -114,7 +114,7 @@ describe("workspace secrets", () => {
   });
 
   test("path injection defaults to Telegram only and respects live per-secret overrides", async () => {
-    setWorkspaceGitHubToken("github-credential");
+    setGitHubToken("github-credential");
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/path-secrets.git")).workspaceTemplate;
     const init = workspaceTemplateInit(workspaceTemplate.id);
     const values = { envName: "BOT_TOKEN", hostPattern: "api.telegram.org", secretValue: "123:telegram-credential" };
@@ -140,15 +140,17 @@ describe("workspace secrets", () => {
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe(customRequest().url);
   });
 
-  test("egress permits LAN and tailnet destinations but still blocks loopback and link-local", async () => {
+  test("egress reaches only public internet destinations", async () => {
     const context = await createWorkspaceSecretContext("test-workspace");
-    for (const ip of ["127.0.0.1", "169.254.169.254", "::1"]) {
+    for (const ip of ["127.0.0.1", "169.254.169.254", "::1", "0.0.0.0", "224.0.0.1", "fe80::1", "::ffff:127.0.0.1"]) {
       expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(false);
     }
-    for (const ip of ["10.200.0.2", "192.168.1.1", "100.64.0.1", "fd00::1", "fd7a:115c:a1e0::2"]) {
-      expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(true);
+    for (const ip of ["10.200.0.2", "192.168.1.1", "172.17.0.1", "100.64.0.1", "100.100.100.100", "fd00::1", "fd7a:115c:a1e0::2", "2001:db8::1"]) {
+      expect(await context.hooks.isIpAllowed!({ hostname: "destination.example", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(false);
     }
-    expect(await context.hooks.isIpAllowed!({ hostname: "example.com", ip: "93.184.215.14", family: 4, port: 443, protocol: "https" })).toBe(true);
+    for (const ip of ["93.184.215.14", "8.8.8.8", "2606:4700:10::6814:179a"]) {
+      expect(await context.hooks.isIpAllowed!({ hostname: "example.com", ip, family: ip.includes(":") ? 6 : 4, port: 443, protocol: "https" })).toBe(true);
+    }
   });
 
   test("passes an inherited placeholder onward for nested AgentsInTheCloud", async () => {

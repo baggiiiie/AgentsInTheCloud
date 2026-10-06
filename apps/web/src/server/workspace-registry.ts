@@ -142,6 +142,7 @@ export function createWorkspaceRegistry(options: WorkspaceRegistryOptions = {}):
   function sorted(): WorkspaceEntry[] {
     return [...entries.values()].sort((a, b) => Number(a.parked) - Number(b.parked)
       || Number(b.requestingAttention) - Number(a.requestingAttention)
+      || (!a.parked && !a.requestingAttention ? Number(a.phase.busy) - Number(b.phase.busy) : 0)
       || (a.requestingAttention && b.requestingAttention ? a.attentionAt! - b.attentionAt! : b.lastActivityAt - a.lastActivityAt)
       || a.id.localeCompare(b.id));
   }
@@ -158,6 +159,7 @@ export function createWorkspaceRegistry(options: WorkspaceRegistryOptions = {}):
   }
   function requestAttention(id: string): void {
     const entry = requireEntry(id);
+    if (entry.phase.deletion?.status === "deleting") return;
     if (visible(id) || entry.requestingAttention) return;
     unpark(entry);
     entry.requestingAttention = true;

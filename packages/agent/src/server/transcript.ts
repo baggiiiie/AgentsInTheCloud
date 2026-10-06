@@ -112,7 +112,7 @@ export type WorkingTranscriptItem = TranscriptItemBase & {
 
 export type TranscriptItem =
   | (TranscriptItemBase & { type: "extension"; render(ctx: AgentRenderContext): string })
-  | (TranscriptItemBase & { type: "user"; text: string; images: SessionImageRef[]; steering?: boolean; pending?: boolean })
+  | (TranscriptItemBase & { type: "user"; text: string; images: SessionImageRef[]; steering?: boolean; pending?: boolean; queuedSubmissionId?: string })
   | (TranscriptItemBase & { type: "inherited-context"; source: string; messageCount: number; items: TranscriptItem[] })
   | WorkingTranscriptItem
   | (TranscriptItemBase & { type: "thinking"; text: string; live?: boolean })
@@ -261,12 +261,21 @@ export function buildTranscript(records: TranscriptRecord[], options: { openEnde
             || (!runScoped && (next.kind === "user" || next.kind === "taskStart")))
           : undefined;
         const retry = record.stopReason === "error" && nextBoundary?.kind === "assistant";
-        if (errorText) {
+        // An aborted attempt that the same run continues without new input was
+        // interrupted by a host restart, not stopped by the user: durable recovery
+        // already re-issued it. Keep the turn open and mark the seam in the activity.
+        const interruptedRun = record.stopReason === "aborted" && !record.errorMessage
+          && records.slice(recordIndex + 1).find((next) =>
+            next.kind === "assistant" || next.kind === "runStart"
+            || ((next.kind === "user" || next.kind === "taskStart") && (!runScoped || runStarts.has(next.id))))?.kind === "assistant";
+        if (interruptedRun) {
+          appendActivity({ type: "note", key: `${record.id}:interrupted`, text: "Interrupted by a restart — continued automatically", tone: "system" }, record.timestamp);
+        } else if (errorText) {
           const error: TranscriptItem = { type: "error", key: `${record.id}:${record.stopReason === "aborted" && !record.errorMessage ? "aborted" : "error"}`, text: errorText, timestamp: record.timestamp };
           if (retry) appendActivity(error, record.timestamp);
           else items.push(error);
         }
-        if (!retry && (record.stopReason === "error" || record.stopReason === "aborted")) stopWorking(record.timestamp);
+        if (!retry && !interruptedRun && (record.stopReason === "error" || record.stopReason === "aborted")) stopWorking(record.timestamp);
       }
       continue;
     }

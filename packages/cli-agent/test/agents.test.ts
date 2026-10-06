@@ -13,9 +13,15 @@ async function scenario(script: string): Promise<void> {
       const calls = [];
       const launches = [];
       const preparations = [];
+      const commands = [];
+      const observableTerminal = await import("@agents-in-the-cloud/observable-terminal/server");
+      const buildSessionCommand = observableTerminal.buildObservableSessionCommand;
+      mock.module("@agents-in-the-cloud/observable-terminal/server", () => ({ ...observableTerminal, buildObservableSessionCommand: (options) => { commands.push(options.command); return buildSessionCommand(options); } }));
+      let launchScript = "printf 'CLI started'";
       let setupError;
       let turnSettled = async () => true;
       let preparationError;
+      let preparationDelay;
       let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
       mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
@@ -32,8 +38,9 @@ async function scenario(script: string): Promise<void> {
           renderFooter: async () => "",
           prepare: async (settings = {}) => settings,
         },
-        prepareWorkspace: async (workspaceId) => { preparations.push(workspaceId); if (preparationError) throw preparationError; },
-        launchScript: (input, images, settings) => { launches.push({ input, images, settings }); return "printf 'CLI started'"; },
+        prepareWorkspace: async (workspaceId) => { preparations.push(workspaceId); await preparationDelay?.promise; if (preparationError) throw preparationError; },
+        prepareSession: async () => ({}),
+        launchScript: (input, images, settings) => { launches.push({ input, images, settings }); return launchScript; },
         turnSettled: (...args) => turnSettled(...args),
       };
       const module = createCliAgentModule(adapter);
@@ -442,4 +449,85 @@ test("a CLI turn ending with StopFailure times out after ten seconds without log
   await Bun.sleep(250);
   expect(busy).toEqual([true, false]);
   expect(errors).toEqual([]);
+`));
+
+test("a launch prompt stays busy through preparation and installation until its first turn finishes", () => scenario(`
+  const busy = [];
+  const { subscribeWorkspaceAgentBusy, configureAgentMcp, handleAgentMcpRequest } = await import("@agents-in-the-cloud/agent/server");
+  subscribeWorkspaceAgentBusy(event => busy.push(event));
+  configureAgentMcp({ on() {}, emit: async () => {} });
+  preparationDelay = Promise.withResolvers();
+  const launch = agentType.launch.prepareWorkspace("installing", { agent: { input: { text: "Hello", images: [], attachmentNotes: [] } } });
+  while (!preparations.length) await Bun.sleep(1);
+  const [{ id }] = await list("installing");
+  expect(busy).toEqual([{ workspaceId: "installing", agentKey: "agent:" + id, busy: true }]);
+  preparationDelay.resolve();
+  await launch;
+  // tmux is ready, but the installer has not reported a native turn yet.
+  expect(busy).toHaveLength(1);
+  const token = calls.findLast(call => call[2]?.stdin?.includes("Authorization: Bearer"))[2].stdin.match(/Authorization: Bearer ([\\w.-]+)/)[1];
+  const signal = boundary => handleAgentMcpRequest(new Request("http://localhost/agent-turn-" + boundary, { method: "POST", headers: { authorization: "Bearer " + token } }), "installing");
+  await signal("started");
+  expect(busy.every(event => event.busy)).toBe(true);
+  await signal("finished");
+  while (busy.at(-1).busy) await Bun.sleep(1);
+  expect(busy.at(-1)).toEqual({ workspaceId: "installing", agentKey: "agent:" + id, busy: false });
+`));
+
+test("a prompted startup failure clears busy; empty interactive launches do not claim work", () => scenario(`
+  const busy = [];
+  const { subscribeWorkspaceAgentBusy } = await import("@agents-in-the-cloud/agent/server");
+  subscribeWorkspaceAgentBusy(event => busy.push(event.busy));
+  preparationError = new Error("Preparation failed");
+  await agentType.launch.prepareWorkspace("failed-prompt", { agent: { input: { text: "Hello", images: [], attachmentNotes: [] } } });
+  expect(busy).toEqual([true, false]);
+  preparationError = undefined;
+  await agentType.create({ workspaceId: "interactive" });
+  expect(busy).toEqual([true, false]);
+`));
+
+test("the terminal reports installation failure even when the CLI script owns its own EXIT trap", () => scenario(`
+  launchScript = "set -eu; trap 'printf installation-failed >&2' EXIT; exit 7";
+  await agentType.launch.prepareWorkspace("installer-failure", { agent: { input: { text: "Hello", images: [], attachmentNotes: [] } } });
+  const [{ id }] = await list("installer-failure");
+  const directory = process.env.ATELIER_DATA_DIR;
+  const signalScript = directory + "/signal.sh";
+  const signalFile = directory + "/boundary";
+  const { shellQuote } = await import("@agents-in-the-cloud/core");
+  await Bun.write(signalScript, 'printf "%s" "$1" > ' + shellQuote(signalFile));
+  // Run the actual terminal command, replacing only its authenticated relay script.
+  const command = commands[0].replaceAll("/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-agents/" + id + "/turn-signal.sh", signalScript);
+  const child = Bun.spawn(["/bin/bash", "-c", command], { stdout: "pipe", stderr: "pipe" });
+  const [code, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
+  expect(code).toBe(7);
+  expect(stderr).toBe("installation-failed");
+  expect(await Bun.file(signalFile).text()).toBe("failed");
+`));
+
+test("native prompt preparation includes shared and plugin guidance once per launch and refreshes it on resume", () => scenario(`
+  const { configureAgentMcp } = await import("@agents-in-the-cloud/agent/server");
+  const { createAgentsInTheCloudEventBus } = await import("@agents-in-the-cloud/core");
+  const events = createAgentsInTheCloudEventBus();
+  let prepared = 0;
+  events.on("agent_system_prompt_prepare", ({ lines, agentId }) => {
+    lines.push("Plugin guidance " + agentId + " revision " + ++prepared + " " + "x".repeat(12000));
+  });
+  configureAgentMcp(events);
+  const prompts = [];
+  adapter.prepareSession = async (_workspaceId, session, mcp) => {
+    prompts.push(mcp.instructions);
+    expect(JSON.parse(Buffer.from(mcp.token.split(".")[0], "base64url").toString())).toMatchObject({ agentId: session.id, instructionDelivery: "system-prompt" });
+    return {};
+  };
+  const id = await agentType.create({ workspaceId: "native-prompt" });
+  expect(prepared).toBe(1);
+  expect(prompts[0]).toContain("You are running inside of an online coding tool called AgentsInTheCloud.");
+  expect(prompts[0]).toContain("Plugin guidance " + id + " revision 1");
+  adapter.resumeScript = async () => "true";
+  inspectionResult = { ...result, exitCode: 1 };
+  const { createCliAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/agents.ts"))});
+  await createCliAgents(adapter, async () => {}).restoreWorkspace("native-prompt");
+  expect(prepared).toBe(2);
+  expect(prompts[1]).toContain("Plugin guidance " + id + " revision 2");
+  expect(prompts[1]).not.toContain("revision 1");
 `));

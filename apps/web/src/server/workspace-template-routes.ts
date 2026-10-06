@@ -1,4 +1,4 @@
-import { renderTemplateSettings, renderTemplateSettingsFrame, templateSettingsErrorHtml, templateSettingsFrameId, templateSettingsHostId, type TemplateSettingsLocation, type TemplateSettingsSection } from "./template-settings.ts";
+import { renderTemplateSettings, renderTemplateSettingsFrame, templateSettingsErrorHtml, templateSettingsFrameId, templateSettingsHostId, templateSettingsUrl, type TemplateSettingsLocation, type TemplateSettingsSection, type TemplateSettingsReference } from "./template-settings.ts";
 import { AgentsInTheCloudCoreError, invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject } from "@agents-in-the-cloud/core";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
@@ -11,7 +11,7 @@ import {
   getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts,
   listWorkspaceTemplates, parseWorkspaceTemplateSpec, renameWorkspaceTemplateSshKey,
   workspaceTemplateSecretPathPermissionSchema,
-  setWorkspaceTemplateDockerfile, setWorkspaceTemplatePreloadImages, setWorkspaceTemplatePrivileged,
+  setWorkspaceTemplateDockerfile, setWorkspaceTemplatePreloadImages, setWorkspaceTemplatePrivileged, setWorkspaceTemplateSeedConfigEnabled,
   setWorkspaceTemplateSshKnownHosts,
   updateWorkspaceTemplate,
   updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret,
@@ -37,20 +37,15 @@ export interface WorkspaceTemplateRoutes {
   editorHtml(options: WorkspaceTemplateEditorOptions): Promise<string>;
 }
 
-interface WorkspaceTemplateWorkspaceReference {
-  workspaceId: string;
-  title: string;
-}
-
 export function createWorkspaceTemplateRoutes(deps: {
-  referencingWorkspaces(workspaceTemplateId: string): WorkspaceTemplateWorkspaceReference[];
+  referencingWorkspaces(workspaceTemplateId: string): TemplateSettingsReference[];
   invalidatePresentation(): void;
   createAgentWorkspace(workspaceTemplate: WorkspaceTemplateSummary, request: Request): Promise<Response>;
 }): WorkspaceTemplateRoutes {
   function newWorkspaceTemplateEditorBody(): string {
     const cancelButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Cancel" }, attributesHtml: 'data-action="dialog#close"' });
     const addButton = buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Add template" }, attributesHtml: 'data-turbo-submits-with="Adding…"' });
-    return `<div id="workspace_template_editor_body" class="workspace-template-editor-body"><div class="workspace-template-editor-page workspace-template-editor-detail-page"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input"><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div></div>`;
+    return `<div class="workspace-template-editor-body"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input"><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div>`;
   }
 
   async function workspaceTemplateEditorHtml(options: WorkspaceTemplateEditorOptions): Promise<string> {
@@ -130,7 +125,6 @@ export function createWorkspaceTemplateRoutes(deps: {
       spec = String(formData.get("gitUrl") ?? "");
     }
     const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec });
-    deps.invalidatePresentation();
     return workspaceTemplateSettingsResponse(request, { workspaceTemplate });
   }
 
@@ -143,34 +137,34 @@ export function createWorkspaceTemplateRoutes(deps: {
     if (concern !== "preload-images") deps.invalidatePresentation();
     if (requestAcceptsJson(request)) return jsonResponse(result);
     const workspaceTemplateId = decodeURIComponent(url.pathname.split("/")[2]!);
-    const section: TemplateSettingsSection = concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
+    const section: TemplateSettingsSection = concern === "seed-config" ? "developer" : concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
     const deleted = url.pathname.endsWith("/delete");
     const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
     // Save/create remains in the editor, using the persisted record ID and fresh credential fields.
     // Deletion returns to the list because that editor no longer exists.
     const location: TemplateSettingsLocation = { section, editor: deleted ? undefined : record };
-    const destination = new URL(`/workspace-templates/${encodeURIComponent(workspaceTemplateId)}/settings`, request.url);
-    destination.searchParams.set("section", section);
-    if (location.editor) destination.searchParams.set("editor", location.editor);
-    if (!wantsStream(request)) return Response.redirect(destination.toString(), 303);
-    const focusRecord = concern === "ssh-known-hosts" ? "known-hosts" : deleted ? record : undefined;
-    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted, focusRecord);
+    if (!wantsStream(request)) return Response.redirect(new URL(templateSettingsUrl(workspaceTemplateId, section, location.editor), request.url).toString(), 303);
+    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted);
     return turboStreamResponse(replace(templateSettingsFrameId, frame));
   }
 
-  async function updateWorkspaceTemplatePrivilegeEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
-    let privileged: boolean;
+  async function readBooleanSetting(request: Request, name: "privileged" | "seedConfigEnabled"): Promise<boolean> {
     if (requestAcceptsJson(request)) {
-      const body = await readJsonObject(request);
-      if (!Value.Check(jsonBooleanSchema, body.privileged)) throw invalidArguments("privileged must be a boolean");
-      privileged = body.privileged;
-    } else {
-      const value = (await request.formData()).get("privileged");
-      if (value !== "true" && value !== "false") throw invalidArguments("privileged must be true or false");
-      privileged = value === "true";
+      const value = (await readJsonObject(request))[name];
+      if (!Value.Check(jsonBooleanSchema, value)) throw invalidArguments(`${name} must be a boolean`);
+      return value;
     }
-    const result = await setWorkspaceTemplatePrivileged(workspaceTemplateId, privileged);
-    return workspaceTemplateSettingsResponse(request, result);
+    const value = (await request.formData()).get(name);
+    if (value !== "true" && value !== "false") throw invalidArguments(`${name} must be true or false`);
+    return value === "true";
+  }
+
+  async function updateWorkspaceTemplatePrivilegeEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
+    return workspaceTemplateSettingsResponse(request, await setWorkspaceTemplatePrivileged(workspaceTemplateId, await readBooleanSetting(request, "privileged")));
+  }
+
+  async function updateWorkspaceTemplateSeedConfigEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
+    return workspaceTemplateSettingsResponse(request, await setWorkspaceTemplateSeedConfigEnabled(workspaceTemplateId, await readBooleanSetting(request, "seedConfigEnabled")));
   }
 
   async function updateWorkspaceTemplateDockerfileEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
@@ -339,6 +333,7 @@ export function createWorkspaceTemplateRoutes(deps: {
     let params: string[] | undefined;
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/privileged$/)) && request.method === "POST") return await updateWorkspaceTemplatePrivilegeEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/dockerfile$/)) && request.method === "POST") return await updateWorkspaceTemplateDockerfileEndpoint(params[0]!, request);
+    if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/seed-config$/)) && request.method === "POST") return await updateWorkspaceTemplateSeedConfigEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)\/preload-images$/)) && request.method === "POST") return await updateWorkspaceTemplatePreloadImagesEndpoint(params[0]!, request);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)$/)) && request.method === "GET" && requestAcceptsJson(request)) return await workspaceTemplateDetailEndpoint(params[0]!);
     if ((params = matchRoute(url, /^\/workspace-templates\/([^/]+)$/)) && request.method === "POST") return await updateWorkspaceTemplateEndpoint(params[0]!, request);

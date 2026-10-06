@@ -2,24 +2,24 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getGitIdentity, getStoredGitIdentity, gitIdentitySettingsFile, hasGitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setGitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, commitIdentitySettingsFile, hasCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
 
-describe("projects", () => {
-  test("parseProjectSpec supports an optional #branch suffix", () => {
+describe("Workspace templates", () => {
+  test("parseWorkspaceTemplateSpec supports an optional #branch suffix", () => {
     expect(parseWorkspaceTemplateSpec("https://github.com/org/repo.git#main")).toEqual({ gitUrl: "https://github.com/org/repo.git", branch: "main" });
     expect(parseWorkspaceTemplateSpec("git@github.com:org/repo.git")).toEqual({ gitUrl: "git@github.com:org/repo.git", branch: null });
     expect(parseWorkspaceTemplateSpec("github.com/octocat/Hello-World")).toEqual({ gitUrl: "https://github.com/octocat/Hello-World", branch: null });
     expect(parseWorkspaceTemplateSpec("github.com/octocat/Hello-World#main")).toEqual({ gitUrl: "https://github.com/octocat/Hello-World", branch: "main" });
   });
 
-  test("rejects malformed persisted projects", async () => {
+  test("rejects malformed persisted Workspace templates", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     await writeFile(file, JSON.stringify({ projects: [{ id: 42 }] }));
 
     expect(listWorkspaceTemplates(file)).rejects.toThrow();
   });
 
-  test("addProject records a remote URL without cloning it", async () => {
+  test("addWorkspaceTemplate records a remote URL without cloning it", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
 
     const result = await addWorkspaceTemplate("https://github.com/org/repo.git#feature", file);
@@ -30,14 +30,14 @@ describe("projects", () => {
     expect(await listWorkspaceTemplates(file)).toEqual({ workspaceTemplates: [result.workspaceTemplate] });
   });
 
-  test("addProject accepts a GitHub URL without a scheme and matches its HTTPS equivalent", async () => {
+  test("addWorkspaceTemplate accepts a GitHub URL without a scheme and matches its HTTPS equivalent", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const workspaceTemplate = (await addWorkspaceTemplate("github.com/octocat/Hello-World", file)).workspaceTemplate;
     expect(workspaceTemplate.gitUrl).toBe("https://github.com/octocat/Hello-World");
     expect(addWorkspaceTemplate("https://github.com/octocat/Hello-World", file)).rejects.toThrow("template already exists");
   });
 
-  test("addProject includes the branch in the name only for an existing repository", async () => {
+  test("addWorkspaceTemplate includes the branch in the name only for an existing repository", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const first = (await addWorkspaceTemplate("https://github.com/org/repo.git#main", file)).workspaceTemplate;
     const second = (await addWorkspaceTemplate("https://github.com/org/repo.git#feature/search", file)).workspaceTemplate;
@@ -62,19 +62,23 @@ describe("projects", () => {
     expect(result.workspaceTemplate).toMatchObject({ id: workspaceTemplate.id, name: "Renamed", gitUrl: "https://github.com/org/renamed.git", branch: "main", sessionShareKey: "Renamed" });
   });
 
-  test("project secrets are encrypted at rest and decryptable by the host", async () => {
+  test("Workspace template secrets are encrypted at rest and decryptable by the host", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-secrets-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "workspace-template-secrets.key");
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/secret-project.git", file)).workspaceTemplate;
 
     const created = await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "real-secret" }, file, keyFile);
+    expect(created.workspaceTemplateId).toBe(workspaceTemplate.id);
+    expect(created).not.toHaveProperty("projectId");
     await updateWorkspaceTemplateSecret(workspaceTemplate.id, created.id, { envName: "API_TOKEN", hostPattern: "*.example.com" }, file, keyFile);
 
     const rawStore = await readFile(file, "utf8");
     expect(rawStore).toContain("API_TOKEN");
     expect(rawStore).toContain("sk-test-placeholder");
     expect(rawStore).not.toContain("real-secret");
+    expect(JSON.parse(rawStore).projects[0].secrets[0].projectId).toBe(workspaceTemplate.id);
+    expect(rawStore).not.toContain("workspaceTemplateId");
     expect(await revealWorkspaceTemplateSecrets(workspaceTemplate.id, file, keyFile)).toMatchObject([{ id: created.id, envName: "API_TOKEN", hostPattern: "*.example.com", placeholder: "sk-test-placeholder", secretValue: "real-secret" }]);
 
     await updateWorkspaceTemplateSecret(workspaceTemplate.id, created.id, { envName: "API_TOKEN", hostPattern: "*.example.com", placeholder: "" }, file, keyFile);
@@ -113,7 +117,7 @@ describe("projects", () => {
     expect(await listWorkspaceTemplateSecrets(workspaceTemplate.id, file)).toMatchObject([{ annotation: "", optional: false, configured: true }]);
   });
 
-  test("project SSH private keys are encrypted at rest", async () => {
+  test("Workspace template SSH private keys are encrypted at rest", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-ssh-key-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "workspace-template-secrets.key");
@@ -124,6 +128,8 @@ describe("projects", () => {
 
     const first = await createWorkspaceTemplateSshKey(workspaceTemplate.id, privateKey, file, keyFile);
     const second = await createWorkspaceTemplateSshKey(workspaceTemplate.id, privateKey, file, keyFile);
+    expect(first.workspaceTemplateId).toBe(workspaceTemplate.id);
+    expect(first).not.toHaveProperty("projectId");
 
     expect(await listWorkspaceTemplateSshKeys(workspaceTemplate.id, file)).toEqual([first, second]);
     const publicKey = await deriveWorkspaceTemplateSshPublicKey(workspaceTemplate.id, first.id, file, keyFile);
@@ -132,6 +138,7 @@ describe("projects", () => {
     expect(await renameWorkspaceTemplateSshKey(workspaceTemplate.id, first.id, "  GitHub deploy key  ", file)).toEqual({ ...first, name: "GitHub deploy key" });
     expect((await listWorkspaceTemplateSshKeys(workspaceTemplate.id, file))[0]?.name).toBe("GitHub deploy key");
     const oldStore = JSON.parse(await readFile(file, "utf8"));
+    expect(oldStore.projects[0].sshKeys[0].projectId).toBe(workspaceTemplate.id);
     delete oldStore.projects[0].sshKeys[1].name;
     oldStore.projects[0].sshKeys[1].publicKey = publicKey;
     oldStore.projects[0].sshKeys[1].fingerprint = "SHA256:legacy";
@@ -153,11 +160,14 @@ describe("projects", () => {
     await expect(createWorkspaceTemplateSshKey(workspaceTemplate.id, await readFile(encryptedKeyPath, "utf8"), file, keyFile)).rejects.toThrow("incorrect passphrase");
   });
 
-  test("project environment variables support empty values", async () => {
+  test("Workspace template environment variables support empty values", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-environment-")), "projects.json");
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/environment-project.git", file)).workspaceTemplate;
 
     const created = await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "API_URL", value: "https://api.example.com" }, file);
+    expect(created.workspaceTemplateId).toBe(workspaceTemplate.id);
+    expect(created).not.toHaveProperty("projectId");
+    expect(JSON.parse(await readFile(file, "utf8")).projects[0].environment[0].projectId).toBe(workspaceTemplate.id);
     await createWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, { name: "EMPTY", value: "" }, file);
     await updateWorkspaceTemplateEnvironmentVariable(workspaceTemplate.id, created.id, { name: "SERVICE_URL", value: "https://service.example.com" }, file);
 
@@ -172,7 +182,7 @@ describe("projects", () => {
     expect(await listWorkspaceTemplateEnvironmentVariables(workspaceTemplate.id, file)).toHaveLength(1);
   });
 
-  test("deleteProject removes a project by id", async () => {
+  test("deleteWorkspaceTemplate removes a Workspace template by id", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-projects-")), "projects.json");
     const first = (await addWorkspaceTemplate("https://github.com/org/first.git", file)).workspaceTemplate;
     const second = (await addWorkspaceTemplate("https://github.com/org/second.git", file)).workspaceTemplate;
@@ -182,17 +192,24 @@ describe("projects", () => {
     expect(await listWorkspaceTemplates(file)).toEqual({ workspaceTemplates: [second] });
   });
 
-  test("git identity settings are stored by the projects module", async () => {
+  test("Settings Commit identity is stored by the workspace-templates module", async () => {
     const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-")), "project-settings.json");
 
-    expect(await hasGitIdentity(file)).toBe(false);
-    await setGitIdentity({ name: " Ada Lovelace ", email: " ada@example.com " }, file);
+    expect(await hasCommitIdentity(file)).toBe(false);
+    await setCommitIdentity({ name: " Ada Lovelace ", email: " ada@example.com " }, file);
 
-    expect(await hasGitIdentity(file)).toBe(true);
-    expect(await getGitIdentity(file)).toEqual({ name: "Ada Lovelace", email: "ada@example.com" });
+    expect(await hasCommitIdentity(file)).toBe(true);
+    expect(await getCommitIdentity(file)).toEqual({ name: "Ada Lovelace", email: "ada@example.com" });
+    expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ gitIdentity: { name: "Ada Lovelace", email: "ada@example.com" } });
   });
 
-  test("git identity adopts the host global git config when app settings are empty", async () => {
+  test("Commit identity reads the existing serialized gitIdentity field", async () => {
+    const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-commit-identity-")), "project-settings.json");
+    await writeFile(file, JSON.stringify({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } }));
+    expect(await getStoredCommitIdentity(file)).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
+  });
+
+  test("Commit identity adopts the host global git config when Settings has no saved Commit identity", async () => {
     const previousDataDir = process.env.ATELIER_DATA_DIR;
     const previousGlobalConfig = process.env.GIT_CONFIG_GLOBAL;
     const dataDir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-settings-"));
@@ -202,9 +219,9 @@ describe("projects", () => {
     try {
       await writeFile(gitConfig, "[user]\n\tname = Grace Hopper\n\temail = grace@example.com\n", "utf8");
 
-      expect(await getStoredGitIdentity()).toBeUndefined();
-      expect(await getGitIdentity()).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
-      expect(JSON.parse(await readFile(gitIdentitySettingsFile(), "utf8"))).toEqual({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } });
+      expect(await getStoredCommitIdentity()).toBeUndefined();
+      expect(await getCommitIdentity()).toEqual({ name: "Grace Hopper", email: "grace@example.com" });
+      expect(JSON.parse(await readFile(commitIdentitySettingsFile(), "utf8"))).toEqual({ gitIdentity: { name: "Grace Hopper", email: "grace@example.com" } });
     } finally {
       if (previousDataDir === undefined) delete process.env.ATELIER_DATA_DIR;
       else process.env.ATELIER_DATA_DIR = previousDataDir;
@@ -212,4 +229,18 @@ describe("projects", () => {
       else process.env.GIT_CONFIG_GLOBAL = previousGlobalConfig;
     }
   });
+});
+
+test("seeding permission defaults off for older templates and persists an explicit opt-in", async () => {
+  const file = join(await mkdtemp(join(tmpdir(), "agents-in-the-cloud-seed-permission-")), "projects.json");
+  const template = (await addWorkspaceTemplate("https://github.com/org/nested.git", file)).workspaceTemplate;
+  expect(template.seedConfigEnabled).toBe(false);
+  const original = template.configurationFingerprint;
+  const enabled = (await setWorkspaceTemplateSeedConfigEnabled(template.id, true, file)).workspaceTemplate;
+  expect(enabled.seedConfigEnabled).toBe(true);
+  expect(enabled.configurationFingerprint).not.toBe(original);
+  expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.seedConfigEnabled).toBe(true);
+  const disabled = (await setWorkspaceTemplateSeedConfigEnabled(template.id, false, file)).workspaceTemplate;
+  expect(disabled.seedConfigEnabled).toBe(false);
+  expect(disabled.configurationFingerprint).toBe(original);
 });

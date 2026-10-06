@@ -1021,3 +1021,33 @@ test("aborting one tool preserves the turn and other tool calls", async () => {
   expect(faux.state.callCount).toBe(2);
   expect(await agent.abortTool(stopping.id)).toBe(false);
 });
+
+test("cancelling one queued input leaves the active turn and other steering intact", async () => {
+  const { runtime, faux } = await setup();
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  faux.setResponses([async () => {
+    entered.resolve();
+    await release.promise;
+    return fauxAssistantMessage("Original answer");
+  }, fauxAssistantMessage("Kept steering answer")]);
+  const agent = await runtime.agent(record);
+  const original = await agent.submit({ requestId: "original", text: "Keep running" });
+  await entered.promise;
+  const cancelled = await agent.submit({ requestId: "cancelled", text: "Remove me" });
+  const kept = await agent.submit({ requestId: "kept", text: "Keep me" });
+  const other = await runtime.agent({ ...record, agentId: "other" });
+  expect(await other.cancelQueuedInput(String(cancelled.id))).toBe(false);
+  expect(await agent.cancelQueuedInput(String(cancelled.id))).toBe(true);
+  expect(await agent.cancelQueuedInput(String(cancelled.id))).toBe(false);
+  expect((await cancelled.status(context)).status).toBe("unanswered");
+  expect((await kept.status(context)).status).toBe("queued");
+  const duplicate = await agent.submit({ requestId: "cancelled", text: "Must not requeue" });
+  expect(duplicate.id).toBe(cancelled.id);
+  expect((await duplicate.status(context)).status).toBe("unanswered");
+  release.resolve();
+  expect((await original.wait(context)).status).toBe("done");
+  expect((await kept.wait(context)).status).toBe("done");
+  expect(await agent.cancelQueuedInput(String(kept.id))).toBe(false);
+  expect(JSON.stringify((await agent.context(context)).messages)).not.toContain("Remove me");
+});

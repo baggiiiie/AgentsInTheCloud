@@ -18,7 +18,7 @@ import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import { parseModelRef, renderModelsDialog } from "@agents-in-the-cloud/llm/server";
-import { getWorkspaceTemplateConfiguration, isGitWorkspaceTemplateInit, isSshAuthenticationFailure, listWorkspaceTemplates, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, workspaceInitFromTemplate, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSummary } from "@agents-in-the-cloud/workspace-templates";
+import { getWorkspaceTemplateConfiguration, isGitWorkspaceTemplateInit, workspaceTemplateIdFromInit, isSshAuthenticationFailure, listWorkspaceTemplates, sshHostTrustFailure, scanSshHost, trustScannedSshHost, workspaceSshTrustRequests, onWorkspaceSshTrustChanged, decideWorkspaceSshTrust, cancelWorkspaceSshTrust, workspaceInitFromTemplate, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSummary } from "@agents-in-the-cloud/workspace-templates";
 import { validDraftId } from "@agents-in-the-cloud/prompt/server";
 import {
   domId,
@@ -222,7 +222,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   const launchComposerFormId = "launch_composer_form";
   const workspaceTemplateRoutes = createWorkspaceTemplateRoutes({
     referencingWorkspaces: (workspaceTemplateId) => registry.list()
-      .filter((entry) => isGitWorkspaceTemplateInit(entry.init) && entry.init.projectId === workspaceTemplateId)
+      .filter((entry) => isGitWorkspaceTemplateInit(entry.init) && workspaceTemplateIdFromInit(entry.init) === workspaceTemplateId)
       .map((entry) => ({ workspaceId: entry.id, title: workspaceTitle(entry) })),
     invalidatePresentation,
     createAgentWorkspace: (workspaceTemplate, request) => createAgentWorkspaceFromForm(request, { workspaceTemplate }),
@@ -358,7 +358,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const workspaces = registry.list().map((entry) => {
       let workspaceTemplate: WorkspacePaneWorkspaceTemplate | undefined;
       if (isGitWorkspaceTemplateInit(entry.init)) {
-        workspaceTemplate = workspaceTemplatesById.get(entry.init.projectId) ?? { id: entry.init.projectId, title: entry.init.name };
+        workspaceTemplate = workspaceTemplatesById.get(workspaceTemplateIdFromInit(entry.init)) ?? { id: workspaceTemplateIdFromInit(entry.init), title: entry.init.name };
       }
       return {
         id: entry.id,
@@ -405,7 +405,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function workspaceWarningState(entry: WorkspaceEntry, workspaceTemplate?: WorkspaceTemplateConfiguration): Promise<WorkspaceWarningState> {
     const [configuration, dismissedWarnings] = await Promise.all([
-      workspaceTemplate ?? (isGitWorkspaceTemplateInit(entry.init) ? getWorkspaceTemplateConfiguration(entry.init.projectId) : undefined),
+      workspaceTemplate ?? (isGitWorkspaceTemplateInit(entry.init) ? getWorkspaceTemplateConfiguration(workspaceTemplateIdFromInit(entry.init)) : undefined),
       presentationStore.dismissedWarnings(entry.id),
     ]);
     return { warnings: workspaceWarnings(entry, configuration), dismissedWarnings };
@@ -507,13 +507,13 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   }
 
   function workspaceBootResidentHtml(entry: WorkspaceEntry): string {
-    const workspaceTemplateId = isGitWorkspaceTemplateInit(entry.init) ? entry.init.projectId : undefined;
+    const workspaceTemplateId = isGitWorkspaceTemplateInit(entry.init) ? workspaceTemplateIdFromInit(entry.init) : undefined;
     const snapshot = provisioning.snapshot(entry.id);
     const failed = entry.phase.kind === "provisioningPhase" && entry.phase.status === "failed";
-    // Deleting is a recovery decision; offer it only once provisioning has stopped progressing.
-    const stalled = failed || (!!snapshot && snapshot.status !== "running");
+    // Waiting means a step failed and needs a recovery decision; done is not a failure.
+    const needsRecovery = failed || snapshot?.status === "failed" || snapshot?.status === "waiting";
     const deleteButton = buttonHtml({ type: "submit", variant: "danger", content: { kind: "caption", caption: "Delete workspace" } });
-    const deleteAction = stalled ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
+    const deleteAction = needsRecovery ? `<form class="workspace-boot-actions" method="post" action="/workspaces/${encodeURIComponent(entry.id)}/delete">${deleteButton}</form>` : "";
     const sourceFailure = snapshot?.steps.find((step) => step.id === "workspace.source" && step.status === "failed");
     const sourceError = `${sourceFailure?.output ?? ""}\n${sourceFailure?.error ?? ""}`;
     const needsSshKey = !!sourceFailure?.error && isSshAuthenticationFailure(sourceFailure.error);
@@ -670,7 +670,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       requestingAttention: entry.requestingAttention,
       };
       if (entry.issues?.length) workspace.issues = entry.issues;
-      if (isGitWorkspaceTemplateInit(entry.init)) workspace.workspaceTemplateId = entry.init.projectId;
+      if (isGitWorkspaceTemplateInit(entry.init)) workspace.workspaceTemplateId = workspaceTemplateIdFromInit(entry.init);
       return workspace;
     }) });
   }
@@ -858,7 +858,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
         const candidate = await scanSshHost(address.host, address.port);
         const form = await request.formData();
         if (address.changed && form.get("confirmation") !== (address.port === 22 ? address.host : `${address.host}:${address.port}`)) throw invalidArguments("Confirm the changed server identity before trusting it");
-        await trustScannedSshHost(entry.init.projectId, candidate, form.getAll("key").map(String));
+        await trustScannedSshHost(workspaceTemplateIdFromInit(entry.init), candidate, form.getAll("key").map(String));
         provisioning.resume(id, "retry");
       }
       hostTrustPanels.delete(id);
@@ -951,7 +951,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const force = new URL(request.url).searchParams.get("force") === "1";
     const result = await requestWorkspaceParkedState(id, parked, force);
     if (result.kind === "confirmation") {
-      if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal and VS Code sessions cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
+      if (requestAcceptsJson(request)) return jsonResponse({ error: { code: "workspace_park_confirmation_required", message: "Terminal sessions and VS Code views cannot recover after parking." }, workViews: result.workViews }, { status: 409 });
       const confirmation = renderWorkspaceParkConfirmation(id, workspaceTitle(entry), result.workViews);
       return wantsStream(request)
         ? turboStreamResponse(update(workspaceModuleModalFrameId, confirmation))

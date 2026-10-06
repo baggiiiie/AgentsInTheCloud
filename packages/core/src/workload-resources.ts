@@ -7,7 +7,7 @@ async function resources(): Promise<
   // A developer's local Docker context has no System-owned workload group.
   return text === undefined ? undefined : JSON.parse(text);
 }
-export async function workloadBuildArgs(): Promise<string[]> {
+export async function workloadCgroupArgs(): Promise<string[]> {
   const config = await resources();
   return config ? ["--cgroup-parent", config.workloadsCgroupParent] : [];
 }

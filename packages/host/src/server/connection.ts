@@ -1,4 +1,3 @@
-import { hostOriginAllowed } from "./authorization.ts";
 import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
 import { existsSync } from "node:fs";
@@ -31,9 +30,9 @@ export function hostRequest<Command extends HostCommand>(request: Command, socke
   });
 }
 
-export const hostTerminalSocket: WorkspaceServerSocketHandler = (url, request) => {
+export const hostTerminalSocket: WorkspaceServerSocketHandler = (url) => {
   const match = url.pathname.match(/^\/host\/terminals\/(host-[a-f0-9-]{36})\/ws$/);
-  if (!match || !hostOriginAllowed(request)) return;
+  if (!match) return;
   let upstream: ReturnType<typeof createConnection> | undefined;
   let clientOpen = false;
   return {

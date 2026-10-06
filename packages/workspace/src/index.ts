@@ -249,7 +249,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   const modelsJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsJson", path, "seedPiConfig.modelsJson") : undefined;
   const modelsStoreJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsStoreJson", path, "seedPiConfig.modelsStoreJson") : undefined;
   const seedAgentsInTheCloudConfigRecord = optionalRecord(record, "seedAgentsInTheCloudConfig", path);
-  const projectsJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
+  const workspaceTemplatesJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
   const manifest: RepoWorkspaceManifest = { version: 1 };
   if (initScripts) manifest.initScripts = initScripts;
   if (seedPiConfigRecord) {
@@ -260,7 +260,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   }
   if (seedAgentsInTheCloudConfigRecord) {
     manifest.seedAgentsInTheCloudConfig = {};
-    if (projectsJson) manifest.seedAgentsInTheCloudConfig.projectsJson = projectsJson;
+    if (workspaceTemplatesJson) manifest.seedAgentsInTheCloudConfig.projectsJson = workspaceTemplatesJson;
   }
   return manifest;
 }
@@ -455,8 +455,9 @@ export async function createWorkspace(options: { id: string; events: AgentsInThe
       activePlan.mounts.push({ type: "volume", target: "/data" });
       activePlan.mounts.push({ type: "bind", source: "/data/erofs-cache", target: "/data/erofs-cache", readonly: true });
       activePlan.mounts.push({ type: "bind", source: dockerHostAgentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspace-sockets", id), target: "/run/agents-in-the-cloud-parent", readonly: true });
-      await applyRepoWorkspaceManifest(id, source.worktreePath, activePlan);
       await events.emit("workspace_plan_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot, plan: activePlan });
+      // Host modules authorize seeding before any repository-requested config is exported.
+      await applyRepoWorkspaceManifest(id, source.worktreePath, activePlan);
       // Gate once, after all modules have contributed their image requests.
       if (!activePlan.privileged) activePlan.preloadImages = [];
       return activePlan;

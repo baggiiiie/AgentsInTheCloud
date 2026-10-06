@@ -3,7 +3,7 @@ import { createWorkspaceMetadataState } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
-const identitySchema = Type.Object({ workspaceId: Type.String({ pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$", maxLength: 128 }), agentId: Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }) }, { additionalProperties: false });
+const identitySchema = Type.Object({ workspaceId: Type.String({ pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$", maxLength: 128 }), agentId: Type.String({ pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" }), instructionDelivery: Type.Optional(Type.Literal("system-prompt")) }, { additionalProperties: false });
 export type AgentMcpIdentity = Static<typeof identitySchema>;
 const schema = Type.Object({ agents: Type.Record(Type.String(), Type.String()) });
 

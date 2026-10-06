@@ -38,6 +38,7 @@ export interface UpdateManagerDeps {
 
 class UpdateConflictError extends Error {}
 
+/** Coordinates Updates for the System-managed installation, not Workspace packages or agent CLIs. */
 export class UpdateManager {
   private context: WorkspaceServerModuleContext | undefined;
   private runtime: SelfUpdateRuntime | undefined;

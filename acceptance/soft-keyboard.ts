@@ -63,7 +63,7 @@ async function openPwa(): Promise<WebKitPage> {
 let page = await openPwa();
 await page.enableNetwork();
 const report = new Report(out, "Soft keyboard acceptance (Tier 2, iPhone 15 Pro simulator, PWA)", {
-  atelier: args.atelier, app: args.app, simulator: sim.udid, workspace: setup.workspaceId, "built-in agent": setup.builtinId, "Pi agent": setup.piId, "terminal tab": setup.terminalKey, started: new Date().toISOString(),
+  atelier: args.atelier, app: args.app, simulator: sim.udid, workspace: setup.workspaceId, "built-in agent": setup.builtinId, "Pi agent": setup.piId, "Terminal view": setup.terminalKey, started: new Date().toISOString(),
 });
 
 const builtinPath = `/workspaces/${setup.workspaceId}?agent=${setup.builtinId}`;
@@ -280,7 +280,7 @@ await scenario("ios-D12-D13-tap-outside", "D12/D13: tapping outside the text fie
   recorder.add(check("Keyboard down", !after.keyboard && !after.focus.includes("composer-input"), `arranged: ${after.keyboard}, focus: ${after.focus || "body"}`));
 });
 
-await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, quick launches, footer or floating buttons; the full-width text runs under send in the bottom-right corner.", async (recorder) => {
+await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only typing UI shows: no attach, close, transcribe, prompt template buttons, footer or floating buttons; the full-width text runs under send in the bottom-right corner.", async (recorder) => {
   await openComposer();
   await tap(sel.input);
   await Bun.sleep(1500);
@@ -297,8 +297,8 @@ await scenario("ios-D7-D23-typing-mode", "D7/D23: while the keyboard is up only 
     // Two controls of 62.5px, each with its 4px inset above and below.
     check("The text field is at least two controls tall", placement.input[3] >= 2 * (62.5 + 8) - 1, `text field ${Math.round(placement.input[3])}px tall, min ${2 * (62.5 + 8)}px`),
   );
-  const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-quick-launches", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-transcribe"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
-  recorder.add(check("D7: attach, close, transcribe, quick launches and footer hidden", hidden.length === 0, hidden.length ? `visible: ${hidden.join(", ")}` : "all hidden"));
+  const hidden = await page.evaluate<string[]>(`[".agent-composer-pane .composer-footer", ".agent-composer-pane .composer-prompt-template-buttons", ".agent-composer-pane .composer-attach", ".agent-composer-pane .composer-close", ".agent-composer-pane .composer-dictation"].filter((s) => [...document.querySelectorAll(s)].some((e) => e.checkVisibility()))`);
+  recorder.add(check("D7: attach, close, transcribe, prompt template buttons and footer hidden", hidden.length === 0, hidden.length ? `visible: ${hidden.join(", ")}` : "all hidden"));
   await recorder.file("typing.png", await sim.screenshot());
   await tapDone();
   await Bun.sleep(1200);
@@ -312,18 +312,18 @@ await scenario("ios-composer-tap-and-column", "On the phone itself: a tap anywhe
   await Bun.sleep(400);
   const beside = await page.evaluate<{ x: number; y: number } | null>(`(() => {
     const pane = [...document.querySelectorAll(".agent-composer-pane")].find((e) => e.checkVisibility());
-    const row = pane.querySelector(".composer-quick-launches");
+    const row = pane.querySelector(".composer-prompt-template-buttons");
     const buttons = [...row.querySelectorAll("button")];
     if (!buttons.length || !row.checkVisibility()) return null;
     const last = buttons[buttons.length - 1].getBoundingClientRect();
     return { x: last.right + 20, y: last.top + last.height / 2 + ${sim.screen.height} - document.documentElement.clientHeight };
   })()`);
   if (beside) {
-    const { after } = await transition(recorder, "tap beside the quick launches", () => sim.tap(beside.x, beside.y));
+    const { after } = await transition(recorder, "tap beside the prompt template buttons", () => sim.tap(beside.x, beside.y));
     recorder.add(check("A tap outside the controls focuses the text", after.focus.includes("composer-input") && after.keyboard, `focus: ${after.focus}, arranged: ${after.keyboard}`));
     await tapDone();
     await Bun.sleep(1200);
-  } else recorder.add(check("Quick launches staged", false, "this workspace has no quick-launch prompt templates"));
+  } else recorder.add(check("Prompt template buttons staged", false, "this workspace has no prompt templates with composer buttons"));
   // The column: one button per row, all sharing the right edge.
   const measure = (): Promise<{ column: boolean; composer: number; max: number }> => page.evaluate(`(() => {
     const c = [...document.querySelectorAll(".agent-composer-pane > .composer")].find((e) => e.checkVisibility());
@@ -347,7 +347,7 @@ await scenario("ios-composer-tap-and-column", "On the phone itself: a tap anywhe
     navigator.mediaDevices.getUserMedia = async () => { const c = new AudioContext(); const o = c.createOscillator(); const d = c.createMediaStreamDestination(); o.connect(d); o.start(); return d.stream; };
     const Real = window.WebSocket;
     window.WebSocket = function (url, protocols) {
-      if (!String(url).includes("/transcription/realtime")) return new Real(url, protocols);
+      if (!String(url).includes("/dictation/realtime")) return new Real(url, protocols);
       const socket = new EventTarget(); socket.readyState = 1; let all = ""; let timer;
       const emit = (data) => socket.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(data) }));
       socket.send = (data) => {
@@ -363,15 +363,15 @@ await scenario("ios-composer-tap-and-column", "On the phone itself: a tap anywhe
     window.WebSocket.OPEN = 1;
     return true;
   })()`);
-  const dictate = await point(".agent-composer-pane [data-transcription-composer-target=\"button\"]");
+  const dictate = await point(".agent-composer-pane [data-dictation-composer-target=\"button\"]");
   await sim.tap(dictate.x, dictate.y);
   await Bun.sleep(2000);
   // First use on a fresh simulator asks for the microphone.
-  if (await page.evaluate<string>(`[...document.querySelectorAll('.agent-composer-pane [data-transcription-composer-target="button"]')].find((e) => e.checkVisibility()).dataset.state`) === "loading") await sim.tap(271, 473);
+  if (await page.evaluate<string>(`[...document.querySelectorAll('.agent-composer-pane [data-dictation-composer-target="button"]')].find((e) => e.checkVisibility()).dataset.state`) === "loading") await sim.tap(271, 473);
   await Bun.sleep(5000);
   const dictated = await measure();
   recorder.add(check("B: dictating long text keeps the column within the max", dictated.column && dictated.composer <= dictated.max + 1, `column: ${dictated.column}, composer ${Math.round(dictated.composer)}px, max ${Math.round(dictated.max)}px`));
-  await tap('.agent-composer-pane [data-transcription-composer-target="button"]');
+  await tap('.agent-composer-pane [data-dictation-composer-target="button"]');
   await Bun.sleep(1500);
   await set("");
   await Bun.sleep(300);
@@ -449,8 +449,8 @@ await scenario("ios-D2-D17-send", "D2/D17: sending on mobile closes the composer
   await Bun.sleep(5000);
 });
 
-// ─── Terminal tab ───────────────────────────────────────────────────────────
-await navigate(terminalPath, ".terminal-pane .observable-terminal-host");
+// ─── Terminal view ───────────────────────────────────────────────────────────
+await navigate(terminalPath, ".terminal-view .observable-terminal-host");
 
 async function terminalLines(): Promise<string[]> {
   const session = Object.keys(await tmuxSizes(setup.workspaceId)).find((name) => !name.startsWith("pi-"))!;
@@ -458,8 +458,8 @@ async function terminalLines(): Promise<string[]> {
   return (await new Response(process.stdout).text()).split("\n").filter((line) => line.trim());
 }
 
-await scenario("ios-D15-D16-terminal-tab", "D15/D16: in a focused terminal tab the key row sits right above the keyboard, and Enter goes to the terminal without dismissing anything.", async (recorder) => {
-  const { after } = await transition(recorder, "focus terminal tab", () => tap(".terminal-pane .terminal-stage", { y: -100 }));
+await scenario("ios-D15-D16-terminal-tab", "D15/D16: in a focused Terminal view the key row sits right above the keyboard, and Enter goes to the terminal without dismissing anything.", async (recorder) => {
+  const { after } = await transition(recorder, "focus Terminal view", () => tap(".terminal-view .terminal-stage", { y: -100 }));
   recorder.add(
     check("D16: key row right above the keyboard", after.keyRow !== null && close(bottom(after.keyRow), keyboardTop(after), 2), `key row ${JSON.stringify(after.keyRow)}, keyboard top ${keyboardTop(after)}`),
     check("D19: terminal kept its size", after.terminal !== null, JSON.stringify(after.terminal)),
@@ -483,7 +483,7 @@ await scenario("ios-D20-rotation", "D20: rotating with the keyboard down resizes
   const pi = Object.keys(await tmuxSizes(setup.workspaceId)).find((name) => name.startsWith("pi-"))!;
   const since = (start: number) => page.resizes.slice(start);
   const describe = (resizes: typeof page.resizes): string => resizes.map((item) => `${item.payload} on ${item.url.replace(/^.*\/workspaces\/[^/]+\//, "").replace(/\?.*$/, "")}`).join(", ") || "none";
-  // Every connected terminal (the Pi agent, and the terminal tab kept alive in the background) resizes at most once; Pi exactly once.
+  // Every connected terminal (the Pi agent, and the Terminal view kept alive in the background) resizes at most once; Pi exactly once.
   const oncePerTerminal = (resizes: typeof page.resizes): boolean => {
     const counts = new Map<string, number>();
     for (const item of resizes) counts.set(item.url, (counts.get(item.url) ?? 0) + 1);
@@ -533,7 +533,7 @@ await scenario("ios-D20-rotation", "D20: rotating with the keyboard down resizes
 await scenario("ios-launch-keyboard", "Launch starts ready for dictation, fills the space above the keyboard, and restores settings after dismissal.", async (recorder) => {
   await page.evaluate<boolean>('(localStorage.removeItem("agents-in-the-cloud:software-keyboard"), true)');
   await navigate("/workspaces/new", ".launch-composer .composer-input");
-  recorder.add(check("Opening launch leaves keyboard down", await page.evaluate<boolean>("!document.documentElement.classList.contains('software-keyboard-visible') && document.activeElement.tagName !== 'TEXTAREA'"), "no textarea focus on open"), check("Dictation available", await visible(".launch-composer .composer-transcribe button"), "dictation visible"));
+  recorder.add(check("Opening launch leaves keyboard down", await page.evaluate<boolean>("!document.documentElement.classList.contains('software-keyboard-visible') && document.activeElement.tagName !== 'TEXTAREA'"), "no textarea focus on open"), check("Dictation available", await visible(".launch-composer .composer-dictation button"), "dictation visible"));
   await tap(".launch-composer .composer-input");
   await Bun.sleep(1600);
   const geometry = await page.evaluate<{ keyboard: boolean; fits: boolean; controls: boolean; fills: boolean; gap: number; inputHeight: number }>(`(() => {
@@ -541,14 +541,14 @@ await scenario("ios-launch-keyboard", "Launch starts ready for dictation, fills 
     const send = document.querySelector(".launch-composer .composer-send button").getBoundingClientRect();
     const input = document.querySelector(".launch-composer .composer-input").getBoundingClientRect();
     const top = visualViewport.offsetTop, bottom = top + visualViewport.height;
-    return { keyboard: document.documentElement.classList.contains("software-keyboard-visible"), fits: d.top >= top - 1 && d.bottom <= bottom + 1 && send.bottom <= bottom, fills: d.top <= top + 10 && d.bottom >= bottom - 10, gap: bottom - input.bottom, inputHeight: input.height, controls: !document.querySelector(".launch-composer .composer-footer").checkVisibility() && !document.querySelector(".launch-composer .composer-transcribe").checkVisibility() };
+    return { keyboard: document.documentElement.classList.contains("software-keyboard-visible"), fits: d.top >= top - 1 && d.bottom <= bottom + 1 && send.bottom <= bottom, fills: d.top <= top + 10 && d.bottom >= bottom - 10, gap: bottom - input.bottom, inputHeight: input.height, controls: !document.querySelector(".launch-composer .composer-footer").checkVisibility() && !document.querySelector(".launch-composer .composer-dictation").checkVisibility() };
   })()`);
   recorder.add(check("Keyboard arranged with launch and send above it", geometry.keyboard && geometry.fits, JSON.stringify(geometry)), check("Typing mode removes settings and auxiliary controls", geometry.controls, JSON.stringify(geometry)));
   recorder.add(check("Empty launch editor fills the space above the keyboard", geometry.fills && geometry.gap >= 0 && geometry.gap <= 10, JSON.stringify(geometry)));
   await recorder.file("typing.png", await sim.screenshot());
   await blur();
   recorder.add(check("Keyboard dismissal returns to content-sized editing", await page.evaluate<number>('document.querySelector(".launch-composer .composer-input").getBoundingClientRect().height') < geometry.inputHeight, `typing height ${geometry.inputHeight}`));
-  recorder.add(check("Dismissal restores settings and dictation", await visible(".launch-composer .composer-footer") && await visible(".launch-composer .composer-transcribe"), "settings and dictation restored"));
+  recorder.add(check("Dismissal restores settings and dictation", await visible(".launch-composer .composer-footer") && await visible(".launch-composer .composer-dictation"), "settings and dictation restored"));
   await transition(recorder, "remembered launch focus", () => tap(".launch-composer .composer-input"), { waitMs: 1600 });
   await page.evaluate<boolean>('(() => { const i = document.querySelector(".launch-composer .composer-input"); i.value = "Long launch prompt\\n".repeat(80); i.dispatchEvent(new Event("input", { bubbles: true })); return true; })()');
   recorder.add(check("Long prompt leaves the end caret visible", await page.evaluate<boolean>('(() => { const i = document.querySelector(".launch-composer .composer-input"); return i.scrollTop + i.clientHeight >= i.scrollHeight - 1; })()'), "long prompt scrolled to its end"));

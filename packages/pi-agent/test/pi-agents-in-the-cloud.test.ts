@@ -42,7 +42,7 @@ function fakePi() {
 }
 
 function fixture() {
-  const identity = { workspaceId: "workspace-a", agentId: "agent-a" };
+  const identity = { workspaceId: "workspace-a", agentId: "agent-a", instructionDelivery: "system-prompt" as const };
   const token = "secret-token";
   const endpoint = createAgentMcpServer({
     authenticate: (candidate) => candidate === token ? identity : undefined,
@@ -65,25 +65,26 @@ function fixture() {
   const server = Bun.serve({ port: 0, fetch: (request) => endpoint.fetch(request) });
   cleanup.push(async () => { await endpoint.revoke({ workspaceId: identity.workspaceId }); server.stop(true); });
   return {
-    url: new URL("/mcp", server.url).href, token, turnSignalCommand: "/session/turn-signal.sh",
+    url: new URL("/mcp", server.url).href, token, turnSignalCommand: "/session/turn-signal.sh", instructions: "Use present to show interactive work.",
   };
 }
 
-test("pi-agents-in-the-cloud registers a native MCP server, not tools or system-prompt hooks", async () => {
-  const config = { url: "http://localhost:2988/mcp", token: "private", turnSignalCommand: "/session/signal.sh" };
+test("pi-agents-in-the-cloud registers a native MCP server, and appends full guidance to the native system prompt", async () => {
+  const config = { url: "http://localhost:2988/mcp", token: "private", turnSignalCommand: "/session/signal.sh", instructions: "Full guidance\n" + "x".repeat(12000) };
   const f = fakePi();
   registerPiAgentsInTheCloud(f.pi, config);
   expect(f.servers.get("agents-in-the-cloud")).toEqual({
     url: config.url, headers: { Authorization: "Bearer private" }, exposure: "codemode", timeout: 3600,
   });
   expect(f.tools.size).toBe(0);
-  expect([...f.handlers.keys()]).toEqual(["agent_start", "agent_end"]);
+  expect([...f.handlers.keys()]).toEqual(["before_agent_start", "agent_start", "agent_end"]);
+  expect(await f.handlers.get("before_agent_start")![0]!({ systemPrompt: "Built-in + user guidance" })).toEqual({ systemPrompt: "Built-in + user guidance\n\n" + config.instructions });
   await f.emit("agent_start");
   await f.emit("agent_end");
   expect(f.executions).toEqual([["sh", [config.turnSignalCommand, "started"]], ["sh", [config.turnSignalCommand, "finished"]]]);
 });
 
-test("Pi native MCP discovers AgentsInTheCloud tools and carries instructions in their namespace", async () => {
+test("Pi native MCP discovers AgentsInTheCloud tools and does not duplicate native prompt guidance in their namespace", async () => {
   const mcp = fixture();
   const f = fakePi();
   registerPiAgentsInTheCloud(f.pi, mcp);
@@ -99,7 +100,7 @@ test("Pi native MCP discovers AgentsInTheCloud tools and carries instructions in
   expect([...f.tools.keys()].filter((name) => name.startsWith("mcp__"))).toEqual(["mcp__agents_in_the_cloud__present", "mcp__agents_in_the_cloud__fail"]);
   const present = f.tools.get("mcp__agents_in_the_cloud__present")!;
   expect(present.exposure).toBe("deferred");
-  expect(present.namespace).toEqual({ name: "mcp__agents_in_the_cloud", instructions: "Use present to show interactive work." });
+  expect(present.namespace).toEqual({ name: "mcp__agents_in_the_cloud", instructions: undefined });
   const updates: string[] = [];
   const result = await present.execute("call", { kind: "browser" }, undefined, (update) => {
     updates.push(update.content[0]!.type === "text" ? update.content[0]!.text : "image");

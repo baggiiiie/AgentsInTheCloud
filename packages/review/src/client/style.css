@@ -58,6 +58,7 @@
 }
 .review-file > summary::-webkit-details-marker { display: none; }
 .review-file-meta { justify-content: flex-end; white-space: nowrap; }
+.workspace-deletion-commit-branches { max-width: min(35vw, 40ch); overflow: hidden; text-overflow: ellipsis; text-align: end; }
 .review-comment-count { color: var(--text-bright); font-family: var(--font-sans); font-weight: var(--weight-medium); }
 .review-git-stats { display: inline-flex; align-items: center; gap: 12px; }
 .review-stats-spinner { width: 14px; height: 14px; }

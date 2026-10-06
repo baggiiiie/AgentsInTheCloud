@@ -32,7 +32,7 @@ afterEach(async () => {
   dir = undefined;
 });
 
-test("a delegated agent finishing while its parent works does not request workspace attention", async () => {
+test("a Subagent finishing while its parent works does not request workspace attention", async () => {
   await dataDir();
   const root = await ensureDefaultWorkspaceAgent("workspace-1");
   const childId = crypto.randomUUID();
@@ -193,7 +193,7 @@ describe("Workspace Agent-tab provider", () => {
   test("Agent prompt-template expansion resolves the immutable conversation id, not its label", async () => {
     await dataDir();
     const conversation = await ensureDefaultWorkspaceAgent("workspace-1");
-    const request = (identity: string) => new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${encodeURIComponent(identity)}/completions/prompt-template-expand`, {
+    const request = (identity: string) => new Request(`http://agents-in-the-cloud.test/workspaces/workspace-1/agents/${encodeURIComponent(identity)}/completions/slash-command-expand`, {
       method: "POST",
       body: new URLSearchParams({ text: "Keep this prompt" }),
     });

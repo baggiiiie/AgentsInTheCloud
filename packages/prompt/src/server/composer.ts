@@ -1,6 +1,6 @@
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { renderTranscriptionComposerControl } from "@agents-in-the-cloud/transcription/server";
+import { renderDictationComposerControl } from "@agents-in-the-cloud/dictation/server";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { renderAttachmentChip, renderAttachmentPicker } from "./render-attachments.ts";
 import type { StagedAttachment } from "./attachment-drafts.ts";
@@ -11,16 +11,16 @@ const sendIcon = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m
 
 /**
  * The shared form body; each host owns its form, supplementary UI, and optional footer.
- * Buttons form one column on the right, top to bottom: close (collapsible composers only), attach, transcribe, send.
- * Quick launches wrap under the text field, beside the buttons.
+ * Buttons form one column on the right, top to bottom: close (collapsible composers only), attach, dictate, send.
+ * Prompt template buttons wrap under the text field, beside the buttons.
  */
 export function renderComposerBody(options: {
   draft: { id: string; rowId: string; attachments?: readonly StagedAttachment[] };
   inputHtml: string;
   sendHtml?: string;
   collapsible?: boolean;
-  /** A wrapping row of quick-launch buttons under the text field, filled from the completion catalog. */
-  quickLaunches?: boolean;
+  /** A wrapping row of prompt-template-button buttons under the text field, filled from the completion catalog. */
+  promptTemplateButtons?: boolean;
 }): string {
   const { draft } = options;
   const send = options.sendHtml ?? buttonHtml({ type: "submit", variant: "primary", content: { kind: "icon-only", iconHtml: sendIcon, label: "Send prompt" }, attributesHtml: "data-popular-button" });
@@ -29,10 +29,10 @@ export function renderComposerBody(options: {
     : "";
   return `<input type="hidden" name="attachmentDraft" value="${escapeHtml(draft.id)}">
     <div class="agent-attach-row" id="${escapeHtml(draft.rowId)}" data-agent-attachments-target="row">${(draft.attachments ?? []).map((attachment) => renderAttachmentChip(attachment, draft.id)).join("")}</div>
-    <div class="composer-input-area">${options.inputHtml}${options.quickLaunches ? '<div class="composer-quick-launches" data-agent-completions-target="quickLaunches"></div>' : ""}<div class="composer-buttons">
+    <div class="composer-input-area">${options.inputHtml}${options.promptTemplateButtons ? '<div class="composer-prompt-template-buttons" data-agent-completions-target="promptTemplateButtons"></div>' : ""}<div class="composer-buttons">
       ${close}
       <span class="composer-button composer-attach">${renderAttachmentPicker("icon-only")}</span>
-      <span class="composer-button composer-transcribe">${renderTranscriptionComposerControl()}</span>
+      <span class="composer-button composer-dictation">${renderDictationComposerControl()}</span>
       <span class="composer-button composer-send">${send}</span>
     </div></div>
     <p role="status" data-agent-attachments-target="status" hidden></p>`;

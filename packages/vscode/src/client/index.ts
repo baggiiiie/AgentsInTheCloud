@@ -35,14 +35,14 @@ export const vscodeClientModule: WorkspaceClientModule = {
     }
 
     class VSCodeNavigateController extends Controller {
-      static values = { paneId: String, path: String, delivered: Boolean };
-      declare readonly paneIdValue: string;
+      static values = { viewId: String, path: String, delivered: Boolean };
+      declare readonly viewIdValue: string;
       declare readonly pathValue: string;
       declare readonly deliveredValue: boolean;
       private observer?: MutationObserver;
 
       connect(): void {
-        // The presentation stream activates the pane; its body may still be loading.
+        // The presentation stream activates the view; its body may still be loading.
         this.observer = new MutationObserver(() => this.navigate());
         this.observer.observe(document.body, { childList: true, subtree: true });
         this.navigate();
@@ -53,7 +53,7 @@ export const vscodeClientModule: WorkspaceClientModule = {
       }
 
       private navigate(): void {
-        const frame = document.getElementById(this.paneIdValue)?.querySelector("iframe");
+        const frame = document.getElementById(this.viewIdValue)?.querySelector("iframe");
         if (!frame) return;
         this.observer!.disconnect();
         // The server already handed the file to the live VS Code windows. A

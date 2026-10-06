@@ -6,7 +6,7 @@ import { createAgentsInTheCloudControlTools } from "./tools.ts";
 import { abandonSettlingTurn, handleAgentTurnBoundary, type AgentTurnFinishReason } from "./turn-lifecycle.ts";
 import { prepareAppendedAgentsInTheCloudInstructions, sharedAgentsInTheCloudInstructions } from "./system-prompt.ts";
 
-async function agentMcpInstructions(workspaceId: string, agentId: string): Promise<string> {
+async function agentInstructions(workspaceId: string, agentId: string): Promise<string> {
   return [sharedAgentsInTheCloudInstructions, ...await prepareAppendedAgentsInTheCloudInstructions(events, workspaceId, agentId)].join("\n\n");
 }
 
@@ -16,7 +16,7 @@ let events: AgentsInTheCloudEventBus | undefined;
 const mcp = createAgentMcpServer({
   authenticate: (token) => credentialStore().authenticate(token),
   tools: ({ workspaceId }) => createAgentsInTheCloudControlTools(workspaceId, { events }),
-  instructions: ({ workspaceId, agentId }) => agentMcpInstructions(workspaceId, agentId),
+  instructions: ({ workspaceId, agentId }) => agentInstructions(workspaceId, agentId),
 });
 export function configureAgentMcp(eventBus: AgentsInTheCloudEventBus): void {
   events = eventBus;
@@ -39,8 +39,15 @@ export async function revokeAgentMcp(workspaceId: string, agentId: string): Prom
   await mcp.revoke({ workspaceId, agentId });
 }
 
-/** Start the workspace relay; the CLI owns writing credentials into its private configuration. */
-export async function prepareAgentMcp(workspaceId: string, agentId: string) {
+export interface CliAgentConnection {
+  url: string;
+  token: string;
+  /** Full guidance for the CLI's native prompt; deliberately omitted from its MCP response. */
+  instructions: string;
+}
+
+/** Prepare the relay, native instructions, and credential as one CLI connection. */
+export async function prepareCliAgentConnection(workspaceId: string, agentId: string): Promise<CliAgentConnection> {
   const result = await execWorkspaceShell(workspaceId, `set -eu
 # One loopback HTTP listener per workspace; parent Unix sockets survive host restarts.
 (
@@ -56,7 +63,8 @@ done
 cat /tmp/agents-in-the-cloud-mcp.log >&2
 exit 1`);
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Could not start workspace MCP relay");
-  return { url: "http://127.0.0.1:2988/mcp", token: credentialStore().issue({ workspaceId, agentId }) };
+  const instructions = await agentInstructions(workspaceId, agentId);
+  return { url: "http://127.0.0.1:2988/mcp", token: credentialStore().issue({ workspaceId, agentId, instructionDelivery: "system-prompt" }), instructions };
 }
 
 /** CLI agents run outside AgentsInTheCloud's runtime, so their turn boundaries arrive as authenticated loopback requests. */

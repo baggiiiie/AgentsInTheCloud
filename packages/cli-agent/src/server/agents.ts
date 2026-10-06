@@ -1,4 +1,4 @@
-import { prepareAgentMcp, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
+import { agentKey, publishWorkspaceAgentBusy, prepareCliAgentConnection, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";
@@ -27,6 +27,17 @@ const turnSettleTimeoutMs = 10_000;
 export async function checkedWorkspaceShell(workspaceId: string, command: string, stdin?: string): Promise<void> {
   const result = await execWorkspaceShell(workspaceId, command, { stdin });
   if (result.exitCode !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `Command failed (exit ${result.exitCode})`);
+}
+
+/** Write private session files in one workspace command, keeping contents off its command line. */
+export async function writeCliSessionFiles(workspaceId: string, session: CliAgentSession, files: Record<string, string>): Promise<void> {
+  const entries = Object.entries(files);
+  const commands = entries.map(([name, content], index) => {
+    const path = shellQuote(`${session.directory}/${name}`);
+    const write = index === entries.length - 1 ? `cat > ${path}` : `dd bs=1 count=${Buffer.byteLength(content)} of=${path} status=none`;
+    return `mkdir -p "$(dirname ${path})"\n${write}`;
+  });
+  await checkedWorkspaceShell(workspaceId, `set -eu\numask 077\n${commands.join("\n")}`, entries.map(([, content]) => content).join(""));
 }
 
 export function createCliAgents(adapter: CliAgentAdapter, onTitleChanged: (workspaceId: string, id: string, title: string) => Promise<void>) {
@@ -67,6 +78,10 @@ export function createCliAgents(adapter: CliAgentAdapter, onTitleChanged: (works
     const { id } = agent;
     const ready = Promise.withResolvers<void>();
     starting.set(id, ready.promise);
+    // A claimed prompt is already work, even while the CLI is installing. Native
+    // turn hooks take over this same busy state once the first turn begins.
+    const pendingPrompt = !!input && !!(input.text.trim() || input.images.length || input.attachmentNotes.length);
+    if (pendingPrompt) publishWorkspaceAgentBusy({ workspaceId, agentKey: agentKey(id), busy: true });
     try {
       await adapter.prepareWorkspace?.(workspaceId);
       const directory = `/tmp/agents-in-the-cloud-attachments/${adapter.id}-${id}`;
@@ -78,19 +93,25 @@ export function createCliAgents(adapter: CliAgentAdapter, onTitleChanged: (works
         await checkedWorkspaceShell(workspaceId, `mkdir -p ${shellQuote(directory)} && base64 -d > ${shellQuote(path)}`, image.data);
         imagePaths.push(path);
       }
-      const mcp = await prepareAgentMcp(workspaceId, id);
+      const connection = await prepareCliAgentConnection(workspaceId, id);
       const sessionDirectory = `/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-agents/${id}`;
       const turnSignalCommand = `${sessionDirectory}/turn-signal.sh`;
       const launchSession: CliAgentSession = { id, directory: sessionDirectory, turnSignalCommand };
       // $1 is the TurnBoundary the CLI reports.
-      await checkedWorkspaceShell(workspaceId, `umask 077; mkdir -p ${shellQuote(sessionDirectory)} && cat > ${shellQuote(turnSignalCommand)}`, `#!/bin/sh
-exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${shellQuote("Authorization: Bearer " + mcp.token)} ${shellQuote(new URL("/agent-turn-", mcp.url).href)}"$1"
-`);
-      const env = { HOME: "/home/agents-in-the-cloud", ...await adapter.prepareSession?.(workspaceId, launchSession, mcp) };
+      await writeCliSessionFiles(workspaceId, launchSession, { "turn-signal.sh": `#!/bin/sh
+exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${shellQuote("Authorization: Bearer " + connection.token)} ${shellQuote(new URL("/agent-turn-", connection.url).href)}"$1"
+` });
+      const env = { HOME: "/home/agents-in-the-cloud", ...await adapter.prepareSession(workspaceId, launchSession, connection) };
       const script = input
         ? adapter.launchScript(input, imagePaths, settings, launchSession)
         : await adapter.resumeScript!(workspaceId, settings, launchSession);
-      const command = `/bin/bash -c ${shellQuote(script)}`;
+      // The launch script has its own diagnostic traps. Keep the lifecycle trap
+      // in an outer shell so installation failures (before any native hook) also
+      // finish the pending work. Normal turns still finish through native hooks.
+      const exitSignal = `code=$?; if [ "$code" -eq 0 ]; then sh ${shellQuote(turnSignalCommand)} finished; else sh ${shellQuote(turnSignalCommand)} failed; fi`;
+      const command = pendingPrompt
+        ? `/bin/bash -c ${shellQuote(`trap ${shellQuote(exitSignal)} EXIT\n/bin/bash -c ${shellQuote(script)}`)}`
+        : `/bin/bash -c ${shellQuote(script)}`;
       await checkedWorkspaceShell(workspaceId, buildObservableSessionCommand({ requireExistingServer: true, session: agent.tmuxSession, cwd: workspaceRoot, command, env, remainOnExit: true, passthrough: true, historyLimit: 10000 }));
       delete agent.error;
       store().write(workspaceId, { agents: list(workspaceId) });
@@ -99,6 +120,7 @@ exec curl --noproxy '*' --fail --silent --show-error --max-time 10 -X POST -H ${
       agent.error = errorMessage(error);
       store().write(workspaceId, { agents: list(workspaceId) });
       await revokeAgentMcp(workspaceId, id);
+      if (pendingPrompt) publishWorkspaceAgentBusy({ workspaceId, agentKey: agentKey(id), busy: false });
     } finally {
       starting.delete(id);
       ready.resolve();

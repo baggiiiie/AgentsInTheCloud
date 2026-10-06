@@ -3,7 +3,7 @@ import { createObservableTerminalSocket, terminalSocketDimensions } from "@agent
 import type { WorkspaceServerSocketHandler } from "@agents-in-the-cloud/shared";
 import { workspaceContainerName, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { terminalIdFromViewKey } from "../shared.ts";
-import { listWorkspaceTerminals } from "./workspace-terminals.ts";
+import { listWorkspaceTerminals, tmuxSessionExists } from "./workspace-terminals.ts";
 
 export function createTerminalSocketHandler(): WorkspaceServerSocketHandler {
   return async (url) => {
@@ -20,6 +20,6 @@ export function createTerminalSocketHandler(): WorkspaceServerSocketHandler {
       ...terminalSocketDimensions(url),
       user: "agents-in-the-cloud",
       workdir: workspaceRoot,
-    });
+    }, { sessionExists: () => tmuxSessionExists(workspaceId, terminal.tmuxSession) });
   };
 }
