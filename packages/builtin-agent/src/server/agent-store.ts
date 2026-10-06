@@ -121,7 +121,8 @@ export async function setWorkspaceAgentTitle(agent: WorkspaceAgentInfo, title: s
   });
 }
 
-export async function archiveWorkspaceAgent(agent: WorkspaceAgentInfo): Promise<void> {
+/** Remove a closed Agent from the active list without deleting its transcript. */
+export async function removeClosedWorkspaceAgent(agent: WorkspaceAgentInfo): Promise<void> {
   await serializeAgentOperation(agent.workspaceId, async () => {
     const current = (await listWorkspaceAgentsUnlocked(agent.workspaceId)).find((item) => item.agentId === agent.agentId)!;
     await saveAgentRecords(current.workspaceId, (await agentRecords(current.workspaceId)).filter((item) => item.agentId !== current.agentId));

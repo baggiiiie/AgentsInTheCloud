@@ -24,7 +24,7 @@ test("concurrent project additions preserve every project", async () => {
   expect(stored.workspaceTemplates.map((workspaceTemplate) => workspaceTemplate.id).sort()).toEqual(added.map(({ workspaceTemplate }) => workspaceTemplate.id).sort());
 });
 
-test("project, environment, and encrypted secret mutations share one transaction", async () => {
+test("Workspace template, environment variable, and encrypted Secret mutations share one transaction", async () => {
   const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/repo.git", file);
   await Promise.all([
     updateWorkspaceTemplate(workspaceTemplate.id, { name: "Renamed", spec: workspaceTemplate.gitUrl }, file),

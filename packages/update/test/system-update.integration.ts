@@ -11,7 +11,7 @@ import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { prepareUpdate } from "../src/server/docker.ts";
 import { UpdateManager } from "../src/server/index.ts";
-import { readStoredReleaseChannel, writeStoredReleaseChannel } from "../src/server/settings-store.ts";
+import { readStoredUpdateChannel, writeStoredUpdateChannel } from "../src/server/settings-store.ts";
 
 process.env.ATELIER_DATA_DIR = "/data/app";
 
@@ -61,7 +61,7 @@ function manager(digest: string) {
     // Fixture registry supplies immutable manifests; preparation is the production code.
     fetchMetadata: async () => ({ digest }),
     prepareUpdate: (reference, progress) => prepareUpdate(`${registry}/agents-in-the-cloud@${reference.split("@")[1]}`, progress),
-    readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel,
+    readChannel: readStoredUpdateChannel, writeChannel: writeStoredUpdateChannel,
     setInterval: () => {},
   });
 }
@@ -147,7 +147,7 @@ try {
   await build(`${name}-dependency`, `FROM ${base}\nLABEL agents-in-the-cloud.update-test-dependency=${name}\n`);
   await good.startPull();
   assert.equal(good.snapshot().state, "ready_to_restart", "dependency retry prepares candidate");
-  await good.setReleaseChannel("latest");
+  await good.setUpdateChannel("latest");
   await good.startPull();
   const acceptedAt = Date.now();
   await good.restart();

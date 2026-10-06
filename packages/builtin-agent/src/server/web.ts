@@ -10,7 +10,7 @@ import { renderAgentPane } from "./render-composer.ts";
 import { agentKey } from "@agents-in-the-cloud/agent/server/render-context";
 import { handleAgentRequest } from "./routes.ts";
 import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgent, getWorkspaceAgentController, getWorkspaceAgentPresentation, restoreWorkspaceAgentRuntime } from "./runtime.ts";
-import { archiveWorkspaceAgent, createNextWorkspaceAgent, listWorkspaceAgents, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
+import { removeClosedWorkspaceAgent, createNextWorkspaceAgent, listWorkspaceAgents, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
 
 let agentEvents: AgentsInTheCloudEventBus | undefined;
 
@@ -19,7 +19,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
   render(conversation: WorkspaceAgentInfo): Promise<string>;
   dispose(workspaceId: string, agentId: string): Promise<void>;
   restore(workspaceId: string, agentId: string): void;
-  archive(conversation: WorkspaceAgentInfo): Promise<void>;
+  removeClosedAgent(conversation: WorkspaceAgentInfo): Promise<void>;
 }): WorkspaceAgentTabProvider {
   const serializedClose = createKeyedOperationQueue();
 
@@ -41,7 +41,7 @@ export function createWorkspaceAgentTabProvider(dependencies: {
         if (!conversation) throw new AgentsInTheCloudCoreError("agent_not_found", `Agent not found: ${agentId}`);
         try {
           await dependencies.dispose(workspaceId, agentId);
-          await dependencies.archive(conversation);
+          await dependencies.removeClosedAgent(conversation);
         } catch (error) {
           dependencies.restore(workspaceId, agentId);
           throw error;
@@ -68,7 +68,7 @@ export const workspaceAgentTabProvider = createWorkspaceAgentTabProvider({
   },
   dispose: closeWorkspaceAgent,
   restore: restoreWorkspaceAgentRuntime,
-  archive: archiveWorkspaceAgent,
+  removeClosedAgent: removeClosedWorkspaceAgent,
 });
 
 const launchComposerCommandContribution: WorkspaceCommandContribution = {

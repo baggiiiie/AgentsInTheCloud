@@ -453,8 +453,8 @@ export function publicWorkspaceAppOrigin(request: Request): string {
   return publicAgentsInTheCloudOrigin(request);
 }
 
-/** The URL people use to reach this AgentsInTheCloud instance from outside. */
-export function publicInstanceUrl(request: Request): string {
+/** The AgentsInTheCloud URL for the current browser connection, not a guarantee of reachability from other devices. */
+export function agentsInTheCloudUrl(request: Request): string {
   return publicAgentsInTheCloudOrigin(request);
 }
 
@@ -609,7 +609,7 @@ export async function handleCanonicalWorkspaceRequest(request: Request, ingress:
   const destination = new URL(response.headers.get("location")!);
   // Compare both the socket-facing and public identity: TLS termination and
   // nested ingress can make them different. Never fall back to same-origin HTML.
-  if (destination.origin === url.origin || destination.origin === publicInstanceUrl(request)) {
+  if (destination.origin === url.origin || destination.origin === agentsInTheCloudUrl(request)) {
     await response.body?.cancel();
     return new Response("Workspace content must use an isolated origin", {
       status: 502,

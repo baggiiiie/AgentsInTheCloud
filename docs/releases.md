@@ -1,5 +1,7 @@
 # AgentsInTheCloud releases
 
+The app’s **Update channel** follows either the published `latest` image or the image promoted to `stable`. Those image tags remain the publication boundary.
+
 ```sh
 bun run release             # latest
 bun run release --stable    # latest and stable

@@ -5,10 +5,10 @@ import { progressButtonHtml } from "@agents-in-the-cloud/design-system/progress-
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { transientFeedbackHtml } from "@agents-in-the-cloud/design-system/transient-feedback";
 import { errorMessage, escapeHtml, turboStream, turboStreamResponse, type SettingsContribution, type WorkspaceModule, type WorkspaceServerModuleContext } from "@agents-in-the-cloud/shared";
-import { isReleaseChannel, type ReleaseChannel } from "./channels.ts";
+import { isUpdateChannel, type UpdateChannel } from "./update-channel.ts";
 import { detectSelfUpdateRuntime, prepareUpdate, type PreparedUpdate, type PullProgress, type SelfUpdateRuntime } from "./docker.ts";
 import { fetchChannelImageMetadata, repository, type ImageMetadata } from "./registry.ts";
-import { readStoredReleaseChannel, writeStoredReleaseChannel } from "./settings-store.ts";
+import { readStoredUpdateChannel, writeStoredUpdateChannel } from "./settings-store.ts";
 import { requestSupervisorUpdate } from "./supervisor.ts";
 
 const updateSidebarContributionId = "agents-in-the-cloud-update";
@@ -22,15 +22,15 @@ export interface StateSnapshot {
   error?: string;
   selfUpdatable: boolean;
   target?: ImageMetadata;
-  releaseChannel: ReleaseChannel;
+  updateChannel: UpdateChannel;
   progressMessage?: string;
 }
 
 export interface UpdateManagerDeps {
-  readChannel?: () => Promise<ReleaseChannel | undefined>;
-  writeChannel?: (channel: ReleaseChannel) => Promise<void>;
+  readChannel?: () => Promise<UpdateChannel | undefined>;
+  writeChannel?: (channel: UpdateChannel) => Promise<void>;
   detectRuntime?: () => Promise<SelfUpdateRuntime | undefined>;
-  fetchMetadata?: (channel: ReleaseChannel) => Promise<ImageMetadata>;
+  fetchMetadata?: (channel: UpdateChannel) => Promise<ImageMetadata>;
   prepareUpdate?: (reference: string, onProgress: (progress: PullProgress) => void) => Promise<PreparedUpdate>;
   requestUpdate?: (imageId: string) => Promise<void>;
   setInterval?: (handler: () => void, interval: number) => void;
@@ -46,7 +46,7 @@ export class UpdateManager {
   private percent: number | undefined;
   private error: string | undefined;
   private target: ImageMetadata | undefined;
-  private releaseChannel: ReleaseChannel = "latest";
+  private updateChannel: UpdateChannel = "latest";
   private pullPromise: Promise<void> | undefined;
   private prepared: PreparedUpdate | undefined;
   private progressMessage: string | undefined;
@@ -59,7 +59,7 @@ export class UpdateManager {
   async initialize(context: WorkspaceServerModuleContext): Promise<void> {
     this.context = context;
     this.runtime = await (this.deps.detectRuntime ?? detectSelfUpdateRuntime)();
-    this.releaseChannel = await this.deps.readChannel?.() ?? "latest";
+    this.updateChannel = await this.deps.readChannel?.() ?? "latest";
     this.updateSidebar();
     if (!this.runtime) return;
     await this.checkNow().catch((error) => console.error("Update check failed", error));
@@ -73,7 +73,7 @@ export class UpdateManager {
   }
 
   snapshot(): StateSnapshot {
-    return { state: this.state, percent: this.percent, error: this.error, selfUpdatable: Boolean(this.runtime), target: this.target, releaseChannel: this.releaseChannel, progressMessage: this.progressMessage };
+    return { state: this.state, percent: this.percent, error: this.error, selfUpdatable: Boolean(this.runtime), target: this.target, updateChannel: this.updateChannel, progressMessage: this.progressMessage };
   }
 
   private updateSidebar(checked = false): void {
@@ -94,7 +94,7 @@ export class UpdateManager {
   async checkNow(options: { announceCurrent?: boolean } = {}): Promise<void> {
     if (!this.runtime || this.switchingChannel || this.pullPromise || this.prepared || this.restarting) return;
     const generation = this.channelGeneration;
-    const channel = this.releaseChannel;
+    const channel = this.updateChannel;
     if (this.state === "idle" || this.state === "failed") this.setState("checking");
     let target: ImageMetadata;
     try {
@@ -114,15 +114,15 @@ export class UpdateManager {
     else this.setState("available");
   }
 
-  async setReleaseChannel(channel: ReleaseChannel): Promise<void> {
+  async setUpdateChannel(channel: UpdateChannel): Promise<void> {
     if (!this.runtime) throw new Error("AgentsInTheCloud is not running in a System-managed installation");
-    if (this.switchingChannel || this.pullPromise || this.restarting) throw new Error("Cannot switch release channels while an update is in progress");
-    if (channel === this.releaseChannel) return await this.checkNow();
+    if (this.switchingChannel || this.pullPromise || this.restarting) throw new Error("Cannot switch update channels while an update is in progress");
+    if (channel === this.updateChannel) return await this.checkNow();
     this.switchingChannel = true;
     try {
       await this.deps.writeChannel?.(channel);
       this.channelGeneration += 1;
-      this.releaseChannel = channel;
+      this.updateChannel = channel;
       this.target = undefined;
       this.prepared = undefined;
       this.setState("idle");
@@ -134,7 +134,7 @@ export class UpdateManager {
 
   startPull(): Promise<void> {
     if (!this.runtime) throw new UpdateConflictError("AgentsInTheCloud is not running in a System-managed installation");
-    if (this.switchingChannel) throw new UpdateConflictError("Release channel change is in progress");
+    if (this.switchingChannel) throw new UpdateConflictError("Update channel change is in progress");
     if (this.pullPromise) return this.pullPromise;
     if (!this.target || (this.state !== "available" && this.state !== "failed")) {
       throw new UpdateConflictError("No update is available to download. Check the selected channel first.");
@@ -181,7 +181,7 @@ export class UpdateManager {
   }
 }
 
-const manager = new UpdateManager({ readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel });
+const manager = new UpdateManager({ readChannel: readStoredUpdateChannel, writeChannel: writeStoredUpdateChannel });
 
 function renderCheckButton(state: "initial" | "in-progress"): string {
   return progressButtonHtml({
@@ -284,7 +284,7 @@ function renderUpdateChannelSettings(updateManager: UpdateManager): string {
     variant: "button",
     label: "Update channel",
     name: "channel",
-    value: snapshot.releaseChannel,
+    value: snapshot.updateChannel,
     form: { action: "/settings/update-channel" },
     options: [
       { value: "stable", label: "Stable", disabled },
@@ -334,8 +334,8 @@ export function createUpdateRouteHandler(updateManager: UpdateManager): (request
     if (url.pathname === "/settings/update-channel" && request.method === "POST") {
       const form = await request.formData();
       const channel = form.get("channel");
-      if (!isReleaseChannel(channel)) return new Response("Unsupported release channel", { status: 400 });
-      await updateManager.setReleaseChannel(channel);
+      if (!isUpdateChannel(channel)) return new Response("Unsupported update channel", { status: 400 });
+      await updateManager.setUpdateChannel(channel);
       return turboStreamResponse("");
     }
     if (url.pathname === "/update/start" && request.method === "POST") {

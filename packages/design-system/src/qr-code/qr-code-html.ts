@@ -17,7 +17,7 @@ export function qrCodeDialogHtml(id: string, url: string): string {
   return dialogHtml({
     element: { id, attributesHtml: "data-qr-code-dialog" },
     iconHtml: Icons.QrCode,
-    titleCaption: "Open on your phone",
+    titleCaption: "QR code",
     bodyHtml: `<div class="qr-code"><div class="qr-code__image" role="img" aria-label="QR code for ${escapeHtml(url)}">${code.createSvgTag({ cellSize: 4, margin: 16, scalable: true })}</div><a class="qr-code__url" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a></div>`,
   });
 }

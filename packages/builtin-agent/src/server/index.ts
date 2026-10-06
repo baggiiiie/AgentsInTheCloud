@@ -1,4 +1,4 @@
-export { archiveWorkspaceAgent, createNextWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
+export { removeClosedWorkspaceAgent, createNextWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
 export {
   getWorkspaceAgentPresentation,
   getWorkspaceAgentController,

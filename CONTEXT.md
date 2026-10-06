@@ -12,9 +12,21 @@ _Avoid_: Initial setup (as the feature name), Workspace setup
 The app-level surface for AgentsInTheCloud preferences and shared configuration, such as Connection mode, theme, Commit identity, GitHub connection, and Model providers. Settings is distinct from Workspace template configuration and an individual Agent’s choices.
 _Avoid_: Preferences, app settings, global settings (as feature names), workspace settings (for this surface)
 
+**Developer tools**:
+The app-level page for maintenance actions and design-system inspection, including resetting stored settings and opening the design system catalogue. Some actions are only available in development builds. It is distinct from Workspace template configuration.
+_Avoid_: Development settings, Developer settings (for this app-level page)
+
+**Theme**:
+The app-wide choice of AgentsInTheCloud’s visual appearance, shared across open pages. Theme is not selected independently for each Workspace or browser.
+_Avoid_: Workspace theme, browser theme (for this setting)
+
 **Connection mode**:
 The installation-wide choice of where AgentsInTheCloud and Workspace previews can be used: Installation computer only, or Devices on your Tailscale network. The selected mode determines generated preview addresses; Tailscale mode includes the installation computer.
 _Avoid_: App access, Local / Remote (as mode labels)
+
+**AgentsInTheCloud URL**:
+The address shown in Settings for opening the current AgentsInTheCloud installation through the browser's connection. It can be copied or shown as a QR code. Its reachability from another device depends on the address and Connection mode; it is not necessarily a public Internet address or usable on a phone.
+_Avoid_: External URL, Instance URL (as the feature label)
 
 **Installation computer**:
 The computer where AgentsInTheCloud is installed, which may differ from the device running the user's browser.
@@ -40,6 +52,10 @@ _Avoid_: System panel (as the feature name), Workspace terminal (for Host access
 The feature for checking for AgentsInTheCloud releases and managing Update operations. Updates is separate from managing packages or agent CLIs inside a Workspace.
 _Avoid_: Upgrades, software updater (as feature names)
 
+**Update channel**:
+The published image track followed by Updates. Stable follows the image promoted to the stable track; Latest follows the most recently published image on the latest track. An Update channel selects which Updates to receive, not when to apply them.
+_Avoid_: Release channel (for the app setting)
+
 **Update**:
 An installation operation that prepares an AgentsInTheCloud release and applies it by restarting the System-managed installation.
 _Avoid_: Upgrade (as the operation name), Workspace package update
@@ -47,6 +63,16 @@ _Avoid_: Upgrade (as the operation name), Workspace package update
 **Workspace template**:
 What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
 _Avoid_: Project, workspace folder, repository
+
+**Atelier-in-Atelier seeding**:
+A fringe Workspace template permission for copying Model provider credentials and saved Workspace template configuration into new Workspaces, primarily to prepare a nested installation. Unlike Secrets, this can put real credentials inside the Workspace, so it is only appropriate for trusted repositories and Agents.
+
+**Secrets**:
+The Workspace template page for managing Secrets shared with its Workspaces. Changes also apply to existing Workspaces, unlike Environment Variables, which only apply to new containers.
+
+**Secret**:
+A Workspace template credential entry that gives Agents a placeholder and permits substitution of its real value into requests to allowed hosts. Real values stay outside Agent sandboxes. A Secret can be required or optional, and its value may still need to be supplied.
+_Avoid_: Project secret, environment variable (when the protected credential entry is meant)
 
 **Environment Variables**:
 The Workspace template page for managing environment variables added to new Workspace containers. Passwords and API keys belong in Secrets; changes do not affect existing containers.
@@ -75,6 +101,10 @@ _Avoid_: Left sidebar, workspace tab
 **Agent**:
 A named coding collaborator within a Workspace, with its own Agent session. Agents added directly by the user have an AgentPaneComposer, with one active in the Agent pane at a time; starting a fresh session does not create another Agent.
 _Avoid_: Agent conversation, Agent view, agent tab, chat, thread
+
+**Close Agent**:
+The operation that ends an Agent’s active lifecycle and removes it from the Agent list. Its transcript is retained, but the closed Agent cannot be reopened or resumed. This is distinct from starting a fresh Agent session, which keeps the same Agent.
+_Avoid_: Archive Agent, Delete Agent (for this operation)
 
 **Subagent**:
 A coding collaborator created by an Agent to carry out delegated work within the same Workspace. A Subagent may delegate further work to its own Subagents; it is distinct from an Agent added directly by the user.

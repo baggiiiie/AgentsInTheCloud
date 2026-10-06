@@ -791,7 +791,7 @@ export const entries: CatalogueEntry[] = [
     id: "qr-code", title: "QR code", when: "Let people open a URL on their phone.",
     contract: "Point qrCodeButtonHtml at a qrCodeDialogHtml rendered outside any form. Opens natively via commandfor; no controller.",
     imports: { "qr-code": "qrCodeButtonHtml, qrCodeDialogHtml" },
-    examples: [{ title: "Button and dialog", render: (suffix = "") => qrCodeButtonHtml(`catalogue_qr${suffix}`, "Open on your phone") + qrCodeDialogHtml(`catalogue_qr${suffix}`, "https://example.com/preview") }],
+    examples: [{ title: "Button and dialog", render: (suffix = "") => qrCodeButtonHtml(`catalogue_qr${suffix}`, "Show QR code") + qrCodeDialogHtml(`catalogue_qr${suffix}`, "https://example.com/preview") }],
   },
   {
     id: "destructive-confirmation",

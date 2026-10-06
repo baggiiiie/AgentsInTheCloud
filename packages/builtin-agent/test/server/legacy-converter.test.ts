@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { fauxAssistantMessage, fauxToolCall, type Message } from "@earendil-works/pi-ai";
 import { convertLegacyAgents } from "@agents-in-the-cloud/legacy-converter";
-import { archiveWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle } from "../../src/server/agent-store.ts";
+import { removeClosedWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle } from "../../src/server/agent-store.ts";
 import { durableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
 import { getWorkspaceAgentPresentation, unloadWorkspaceAgentPresentation, closeWorkspaceAgent } from "../../src/server/runtime.ts";
 import { AgentPresentation } from "../../src/server/agent-presentation.ts";
@@ -127,7 +127,7 @@ test("shared sidecar import is discovered once, renamed natively, and never resu
   const renamed = await setWorkspaceAgentTitle(agent!, "Imported notes");
   expect((await (await durableWorkspaceOwner(workspace)).catalog())[0]!.title).toBe("Imported notes");
   await closeWorkspaceAgent(workspace, record.agentId);
-  await archiveWorkspaceAgent(renamed);
+  await removeClosedWorkspaceAgent(renamed);
   expect(await listWorkspaceAgents(workspace)).toEqual([]);
   expect(await Bun.file(target).exists()).toBe(true);
   expect(await Bun.file(target.replace(/\.jsonl$/, ".title")).text()).toBe(record.title);

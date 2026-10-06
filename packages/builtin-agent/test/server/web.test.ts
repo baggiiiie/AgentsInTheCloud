@@ -85,7 +85,7 @@ describe("Workspace Agent-tab provider", () => {
       },
       dispose: async () => {},
       restore: () => {},
-      archive: async () => {},
+      removeClosedAgent: async () => {},
     });
 
     expect(await provider.list({ workspaceId: "workspace-1" })).toEqual([
@@ -115,7 +115,7 @@ describe("Workspace Agent-tab provider", () => {
     ]);
   });
 
-  test("failed archival rolls back the close tombstone so the published conversation remains usable", async () => {
+  test("failed closed Agent removal rolls back the close tombstone so the active Agent remains usable", async () => {
     const conversations = [
       { workspaceId: "workspace-1", agentId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
       { workspaceId: "workspace-1", agentId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
@@ -129,15 +129,15 @@ describe("Workspace Agent-tab provider", () => {
       },
       dispose: async (_workspaceId, agentId) => { blocked.add(agentId); },
       restore: (_workspaceId, agentId) => { blocked.delete(agentId); },
-      archive: async () => { throw new Error("archive failed"); },
+      removeClosedAgent: async () => { throw new Error("closed Agent removal failed"); },
     });
 
-    await expect(provider.close({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId })).rejects.toThrow("archive failed");
+    await expect(provider.close({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId })).rejects.toThrow("closed Agent removal failed");
 
     expect(await provider.render({ workspaceId: "workspace-1", agentId: conversations[0]!.agentId })).toBe("First");
   });
 
-  test("close waits for runtime disposal before archiving the conversation", async () => {
+  test("close waits for runtime disposal before removing the closed Agent", async () => {
     const conversations = [
       { workspaceId: "workspace-1", agentId: "53fc77b7-dc19-42d5-b200-2e134ec67529", label: "Agent 1", title: "First", path: "/tmp/first.jsonl" },
       { workspaceId: "workspace-1", agentId: "268604ac-d16a-4a4a-ab1e-1ed3ca54687d", label: "Agent 2", title: "Second", path: "/tmp/second.jsonl" },
@@ -153,8 +153,8 @@ describe("Workspace Agent-tab provider", () => {
         lifecycle.push("dispose:end");
       },
       restore: () => {},
-      async archive() {
-        lifecycle.push("archive");
+      async removeClosedAgent() {
+        lifecycle.push("remove-closed-agent");
       },
     });
 
@@ -164,7 +164,7 @@ describe("Workspace Agent-tab provider", () => {
 
     disposal.resolve();
     await closing;
-    expect(lifecycle).toEqual(["dispose:start", "dispose:end", "archive"]);
+    expect(lifecycle).toEqual(["dispose:start", "dispose:end", "remove-closed-agent"]);
   });
 
   test("can dispose all native sessions without imposing the shell last-tab policy", async () => {

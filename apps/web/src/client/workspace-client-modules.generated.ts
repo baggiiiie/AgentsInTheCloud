@@ -9,13 +9,12 @@ import { agentsInTheCloudClientModule as clientModule7 } from "@agents-in-the-cl
 import { agentsInTheCloudClientModule as clientModule8 } from "@agents-in-the-cloud/files/client";
 import { agentsInTheCloudClientModule as clientModule9 } from "@agents-in-the-cloud/host/client";
 import { agentsInTheCloudClientModule as clientModule10 } from "@agents-in-the-cloud/inline-content/client";
-import { agentsInTheCloudClientModule as clientModule11 } from "@agents-in-the-cloud/keypress-probe/client";
-import { agentsInTheCloudClientModule as clientModule12 } from "@agents-in-the-cloud/llm/client";
-import { agentsInTheCloudClientModule as clientModule13 } from "@agents-in-the-cloud/prompt/client";
-import { agentsInTheCloudClientModule as clientModule14 } from "@agents-in-the-cloud/subagents/client";
-import { agentsInTheCloudClientModule as clientModule15 } from "@agents-in-the-cloud/update/client";
-import { agentsInTheCloudClientModule as clientModule16 } from "@agents-in-the-cloud/vscode/client";
-import { agentsInTheCloudClientModule as clientModule17 } from "@agents-in-the-cloud/workspace-terminal/client";
+import { agentsInTheCloudClientModule as clientModule11 } from "@agents-in-the-cloud/llm/client";
+import { agentsInTheCloudClientModule as clientModule12 } from "@agents-in-the-cloud/prompt/client";
+import { agentsInTheCloudClientModule as clientModule13 } from "@agents-in-the-cloud/subagents/client";
+import { agentsInTheCloudClientModule as clientModule14 } from "@agents-in-the-cloud/update/client";
+import { agentsInTheCloudClientModule as clientModule15 } from "@agents-in-the-cloud/vscode/client";
+import { agentsInTheCloudClientModule as clientModule16 } from "@agents-in-the-cloud/workspace-terminal/client";
 import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
 
 export const workspaceClientModules: WorkspaceClientModule[] = [
@@ -36,5 +35,4 @@ export const workspaceClientModules: WorkspaceClientModule[] = [
   clientModule14,
   clientModule15,
   clientModule16,
-  clientModule17,
 ];

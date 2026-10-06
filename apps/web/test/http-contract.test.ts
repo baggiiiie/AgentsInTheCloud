@@ -243,7 +243,7 @@ describe("HTTP contracts", () => {
     expect(Value.Parse(deletedWorkspaceTemplateEnvironmentVariableResponseSchema, await deletedEnvironmentResponse.json()).deleted).toBe(true);
   });
 
-  test("project secret JSON supports missing values and editable requirement metadata", async () => {
+  test("Secret JSON supports missing values and editable requirement metadata", async () => {
     const { app, registry } = createTestApp();
     await registry.seed([]);
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/requirements.git")).workspaceTemplate;

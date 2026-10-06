@@ -7,9 +7,9 @@ import { createPiModelRuntime, modelsDialogId, setEnabledModels } from "@agents-
 import { invalidArguments } from "@agents-in-the-cloud/core";
 import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
 import { clearGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { publicInstanceUrl } from "@agents-in-the-cloud/proxy-ingress";
+import { agentsInTheCloudUrl } from "@agents-in-the-cloud/proxy-ingress";
 import { clearCommitIdentity, getCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud/workspace-templates";
-import { instanceUrlHtml } from "../instance-url.ts";
+import { agentsInTheCloudUrlHtml } from "../agents-in-the-cloud-url.ts";
 import { resetOnboarding } from "../onboarding/state.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { workspaceModules } from "../workspace-modules.generated.ts";
@@ -17,7 +17,7 @@ import { remove, replace, response, stream, update, wantsStream } from "@agents-
 import { listSettingsContributions, registerSettingsContribution } from "./registry.ts";
 import { renderThemeSettings } from "./theme.ts";
 
-function devSettingsEnabled(): boolean {
+function forceDeleteWorkspacesEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
@@ -50,15 +50,15 @@ function renderForceDeleteWorkspaces(result?: WorkspaceCleanupResult): string {
     confirmCaption: "Delete all workspaces",
     cancelCaption: "Cancel",
   });
-  const deleted = result === undefined ? "" : `<p class="settings-development-status" role="status">Deleted ${escapeHtml(result.deleted)} workspace${result.deleted === 1 ? "" : "s"}.</p>`;
+  const deleted = result === undefined ? "" : `<p class="developer-tools-status" role="status">Deleted ${escapeHtml(result.deleted)} workspace${result.deleted === 1 ? "" : "s"}.</p>`;
   const errors = result?.errors.length ? `<p class="settings-error">${escapeHtml(result.errors.join("\n"))}</p>` : "";
-  return `<div id="settings_force_delete_workspaces" class="settings-development-action">
-    <div class="settings-development-copy">
+  return `<div id="settings_force_delete_workspaces" class="developer-tools-action">
+    <div class="developer-tools-copy">
       <div>Workspaces</div>
       <p>Permanently delete every workspace and its files.</p>
       ${deleted}${errors}
     </div>
-    <div class="settings-development-control"><form method="post" action="/settings/workspaces/force-delete" data-turbo="true">${confirmation}</form></div>
+    <div class="developer-tools-control"><form method="post" action="/settings/workspaces/force-delete" data-turbo="true">${confirmation}</form></div>
   </div>`;
 }
 
@@ -69,19 +69,18 @@ function renderResetSettings(): string {
     confirmCaption: "Delete all settings",
     cancelCaption: "Cancel",
   });
-  return `<div class="settings-development-action">
-    <div class="settings-development-copy">
+  return `<div class="developer-tools-action">
+    <div class="developer-tools-copy">
       <div>Stored settings</div>
       <p>Delete the Commit identity, GitHub token, and model provider credentials stored by AgentsInTheCloud.</p>
     </div>
-    <div class="settings-development-control"><form method="post" action="/settings/reset" data-turbo="true">${confirmation}</form></div>
+    <div class="developer-tools-control"><form method="post" action="/settings/reset" data-turbo="true">${confirmation}</form></div>
   </div>`;
 }
 
-async function renderDevelopmentSettings(): Promise<string> {
-  const keypressProbeSettings = await listSettingsContributions().find((contribution) => contribution.id === "keypress-probe")?.render() ?? "";
-  const destructiveActions = `${renderResetSettings()}${devSettingsEnabled() ? renderForceDeleteWorkspaces() : ""}`;
-  return `${keypressProbeSettings}<section class="settings-sec settings-sec-development">${destructiveActions}</section>`;
+async function renderDeveloperTools(): Promise<string> {
+  const destructiveActions = `${renderResetSettings()}${forceDeleteWorkspacesEnabled() ? renderForceDeleteWorkspaces() : ""}`;
+  return `<section class="settings-sec settings-sec-developer-tools">${destructiveActions}</section>`;
 }
 
 registerSettingsContribution({ id: "access", label: "Connection mode", order: 15, render: renderConnectionModeSettings });
@@ -110,13 +109,13 @@ function settingsDialogHtml(titleCaption: string, bodyHtml: string, sectionId?: 
 export async function renderSettingsDialog(request: Request, sectionId?: string): Promise<string> {
   // Keep previously published Settings links working without retaining the old app name.
   if (sectionId === "git-identity") sectionId = "commit-identity";
-  const contributions = listSettingsContributions().filter((contribution) => contribution.id !== "keypress-probe");
+  const contributions = listSettingsContributions();
   if (sectionId && !contributions.some((contribution) => contribution.id === sectionId)) throw invalidArguments(`settings section not found: ${sectionId}`);
   const sections = await Promise.all(contributions.map((contribution) => contribution.render()));
-  return settingsDialogHtml("Settings", `<main class="settings-main"><section class="settings-sec" id="settings-sec-instance-url"><h2>External URL</h2>${instanceUrlHtml(publicInstanceUrl(request), "settings_instance_url_qr")}</section>${sections.join("")}<div class="settings-dev-link"><a class="settings-development-link" href="/settings/development" data-turbo-frame="_top" data-turbo-stream="true">Development settings</a>${renderBuildIdentity()}</div></main>`, sectionId);
+  return settingsDialogHtml("Settings", `<main class="settings-main"><section class="settings-sec" id="settings-sec-agents-in-the-cloud-url"><h2>AgentsInTheCloud URL</h2>${agentsInTheCloudUrlHtml(agentsInTheCloudUrl(request), "settings_agents_in_the_cloud_url_qr")}</section>${sections.join("")}<div class="settings-developer-tools-link-row"><a class="developer-tools-link" href="/settings/developer-tools" data-turbo-frame="_top" data-turbo-stream="true">Developer tools</a>${renderBuildIdentity()}</div></main>`, sectionId);
 }
 
-export async function renderDevelopmentSettingsDialog(): Promise<string> {
+export async function renderDeveloperToolsDialog(): Promise<string> {
   const backLink = actionLinkHtml({
     href: "/settings",
     variant: "secondary",
@@ -129,7 +128,7 @@ export async function renderDevelopmentSettingsDialog(): Promise<string> {
     content: { kind: "caption", caption: "Design system catalogue" },
     attributesHtml: 'data-turbo="false"',
   });
-  return settingsDialogHtml("Development settings", `<main class="settings-main settings-main-dev">${await renderDevelopmentSettings()}<nav class="settings-development-back" aria-label="Settings navigation">${backLink}${catalogueLink}</nav></main>`);
+  return settingsDialogHtml("Developer tools", `<main class="settings-main settings-main-developer-tools">${await renderDeveloperTools()}<nav class="developer-tools-back" aria-label="Settings navigation">${backLink}${catalogueLink}</nav></main>`);
 }
 
 async function deleteAllStoredSettings(): Promise<void> {
@@ -146,16 +145,16 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
     const html = await renderSettingsDialog(request);
     return wantsStream(request) ? stream(update("settings_modal_host", html)) : response(html);
   }
-  if (url.pathname === "/settings/development" && request.method === "GET") {
-    const html = await renderDevelopmentSettingsDialog();
+  if ((url.pathname === "/settings/developer-tools" || url.pathname === "/settings/development") && request.method === "GET") {
+    const html = await renderDeveloperToolsDialog();
     return wantsStream(request) ? stream(update("settings_modal_host", html)) : response(html);
   }
   if (url.pathname === "/settings/reset" && request.method === "POST") {
     await deleteAllStoredSettings();
     const pickerUpdates = await options.renderModelPickerUpdates();
-    return stream(`${pickerUpdates}${replace("settings_dialog", await renderDevelopmentSettingsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove(modelsDialogId)}`);
+    return stream(`${pickerUpdates}${replace("settings_dialog", await renderDeveloperToolsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove(modelsDialogId)}`);
   }
-  if (url.pathname === "/settings/workspaces/force-delete" && request.method === "POST" && devSettingsEnabled()) {
+  if (url.pathname === "/settings/workspaces/force-delete" && request.method === "POST" && forceDeleteWorkspacesEnabled()) {
     const result = options.forceDeleteAllWorkspaces
       ? await options.forceDeleteAllWorkspaces()
       : { deleted: 0, errors: ["Workspace deletion is not available."] };

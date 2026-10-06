@@ -19,7 +19,6 @@
     "@agents-in-the-cloud/core": "workspace:*",
     "@agents-in-the-cloud/design-system": "workspace:*",
     "@agents-in-the-cloud/files": "workspace:*",
-    "@agents-in-the-cloud/keypress-probe": "workspace:*",
     "@agents-in-the-cloud/proxy-egress": "workspace:*",
     "@agents-in-the-cloud/proxy-ingress": "workspace:*",
     "@agents-in-the-cloud/workspace-templates": "workspace:*",

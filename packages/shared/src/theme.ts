@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
-/** AgentsInTheCloud's UI themes. design-system.css defines each one as a [data-theme] rule. */
+/** App-wide Themes shared across open pages. design-system.css defines each one as a [data-theme] rule. */
 export const agentsInTheCloudThemes = [
   { id: "daylight", label: "Daylight", appearance: "light" },
   { id: "cappuccino", label: "Cappuccino", appearance: "dark" },

@@ -56,6 +56,8 @@ Workspace template settings has a browser-navigable surface that agents can pass
 
 Supported sections are `index`, `general`, `secrets`, `ssh`, `environment`, and `container`. The index lists the five settings sections; each section opens a focused page in the complete AgentsInTheCloud shell. Use `editor=new` or a record ID for Secrets, SSH keys, or Environment Variables, and `editor=docker`, `images`, or `dockerfile` for Container. Legacy section links (`repository`, `ssh-keys`, `privileged`, `dockerfile`, `preload-images`, and `danger`) still resolve to their corresponding pages.
 
+**Secrets** manages protected credential entries shared with a template's Workspaces. Agents receive placeholders; real values are substituted into requests to allowed hosts. Secret changes apply to existing Workspaces, while Environment Variables only apply to new containers. Secret summaries never return real values.
+
 Use `GET /workspace-templates` with `Accept: application/json` to discover the template ID before constructing the presentation URL. Template environment-variable, secret, and SSH-key summaries identify their template with `workspaceTemplateId`. Existing storage filenames and serialized formats are unchanged; their older `project` spellings remain at storage boundaries.
 
 Other browser-navigable surfaces are:
@@ -67,16 +69,24 @@ Other browser-navigable surfaces are:
 /models                                 # Models: Model providers, their usage, and enabled models
 /settings                               # Settings: app-level preferences and shared configuration
 /settings?section=models                # A specific settings section
-/settings/development                   # Development settings
+/settings/developer-tools               # Developer tools: app-level maintenance and design-system inspection
 /host                                   # Host: System diagnostics and privileged terminals
 /design-system-catalogue.html           # Live component catalogue (HTML)
 ```
 
 Host targets AgentsInTheCloud System, outside individual Workspaces, rather than necessarily the physical machine running Docker. `GET /host` with `Accept: application/json` reports availability and the access boundary; it does not create a terminal.
 
+**Developer tools** is the app-level maintenance and design-system inspection page, separate from Workspace template configuration. The existing `/settings/development` URL remains valid.
+
+**Theme** is an app-wide setting shared across open pages, not a per-Workspace or per-browser preference. Its settings section is `theme`.
+
+Settings shows the **AgentsInTheCloud URL** for the current browser connection, with copy and QR-code actions. It is not necessarily reachable from other devices; a local-only address must be opened on the Installation computer.
+
 The `access` section controls **Connection mode** in a System-managed installation: **Installation computer only** or **Devices on your Tailscale network**. The existing access API spelling is unchanged.
 
 **Commit identity** uses section `commit-identity` and POST `/settings/commit-identity` with `commitAuthorName` and `commitAuthorEmail`. Existing `git-identity` section links and POST `/settings/git-identity` remain valid.
+
+The `update-channel` section is **Update channel**, with **Stable** and **Latest** choices. Its POST endpoint is `/settings/update-channel` with form field `channel=stable` or `channel=latest`. The image tags and saved settings format are unchanged.
 
 The `update` section is **Updates**, the feature for managing AgentsInTheCloud installation Updates. It is separate from Workspace package and agent CLI updates.
 
@@ -131,6 +141,8 @@ when template settings change.
 A running-phase response advertises its `agents`, typed `workViews`, and available `commands` with their `inputSchema`.
 
 ## Stage Agents and Work views
+
+**Close Agent** uses `POST /workspaces/:id/agents/:agentId/close`. The transcript is retained, but the closed Agent cannot be reopened or resumed. Starting a fresh Agent session is different: it keeps the same Agent.
 
 Execute commands using their advertised schema:
 

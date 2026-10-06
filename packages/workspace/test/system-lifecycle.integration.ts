@@ -185,7 +185,7 @@ try {
   console.log("Verify terminal session ownership through the real app API");
   await terminalChecks(emptyId, empty.Id);
 
-  console.log("Create a project with Alpine preload and a test-only egress secret");
+  console.log("Create a Workspace template with Alpine preload and a test-only egress Secret");
   await docker("exec", "--user", "1000", "agents-in-the-cloud", "sh", "-eu", "-c", `mkdir '${repository}'; cd '${repository}'; git init -b main; git config user.name Acceptance; git config user.email acceptance@example.invalid; printf fixture > README; git add README; git commit -m fixture`);
   workspaceTemplateId = (await api<{ workspaceTemplate: { id: string } }>("/workspace-templates", { gitUrl: repository })).workspaceTemplate.id;
   await api(`/workspace-templates/${workspaceTemplateId}/preload-images`, { preloadImages: ["alpine:3.21"] });
@@ -228,7 +228,7 @@ try {
   for (const [path, hash] of hashes) assert.equal(await digest(path), hash, "shared EROFS files remain unchanged");
   const echoed: { headers: Record<string, string> } = JSON.parse(await exec(loaded.Id, "sh", "-c", 'curl --fail --silent --show-error --max-time 30 -H "X-Agents-In-The-Cloud-Test: $LIFECYCLE_TEST_SECRET" https://httpbin.org/headers'));
   const injected = Object.entries(echoed.headers).find(([name]) => name.toLowerCase() === "x-agents-in-the-cloud-test")?.[1];
-  assert.equal(injected, secret, "egress socket injects the project secret");
+  assert.equal(injected, secret, "egress socket injects the Workspace template Secret");
   await api(`/workspace-templates/${workspaceTemplateId}/preload-images`, { preloadImages: [] });
   await parkResume(loadedId, loadedIdentity);
   assert.equal(await readFile(preloadPath, "utf8"), pinned, "settings changes do not change existing workspace pins");

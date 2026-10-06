@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  archiveWorkspaceAgent,
+  removeClosedWorkspaceAgent,
   createNextWorkspaceAgent,
   ensureDefaultWorkspaceAgent as ensureNativeAgent,
   listWorkspaceAgents,
@@ -80,11 +80,11 @@ describe("Workspace Agent store", () => {
     expect(await listWorkspaceAgents("ws1")).toEqual([renamed]);
   });
 
-  test("archiving metadata does not resurrect the tab and permits label reuse", async () => {
+  test("removing closed Agent metadata does not resurrect the Agent and permits label reuse", async () => {
     await dataDir();
     const first = await ensureNativeAgent("ws1");
     const second = await createNextWorkspaceAgent("ws1");
-    await archiveWorkspaceAgent(second);
+    await removeClosedWorkspaceAgent(second);
     expect(await listWorkspaceAgents("ws1")).toEqual([first]);
     expect((await createNextWorkspaceAgent("ws1")).label).toBe("Agent 2");
   });
@@ -103,7 +103,7 @@ test("new agents explicitly select durable storage without a legacy transcript",
   expect(await Bun.file(join(root, "workspaces", "native", "agent-sessions", `${agent.agentId}.jsonl`)).exists()).toBe(false);
   const renamed = await setWorkspaceAgentTitle(agent, "Before first turn");
   expect(renamed.storage).toBe("durable");
-  await archiveWorkspaceAgent(renamed);
+  await removeClosedWorkspaceAgent(renamed);
   expect(await listWorkspaceAgents("native")).toEqual([]);
 });
 
@@ -119,6 +119,6 @@ test("previous Agent metadata preserves IDs and titles and writes only the new v
   expect(await Bun.file(join(metadata, "agents.json")).json()).toEqual({
     version: 2, agents: [{ agentId: record.conversationId, label: record.label, title: record.title, storage: "durable" }],
   });
-  await archiveWorkspaceAgent(agent!);
+  await removeClosedWorkspaceAgent(agent!);
   expect(await listWorkspaceAgents("previous")).toEqual([]);
 });

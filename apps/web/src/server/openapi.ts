@@ -43,9 +43,10 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
   const commandSchemas = Object.fromEntries(commands.map((command) => [command.id, command.inputSchema ?? emptyWorkspaceCommandInputSchema]));
   const closeAgentPath = { post: {
     summary: "Close an Agent using its Agent type lifecycle",
+    description: "Closing retains the Agent transcript, but the closed Agent cannot be reopened or resumed.",
     parameters: [workspaceId, agentId],
     responses: {
-      ...jsonResponse("Agent archived", { $ref: "#/components/schemas/AgentCloseResult" }),
+      ...jsonResponse("Agent closed", { $ref: "#/components/schemas/AgentCloseResult" }),
     },
   } };
   const agentMessageResponses = {

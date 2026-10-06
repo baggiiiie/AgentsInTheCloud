@@ -31,7 +31,6 @@
         "@agents-in-the-cloud/files": "workspace:*",
         "@agents-in-the-cloud/host": "workspace:*",
         "@agents-in-the-cloud/inline-content": "workspace:*",
-        "@agents-in-the-cloud/keypress-probe": "workspace:*",
         "@agents-in-the-cloud/llm": "workspace:*",
         "@agents-in-the-cloud/pi-agent": "workspace:*",
         "@agents-in-the-cloud/prompt": "workspace:*",
@@ -253,14 +252,6 @@
         "@agents-in-the-cloud/workspace": "workspace:*",
         "@hotwired/stimulus": "github:hotwired/dev-builds#339df548999c34d440e04c24b59ad9dc57ce3eb1",
         "typebox": "^1.0.57",
-      },
-    },
-    "packages/keypress-probe": {
-      "name": "@agents-in-the-cloud/keypress-probe",
-      "dependencies": {
-        "@agents-in-the-cloud/core": "workspace:*",
-        "@agents-in-the-cloud/design-system": "workspace:*",
-        "@agents-in-the-cloud/shared": "workspace:*",
       },
     },
     "packages/legacy-converter": {
@@ -507,7 +498,6 @@
 
     "@agents-in-the-cloud/inline-content": ["@agents-in-the-cloud/inline-content@workspace:packages/inline-content"],
 
-    "@agents-in-the-cloud/keypress-probe": ["@agents-in-the-cloud/keypress-probe@workspace:packages/keypress-probe"],
 
     "@agents-in-the-cloud/legacy-converter": ["@agents-in-the-cloud/legacy-converter@workspace:packages/legacy-converter"],
 

@@ -9,7 +9,7 @@ import { AgentPresentation } from "../../src/server/agent-presentation.ts";
 import { openDurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { durableWorkspaceOwner, retainedDurableWorkspaceOwner, suspendAllDurableWorkspaceOwners } from "../../src/server/runtime.ts";
 import { getWorkspaceAgentController, getWorkspaceAgentPresentation, unloadWorkspaceAgentPresentation, closeWorkspaceAgent, removeWorkspaceAgentRuntimes, suspendWorkspaceAgentRuntimes, allowWorkspaceAgentResume } from "../../src/server/runtime.ts";
-import { archiveWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle } from "../../src/server/agent-store.ts";
+import { removeClosedWorkspaceAgent, ensureDefaultWorkspaceAgent, listWorkspaceAgents, setWorkspaceAgentTitle } from "../../src/server/agent-store.ts";
 
 const originalDataDir = process.env.ATELIER_DATA_DIR;
 let directory: string;
@@ -73,7 +73,7 @@ test("production dispatch reattaches native journal, deduplicates passively, ret
   await closing;
   allowWorkspaceAgentResume(workspaceId);
   expect((await (await durableWorkspaceOwner(workspaceId)).admission())?.closed).toContain(controller.id);
-  await archiveWorkspaceAgent(named);
+  await removeClosedWorkspaceAgent(named);
   expect(await listWorkspaceAgents(workspaceId)).toEqual([]);
   // Deletion must fence the retained owner even when no mounted tabs remain.
   await removeWorkspaceAgentRuntimes(workspaceId);

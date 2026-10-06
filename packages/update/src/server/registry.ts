@@ -1,4 +1,4 @@
-import { type ReleaseChannel } from "./channels.ts";
+import { type UpdateChannel } from "./update-channel.ts";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 
@@ -113,7 +113,7 @@ async function fetchRegistryImage(base: string, version: string, fetcher: HttpFe
   return { digest, layers: manifest.layers, labels: config.config?.Labels ?? {} };
 }
 
-export async function fetchChannelImageMetadata(channel: ReleaseChannel, fetcher: HttpFetcher = fetch, platform = { os: "linux", architecture: currentArch() }): Promise<ImageMetadata> {
+export async function fetchChannelImageMetadata(channel: UpdateChannel, fetcher: HttpFetcher = fetch, platform = { os: "linux", architecture: currentArch() }): Promise<ImageMetadata> {
   const image = await fetchRegistryImage(`https://ghcr.io/v2/${repository}`, channel, fetcher, platform);
   return { digest: image.digest, revision: image.labels["org.opencontainers.image.revision"] };
 }

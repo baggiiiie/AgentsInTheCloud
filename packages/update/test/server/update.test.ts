@@ -1,10 +1,10 @@
 import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { UpdateManager, createUpdateRouteHandler, type UpdateManagerDeps } from "../../src/server/index.ts";
-import { readStoredReleaseChannel, writeStoredReleaseChannel } from "../../src/server/settings-store.ts";
+import { readStoredUpdateChannel, writeStoredUpdateChannel } from "../../src/server/settings-store.ts";
 import { requestSupervisorUpdate } from "../../src/server/supervisor.ts";
 
 function context() {
@@ -79,7 +79,7 @@ test("download remains in progress until all preparation completes; restart uses
   expect(instance.startPull()).toBe(pull);
   expect(instance.snapshot()).toMatchObject({ state: "pulling", percent: 60 });
   await expect(instance.restart()).rejects.toThrow("No prepared update");
-  await expect(instance.setReleaseChannel("latest")).rejects.toThrow("in progress");
+  await expect(instance.setUpdateChannel("latest")).rejects.toThrow("in progress");
   gate.resolve(); await pull;
   expect(instance.snapshot().state).toBe("ready_to_restart");
   await instance.restart();
@@ -142,15 +142,17 @@ test("channel changes persist, discard prior prepared images, and survive manage
   const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-update-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   try {
-    await writeStoredReleaseChannel("stable");
-    const dependencies = { readChannel: readStoredReleaseChannel, writeChannel: writeStoredReleaseChannel };
+    await writeStoredUpdateChannel("stable");
+    expect(JSON.parse(await readFile(join(directory, "update.json"), "utf8"))).toEqual({ releaseChannel: "stable" });
+    const dependencies = { readChannel: readStoredUpdateChannel, writeChannel: writeStoredUpdateChannel };
     const instance = manager(dependencies);
     await instance.initialize(context().ctx); await instance.startPull();
-    await instance.setReleaseChannel("latest");
+    await instance.setUpdateChannel("latest");
     await expect(instance.restart()).rejects.toThrow("No prepared update");
     const restarted = manager(dependencies);
     await restarted.initialize(context().ctx);
-    expect(restarted.snapshot().releaseChannel).toBe("latest");
+    expect(restarted.snapshot().updateChannel).toBe("latest");
+    expect(JSON.parse(await readFile(join(directory, "update.json"), "utf8"))).toEqual({ releaseChannel: "latest" });
   } finally {
     if (previous === undefined) delete process.env.ATELIER_DATA_DIR; else process.env.ATELIER_DATA_DIR = previous;
     await rm(directory, { recursive: true, force: true });
@@ -161,9 +163,9 @@ test("a superseded channel check cannot publish success or failure", async () =>
     const pending = deferred<{ digest: string }>();
     const instance = manager({ readChannel: async () => "stable", fetchMetadata: async (channel) => channel === "latest" ? pending.promise : { digest: newDigest } });
     await instance.initialize(context().ctx);
-    const stale = instance.setReleaseChannel("latest");
+    const stale = instance.setUpdateChannel("latest");
     await Bun.sleep(0);
-    await instance.setReleaseChannel("stable");
+    await instance.setUpdateChannel("stable");
     const snapshot = instance.snapshot();
     if (fail) pending.reject(new Error("registry failed")); else pending.resolve({ digest: newerDigest });
     await stale;
@@ -188,9 +190,9 @@ test("new installations discover latest updates and pin their immutable image", 
     fetchMetadata: async (channel) => { channels.push(channel); return { digest: newDigest }; },
     prepareUpdate: async (reference) => { prepared.push(reference); return { reference, imageId: "sha256:latest-image" }; },
   });
-  expect(instance.snapshot().releaseChannel).toBe("latest");
+  expect(instance.snapshot().updateChannel).toBe("latest");
   await instance.initialize(context().ctx);
-  expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available" });
+  expect(instance.snapshot()).toMatchObject({ updateChannel: "latest", state: "available" });
   expect(channels).toEqual(["latest"]);
   await instance.startPull();
   expect(prepared).toEqual([exact]);
@@ -204,7 +206,7 @@ test.each(["stable", "latest"] as const)("stored %s channel overrides the latest
     fetchMetadata: async (selected) => { channels.push(selected); return { digest: newDigest }; },
   });
   await instance.initialize(context().ctx);
-  expect(instance.snapshot().releaseChannel).toBe(channel);
+  expect(instance.snapshot().updateChannel).toBe(channel);
   expect(channels).toEqual([channel]);
 });
 
@@ -213,11 +215,11 @@ test("switching from stable to latest persists the channel and refreshes the tar
   const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-latest-settings-"));
   process.env.ATELIER_DATA_DIR = directory;
   try {
-    await writeStoredReleaseChannel("stable");
+    await writeStoredUpdateChannel("stable");
     const channels: string[] = [];
     const dependencies = {
-      readChannel: readStoredReleaseChannel,
-      writeChannel: writeStoredReleaseChannel,
+      readChannel: readStoredUpdateChannel,
+      writeChannel: writeStoredUpdateChannel,
       fetchMetadata: async (channel: "stable" | "latest") => {
         channels.push(channel);
         return { digest: channel === "latest" ? newerDigest : newDigest };
@@ -226,14 +228,14 @@ test("switching from stable to latest persists the channel and refreshes the tar
     const instance = manager(dependencies);
     await instance.initialize(context().ctx);
     await instance.startPull();
-    await instance.setReleaseChannel("latest");
+    await instance.setUpdateChannel("latest");
     expect(channels).toEqual(["stable", "latest"]);
-    expect(instance.snapshot()).toMatchObject({ releaseChannel: "latest", state: "available", target: { digest: newerDigest } });
+    expect(instance.snapshot()).toMatchObject({ updateChannel: "latest", state: "available", target: { digest: newerDigest } });
     await expect(instance.restart()).rejects.toThrow("No prepared update");
-    expect(await readStoredReleaseChannel()).toBe("latest");
+    expect(await readStoredUpdateChannel()).toBe("latest");
     const restarted = manager(dependencies);
     await restarted.initialize(context().ctx);
-    expect(restarted.snapshot().releaseChannel).toBe("latest");
+    expect(restarted.snapshot().updateChannel).toBe("latest");
   } finally {
     if (previous === undefined) delete process.env.ATELIER_DATA_DIR; else process.env.ATELIER_DATA_DIR = previous;
     await rm(directory, { recursive: true, force: true });
