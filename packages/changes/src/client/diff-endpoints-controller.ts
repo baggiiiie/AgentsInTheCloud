@@ -1,7 +1,7 @@
 import { setContentRowLabel } from "@agents-in-the-cloud/design-system/content-row/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { resolveDiffEndpoints } from "../diff-endpoints.ts";
-import { endpointName, workingTree, historyGraph, diffEndpointsDescription, comparisonGraph, rowHeight, type DiffEndpoints, type HistoryGraph, type HistoryModel } from "../history.ts";
+import { workingTree, historyGraph, diffEndpointsDescription, comparisonGraph, rowHeight, type DiffEndpoints, type HistoryGraph, type HistoryModel } from "../history.ts";
 
 type ComparisonModel = { endpoints: DiffEndpoints; label: string; baseLabel: string; targetLabel: string };
 
@@ -210,7 +210,6 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       const applied = this.comparison?.endpoints.target === endpoints.target && this.comparison.endpoints.base === endpoints.base;
       const description = applied ? this.comparison!.label : diffEndpointsDescription(model, selected);
       setContentRowLabel(this.triggerTarget, this.awaitingEnd ? "Select a second commit for a custom range" : description);
-      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.targetLabel}` : `${endpointName(model, selected.base ?? undefined)} → ${endpointName(model, selected.target)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
       this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
     }
