@@ -78,7 +78,8 @@ export function selectComparison(commits: readonly ComparisonCommit[], endpoints
   const pathIds = new Set(path), loadedIds = new Set(loaded);
   const trace = commits.flatMap(commit => loadedIds.has(commit.id) && pathIds.has(commit.id)
     ? commit.parents.filter(parent => corridor.has(parent)).map(parent => ({ from: commit.id, to: parent })) : []);
-  const selectedRows = loaded.filter(id => id === end || id === start);
+  // An inferred parent defines the diff and path, not an explicit user selection.
+  const selectedRows = loaded.filter(id => id === end || (endpoints.start !== undefined && id === start));
   const roles = loaded.map(id => ({ id, dot: id === end ? "end" as const : pathIds.has(id) ? "path" as const : "ordinary" as const, rowSelected: selectedRows.includes(id) }));
   return { start, end, implicitStart: endpoints.start === undefined, connection, complete, path, trace, selectedRows, roles };
 }

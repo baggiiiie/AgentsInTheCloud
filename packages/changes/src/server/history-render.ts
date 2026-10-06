@@ -1,7 +1,7 @@
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { branchColor, historyGraph, rowHeight, comparisonGraph, type HistoryModel } from "../history.ts";
 
-/** The live history and the review gallery share endpoint selection and graph markup. */
+/** Server-rendered history rows and their shared graph. */
 export function renderHistoryGraph(model: HistoryModel, historyId: string, moreHtml = ""): string {
   const graph = historyGraph(model.commits);
   const selected = comparisonGraph(graph, model.range, model.topology);
@@ -12,8 +12,8 @@ export function renderHistoryGraph(model: HistoryModel, historyId: string, moreH
     const color = selected.path.includes(commit.id) || endpoint ? "var(--accent)" : `var(--changes-branch-${node.lane % 8})`;
     return `<circle data-dot="${commit.id}" data-ahead="${commit.ahead}" data-color="${node.lane % 8}" cx="${12 + node.lane * 16}" cy="${node.row * rowHeight + 18}" r="${endpoint ? 6 : 3.5}" stroke-width="${endpoint ? 2 : 1.5}" stroke="${color}" fill="${endpoint || commit.ahead ? color : "var(--panel)"}"/>`;
   }).join("");
-  const rowBackgrounds = graph.nodes.filter(node => rowSelected(node.commit.id)).map(node => `<rect x="0" y="${node.row * rowHeight}" width="${graph.width}" height="${rowHeight}" fill="color-mix(in srgb,var(--accent) 12%,var(--panel))"/>`).join("");
-  const svg = `<svg data-changes-range-target="graph" aria-hidden="true" width="${graph.width}" height="${graph.height}" viewBox="0 0 ${graph.width} ${graph.height}"><g data-endpoint-backgrounds>${rowBackgrounds}</g><g class="changes-history-edges" fill="none" stroke-width="1.4">${edges}</g><path data-selected-backbone d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="1.75"/><path data-selected-beads d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="0 7"/>${nodes}</svg>`;
+  const rowBackgrounds = graph.nodes.map(node => `<rect class="changes-history-row-background" data-commit="${node.commit.id}" data-path="${rowSelected(node.commit.id)}" x="0" y="${node.row * rowHeight}" width="${graph.width}" height="${rowHeight}"/>`).join("");
+  const svg = `<svg data-changes-range-target="graph" aria-hidden="true" width="${graph.width}" height="${graph.height}" viewBox="0 0 ${graph.width} ${graph.height}"><g data-history-backgrounds>${rowBackgrounds}</g><g class="changes-history-edges" fill="none" stroke-width="1.4">${edges}</g><path data-selected-backbone d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="1.75"/><path data-selected-beads d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="0 7"/>${nodes}</svg>`;
   const rows = graph.nodes.map((node, index) => {
     const c = node.commit;
     const labels = c.refs.map(ref => `<span class="changes-ref" data-ref-kind="${ref.kind}" style="--changes-ref-color:var(--changes-branch-${branchColor(ref.name, ref.kind)})" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join("");
@@ -24,5 +24,5 @@ export function renderHistoryGraph(model: HistoryModel, historyId: string, moreH
       <td data-col="author">${escapeHtml(c.author)}</td><td data-col="date">${escapeHtml(c.date)}</td><td data-col="sha"><code>${c.kind === "commit" ? c.id.slice(0, 7) : "—"}</code></td>
     </tr>`;
   }).join("");
-  return `<div id="${domId("changes", historyId, "history")}" class="changes-history-content changes-comparison-graph" data-changes-range-target="historyContent"><table class="changes-history-table" role="grid" aria-multiselectable="true" aria-label="Local commit history" data-changes-range-target="table" data-action="pointerdown->changes-range#beginSelection pointerup->changes-range#finishSelection pointercancel->changes-range#cancelGesture"><colgroup><col class="changes-graph-column" style="width:${graph.width}px"><col><col data-col="author"><col data-col="date"><col data-col="sha"></colgroup><tbody>${rows}</tbody></table>${moreHtml}</div>`;
+  return `<div id="${domId("changes", historyId, "history")}" class="changes-history-content changes-comparison-graph" data-changes-range-target="historyContent"><table class="changes-history-table" role="grid" aria-multiselectable="true" aria-label="Local commit history" data-changes-range-target="table" data-action="pointerdown->changes-range#beginSelection pointerup->changes-range#finishSelection pointercancel->changes-range#cancelGesture pointermove->changes-range#hoverRow pointerleave->changes-range#clearHover"><colgroup><col class="changes-graph-column" style="width:${graph.width}px"><col><col data-col="author"><col data-col="date"><col data-col="sha"></colgroup><tbody>${rows}</tbody></table>${moreHtml}</div>`;
 }

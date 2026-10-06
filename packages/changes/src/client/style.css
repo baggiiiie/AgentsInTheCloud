@@ -71,7 +71,7 @@
 .changes-history-scroll { min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
 .changes-history-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--text-code); }
 .changes-history-content { position: relative; }
-.changes-history-table tbody tr { height: 36px; cursor: default; outline: none; }
+.changes-history-table tbody tr { --changes-history-row-background: transparent; height: 36px; cursor: default; outline: none; }
 .changes-history-table td { padding: 0 8px; height: 36px; border-top: 1px solid transparent; border-bottom: 1px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .changes-history-table td[data-col] { color: var(--text-muted); }
 .changes-history-table .changes-graph-cell { vertical-align: top; padding: 0; border: 0; overflow: visible; }
@@ -82,8 +82,11 @@
 .changes-ref { flex: none; max-width: 180px; padding: 1px 5px; border-radius: var(--radius-indicator); color: var(--changes-ref-color); background: color-mix(in srgb, var(--changes-ref-color) 17%, transparent); font-size: 11px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
 .changes-ref[data-ref-kind=remote] { color: color-mix(in srgb, var(--changes-ref-color) 75%, var(--text-muted)); background: color-mix(in srgb, var(--changes-ref-color) 7%, transparent); }
 .changes-ref[data-ref-kind=tag] { color: var(--text-muted); background: color-mix(in srgb, var(--text-muted) 10%, transparent); }
-.changes-history-table tr[data-path=true] td:not(.changes-graph-cell) { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
-.changes-history-table tbody tr:hover td:not(.changes-graph-cell) { background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.changes-history-row-background { --changes-history-row-background: transparent; fill: var(--changes-history-row-background); pointer-events: none; }
+.changes-history-table :is(tr, .changes-history-row-background)[data-path=true] { --changes-history-row-background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.changes-history-table :is(tr, .changes-history-row-background)[data-hovered=true] { --changes-history-row-background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+.changes-history-table :is(tr, .changes-history-row-background)[data-path=true][data-hovered=true] { --changes-history-row-background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+.changes-history-table td:not(.changes-graph-cell) { background: var(--changes-history-row-background); }
 .changes-history-table tbody tr:focus-visible td:not(.changes-graph-cell) { outline: 1px solid var(--accent); outline-offset: -1px; }
 .changes-history-edges path { opacity: .35; }
 .changes-history-table tbody { touch-action: pan-y; }

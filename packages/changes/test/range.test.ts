@@ -33,10 +33,13 @@ test("one commit uses its parent; explicit pairs use exact snapshots, including 
   await writeFile(join(root, "file.txt"), "not committed\n");
   const single = await captureChanges(localRepository(root), { end: third });
   expect(single.base).toBe(second);
+  expect(single.range).toEqual({ end: third });
   expect(single.files.get("file.txt")!.oldContents).toBe("two\n");
   expect(single.files.get("file.txt")!.newContents).toBe("three\n");
   const range = await captureChanges(localRepository(root), { end: third, start: second });
   expect(range.base).toBe(second);
+  expect(range.range).toEqual({ end: third, start: second });
+  expect(range.stats).toEqual(single.stats);
   expect(range.files.get("file.txt")!.oldContents).toBe("two\n");
   expect(range.files.get("file.txt")!.newContents).toBe("three\n");
   expect(range.stats[0]!.additions).toBe(1);

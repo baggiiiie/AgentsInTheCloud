@@ -31,6 +31,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     private range?: ChangesRange;
     private comparison?: ComparisonModel;
     private anchor?: string;
+    private hoveredCommit?: string;
     private gesture?: { pointer: number; last: string; deferred: boolean; extend: boolean };
     private isOpen = false;
     private busy = false;
@@ -100,6 +101,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       if (!this.isOpen) return;
       // Closing during a drag commits its final preview, just like releasing the pointer.
       if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); }
+      this.clearHover();
       this.isOpen = false;
       this.element.classList.remove("changes-range-open");
       this.pickerTarget.hidden = true;
@@ -184,22 +186,32 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
         if (this.modified(event)) { this.choose(next.dataset.commit!, true); void this.generate("compare"); }
       }
     }
+    hoverRow(event: PointerEvent): void {
+      if (event.pointerType === "touch") { this.clearHover(); return; }
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      this.setHovered(element && this.tableTarget.contains(element) ? this.commitAt(element, event.clientY) : undefined);
+    }
+    clearHover(): void { this.setHovered(undefined); }
+    private setHovered(id: string | undefined): void {
+      if (id === this.hoveredCommit) return;
+      this.hoveredCommit = id;
+      for (const row of this.rowTargets) row.dataset.hovered = String(row.dataset.commit === id);
+      for (const rect of this.graphTarget.querySelectorAll<SVGRectElement>(".changes-history-row-background")) rect.dataset.hovered = String(rect.dataset.commit === id);
+    }
+
     private paint(): void {
       const model = this.model!, range = this.range!, graph = this.graph!;
       const selected = comparisonGraph(graph, range, model.topology);
-      const backgrounds = this.graphTarget.querySelector<SVGGElement>("[data-endpoint-backgrounds]")!;
-      backgrounds.replaceChildren(...graph.nodes.filter(node => selected.selectedRows.includes(node.commit.id)).map(node => {
-        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", "0"); rect.setAttribute("y", String(node.row * rowHeight));
-        rect.setAttribute("width", String(graph.width)); rect.setAttribute("height", String(rowHeight));
-        rect.setAttribute("fill", "color-mix(in srgb,var(--accent) 12%,var(--panel))");
-        return rect;
-      }));
+      for (const rect of this.graphTarget.querySelectorAll<SVGRectElement>(".changes-history-row-background")) {
+        rect.dataset.path = String(selected.selectedRows.includes(rect.dataset.commit!));
+        rect.dataset.hovered = String(rect.dataset.commit === this.hoveredCommit);
+      }
       const focused = this.rowTargets.find(row => row === document.activeElement);
       for (const row of this.rowTargets) {
         row.tabIndex = focused ? row === focused ? 0 : -1 : row.dataset.commit === range.end ? 0 : -1;
         const id = row.dataset.commit!;
         row.dataset.path = String(selected.selectedRows.includes(id));
+        row.dataset.hovered = String(id === this.hoveredCommit);
         row.dataset.top = String(id === selected.end);
         row.dataset.bottom = String(id === selected.start);
         row.setAttribute("aria-selected", row.dataset.path);
