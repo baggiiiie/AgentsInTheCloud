@@ -18,18 +18,11 @@ class HostTerminalController extends Controller<HTMLElement> {
   retry() { this.viewer?.reconnect(); }
   disconnect() { this.theme.disconnect(); this.viewer?.dispose(); this.viewer = undefined; }
 }
-class HostPanelController extends Controller<HTMLDialogElement> {
-  closed() {
-    // Remove terminal viewers and their attachments; detached System tmux owns the processes.
-    this.element.remove();
-  }
-}
 class HostDismissController extends Controller<HTMLElement> { dismiss() { this.element.remove(); } }
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "host",
   install({ application }) {
     application.register("host-terminal", HostTerminalController);
-    application.register("host-panel", HostPanelController);
     application.register("host-dismiss", HostDismissController);
   },
 };

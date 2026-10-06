@@ -1,6 +1,8 @@
 import { renderConnectionModeSettings } from "./connection-mode.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
-import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
+import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { createPiModelRuntime, modelsDialogId, setEnabledModels } from "@agents-in-the-cloud/llm/server";
@@ -21,7 +23,7 @@ function forceDeleteWorkspacesEnabled(): boolean {
   return process.env.NODE_ENV !== "production";
 }
 
-async function renderCommitIdentityForm(error = ""): Promise<string> {
+export async function renderCommitIdentityForm(error = ""): Promise<string> {
   const identity = await getCommitIdentity();
   return `<form id="settings_commit_identity" class="settings-commit-identity" method="post" action="/settings/commit-identity" autocomplete="off" data-controller="commit-identity" data-action="input->commit-identity#queue change->commit-identity#save submit->commit-identity#submit">
     ${error ? `<p class="settings-error">${escapeHtml(error)}</p>` : ""}
@@ -31,7 +33,7 @@ async function renderCommitIdentityForm(error = ""): Promise<string> {
 }
 
 async function renderCommitIdentitySettings(): Promise<string> {
-  return `<section class="settings-sec" id="settings-sec-commit-identity"><h2>Commit identity</h2>${await renderCommitIdentityForm()}</section>`;
+  return `<section class="settings-sec settings-sec-commit-identity" id="settings-sec-commit-identity">${await renderCommitIdentityForm()}</section>`;
 }
 
 function renderBuildIdentity(): string {
@@ -90,45 +92,47 @@ for (const module of workspaceModules) {
   for (const contribution of module.settingsContributions ?? []) registerSettingsContribution(contribution);
 }
 
-function settingsDialogHtml(titleCaption: string, bodyHtml: string, sectionId?: string): string {
-  const sectionAttributes = sectionId ? ` data-controller="scroll-into-view" data-scroll-into-view-target-id-value="${escapeHtml(`settings-sec-${sectionId}`)}" data-action="turbo:frame-load->scroll-into-view#frameLoaded"` : "";
-  return dialogHtml({
-    element: {
-      id: "settings_dialog",
+export const appSettingsFrameId = "app_settings_frame";
 
-      attributesHtml: `data-dialog-auto-show${sectionAttributes}`,
-    },
-    iconHtml: Icons.Settings,
-    titleCaption,
-    bodyHtml,
-    bodyLayout: "full-bleed",
-    closeLabel: "Close settings",
-  });
+const disclosureSections = new Set(["models", "host", "developer-tools"]);
+const disclosureFrameId = (id: string) => `app_settings_section_${id}`;
+
+async function renderSettingsDisclosureFrame(id: string): Promise<string> {
+  const section = listSettingsContributions().find(contribution => contribution.id === id);
+  if (!disclosureSections.has(id)) throw invalidArguments(`settings disclosure not found: ${id}`);
+  const content = id === "developer-tools"
+    ? `${await renderDeveloperTools()}${actionLinkHtml({ href: "/design-system-catalogue.html", variant: "secondary", content: { kind: "caption", caption: "Design system catalogue" }, attributesHtml: 'data-turbo="false"' })}${renderBuildIdentity()}`
+    : await section!.render();
+  return `<turbo-frame class="app-settings-disclosure-frame" id="${disclosureFrameId(id)}"><div class="app-settings-expanded">${content}</div></turbo-frame>`;
 }
 
-export async function renderSettingsDialog(request: Request, sectionId?: string): Promise<string> {
-  // Keep previously published Settings links working without retaining the old app name.
+export async function renderSettingsFrame(request: Request, sectionId?: string): Promise<string> {
   if (sectionId === "git-identity") sectionId = "commit-identity";
   const contributions = listSettingsContributions();
-  if (sectionId && !contributions.some((contribution) => contribution.id === sectionId)) throw invalidArguments(`settings section not found: ${sectionId}`);
-  const sections = await Promise.all(contributions.map((contribution) => contribution.render()));
-  return settingsDialogHtml("Settings", `<main class="settings-main"><section class="settings-sec" id="settings-sec-agents-in-the-cloud-url"><h2>AgentsInTheCloud URL</h2>${agentsInTheCloudUrlHtml(agentsInTheCloudUrl(request), "settings_agents_in_the_cloud_url_qr")}</section>${sections.join("")}<div class="settings-developer-tools-link-row"><a class="developer-tools-link" href="/settings/developer-tools" data-turbo-frame="_top" data-turbo-stream="true">Developer tools</a>${renderBuildIdentity()}</div></main>`, sectionId);
+  if (sectionId && !contributions.some(contribution => contribution.id === sectionId) && sectionId !== "developer-tools" && sectionId !== "url") throw invalidArguments(`settings section not found: ${sectionId}`);
+  const inline = new Map(await Promise.all(contributions.filter(contribution => !disclosureSections.has(contribution.id)).map(async contribution => [contribution.id, await contribution.render()] as const)));
+  const take = (...ids: string[]) => ids.map(id => { const html = inline.get(id) ?? ""; inline.delete(id); return html; }).join("");
+  const disclosure = (id: string, label: string) => disclosureHtml({
+    element: { id: `settings-sec-${id}`, attributesHtml: id === "developer-tools" ? 'hidden data-app-settings-target="developer"' : undefined }, open: sectionId === id,
+    summary: { kind: "compact", width: "fit", label: { kind: "text", text: label } },
+    bodyHtml: `<turbo-frame class="app-settings-disclosure-frame" id="${disclosureFrameId(id)}" src="/settings/sections/${id}" loading="lazy"><span role="status">Loading…</span></turbo-frame>`,
+  });
+  const content = `<div class="app-settings-overview">
+    ${take("theme", "dictation", "commit-identity", "github", "update-channel", "update", "access")}
+    <section class="settings-sec settings-sec-url" id="settings-sec-url"><h2>AgentsInTheCloud URL</h2>${agentsInTheCloudUrlHtml(agentsInTheCloudUrl(request), "settings_agents_in_the_cloud_url_qr")}</section>
+    ${take(...inline.keys())}
+    <div class="app-settings-disclosures">${disclosure("models", "Models")}${disclosure("host", "Host")}${disclosure("developer-tools", "Developer tools")}</div>
+  </div>`;
+  const header = `<h1 class="panel__title" tabindex="-1" data-app-settings-heading>${Icons.Settings}<span>Settings</span></h1>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Close settings" }, attributesHtml: 'data-action="app-settings#close"' })}`;
+  return `<turbo-frame id="${appSettingsFrameId}" data-app-settings-target="frame">${panelHtml({ element: { tag: "section", attributesHtml: 'aria-label="Settings"' }, headerHtml: header, bodyHtml: `<div class="template-settings-content app-settings-content"${sectionId ? ` data-app-settings-anchor="settings-sec-${escapeHtml(sectionId)}"` : ""} data-app-settings-location="/settings${sectionId ? `?section=${encodeURIComponent(sectionId)}` : ""}">${content}</div>`, bodyLayout: "full-bleed", bodyOverflow: "scroll" })}</turbo-frame>`;
 }
 
-export async function renderDeveloperToolsDialog(): Promise<string> {
-  const backLink = actionLinkHtml({
-    href: "/settings",
-    variant: "secondary",
-    content: { kind: "caption", caption: "Back to settings" },
-    attributesHtml: 'data-turbo-frame="_top" data-turbo-stream="true"',
-  });
-  const catalogueLink = actionLinkHtml({
-    href: "/design-system-catalogue.html",
-    variant: "secondary",
-    content: { kind: "caption", caption: "Design system catalogue" },
-    attributesHtml: 'data-turbo="false"',
-  });
-  return settingsDialogHtml("Developer tools", `<main class="settings-main settings-main-developer-tools">${await renderDeveloperTools()}<nav class="developer-tools-back" aria-label="Settings navigation">${backLink}${catalogueLink}</nav></main>`);
+export async function renderAppSettings(request: Request, sectionId?: string): Promise<string> {
+  return `<div id="app_settings_panel" class="template-settings-host app-settings-host" data-controller="app-settings" data-action="keydown->app-settings#keydown keydown@window->app-settings#developerKey keyup@window->app-settings#developerKey blur@window->app-settings#developerKey">${await renderSettingsFrame(request, sectionId)}</div>`;
+}
+
+export async function renderDeveloperToolsSettings(request: Request): Promise<string> {
+  return renderAppSettings(request, "developer-tools");
 }
 
 async function deleteAllStoredSettings(): Promise<void> {
@@ -141,18 +145,22 @@ async function deleteAllStoredSettings(): Promise<void> {
 }
 
 export async function handleSettingsPageRequest(request: Request, url: URL, options: { forceDeleteAllWorkspaces?: () => Promise<WorkspaceCleanupResult>; renderModelPickerUpdates: () => Promise<string> }): Promise<Response | undefined> {
+  const disclosureMatch = url.pathname.match(/^\/settings\/sections\/(models|host|developer-tools)$/);
+  if (disclosureMatch && request.method === "GET") return response(await renderSettingsDisclosureFrame(disclosureMatch[1]!));
   if (url.pathname === "/settings" && request.method === "GET") {
-    const html = await renderSettingsDialog(request);
-    return wantsStream(request) ? stream(update("settings_modal_host", html)) : response(html);
+    const section = url.searchParams.get("section") ?? undefined;
+    if (request.headers.get("turbo-frame") === appSettingsFrameId) return response(await renderSettingsFrame(request, section));
+    const html = await renderAppSettings(request, section);
+    return wantsStream(request) ? stream(update("app_settings_host", html)) : response(html);
   }
   if ((url.pathname === "/settings/developer-tools" || url.pathname === "/settings/development") && request.method === "GET") {
-    const html = await renderDeveloperToolsDialog();
-    return wantsStream(request) ? stream(update("settings_modal_host", html)) : response(html);
+    const html = await renderDeveloperToolsSettings(request);
+    return wantsStream(request) ? stream(update("app_settings_host", html)) : response(html);
   }
   if (url.pathname === "/settings/reset" && request.method === "POST") {
     await deleteAllStoredSettings();
     const pickerUpdates = await options.renderModelPickerUpdates();
-    return stream(`${pickerUpdates}${replace("settings_dialog", await renderDeveloperToolsDialog())}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove(modelsDialogId)}`);
+    return stream(`${pickerUpdates}${replace(appSettingsFrameId, await renderSettingsFrame(request, "developer-tools"))}${update("onboarding_modal_host", await renderOnboardingDialog())}${remove(modelsDialogId)}`);
   }
   if (url.pathname === "/settings/workspaces/force-delete" && request.method === "POST" && forceDeleteWorkspacesEnabled()) {
     const result = options.forceDeleteAllWorkspaces
@@ -169,7 +177,7 @@ export async function handleSettingsPageRequest(request: Request, url: URL, opti
       const message = errorMessage(error);
       return stream(replace("settings_commit_identity", await renderCommitIdentityForm(message)));
     }
-    return stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
+    return stream(update("onboarding_modal_host", await renderOnboardingDialog()));
   }
   return undefined;
 }

@@ -1,3 +1,4 @@
+import { AppSettingsController } from "./app-settings-controller.ts";
 import { TemplateSettingsController } from "./template-settings-controller.ts";
 import { WorkspaceTemplateSecretPathController } from "./workspace-template-secret-path-controller.ts";
 import type { ToggleChangeEvent } from "@agents-in-the-cloud/design-system/toggle/client";
@@ -196,6 +197,7 @@ export function registerWorkspaceSettingsControllers(): void {
     "settings-autosave": SettingsAutosaveController,
     "ssh-public-key-copy": SshPublicKeyCopyController,
     "template-settings": TemplateSettingsController,
+    "app-settings": AppSettingsController,
     "workspace-template-secret-path": WorkspaceTemplateSecretPathController,
     "settings-prefetch": SettingsPrefetchController,
     "server-filter": ServerFilterController,

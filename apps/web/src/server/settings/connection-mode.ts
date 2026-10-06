@@ -32,7 +32,7 @@ export async function renderConnectionModeSettings(source = true): Promise<strin
     ? actionLinkHtml({ href: access.authUrl, variant: "primary", content: { kind: "caption", caption: "Sign in to Tailscale" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
     : `<form action="/settings/access" method="post"><input type="hidden" name="mode" value="tailscale">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Retry Tailscale connection" } })}</form>`;
   return `<turbo-frame id="settings_access"${source ? ' src="/settings/access"' : ""} data-controller="connection-mode-settings">
-    <section class="settings-sec">
+    <section class="settings-sec" id="settings-sec-access">
       <div class="settings-choice-row"><h2>Where can you use AgentsInTheCloud?</h2>${modeToggle}</div>
       <p>${remote ? "Use AgentsInTheCloud and Workspace previews from devices on your Tailscale network, including the installation computer." : "Use AgentsInTheCloud and Workspace previews in a browser on the computer where AgentsInTheCloud is installed. Tailscale is off."}</p>
       ${remote && !connected ? "<p>Tailscale isn’t connected yet.</p>" : ""}

@@ -60,7 +60,7 @@ import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/ro
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
 import { createWorkspaceTemplateRoutes, type WorkspaceTemplateEditorOptions } from "./workspace-template-routes.ts";
-import { renderDeveloperToolsDialog, renderSettingsDialog } from "./settings/page.ts";
+import { appSettingsFrameId, renderDeveloperToolsSettings, renderAppSettings } from "./settings/page.ts";
 import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
@@ -579,7 +579,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const pane = await workspacePaneCollections(selectedId ?? "");
     const workspaceTemplateEditor = surface?.kind === "workspace-template-editor" ? surface.dialogHtml : '<div id="workspace-template-editor-modal"></div>';
     const settings = surface?.kind === "settings"
-      ? surface.developerTools ? await renderDeveloperToolsDialog() : await renderSettingsDialog(surface.request, surface.section)
+      ? surface.developerTools ? await renderDeveloperToolsSettings(surface.request) : await renderAppSettings(surface.request, surface.section)
       : surface?.kind === "models" ? await renderModelsDialog({ focus: surface.focus })
       : "";
     const launchComposer = surface?.kind === "new-workspace"
@@ -587,12 +587,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
     return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""), launchComposerCommand.binding)}
-    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}${surface?.kind === "template-settings" ? surface.html : `<div id="${templateSettingsHostId}"></div>`}</main>
+    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}${surface?.kind === "template-settings" ? surface.html : `<div id="${templateSettingsHostId}"></div>`}<div id="app_settings_host">${surface?.kind === "settings" ? settings : ""}</div></main>
     ${renderAgentsInTheCloudBar()}
   </div>
   ${workspaceTemplateEditor}
   <div id="update_modal_host"></div>
-  <div id="settings_modal_host">${settings}</div>
+  <div id="settings_modal_host">${surface?.kind === "models" ? settings : ""}</div>
   <turbo-frame id="${workspaceModuleModalFrameId}">${surface?.kind === "module-modal" ? surface.dialogHtml : ""}</turbo-frame>
   <div id="onboarding_modal_host">${await renderOnboardingDialog()}</div>
   <div id="${workspaceCommandModalHostId}"></div>
@@ -1187,7 +1187,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/workspace-templates/new" && request.method === "GET") {
       return workspaceTemplateEditorResponse(request, { kind: "new" });
     }
-    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
+    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request) && request.headers.get("turbo-frame") !== appSettingsFrameId) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
     if (url.pathname === "/models" && request.method === "GET" && !wantsStream(request) && !url.searchParams.has("host")) return await surfacePage({ kind: "models", focus: url.searchParams.get("focus") ?? undefined });
     if ((url.pathname === "/settings/developer-tools" || url.pathname === "/settings/development") && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: undefined, developerTools: true });
     if (url.pathname === "/workspaces" && request.method === "GET") return workspaceListEndpoint(request, url);

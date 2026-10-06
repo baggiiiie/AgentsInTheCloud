@@ -3,13 +3,12 @@ import { hostDiagnosticGroups } from "../diagnostics.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
-import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { hostOpenApiPaths } from "./openapi.ts";
 import { tabHtml, tabStripHtml } from "@agents-in-the-cloud/design-system/tab-strip";
 import { observableTerminalStaticFiles, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
-import { escapeHtml, workspaceModuleModalFrameId, type WorkspaceModule, type WorkspaceModuleRouteContext } from "@agents-in-the-cloud/shared";
+import { escapeHtml, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { hostAvailable, hostRequest, hostTerminalSocket } from "./connection.ts";
 import type { HostSample, HostTerminal } from "../protocol.ts";
@@ -65,14 +64,12 @@ function renderTerminals(terminals: HostTerminal[], selected?: string): string {
   return `<turbo-frame id="${terminalFrame}"><section class="host-terminals"><header class="host-terminal-heading">${terminals.length ? tabStripHtml({ id: "host_terminal_tabs", label: "Host terminals", tabsHtml: tabs }) : ""}<form method="post" action="/host/terminals" data-turbo-frame="${terminalFrame}">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "+ New host terminal" } })}</form></header>
   ${active ? `<section id="host_terminal_panel" role="tabpanel" aria-labelledby="host_tab_${active.id}" data-controller="host-terminal" data-host-terminal-url-value="/host/terminals/${active.id}/ws">${renderTerminalConnectionStatus("host-terminal")}<div class="host-terminal-screen observable-terminal-host" data-host-terminal-target="host"></div></section>` : `<p class="host-empty">Host terminals run as root in AgentsInTheCloud System, outside your Workspaces. Commands can affect the app and every Workspace, and can access secrets.</p>`}</section></turbo-frame>`;
 }
-async function handle(request: Request, url: URL, context: WorkspaceModuleRouteContext): Promise<Response | undefined> {
+async function handle(request: Request, url: URL): Promise<Response | undefined> {
   if (url.pathname !== "/host" && !url.pathname.startsWith("/host/")) return;
   const json = requestAcceptsJson(request);
   if (url.pathname === "/host" && request.method === "GET") {
     if (json) return Response.json({ available: hostAvailable(), url: "/host", boundary: "AgentsInTheCloud System", shellUser: "root" });
-    const body = hostAvailable() ? `<div class="host-content"><turbo-frame id="${statsFrame}" src="/host/sample"><p role="status">Sampling host…</p></turbo-frame><turbo-frame id="${terminalFrame}" src="/host/terminals"><p role="status">Loading terminals…</p></turbo-frame></div>` : `<p>Host access requires an AgentsInTheCloud System image with the host service. This instance has no Host connection.</p>`;
-    const dialog = dialogHtml({ element: { id: "host_dialog", attributesHtml: 'data-dialog-auto-show data-controller="host-panel" data-action="close->host-panel#closed"' }, titleCaption: "Host", iconHtml: Icons.Server, bodyHtml: body });
-    return request.headers.has("turbo-frame") ? response(`<turbo-frame id="${workspaceModuleModalFrameId}">${dialog}</turbo-frame>`) : context.renderModalPage(dialog);
+    return Response.redirect(new URL("/settings?section=host", url), 303);
   }
   if (!hostAvailable()) return json
     ? Response.json({ error: { code: "host_unavailable", message: "Host access requires AgentsInTheCloud System" } }, { status: 503 })
@@ -104,7 +101,7 @@ async function handle(request: Request, url: URL, context: WorkspaceModuleRouteC
 /** Host targets AgentsInTheCloud System, not a Workspace or necessarily the physical Docker host. */
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "host",
-  renderWorkspacePaneActions: () => actionLinkHtml({ href: "/host", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Server, label: "Host" }, attributesHtml: `data-turbo-frame="${workspaceModuleModalFrameId}"` }),
+  settingsContributions: [{ id: "host", label: "Host", order: 80, render: async () => hostAvailable() ? `<div class="host-content"><turbo-frame id="${statsFrame}" src="/host/sample"><p role="status">Sampling host…</p></turbo-frame><turbo-frame id="${terminalFrame}" src="/host/terminals"><p role="status">Loading terminals…</p></turbo-frame></div>` : `<p>Host access requires an AgentsInTheCloud System image with the host service. This instance has no Host connection.</p>` }],
   initialize(context) { context.registerSocketHandler(hostTerminalSocket); },
   routes: [{ handle }],
   openApiPaths: hostOpenApiPaths,

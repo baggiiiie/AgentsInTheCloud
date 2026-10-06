@@ -1,3 +1,4 @@
+import { restoreAppSettingsDestination } from "./app-settings-controller.ts";
 import { restoreTemplateSettingsDestination } from "./template-settings-controller.ts";
 import { markActiveWorkspaceRow } from "./workspace-presentation.ts";
 import { phoneLayoutMediaQuery } from "@agents-in-the-cloud/shared";
@@ -171,7 +172,7 @@ class WorkspaceResidencyController extends Controller<HTMLElement> {
     window.AgentsInTheCloudCable?.reportVisibility({ workspaceId: hidden ? undefined : workspaceId, surfaceKeys });
   };
   private readonly historyChanged = (): void => {
-    if (restoreTemplateSettingsDestination()) return;
+    if (restoreTemplateSettingsDestination() || restoreAppSettingsDestination()) return;
     const id = location.pathname.match(/^\/workspaces\/([^/]+)$/)?.[1];
     if (id) void this.selectWorkspace(decodeURIComponent(id), location.href, "none");
     else if (this.intended) this.unselectWorkspace(this.intended);

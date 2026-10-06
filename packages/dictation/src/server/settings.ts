@@ -9,8 +9,8 @@ async function renderDictationSettings(): Promise<string> {
   const selected = await readDictationModel();
   const options = dictationModels.map((model) =>
     `<option value="${model.id}"${model.id === selected ? " selected" : ""}>${escapeHtml(model.name)} — ${escapeHtml(model.description)}</option>`).join("");
-  return `<section class="settings-sec settings-sec-inline" id="${sectionId}">
-    <p class="settings-sub">Local speech-to-text model for Dictation</p>
+  return `<section class="settings-sec settings-sec-inline settings-sec-dictation" id="${sectionId}">
+    <h2>Dictation</h2>
     <form method="post" action="${settingsPath}" data-turbo="true" data-controller="settings-autosave" data-action="change->settings-autosave#save submit->settings-autosave#submit">
       <select class="settings-select popup-select" name="model" aria-label="Dictation model">${options}</select>
     </form>
