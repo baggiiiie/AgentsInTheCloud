@@ -1,7 +1,7 @@
-import type { ComparisonEndpoints, ComparisonCommit } from "./comparison-selection.ts";
+import type { DiffEndpoints, ComparisonCommit } from "./diff-endpoints.ts";
 export const workingTree = "working";
 export const stagedChanges = "staged";
-export type ChangesRange = ComparisonEndpoints;
+export type { DiffEndpoints } from "./diff-endpoints.ts";
 export interface ChangesRef { name: string; kind: "local" | "remote" | "tag" }
 export interface ChangesNodeStats { files: number; additions: number; deletions: number }
 export interface ChangesCommit {
@@ -20,7 +20,7 @@ export interface HistoryModel {
   commits: ChangesCommit[];
   topology: ComparisonCommit[];
   references: (ChangesRef & { id: string })[];
-  range: ChangesRange;
+  endpoints: DiffEndpoints;
   head?: string;
   upstream?: string;
   unpushed?: UnpushedHistory;

@@ -1,10 +1,10 @@
-import { selectComparison } from "../comparison-selection.ts";
+import { resolveDiffEndpoints } from "../diff-endpoints.ts";
 import { captureSyntheticStats } from "./synthetic-stats.ts";
 import { collectChangesComparison, collectChangesIndex, type ChangesFile, type ChangesFileStats, type ChangesIndex } from "./diff.ts";
 import { git, type Repository } from "@agents-in-the-cloud/workspace/git";
-import { endpointName, rangeDescription, stagedChanges, workingTree, type ChangesCommit, type ChangesRange, type HistoryModel } from "../history.ts";
+import { endpointName, diffEndpointsDescription, stagedChanges, workingTree, type ChangesCommit, type DiffEndpoints, type HistoryModel } from "../history.ts";
 export { stagedChanges, workingTree } from "../history.ts";
-export type { ChangesCommit, ChangesRange } from "../history.ts";
+export type { ChangesCommit, DiffEndpoints } from "../history.ts";
 
 export interface ChangesHistory extends HistoryModel {
   id: string;
@@ -25,14 +25,14 @@ export interface ChangesSnapshot {
   stats: ChangesFileStats[];
   files: Map<string, ChangesFile>;
   history: ChangesHistory;
-  range: ChangesRange;
+  endpoints: DiffEndpoints;
   label: string;
   base?: string;
   baseLabel: string;
-  end?: string;
-  endLabel: string;
+  target?: string;
+  targetLabel: string;
 }
-export class InvalidChangesRange extends Error {}
+export class InvalidDiffEndpoints extends Error {}
 
 const commitFormat = "%H%x00%P%x00%s%x00%an%x00%cs";
 function commitRecord(history: ChangesHistory, line: string): ChangesCommit {
@@ -49,7 +49,7 @@ export async function commitHistory(root: Repository, history: ChangesHistory, s
 
 export async function captureHistory(root: Repository): Promise<ChangesHistory> {
   const index = await collectChangesIndex(root);
-  const history: ChangesHistory = { id: crypto.randomUUID(), commits: [], topology: [], tips: [], references: [], indexTree: "", emptyTree: "", aheadIds: new Set(), range: { end: workingTree }, hasStaged: false, hasMore: false, loaded: 0, phase: index.phase };
+  const history: ChangesHistory = { id: crypto.randomUUID(), commits: [], topology: [], tips: [], references: [], indexTree: "", emptyTree: "", aheadIds: new Set(), endpoints: { target: workingTree }, hasStaged: false, hasMore: false, loaded: 0, phase: index.phase };
   if (index.phase !== "ready") return history;
   const [head, branch, refs, emptyTree, indexTree] = await Promise.all([
     git(root, ["rev-parse", "--verify", "HEAD"], true),
@@ -92,11 +92,11 @@ export async function captureHistory(root: Repository): Promise<ChangesHistory> 
   const synthetic = (id: string, kind: "working" | "staged", subject: string, parents: string[]): ChangesCommit => ({ id, kind, subject, parents, author: "You", date: "Now", refs: [], ahead: false, stats: syntheticStats[kind] });
   history.commits.push(synthetic(workingTree, "working", "Working tree", history.hasStaged ? [stagedChanges] : history.head ? [history.head] : []));
   if (history.hasStaged) history.commits.push(synthetic(stagedChanges, "staged", "Staged changes", history.head ? [history.head] : []));
-  history.range = { end: workingTree, start: history.head ?? null };
+  history.endpoints = { target: workingTree, base: history.head ?? null };
   if (history.aheadIds.size) {
     const base = (await git(root, ["merge-base", history.head!, history.upstreamId!])).toString().trim();
     history.unpushed = { base, count: history.aheadIds.size };
-    history.range = { end: workingTree, start: base };
+    history.endpoints = { target: workingTree, base: base };
   }
   history.topology = [...history.commits.map(({ id, parents }) => ({ id, parents })), ...topologyOutput.toString().trim().split("\n").filter(Boolean).map(line => {
     const [id, ...parents] = line.split(" ");
@@ -111,25 +111,25 @@ export async function captureHistory(root: Repository): Promise<ChangesHistory> 
 }
 
 /** Endpoints are object IDs (or captured index/working-tree states), never moving Git expressions. */
-export async function captureChanges(root: Repository, range?: ChangesRange, capturedHistory?: ChangesHistory): Promise<ChangesSnapshot> {
+export async function captureChanges(root: Repository, endpoints?: DiffEndpoints, capturedHistory?: ChangesHistory): Promise<ChangesSnapshot> {
   const history = capturedHistory ?? await captureHistory(root);
-  range ??= history.range;
-  const snapshot: ChangesSnapshot = { id: crypto.randomUUID(), index: { phase: "not-git" }, stats: [], files: new Map(), history, range, label: "Changes", baseLabel: "", endLabel: "" };
+  endpoints ??= history.endpoints;
+  const snapshot: ChangesSnapshot = { id: crypto.randomUUID(), index: { phase: "not-git" }, stats: [], files: new Map(), history, endpoints, label: "Changes", baseLabel: "", targetLabel: "" };
   if (history.phase !== "ready") return snapshot;
   // Only pinned IDs from this history may reach Git. The full compact topology
   // makes direction and ALL connecting routes independent of history paging.
-  if (!history.commits.some(commit => commit.id === range.end) || (range.start != null && !history.topology.some(commit => commit.id === range.start))) throw new InvalidChangesRange("These endpoints aren’t in this history. Refresh Changes.");
+  if (!history.commits.some(commit => commit.id === endpoints.target) || (endpoints.base != null && !history.topology.some(commit => commit.id === endpoints.base))) throw new InvalidDiffEndpoints("These endpoints aren’t in this history. Refresh Changes.");
   let selected;
-  try { selected = selectComparison(history.topology, range, history.commits.map(commit => commit.id)); }
-  catch (error) { if (!(error instanceof RangeError)) throw error; throw new InvalidChangesRange(error.message); }
-  snapshot.range = { end: selected.end };
-  if (range.start !== undefined) snapshot.range.start = selected.start;
-  snapshot.base = selected.start === null ? history.emptyTree : selected.start === stagedChanges ? history.indexTree : selected.start;
-  snapshot.end = selected.end === workingTree ? undefined : selected.end === stagedChanges ? history.indexTree : selected.end;
-  snapshot.baseLabel = snapshot.base === history.emptyTree ? "Empty tree" : snapshot.base === history.indexTree ? "Staged changes" : endpointName(history, selected.start ?? undefined);
-  snapshot.endLabel = endpointName(history, selected.end);
-  snapshot.label = rangeDescription(history, selected);
-  const comparison = await collectChangesComparison(root, snapshot.base, snapshot.end);
+  try { selected = resolveDiffEndpoints(history.topology, endpoints, history.commits.map(commit => commit.id)); }
+  catch (error) { if (!(error instanceof RangeError)) throw error; throw new InvalidDiffEndpoints(error.message); }
+  snapshot.endpoints = { target: selected.target };
+  if (endpoints.base !== undefined) snapshot.endpoints.base = selected.base;
+  snapshot.base = selected.base === null ? history.emptyTree : selected.base === stagedChanges ? history.indexTree : selected.base;
+  snapshot.target = selected.target === workingTree ? undefined : selected.target === stagedChanges ? history.indexTree : selected.target;
+  snapshot.baseLabel = snapshot.base === history.emptyTree ? "Empty tree" : snapshot.base === history.indexTree ? "Staged changes" : endpointName(history, selected.base ?? undefined);
+  snapshot.targetLabel = endpointName(history, selected.target);
+  snapshot.label = diffEndpointsDescription(history, selected);
+  const comparison = await collectChangesComparison(root, snapshot.base, snapshot.target);
   snapshot.index = comparison.index;
   snapshot.stats = comparison.stats;
   snapshot.files = comparison.files;

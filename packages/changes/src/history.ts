@@ -1,4 +1,4 @@
-import { selectComparison, type ComparisonEndpoints, type ComparisonCommit, type ComparisonSelection } from "./comparison-selection.ts";
+import { resolveDiffEndpoints, type DiffEndpoints, type ComparisonCommit, type ResolvedDiffEndpoints } from "./diff-endpoints.ts";
 import { workingTree, stagedChanges, type ChangesCommit, type ChangesRef, type HistoryGraph, type GraphNode, type GraphEdge, type HistoryModel } from "./history-model.ts";
 export * from "./history-model.ts";
 
@@ -56,16 +56,16 @@ export function endpointName(model: Pick<HistoryModel, "references">, id: string
   return refs.find(ref => ref.kind === "local")?.name ?? refs.find(ref => ref.kind === "remote")?.name ?? refs.find(ref => ref.kind === "tag")?.name ?? id.slice(0, 7);
 }
 
-export function rangeDescription(model: HistoryModel, selected: ComparisonSelection): string {
-  if (model.unpushed && selected.end === workingTree && selected.start === model.unpushed.base) return `Unpushed changes · ${model.unpushed.count} ${model.unpushed.count === 1 ? "commit" : "commits"}`;
-  if (selected.end === workingTree && selected.start === model.head) return "Uncommitted changes";
-  if (selected.end === workingTree && selected.start === stagedChanges) return "Unstaged changes";
-  if (selected.end === stagedChanges && selected.start === (model.head ?? null)) return "Staged changes";
-  if (selected.implicitStart) {
-    const commit = model.commits.find(commit => commit.id === selected.end)!;
-    return `${endpointName(model, selected.end)} · ${commit.subject}`;
+export function diffEndpointsDescription(model: HistoryModel, selected: ResolvedDiffEndpoints): string {
+  if (model.unpushed && selected.target === workingTree && selected.base === model.unpushed.base) return `Unpushed changes · ${model.unpushed.count} ${model.unpushed.count === 1 ? "commit" : "commits"}`;
+  if (selected.target === workingTree && selected.base === model.head) return "Uncommitted changes";
+  if (selected.target === workingTree && selected.base === stagedChanges) return "Unstaged changes";
+  if (selected.target === stagedChanges && selected.base === (model.head ?? null)) return "Staged changes";
+  if (selected.implicitBase) {
+    const commit = model.commits.find(commit => commit.id === selected.target)!;
+    return `${endpointName(model, selected.target)} · ${commit.subject}`;
   }
-  return `${endpointName(model, selected.start ?? undefined)} → ${endpointName(model, selected.end)}`;
+  return `${endpointName(model, selected.base ?? undefined)} → ${endpointName(model, selected.target)}`;
 }
 
 /** Local and tracking labels share a hue; the remote name is not part of their identity. */
@@ -77,8 +77,8 @@ export function branchColor(name: string, kind: ChangesRef["kind"] = "local"): n
 }
 
 /** Attach geometry to all real connecting edges between snapshot endpoints. */
-export function comparisonGraph(graph: HistoryGraph, endpoints: ComparisonEndpoints, topology: readonly ComparisonCommit[] = graph.nodes.map(node => node.commit)) {
-  const selection = selectComparison(topology, endpoints, graph.nodes.map(node => node.commit.id));
+export function comparisonGraph(graph: HistoryGraph, endpoints: DiffEndpoints, topology: readonly ComparisonCommit[] = graph.nodes.map(node => node.commit)) {
+  const selection = resolveDiffEndpoints(topology, endpoints, graph.nodes.map(node => node.commit.id));
   const keys = new Set(selection.trace.map(edge => JSON.stringify([edge.from, edge.to])));
   const route = graph.edges.filter(edge => keys.has(JSON.stringify([edge.from, edge.to]))).map(edge => edge.d).join(" ");
   return { ...selection, route };

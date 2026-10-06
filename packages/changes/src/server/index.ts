@@ -8,8 +8,8 @@ import { workspaceRepository } from "@agents-in-the-cloud/workspace/git";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory } from "./render.ts";
-import type { ChangesRange } from "../history.ts";
-import { captureChanges, commitHistory, InvalidChangesRange, type ChangesSnapshot } from "./snapshot.ts";
+import type { DiffEndpoints } from "../history.ts";
+import { captureChanges, commitHistory, InvalidDiffEndpoints, type ChangesSnapshot } from "./snapshot.ts";
 
 const reference = { type: "changes" } as const;
 const referenceSchema = Type.Object({ type: Type.Literal("changes") });
@@ -26,7 +26,7 @@ function current(workspaceId: string): Promise<ChangesState> {
   return state;
 }
 const replace = (target: string, html: string) => `<turbo-stream action="replace" target="${escapeHtml(target)}"><template>${html}</template></turbo-stream>`;
-const rangeSchema = Type.Object({ end: Type.String(), start: Type.Optional(Type.Union([Type.String(), Type.Null()])) });
+const diffEndpointsSchema = Type.Object({ target: Type.String(), base: Type.Optional(Type.Union([Type.String(), Type.Null()])) });
 const requestSchema = Type.Object({ client: Type.String({ minLength: 1, maxLength: 64 }), sequence: Type.Integer({ minimum: 1 }) });
 
 export const agentsInTheCloudServerModule: WorkspaceModule = {
@@ -82,16 +82,17 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (order.sequence <= (state.clients.get(order.client) ?? 0)) return new Response(null, { status: 204 });
     state.clients.set(order.client, order.sequence);
     const ticket = ++state.request;
-    const requestedRange = { end: data.get("end"), start: data.has("start") ? data.get("start") === "" ? null : data.get("start") : undefined };
+    // Existing HTTP field names map to the canonical Diff endpoints model.
+    const requestedEndpoints = { target: data.get("end"), base: data.has("start") ? data.get("start") === "" ? null : data.get("start") : undefined };
     let next: ChangesSnapshot;
     try {
-      if (!Value.Check(rangeSchema, requestedRange)) throw new InvalidChangesRange("Invalid comparison endpoints.");
-      const range: ChangesRange = requestedRange;
+      if (!Value.Check(diffEndpointsSchema, requestedEndpoints)) throw new InvalidDiffEndpoints("Invalid comparison endpoints.");
+      const endpoints: DiffEndpoints = requestedEndpoints;
       const root = workspaceRepository(workspaceId);
-      if (match[1] === "compare") next = await captureChanges(root, range, previous.history);
-      else next = await refreshChanges(root, previous, range);
+      if (match[1] === "compare") next = await captureChanges(root, endpoints, previous.history);
+      else next = await refreshChanges(root, previous, endpoints);
     } catch (error) {
-      if (!(error instanceof InvalidChangesRange)) throw error;
+      if (!(error instanceof InvalidDiffEndpoints)) throw error;
       if (ticket !== state.request) return new Response(null, { status: 204 });
       return turboStreamResponse(replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id, error.message)), { status: 422 });
     }

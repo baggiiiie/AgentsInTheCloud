@@ -14,7 +14,7 @@ export const comparisonId = (workspaceId: string, historyId: string) => domId("c
 export const historyContentId = (history: ChangesHistory) => domId("changes", history.id, "history");
 export const errorId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "error");
 const json = <Value>(value: Value) => JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("&", "\\u0026");
-const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, topology: history.topology, references: history.references, range: snapshot.range, head: history.head, upstream: history.upstream, unpushed: history.unpushed });
+const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, topology: history.topology, references: history.references, endpoints: snapshot.endpoints, head: history.head, upstream: history.upstream, unpushed: history.unpushed });
 
 export function renderChangesTitle(snapshot: ChangesSnapshot): string {
   const additions = snapshot.stats.reduce((sum, file) => sum + file.additions, 0);
@@ -24,13 +24,13 @@ export function renderChangesTitle(snapshot: ChangesSnapshot): string {
 
 export function renderHistory(snapshot: ChangesSnapshot): string {
   const history = snapshot.history;
-  const more = history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-range#loadMore" data-changes-range-target="more"' })}</div>` : "";
+  const more = history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-diff-endpoints#loadMore" data-changes-diff-endpoints-target="more"' })}</div>` : "";
   const model = historyModel(history, snapshot);
-  return renderHistoryGraph(model, history.id, `${more}<script type="application/json" data-changes-range-target="historyModel">${json(model)}</script>`);
+  return renderHistoryGraph(model, history.id, `${more}<script type="application/json" data-changes-diff-endpoints-target="historyModel">${json(model)}</script>`);
 }
 
 export function renderError(workspaceId: string, historyId: string, message = ""): string {
-  return `<div id="${errorId(workspaceId, historyId)}" class="changes-range-error" data-changes-range-target="error" role="alert" ${message ? "" : "hidden"}><span>${escapeHtml(message)}</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Retry" }, attributesHtml: 'data-action="changes-range#retry"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Dismiss comparison error" }, attributesHtml: 'data-action="changes-range#dismissError"' })}</div>`;
+  return `<div id="${errorId(workspaceId, historyId)}" class="changes-diff-endpoints-error" data-changes-diff-endpoints-target="error" role="alert" ${message ? "" : "hidden"}><span>${escapeHtml(message)}</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Retry" }, attributesHtml: 'data-action="changes-diff-endpoints#retry"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Dismiss comparison error" }, attributesHtml: 'data-action="changes-diff-endpoints#dismissError"' })}</div>`;
 }
 
 export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pickerOpen = false): string {
@@ -39,18 +39,18 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
   const header = history.phase === "ready" ? contentRowHtml({
     width: "fill",
     kind: "compact", label: { kind: "text", text: snapshot.label }, leadingHtml: Icons.Disclosure,
-    element: { tag: "button", attributesHtml: `type="button" data-action="changes-range#togglePicker" data-changes-range-target="trigger" aria-expanded="${pickerOpen}" aria-controls="${pickerId}"` },
+    element: { tag: "button", attributesHtml: `type="button" data-action="changes-diff-endpoints#togglePicker" data-changes-diff-endpoints-target="trigger" aria-expanded="${pickerOpen}" aria-controls="${pickerId}"` },
   }) : '<strong>Changes</strong>';
-  const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-range-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-range-target="historyScroll">${renderHistory(snapshot)}</div></div>` : "";
+  const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-diff-endpoints-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-diff-endpoints-target="historyScroll">${renderHistory(snapshot)}</div></div>` : "";
   // History is the permanent shell; live comparisons replace only the Pierre island underneath it.
-  return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-range" data-changes-range-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-range-history-id-value="${history.id}" data-changes-range-open-value="${pickerOpen}" data-action="live:before-stream-render@document->changes-range#preservePresentation turbo:before-stream-render@document->changes-range#preservePresentation keydown.esc->changes-range#escape pointermove@window->changes-range#moveSelection">
-    <header class="changes-range-header">${header}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh history and diff" }, attributesHtml: 'data-action="changes-range#refresh" data-changes-range-target="refresh"' })}</header>${picker}${renderComparison(workspaceId, snapshot)}
-    <div class="changes-loading" data-changes-range-target="loading" role="status" hidden><span class="changes-spinner" aria-hidden="true"></span><span>Generating comparison…</span></div>${renderError(workspaceId, history.id)}
+  return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-diff-endpoints" data-changes-diff-endpoints-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-diff-endpoints-history-id-value="${history.id}" data-changes-diff-endpoints-open-value="${pickerOpen}" data-action="live:before-stream-render@document->changes-diff-endpoints#preservePresentation turbo:before-stream-render@document->changes-diff-endpoints#preservePresentation keydown.esc->changes-diff-endpoints#escape pointermove@window->changes-diff-endpoints#moveSelection">
+    <header class="changes-diff-endpoints-header">${header}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh history and diff" }, attributesHtml: 'data-action="changes-diff-endpoints#refresh" data-changes-diff-endpoints-target="refresh"' })}</header>${picker}${renderComparison(workspaceId, snapshot)}
+    <div class="changes-loading" data-changes-diff-endpoints-target="loading" role="status" hidden><span class="changes-spinner" aria-hidden="true"></span><span>Generating comparison…</span></div>${renderError(workspaceId, history.id)}
   </section>`;
 }
 
 export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot, collapsed = false): string {
-  return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-range-target="diff">${renderDiff(workspaceId, snapshot, collapsed)}</div>`;
+  return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-diff-endpoints-target="diff">${renderDiff(workspaceId, snapshot, collapsed)}</div>`;
 }
 
 export function renderChangesFile(file: ChangesFile, snapshotId: string): string {
@@ -96,6 +96,6 @@ function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, collapsed: b
     </header>
     <div id="${changesBodyId(workspaceId, snapshot.id)}-error" class="changes-error" data-changes-target="error" role="alert" hidden><span data-changes-target="errorMessage"></span>${iconButton("Dismiss file error", "dismissError", Icons.Close)}</div>
     ${files.length ? `<div class="changes-surface"><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Changes diff"></div></div>` : `<div class="changes-empty">${escapeHtml(empty)}</div>`}
-    <script type="application/json" data-changes-target="model">${json({ files, items })}</script><script type="application/json" data-changes-range-target="comparisonModel">${json({ range: snapshot.range, label: snapshot.label, baseLabel: snapshot.baseLabel, endLabel: snapshot.endLabel })}</script>${headers}${commentTemplates}
+    <script type="application/json" data-changes-target="model">${json({ files, items })}</script><script type="application/json" data-changes-diff-endpoints-target="comparisonModel">${json({ endpoints: snapshot.endpoints, label: snapshot.label, baseLabel: snapshot.baseLabel, targetLabel: snapshot.targetLabel })}</script>${headers}${commentTemplates}
   </section>`;
 }

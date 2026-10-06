@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git } from "@agents-in-the-cloud/workspace/git";
 import { localRepository } from "../../workspace/test/support/local-repository.ts";
-import { selectComparison } from "../src/comparison-selection.ts";
-import { captureChanges, commitHistory, InvalidChangesRange, workingTree as uncommitted, stagedChanges } from "../src/server/snapshot.ts";
+import { resolveDiffEndpoints } from "../src/diff-endpoints.ts";
+import { captureChanges, commitHistory, InvalidDiffEndpoints, workingTree as uncommitted, stagedChanges } from "../src/server/snapshot.ts";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 async function repository(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "changes-range-"));
+  const root = await mkdtemp(join(tmpdir(), "changes-diff-endpoints-"));
   roots.push(root);
   await git(localRepository(root), ["init", "-b", "main"]);
   await git(localRepository(root), ["config", "user.name", "Changes Test"]);
@@ -32,23 +32,23 @@ test("one commit uses its parent; explicit pairs use exact snapshots, including 
   await writeFile(join(root, "file.txt"), "three\n");
   const third = await commit(root, "Third");
   await writeFile(join(root, "file.txt"), "not committed\n");
-  const single = await captureChanges(localRepository(root), { end: third });
+  const single = await captureChanges(localRepository(root), { target: third });
   expect(single.base).toBe(second);
-  expect(single.range).toEqual({ end: third });
+  expect(single.endpoints).toEqual({ target: third });
   expect(single.files.get("file.txt")!.oldContents).toBe("two\n");
   expect(single.files.get("file.txt")!.newContents).toBe("three\n");
-  const range = await captureChanges(localRepository(root), { end: third, start: second });
-  expect(range.base).toBe(second);
-  expect(range.range).toEqual({ end: third, start: second });
-  expect(range.stats).toEqual(single.stats);
-  expect(range.files.get("file.txt")!.oldContents).toBe("two\n");
-  expect(range.files.get("file.txt")!.newContents).toBe("three\n");
-  expect(range.stats[0]!.additions).toBe(1);
-  expect(range.stats[0]!.deletions).toBe(1);
-  const initial = await captureChanges(localRepository(root), { end: first });
+  const endpoints = await captureChanges(localRepository(root), { target: third, base: second });
+  expect(endpoints.base).toBe(second);
+  expect(endpoints.endpoints).toEqual({ target: third, base: second });
+  expect(endpoints.stats).toEqual(single.stats);
+  expect(endpoints.files.get("file.txt")!.oldContents).toBe("two\n");
+  expect(endpoints.files.get("file.txt")!.newContents).toBe("three\n");
+  expect(endpoints.stats[0]!.additions).toBe(1);
+  expect(endpoints.stats[0]!.deletions).toBe(1);
+  const initial = await captureChanges(localRepository(root), { target: first });
   expect(initial.files.get("file.txt")!.change).toBe("added");
   expect(initial.files.get("file.txt")!.oldContents).toBeUndefined();
-  const all = await captureChanges(localRepository(root), { end: third, start: first });
+  const all = await captureChanges(localRepository(root), { target: third, base: first });
   expect(all.files.get("file.txt")!.newContents).toBe("three\n");
   expect(all.files.get("file.txt")!.change).toBe("modified");
   expect(all.files.get("file.txt")!.oldContents).toBe("one\n");
@@ -66,9 +66,9 @@ test("synthetic endpoint combines committed, staged, unstaged and untracked chan
   await writeFile(join(root, "new.txt"), "new\n");
   const status = await git(localRepository(root), ["status", "--porcelain=v1", "-z"]);
   const index = await git(localRepository(root), ["write-tree"]);
-  const snapshot = await captureChanges(localRepository(root), { end: uncommitted, start: first });
+  const snapshot = await captureChanges(localRepository(root), { target: uncommitted, base: first });
   expect(snapshot.base).toBe(first);
-  expect(snapshot.end).toBeUndefined();
+  expect(snapshot.target).toBeUndefined();
   expect(snapshot.files.get("file.txt")!.oldContents).toBe("base\n");
   expect(snapshot.files.get("file.txt")!.newContents).toBe("working\n");
   expect(snapshot.files.get("new.txt")!.change).toBe("added");
@@ -76,10 +76,10 @@ test("synthetic endpoint combines committed, staged, unstaged and untracked chan
   expect(await git(localRepository(root), ["write-tree"])).toEqual(index);
   expect((await git(localRepository(root), ["rev-parse", "HEAD"])).toString().trim()).toBe(second);
   await writeFile(join(root, "file.txt"), "newer\n");
-  const refreshed = await captureChanges(localRepository(root), snapshot.range);
+  const refreshed = await captureChanges(localRepository(root), snapshot.endpoints);
   expect(snapshot.files.get("file.txt")!.newContents).toBe("working\n");
   expect(refreshed.files.get("file.txt")!.newContents).toBe("newer\n");
-  expect(refreshed.range).toEqual(snapshot.range);
+  expect(refreshed.endpoints).toEqual(snapshot.endpoints);
   expect(refreshed.id).not.toBe(snapshot.id);
 });
 
@@ -95,22 +95,22 @@ test("branching history includes side commits and merge comparisons use the firs
   const main = await commit(root, "Main");
   await git(localRepository(root), ["merge", "--no-ff", "side", "-m", "Merge"]);
   const merge = (await git(localRepository(root), ["rev-parse", "HEAD"])).toString().trim();
-  const snapshot = await captureChanges(localRepository(root), { end: merge });
+  const snapshot = await captureChanges(localRepository(root), { target: merge });
   expect(snapshot.history.commits.filter(entry => entry.kind === "commit").map(entry => entry.id)).toEqual([merge, side, main, first]);
   expect(snapshot.base).toBe(main);
   expect([...snapshot.files.keys()]).toEqual(["side.txt"]);
-  const mergePair = await captureChanges(localRepository(root), { end: main, start: merge }, snapshot.history);
-  expect(mergePair.range).toEqual({ end: merge, start: main });
+  const mergePair = await captureChanges(localRepository(root), { target: main, base: merge }, snapshot.history);
+  expect(mergePair.endpoints).toEqual({ target: merge, base: main });
   expect(mergePair.stats).toEqual(snapshot.stats);
-  const secondParent = await captureChanges(localRepository(root), { end: side, start: merge }, snapshot.history);
+  const secondParent = await captureChanges(localRepository(root), { target: side, base: merge }, snapshot.history);
   expect(secondParent.base).toBe(side);
   expect([...secondParent.files.keys()]).toEqual(["main.txt"]);
-  expect((await captureChanges(localRepository(root), { end: side })).base).toBe(first);
-  const reversed = await captureChanges(localRepository(root), { end: first, start: merge });
-  expect(reversed.range).toEqual({ end: merge, start: first });
+  expect((await captureChanges(localRepository(root), { target: side })).base).toBe(first);
+  const reversed = await captureChanges(localRepository(root), { target: first, base: merge });
+  expect(reversed.endpoints).toEqual({ target: merge, base: first });
   expect(reversed.base).toBe(first);
-  await expect(captureChanges(localRepository(root), { end: merge, start: merge })).rejects.toBeInstanceOf(InvalidChangesRange);
-  await expect(captureChanges(localRepository(root), { end: "HEAD", start: "HEAD" })).rejects.toBeInstanceOf(InvalidChangesRange);
+  await expect(captureChanges(localRepository(root), { target: merge, base: merge })).rejects.toBeInstanceOf(InvalidDiffEndpoints);
+  await expect(captureChanges(localRepository(root), { target: "HEAD", base: "HEAD" })).rejects.toBeInstanceOf(InvalidDiffEndpoints);
 });
 
 test("history pages keep topological order and use the captured HEAD even after new commits", async () => {
@@ -125,13 +125,13 @@ test("history pages keep topological order and use the captured HEAD even after 
   expect(page.commits.map((entry) => entry.id)).toEqual(ids.slice(8));
   snapshot.history.commits.push(...page.commits);
   expect(page.hasMore).toBe(false);
-  const start = ids.at(-1)!;
-  const selected = await captureChanges(localRepository(root), { end: start }, snapshot.history);
-  expect(selected.range).toEqual({ end: start });
-  expect(selected.history.commits.at(-1)!.id).toBe(start);
+  const base = ids.at(-1)!;
+  const selected = await captureChanges(localRepository(root), { target: base }, snapshot.history);
+  expect(selected.endpoints).toEqual({ target: base });
+  expect(selected.history.commits.at(-1)!.id).toBe(base);
 });
 
-test("historical ranges handle renames, deletions, binary, large, mode-only and empty files", async () => {
+test("historical Diff endpoints handle renames, deletions, binary, large, mode-only and empty files", async () => {
   const root = await repository();
   await mkdir(join(root, "src"));
   await writeFile(join(root, "src/old.txt"), "same contents\n");
@@ -148,7 +148,7 @@ test("historical ranges handle renames, deletions, binary, large, mode-only and 
   await git(localRepository(root), ["add", "src", "removed.txt", "binary.bin", "large.txt", "empty.txt"]);
   await git(localRepository(root), ["commit", "-m", "Special files"]);
   const head = (await git(localRepository(root), ["rev-parse", "HEAD"])).toString().trim();
-  const snapshot = await captureChanges(localRepository(root), { end: head });
+  const snapshot = await captureChanges(localRepository(root), { target: head });
   expect(snapshot.files.get("src/new.txt")!.previousPath).toBe("src/old.txt");
   expect(snapshot.files.get("removed.txt")!.change).toBe("removed");
   expect(snapshot.files.get("binary.bin")!.kind).toBe("binary");
@@ -158,21 +158,21 @@ test("historical ranges handle renames, deletions, binary, large, mode-only and 
   expect(snapshot.files.get("mode.txt")!.detail).toBe("File mode changed");
 });
 
-test("working ranges use actual contents when a later deletion is recreated as untracked", async () => {
+test("working-tree Diff endpoints use actual contents when a later deletion is recreated as untracked", async () => {
   const root = await repository();
   await writeFile(join(root, "file.txt"), "base\n");
   const initial = await commit(root, "Initial");
   await rm(join(root, "file.txt"));
   await commit(root, "Delete file");
   await writeFile(join(root, "file.txt"), "recreated\n");
-  const snapshot = await captureChanges(localRepository(root), { end: uncommitted, start: initial });
+  const snapshot = await captureChanges(localRepository(root), { target: uncommitted, base: initial });
   expect(snapshot.files.get("file.txt")!.change).toBe("modified");
   expect(snapshot.files.get("file.txt")!.oldContents).toBe("base\n");
   expect(snapshot.files.get("file.txt")!.newContents).toBe("recreated\n");
   expect(snapshot.stats[0]!.additions).toBe(1);
   expect(snapshot.stats[0]!.deletions).toBe(1);
   await writeFile(join(root, "file.txt"), "base\n");
-  expect((await captureChanges(localRepository(root), snapshot.range)).files.size).toBe(0);
+  expect((await captureChanges(localRepository(root), snapshot.endpoints)).files.size).toBe(0);
 });
 
 test("staged and working nodes compare the captured index independently without changing its bytes", async () => {
@@ -185,32 +185,32 @@ test("staged and working nodes compare the captured index independently without 
   await writeFile(join(root, "new.txt"), "untracked\n");
   const indexBytes = await readFile(join(root, ".git/index"));
   const all = await captureChanges(localRepository(root));
-  expect(all.range).toEqual({ end: uncommitted, start: head });
+  expect(all.endpoints).toEqual({ target: uncommitted, base: head });
   expect(all.base).toBe(head);
   expect(all.history.commits.slice(0, 3).map(commit => commit.id)).toEqual([uncommitted, stagedChanges, head]);
-  const staged = await captureChanges(localRepository(root), { end: stagedChanges }, all.history);
+  const staged = await captureChanges(localRepository(root), { target: stagedChanges }, all.history);
   expect(staged.files.get("file.txt")!.oldContents).toBe("base\n");
   expect(staged.files.get("file.txt")!.newContents).toBe("staged\n");
   expect(staged.files.has("new.txt")).toBe(false);
-  const working = await captureChanges(localRepository(root), { end: uncommitted }, all.history);
+  const working = await captureChanges(localRepository(root), { target: uncommitted }, all.history);
   expect(working.files.get("file.txt")!.oldContents).toBe("staged\n");
   expect(working.files.get("file.txt")!.newContents).toBe("working\n");
   expect(working.files.get("new.txt")!.newContents).toBe("untracked\n");
-  const explicitWorking = await captureChanges(localRepository(root), { end: stagedChanges, start: uncommitted }, all.history);
-  expect(explicitWorking.range).toEqual({ end: uncommitted, start: stagedChanges });
+  const explicitWorking = await captureChanges(localRepository(root), { target: stagedChanges, base: uncommitted }, all.history);
+  expect(explicitWorking.endpoints).toEqual({ target: uncommitted, base: stagedChanges });
   expect(explicitWorking.base).toBe(working.base);
   expect(explicitWorking.stats).toEqual(working.stats);
   expect(explicitWorking.files.get("file.txt")!.oldContents).toBe("staged\n");
   expect(explicitWorking.files.get("file.txt")!.newContents).toBe("working\n");
-  const explicitStaged = await captureChanges(localRepository(root), { end: head, start: stagedChanges }, all.history);
-  expect(explicitStaged.range).toEqual({ end: stagedChanges, start: head });
+  const explicitStaged = await captureChanges(localRepository(root), { target: head, base: stagedChanges }, all.history);
+  expect(explicitStaged.endpoints).toEqual({ target: stagedChanges, base: head });
   expect(explicitStaged.stats).toEqual(staged.stats);
   expect(await readFile(join(root, ".git/index"))).toEqual(indexBytes);
   // Moving the real index does not change this history's staged endpoint.
   await git(localRepository(root), ["add", "file.txt"]);
-  const pinned = await captureChanges(localRepository(root), staged.range, all.history);
+  const pinned = await captureChanges(localRepository(root), staged.endpoints, all.history);
   expect(pinned.files.get("file.txt")!.newContents).toBe("staged\n");
-  const refreshed = await captureChanges(localRepository(root), staged.range);
+  const refreshed = await captureChanges(localRepository(root), staged.endpoints);
   expect(refreshed.files.get("file.txt")!.newContents).toBe("working\n");
 });
 
@@ -224,7 +224,7 @@ test("unstaged-only repositories omit the staged node, including unborn HEAD", a
   await git(localRepository(root), ["add", "."]);
   const staged = await captureChanges(localRepository(root));
   expect(staged.history.hasStaged).toBe(true);
-  expect((await captureChanges(localRepository(root), { end: stagedChanges }, staged.history)).files.get("file.txt")!.newContents).toBe("first\n");
+  expect((await captureChanges(localRepository(root), { target: stagedChanges }, staged.history)).files.get("file.txt")!.newContents).toBe("first\n");
   const head = await commit(root, "First");
   await writeFile(join(root, "file.txt"), "second\n");
   const working = await captureChanges(localRepository(root));
@@ -249,9 +249,9 @@ test("local branch tips join the graph; remote-only history does not", async () 
   expect(snapshot.history.commits.some(commit => commit.id === side)).toBe(true);
   expect(snapshot.history.commits.some(commit => commit.id === remote)).toBe(false);
   expect(snapshot.history.references.find(ref => ref.name === "origin/remote-only")!.id).toBe(remote);
-  const selected = await captureChanges(localRepository(root), { end: side }, snapshot.history);
+  const selected = await captureChanges(localRepository(root), { target: side }, snapshot.history);
   expect(selected.files.get("side.txt")!.newContents).toBe("side\n");
-  await expect(captureChanges(localRepository(root), { end: remote }, snapshot.history)).rejects.toBeInstanceOf(InvalidChangesRange);
+  await expect(captureChanges(localRepository(root), { target: remote }, snapshot.history)).rejects.toBeInstanceOf(InvalidDiffEndpoints);
 });
 
 test("cross-branch comparisons use the exact selected snapshots without requiring ancestry", async () => {
@@ -266,14 +266,14 @@ test("cross-branch comparisons use the exact selected snapshots without requirin
   const main = await commit(root, "Main");
   const history = (await captureChanges(localRepository(root))).history;
   const endpoints = [main, side].sort((a, b) => history.commits.findIndex(commit => commit.id === a) - history.commits.findIndex(commit => commit.id === b));
-  const snapshot = await captureChanges(localRepository(root), { end: endpoints[0]!, start: endpoints[1]! }, history);
+  const snapshot = await captureChanges(localRepository(root), { target: endpoints[0]!, base: endpoints[1]! }, history);
   expect(snapshot.base).toBe(endpoints[1]);
-  expect(snapshot.end).toBe(endpoints[0]);
+  expect(snapshot.target).toBe(endpoints[0]);
   expect(snapshot.files.get("file.txt")!.oldContents).toBe(endpoints[1] === main ? "main\n" : "side\n");
   expect(snapshot.files.get("file.txt")!.newContents).toBe(endpoints[0] === main ? "main\n" : "side\n");
   await writeFile(join(root, "file.txt"), "working\n");
-  const working = await captureChanges(localRepository(root), { end: side, start: uncommitted }, history);
-  expect(working.range).toEqual({ end: uncommitted, start: side });
+  const working = await captureChanges(localRepository(root), { target: side, base: uncommitted }, history);
+  expect(working.endpoints).toEqual({ target: uncommitted, base: side });
   expect(working.base).toBe(side);
   expect(working.files.get("file.txt")!.oldContents).toBe("side\n");
   expect(working.files.get("file.txt")!.newContents).toBe("working\n");
@@ -317,7 +317,7 @@ test("detached HEAD remains reachable and no upstream does not imply unpublished
   expect(snapshot.history.commits.every(commit => !commit.ahead)).toBe(true);
 });
 
-test("connecting paths exclude Start and side work merged from below Start", async () => {
+test("connecting paths exclude Base and side work merged from below Base", async () => {
   const root = await repository();
   const base = await commit(root, "Base");
   await git(localRepository(root), ["checkout", "-b", "side"]);
@@ -335,8 +335,8 @@ test("connecting paths exclude Start and side work merged from below Start", asy
   await writeFile(join(root, "unmerged.txt"), "not in feature\n");
   const unrelated = await commit(root, "Unrelated");
   await git(localRepository(root), ["checkout", "feature"]);
-  const snapshot = await captureChanges(localRepository(root), { end: uncommitted, start: main });
-  const coverage = selectComparison(snapshot.history.topology, snapshot.range).path;
+  const snapshot = await captureChanges(localRepository(root), { target: uncommitted, base: main });
+  const coverage = resolveDiffEndpoints(snapshot.history.topology, snapshot.endpoints).path;
   expect(coverage.filter(id => id !== uncommitted).sort()).toEqual([feature, merge].sort());
   expect(coverage).not.toContain(base);
   expect(coverage).not.toContain(unrelated);
@@ -374,9 +374,9 @@ test("default unpushed comparison includes committed, staged and working changes
   await writeFile(join(root, "new.txt"), "untracked\n");
   const index = await readFile(join(root, ".git/index"));
   const snapshot = await captureChanges(localRepository(root));
-  expect(snapshot.range).toEqual({ end: uncommitted, start: published });
+  expect(snapshot.endpoints).toEqual({ target: uncommitted, base: published });
   expect(snapshot.base).toBe(published);
-  expect(snapshot.end).toBeUndefined();
+  expect(snapshot.target).toBeUndefined();
   expect(snapshot.history.upstream).toBe("company/release");
   expect(snapshot.history.unpushed?.count).toBe(12);
   expect(snapshot.history.aheadIds.has(unrelated)).toBe(false);
@@ -407,15 +407,15 @@ test("unpushed defaults use merge-base snapshots; explicit pairs use exactly the
   expect(diverged.files.has("theirs.txt")).toBe(false);
   await git(localRepository(root), ["merge", "--no-ff", "remote-work", "-m", "Merge remote work"]);
   const merged = await captureChanges(localRepository(root));
-  expect(merged.range).toEqual({ end: uncommitted, start: theirs });
+  expect(merged.endpoints).toEqual({ target: uncommitted, base: theirs });
   expect(merged.base).toBe(theirs);
   expect(merged.history.unpushed?.count).toBe(2);
   expect(merged.files.has("theirs.txt")).toBe(false);
   expect(merged.files.get("ours.txt")!.newContents).toBe("ours\n");
-  const explicit = await captureChanges(localRepository(root), { end: uncommitted, start: ours }, merged.history);
+  const explicit = await captureChanges(localRepository(root), { target: uncommitted, base: ours }, merged.history);
   expect(explicit.base).toBe(ours);
   expect(explicit.files.has("theirs.txt")).toBe(true);
-  expect((await captureChanges(localRepository(root), { end: uncommitted, start: theirs }, merged.history)).base).toBe(theirs);
+  expect((await captureChanges(localRepository(root), { target: uncommitted, base: theirs }, merged.history)).base).toBe(theirs);
 });
 
 test("published branches and branches without tracking default to uncommitted changes", async () => {
@@ -426,14 +426,14 @@ test("published branches and branches without tracking default to uncommitted ch
   await writeFile(join(root, "file.txt"), "working\n");
   const published = await captureChanges(localRepository(root));
   expect(published.history.unpushed).toBeUndefined();
-  expect(published.range).toEqual({ end: uncommitted, start: head });
+  expect(published.endpoints).toEqual({ target: uncommitted, base: head });
   expect(published.base).toBe(head);
   await git(localRepository(root), ["config", "--unset", "branch.main.remote"]);
   await git(localRepository(root), ["config", "--unset", "branch.main.merge"]);
   const untracked = await captureChanges(localRepository(root));
   expect(untracked.history.upstream).toBeUndefined();
   expect(untracked.history.unpushed).toBeUndefined();
-  expect(untracked.range).toEqual({ end: uncommitted, start: head });
+  expect(untracked.endpoints).toEqual({ target: uncommitted, base: head });
 });
 
 test("repository read commands disable configured fsmonitor and diff callbacks", async () => {
@@ -451,25 +451,25 @@ test("repository read commands disable configured fsmonitor and diff callbacks",
   await git(localRepository(root), ["config", "diff.attack.textconv", callback]);
   await writeFile(join(root, ".gitattributes"), "file.txt diff=attack\n");
   await writeFile(join(root, "file.txt"), "after\n");
-  const snapshot = await captureChanges(localRepository(root), { end: uncommitted });
+  const snapshot = await captureChanges(localRepository(root), { target: uncommitted });
   expect(snapshot.base).toBe(base);
   expect(snapshot.files.get("file.txt")!.oldContents).toBe("before\n");
   expect(snapshot.files.get("file.txt")!.newContents).toBe("after\n");
   await expect(access(marker)).rejects.toMatchObject({ code: "ENOENT" });
 });
 
-test("comparison follows End ancestry, not the later merge containing both endpoints", async () => {
+test("comparison follows Target ancestry, not the later merge containing both endpoints", async () => {
   const root = await repository();
-  const start = await commit(root, "Start");
+  const base = await commit(root, "Base");
   const fork = await commit(root, "Fork");
   await git(localRepository(root), ["checkout", "-b", "side"]);
-  const end = await commit(root, "End on side");
+  const target = await commit(root, "Target on side");
   await git(localRepository(root), ["checkout", "main"]);
   const later = [];
   for (let number = 0; number < 3; number++) later.push(await commit(root, `Later main ${number}`));
   await git(localRepository(root), ["merge", "--no-ff", "side", "-m", "Enclosing merge"]);
   const history = (await captureChanges(localRepository(root))).history;
-  const selected = selectComparison(history.topology, { end, start });
-  expect(selected.path.sort()).toEqual([end, fork].sort());
+  const selected = resolveDiffEndpoints(history.topology, { target, base });
+  expect(selected.path.sort()).toEqual([target, fork].sort());
   for (const id of later) expect(selected.path).not.toContain(id);
 });

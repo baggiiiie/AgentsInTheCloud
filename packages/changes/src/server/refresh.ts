@@ -1,23 +1,23 @@
 import type { Repository } from "@agents-in-the-cloud/workspace/git";
-import type { ChangesRange } from "../history.ts";
+import type { DiffEndpoints } from "../history.ts";
 import { captureChanges, captureHistory, commitHistory, stagedChanges, workingTree, type ChangesSnapshot } from "./snapshot.ts";
 
-/** Manual and turn-end refresh share the same endpoint-preservation rules. */
-export async function refreshChanges(root: Repository, previous: ChangesSnapshot, requested = previous.range): Promise<ChangesSnapshot> {
+/** Manual and turn-target refresh share the same endpoint-preservation rules. */
+export async function refreshChanges(root: Repository, previous: ChangesSnapshot, requested = previous.endpoints): Promise<ChangesSnapshot> {
   const history = await captureHistory(root);
-  let range: ChangesRange = { ...requested };
-  const initial = previous.history.range;
-  const followsDefault = range.end === initial.end && range.start === initial.start;
-  if (followsDefault) range = history.range;
+  let endpoints: DiffEndpoints = { ...requested };
+  const initial = previous.history.endpoints;
+  const followsDefault = endpoints.target === initial.target && endpoints.base === initial.base;
+  if (followsDefault) endpoints = history.endpoints;
   if (!history.hasStaged) {
-    if (range.end === stagedChanges) range = { end: workingTree };
-    else if (range.start === stagedChanges) range.start = history.head ?? null;
+    if (endpoints.target === stagedChanges) endpoints = { target: workingTree };
+    else if (endpoints.base === stagedChanges) endpoints.base = history.head ?? null;
   }
-  while (history.hasMore && (!history.commits.some(commit => commit.id === range.end) || (!followsDefault && range.start != null && !history.commits.some(commit => commit.id === range.start)))) {
+  while (history.hasMore && (!history.commits.some(commit => commit.id === endpoints.target) || (!followsDefault && endpoints.base != null && !history.commits.some(commit => commit.id === endpoints.base)))) {
     const page = await commitHistory(root, history, history.loaded);
     history.commits.push(...page.commits);
     history.loaded += page.commits.length;
     history.hasMore = page.hasMore;
   }
-  return captureChanges(root, range, history);
+  return captureChanges(root, endpoints, history);
 }

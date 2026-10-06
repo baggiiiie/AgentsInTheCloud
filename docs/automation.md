@@ -166,6 +166,8 @@ Navigate an existing Browser view with `POST /workspaces/:id/browser/:browserId/
 
 ## Arrange Work views
 
+Changes uses **Diff endpoints**: a `base` and `target`, with an optional implicit base for a single chosen commit. Existing comparison HTTP fields remain `start` (base) and `end` (target); their behavior is unchanged.
+
 - `POST /workspaces/:id/work-views/reorder` with `key` and `index`
 - `POST /workspaces/:id/work-views/close` with a typed `reference`
 - `POST /workspaces/:id/work-views/:key/attention/request` to request attention for a Work view without selecting it

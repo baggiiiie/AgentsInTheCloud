@@ -1,7 +1,7 @@
 import { createDeletionReviewController } from "./deletion-controller.ts";
 import type { CodeView, CodeViewItem, CodeViewOptions, SelectedLineRange } from "@pierre/diffs";
 import type { WorkspaceClientModule, WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
-import { createRangeController } from "./range-controller.ts";
+import { createDiffEndpointsController } from "./diff-endpoints-controller.ts";
 import { changesDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
 type FileSummary = { path: string };
@@ -277,5 +277,5 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-range", createRangeController(Controller)); },
+  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
 };

@@ -1,12 +1,12 @@
 import { setContentRowLabel } from "@agents-in-the-cloud/design-system/content-row/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
-import { selectComparison } from "../comparison-selection.ts";
-import { endpointName, workingTree, historyGraph, rangeDescription, comparisonGraph, rowHeight, type ChangesRange, type HistoryGraph, type HistoryModel } from "../history.ts";
+import { resolveDiffEndpoints } from "../diff-endpoints.ts";
+import { endpointName, workingTree, historyGraph, diffEndpointsDescription, comparisonGraph, rowHeight, type DiffEndpoints, type HistoryGraph, type HistoryModel } from "../history.ts";
 
-type ComparisonModel = { range: ChangesRange; label: string; baseLabel: string; endLabel: string };
+type ComparisonModel = { endpoints: DiffEndpoints; label: string; baseLabel: string; targetLabel: string };
 
-export function createRangeController(Controller: WorkspaceClientControllerConstructor) {
-  return class ChangesRangeController extends Controller {
+export function createDiffEndpointsController(Controller: WorkspaceClientControllerConstructor) {
+  return class DiffEndpointsController extends Controller {
     declare readonly element: HTMLElement;
     static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more"];
     static values = { workspaceId: String, historyId: String, open: Boolean };
@@ -28,7 +28,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     declare readonly hasMoreTarget: boolean;
     private model?: HistoryModel;
     private graph?: HistoryGraph;
-    private range?: ChangesRange;
+    private endpoints?: DiffEndpoints;
     private comparison?: ComparisonModel;
     private anchor?: string;
     private hoveredCommit?: string;
@@ -59,22 +59,22 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       // SAFETY: This model is emitted by the Changes history renderer, not an external endpoint.
       this.model = JSON.parse(script.textContent!) as HistoryModel;
       this.graph = historyGraph(this.model.commits);
-      this.range ??= this.model.range;
-      this.anchor ??= this.range.end;
+      this.endpoints ??= this.model.endpoints;
+      this.anchor ??= this.endpoints.target;
       this.paint();
     }
     comparisonModelTargetConnected(script: HTMLScriptElement): void {
-      // SAFETY: The comparison endpoint emits the applied range alongside its server-rendered viewer.
+      // SAFETY: The comparison endpoint emits the applied endpoints alongside its server-rendered viewer.
       this.comparison = JSON.parse(script.textContent!) as ComparisonModel;
-      this.range ??= this.comparison.range;
+      this.endpoints ??= this.comparison.endpoints;
       if (this.model) this.paint();
       this.syncAvailability();
       queueMicrotask(() => { if (this.element.isConnected) this.measure(); });
     }
     preservePresentation(event: CustomEvent<{ newStream: { templateElement: HTMLTemplateElement } }>): void {
       for (const shell of event.detail.newStream.templateElement.content.querySelectorAll<HTMLElement>(".changes-body")) {
-        if (shell.dataset.changesRangeWorkspaceIdValue !== this.workspaceIdValue) continue;
-        shell.dataset.changesRangeOpenValue = String(this.isOpen);
+        if (shell.dataset.changesDiffEndpointsWorkspaceIdValue !== this.workspaceIdValue) continue;
+        shell.dataset.changesDiffEndpointsOpenValue = String(this.isOpen);
         shell.dataset.changesLayout = this.element.dataset.changesLayout ?? "unified";
         shell.dataset.changesWrap = this.element.dataset.changesWrap ?? "false";
       }
@@ -91,9 +91,9 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       this.paint();
       this.syncAvailability();
       this.measure();
-      const row = this.rowTargets.find(row => row.dataset.commit === this.range!.end)!;
+      const row = this.rowTargets.find(row => row.dataset.commit === this.endpoints!.target)!;
       row.focus({ preventScroll: true });
-      if (this.range!.end === workingTree) this.historyScrollTarget.scrollTop = 0;
+      if (this.endpoints!.target === workingTree) this.historyScrollTarget.scrollTop = 0;
       else row.scrollIntoView({ block: "nearest" });
     }
     closePicker(): void {
@@ -119,16 +119,16 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     private commitAt(element: Element, clientY: number): string | undefined {
       const dot = element.closest<SVGCircleElement>("[data-dot]");
       if (dot) return dot.dataset.dot;
-      if (element.closest("[data-changes-range-target=graph]")) {
+      if (element.closest("[data-changes-diff-endpoints-target=graph]")) {
         return this.model!.commits[Math.floor((clientY - this.graphTarget.getBoundingClientRect().top) / rowHeight)]?.id;
       }
       return element.closest<HTMLElement>("[data-commit]")?.dataset.commit;
     }
     private choose(id: string, extend: boolean): void {
       if (!extend) this.anchor = id;
-      const candidate: ChangesRange = !extend || id === this.anchor ? { end: id } : { end: id, start: this.anchor! };
-      const selected = selectComparison(this.model!.topology, candidate, this.model!.commits.map(commit => commit.id));
-      this.range = candidate.start === undefined ? { end: selected.end } : { end: selected.end, start: selected.start };
+      const candidate: DiffEndpoints = !extend || id === this.anchor ? { target: id } : { target: id, base: this.anchor! };
+      const selected = resolveDiffEndpoints(this.model!.topology, candidate, this.model!.commits.map(commit => commit.id));
+      this.endpoints = candidate.base === undefined ? { target: selected.target } : { target: selected.target, base: selected.base };
       this.paint();
     }
     beginSelection(event: PointerEvent): void {
@@ -198,22 +198,22 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     }
 
     private paint(): void {
-      const model = this.model!, range = this.range!, graph = this.graph!;
-      const selected = comparisonGraph(graph, range, model.topology);
+      const model = this.model!, endpoints = this.endpoints!, graph = this.graph!;
+      const selected = comparisonGraph(graph, endpoints, model.topology);
       for (const rect of this.graphTarget.querySelectorAll<SVGRectElement>(".changes-history-row-background")) {
         rect.dataset.path = String(selected.selectedRows.includes(rect.dataset.commit!));
         rect.dataset.hovered = String(rect.dataset.commit === this.hoveredCommit);
       }
       const focused = this.rowTargets.find(row => row === document.activeElement);
       for (const row of this.rowTargets) {
-        row.tabIndex = focused ? row === focused ? 0 : -1 : row.dataset.commit === range.end ? 0 : -1;
+        row.tabIndex = focused ? row === focused ? 0 : -1 : row.dataset.commit === endpoints.target ? 0 : -1;
         const id = row.dataset.commit!;
         row.dataset.path = String(selected.selectedRows.includes(id));
         row.dataset.hovered = String(id === this.hoveredCommit);
         row.setAttribute("aria-selected", row.dataset.path);
       }
       for (const dot of this.graphTarget.querySelectorAll<SVGCircleElement>("[data-dot]")) {
-        const id = dot.dataset.dot!, endpoint = id === selected.end;
+        const id = dot.dataset.dot!, endpoint = id === selected.target;
         const color = selected.path.includes(id) || endpoint ? "var(--accent)" : `var(--changes-branch-${dot.dataset.color})`;
         dot.setAttribute("r", endpoint ? "6" : "3.5");
         dot.setAttribute("stroke", color);
@@ -221,10 +221,10 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
         dot.setAttribute("fill", endpoint || dot.dataset.ahead === "true" ? color : "var(--panel)");
       }
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
-      const applied = this.comparison?.range.end === range.end && this.comparison.range.start === range.start;
-      const description = applied ? this.comparison!.label : rangeDescription(model, selected);
+      const applied = this.comparison?.endpoints.target === endpoints.target && this.comparison.endpoints.base === endpoints.base;
+      const description = applied ? this.comparison!.label : diffEndpointsDescription(model, selected);
       setContentRowLabel(this.triggerTarget, description);
-      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.endLabel}` : `${endpointName(model, selected.start ?? undefined)} → ${endpointName(model, selected.end)}`;
+      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.targetLabel}` : `${endpointName(model, selected.base ?? undefined)} → ${endpointName(model, selected.target)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
       this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
     }
@@ -269,8 +269,9 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       data.set("history", this.historyIdValue);
       data.set("client", this.client);
       data.set("sequence", String(++this.sequence));
-      data.set("end", this.range!.end);
-      if (this.range!.start !== undefined) data.set("start", this.range!.start ?? "");
+      // Keep the existing comparison request fields at the HTTP boundary.
+      data.set("end", this.endpoints!.target);
+      if (this.endpoints!.base !== undefined) data.set("start", this.endpoints!.base ?? "");
       data.set("pickerOpen", String(this.isOpen));
       try {
         const result = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/changes/${operation}`, { method: "POST", body: data, signal: request.signal, headers: { Accept: "text/vnd.turbo-stream.html" } });

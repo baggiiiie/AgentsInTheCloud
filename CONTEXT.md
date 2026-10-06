@@ -187,6 +187,13 @@ _Avoid_: Document view, permanent view
 A workspace-level utility Work view, such as Files or Changes.
 _Avoid_: Permanent view, special view
 
+**Changes**:
+The Workspace-level feature for inspecting Git history and diffs between repository states, including commits, staged changes, and the working tree.
+
+**Diff endpoints**:
+The base and target repository states whose difference is shown in Changes. Both may be chosen explicitly, or the base may be implicit; choosing a single commit uses its first parent as the base, or the empty tree if it has no parent. Endpoints describe two states, not an inclusive range of commits.
+_Avoid_: Changes range, Comparison selection (for the endpoint pair)
+
 **Browser**:
 The feature for opening webpages in a Workspace, including apps running in that Workspace. It is distinct from the remote graphical environment shown by Desktop.
 _Avoid_: Preview browser, browser preview
