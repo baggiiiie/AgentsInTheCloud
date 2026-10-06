@@ -144,10 +144,6 @@ function connectFrame(host: ModelsHost, body: string): string {
   return `<turbo-frame id="${ids.connect(host)}" class="model-connect">${body}</turbo-frame>`;
 }
 
-function connectButton(host: ModelsHost): string {
-  return connectFrame(host, actionLinkHtml({ href: `/models/connect?${hostQuery(host)}`, variant: "secondary", content: { kind: "caption", caption: "Connect a provider", iconHtml: Icons.Plus } }));
-}
-
 /** Providers without an account yet, split into popular ones and the rest. */
 function unconnectedProviders(runtime: Runtime, accounts: Account[]) {
   const connected = new Set(accounts.map((account) => account.provider));
@@ -156,17 +152,16 @@ function unconnectedProviders(runtime: Runtime, accounts: Account[]) {
   return { popular, other: choices.filter((provider) => !popular.includes(provider)) };
 }
 
-/** Popular providers up front, the rest behind a search. Cancel only makes sense once something is connected. */
+/** Always offer popular providers up front, with the rest behind a search. */
 function renderConnectChoices(host: ModelsHost, runtime: Runtime, accounts: Account[]): string {
   const { popular, other } = unconnectedProviders(runtime, accounts);
-  const cancel = accounts.length ? `<div class="model-setup-actions">${actionLinkHtml({ href: `/models/connect?${hostQuery(host)}&open=false`, variant: "secondary", content: { kind: "caption", caption: "Cancel" } })}</div>` : "";
   return connectFrame(host, `<div class="model-provider-groups">
-    <p class="model-connect__hint">Bring your own subscription or API key.</p>
+    <h3 class="models-panel__heading">Connect model providers</h3>
     <div class="model-popular-providers">${popular.map((provider) => renderProviderChoice(provider, host)).join("")}</div>
     ${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Other model providers" } }, bodyHtml: `<div class="model-other-providers-body"><form method="get" action="/models/connect/providers" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.otherProviders(host)}">
         <input type="hidden" name="host" value="${host}"><input class="text-field" type="search" name="q" placeholder="Find a provider…" aria-label="Find a provider" autocomplete="off"><button type="submit" hidden>Search</button>
       </form>${renderOtherProviders(other, host)}</div>` })}
-  </div>${cancel}`);
+  </div>`);
 }
 
 async function renderEnabledModelsList(runtime: Runtime, host: ModelsHost): Promise<string> {
@@ -282,12 +277,12 @@ type PanelOptions = {
 async function renderModelsPanel(host: ModelsHost, options: PanelOptions = {}): Promise<string> {
   const runtime = await createPiModelRuntime();
   const accounts = await listAccounts(runtime);
-  const connect = options.connectHtml ?? (accounts.length ? connectButton(host) : renderConnectChoices(host, runtime, accounts));
-  const providers = `<section class="models-panel__section" aria-labelledby="${domId("models_providers", host)}">
-    <h3 class="models-panel__heading" id="${domId("models_providers", host)}">Model providers</h3>
-    ${accounts.length ? `<div class="model-accounts">${accounts.map((account) => renderAccountCard(account, host, options.focus === account.id)).join("")}</div>` : ""}
-    ${connect}
-  </section>`;
+  const connect = options.connectHtml ?? renderConnectChoices(host, runtime, accounts);
+  const providers = `${accounts.length ? `<section class="models-panel__section" aria-labelledby="${domId("models_providers", host)}">
+    <h3 class="models-panel__heading" id="${domId("models_providers", host)}">Enabled model providers</h3>
+    <div class="model-accounts">${accounts.map((account) => renderAccountCard(account, host, options.focus === account.id)).join("")}</div>
+  </section>` : ""}
+  ${connect}`;
   const models = accounts.length ? await renderEnabledModelsSection(runtime, accounts, host, options.focus === "models") : "";
   const advanced = host === "settings" ? renderCustomModelsSettings({ source: await getCustomModelsJson(), ...options.customModels }) : "";
   const actions = host === "onboarding" ? onboardingActions(await hasAvailableEnabledModel()) : "";
@@ -341,7 +336,7 @@ function renderConnectionStep(provider: Pick<ProviderChoice, "provider" | "label
 }
 function renderConnectionMethods(provider: ProviderChoice, host: ModelsHost): string {
   return renderConnectionStep(provider, host, {
-    bodyHtml: `<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}&method=${method}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>${provider.provider === "anthropic" ? warningBannerHtml(anthropicSubscriptionNotice) : ""}`,
+    bodyHtml: `<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}&method=${method}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>`,
   });
 }
 function renderApiKeyConnectionStep(provider: ProviderChoice, host: ModelsHost, error = ""): string {
@@ -524,7 +519,8 @@ function oauthBrowserRedirectBody(flow: PendingOAuthFlow): string {
   const promptForm = localhost ? oauthPromptForm(flow) : oauthPromptForm(flow, `Paste the code from the ${flow.label} page here`);
   return `<div class="settings-oauth-card">
     ${localhost ? "<p>After signing in, copy the localhost URL here—even if that page won’t load.</p>" : ""}
-    ${oauthAuthenticationAction(flow, flow.authUrl ?? "#", false, localhost ? undefined : `Open ${flow.label} page to get the code`)}
+    ${flow.provider === "anthropic" ? warningBannerHtml(anthropicSubscriptionNotice) : ""}
+    ${oauthAuthenticationAction(flow, flow.authUrl ?? "#", false, flow.provider === "anthropic" ? "Open Anthropic auth page" : localhost ? undefined : `Open ${flow.label} page to get the code`)}
     ${promptForm}
     ${!prompt && flow.redirectSubmitted ? oauthStatus("pending", `Waiting for ${flow.label}`, localhost ? "Confirming the pasted redirect URL." : "Confirming the pasted code.") : ""}
   </div>`;
@@ -588,7 +584,6 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
     return stream(update(dialogHost === "onboarding" ? "onboarding_modal_host" : "settings_modal_host", html));
   }
   if (url.pathname === "/models/connect" && request.method === "GET") {
-    if (url.searchParams.get("open") === "false") return response(connectButton(host));
     const runtime = await createPiModelRuntime();
     return response(renderConnectChoices(host, runtime, await listAccounts(runtime)));
   }

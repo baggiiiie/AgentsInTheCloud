@@ -6,7 +6,7 @@
 .models-panel__section + .models-panel__section { padding-top: 28px; border-top: 1px solid var(--line); }
 .models-panel__header { display: grid; gap: 2px; min-width: 0; }
 .models-panel__heading { margin: 0; color: var(--text-bright); font-size: var(--text-body); font-weight: var(--weight-bold); }
-.models-panel__hint, .model-connect__hint { color: var(--text-muted); }
+.models-panel__hint { color: var(--text-muted); }
 .models-panel > .settings-error { margin-bottom: -12px; }
 .models-panel__actions { justify-content: flex-end; }
 .model-setup-heading, .model-setup-actions, .model-setup-choices { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
