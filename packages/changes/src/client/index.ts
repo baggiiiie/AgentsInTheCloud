@@ -9,7 +9,7 @@ type CommentAnnotation = { id: string; kind: "draft" | "comment"; path: string; 
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
     static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard"];
-    static values = { workspaceId: String, snapshotId: String };
+    static values = { workspaceId: String, snapshotId: String, collapsed: Boolean };
     declare readonly viewerTarget: HTMLElement;
     declare readonly modelTarget: HTMLScriptElement;
     declare readonly errorTarget: HTMLElement;
@@ -20,6 +20,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     declare readonly commentCardTarget: HTMLTemplateElement;
     declare readonly workspaceIdValue: string;
     declare readonly snapshotIdValue: string;
+    declare readonly collapsedValue: boolean;
     private viewer?: CodeView<CommentAnnotation, undefined>;
     private comments = new Map<string, CommentAnnotation>();
     private draft?: CommentAnnotation;
@@ -32,10 +33,20 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     private layout: "unified" | "split" = "unified";
     private wrap = false;
     private collapsed = false;
+    private readonly headerMedia = window.matchMedia("(max-width: 700px), (pointer: coarse)");
+    private get headerHeight(): number { return this.headerMedia.matches ? 58 : 36; }
+    private readonly resizeHeaders = (): void => {
+      this.options = { ...this.options, itemMetrics: { diffHeaderHeight: this.headerHeight } };
+      this.viewer?.setOptions(this.options);
+    };
 
-    connect(): void { void this.mount(); }
+    connect(): void {
+      this.headerMedia.addEventListener("change", this.resizeHeaders);
+      void this.mount();
+    }
 
     disconnect(): void {
+      this.headerMedia.removeEventListener("change", this.resizeHeaders);
       this.abort?.abort();
       this.viewer?.cleanUp();
       this.viewer = undefined;
@@ -44,6 +55,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     }
 
     private async mount(): Promise<void> {
+      this.collapsed = this.collapsedValue;
       const shell = this.element.closest<HTMLElement>(".changes-body")!;
       this.layout = shell.dataset.changesLayout === "split" ? "split" : "unified";
       this.wrap = shell.dataset.changesWrap === "true";
@@ -76,7 +88,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         lineDiffType: "word-line",
         stickyHeaders: true,
         layout: { paddingTop: 0, paddingBottom: 8, gap: 0 },
-        itemMetrics: { diffHeaderHeight: 36 },
+        itemMetrics: { diffHeaderHeight: this.headerHeight },
         unsafeCSS: `${wordDiffCSS} [data-diffs-header] { background: var(--bg); }`,
         onPostRender: (_node, _instance, _phase, context) => { void this.loadFile(context.item.id, abort.signal); },
         renderCustomHeader: (_file, context) => this.header(context.item.id, context.item.collapsed === true),

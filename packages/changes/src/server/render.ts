@@ -65,8 +65,8 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
   </section>`;
 }
 
-export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot): string {
-  return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-range-target="diff">${renderDiff(workspaceId, snapshot)}</div>`;
+export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot, collapsed = false): string {
+  return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-range-target="diff">${renderDiff(workspaceId, snapshot, collapsed)}</div>`;
 }
 
 export function renderChangesFile(file: ReviewFile, snapshotId: string): string {
@@ -76,7 +76,7 @@ export function renderChangesFile(file: ReviewFile, snapshotId: string): string 
   return `<script type="application/json" data-changes-file>${json(item)}</script>`;
 }
 
-function renderDiff(workspaceId: string, snapshot: ChangesSnapshot): string {
+function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, collapsed: boolean): string {
   const files = snapshot.stats;
   const items: CodeViewItem<undefined>[] = files.map((file) => {
     const captured = snapshot.files.get(file.path)!;
@@ -97,17 +97,17 @@ function renderDiff(workspaceId: string, snapshot: ChangesSnapshot): string {
   const collapseIcons = `<span class="changes-collapse-icon">${Icons.CollapseAll}</span><span class="changes-expand-icon">${Icons.ExpandAll}</span>`;
   const headers = snapshot.stats.map((file) => `<template data-changes-header="${escapeHtml(file.path)}"><div class="changes-file-header">${actionItemHtml({
     kind: "single", label: { kind: "text", text: file.path }, leadingHtml: Icons.Disclosure,
-    trailingHtml: `<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}${file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : ""}</span>`,
-    element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="true"` },
+    trailingHtml: `${file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : ""}<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}</span>`,
+    element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="${!collapsed}"` },
   })}</div></template>`).join("");
   const commentTemplates = `<template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
     <template data-changes-target="commentEditor"><form class="changes-comment changes-comment-editor" data-action="submit->changes#saveComment keydown.meta+enter->changes#commentShortcut keydown.ctrl+enter->changes#commentShortcut keydown.esc->changes#cancelComment"><header><span data-comment-anchor></span>${iconButton("Cancel comment", "cancelComment", Icons.Close)}</header><textarea class="textarea" rows="3" required maxlength="10000" aria-label="Comment" placeholder="Leave a comment" data-action="input->changes#commentInput"></textarea><footer><small>Temporary—cleared on refresh or comparison change.</small>${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Comment" } })}</footer></form></template>
     <template data-changes-target="commentCard"><article class="changes-comment"><header><span data-comment-anchor></span>${iconButton("Delete comment", "deleteComment", Icons.Trash)}</header>${actionItemHtml({ kind: "single", label: { kind: "text", text: "Comment", textAttributesHtml: "data-comment-body" }, element: { tag: "button", attributesHtml: 'type="button" aria-label="Edit comment" data-action="changes#editComment"' } })}</article></template>`;
   const empty = snapshot.index.phase === "not-git" ? "This workspace isn’t a Git repository." : snapshot.label === "Uncommitted changes" ? "No uncommitted changes." : snapshot.label === "Unstaged changes" ? "No unstaged changes." : snapshot.label === "Staged changes" ? "No staged changes." : "No changed files in this comparison.";
   // The history-keyed parent protects Pierre’s managed DOM during live shell morphs.
-  return `<section id="${domId("changes", snapshot.id, "diff")}" class="changes-diff" data-controller="changes" data-changes-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-snapshot-id-value="${snapshot.id}">
+  return `<section id="${domId("changes", snapshot.id, "diff")}" class="changes-diff" data-controller="changes" data-changes-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-snapshot-id-value="${snapshot.id}" data-changes-collapsed-value="${collapsed}">
     <header class="changes-toolbar">
-      <div class="changes-controls"><span class="changes-summary">${files.length} ${files.length === 1 ? "file" : "files"} <span class="changes-additions">+${additions}</span> <span class="changes-deletions">−${deletions}</span></span>${files.length ? iconButton("Collapse all files", "toggleCollapse", collapseIcons, 'data-changes-target="collapseToggle" aria-pressed="false"') : ""}${displayMenu}</div>
+      <div class="changes-controls"><span class="changes-summary">${files.length} ${files.length === 1 ? "file" : "files"} <span class="changes-additions">+${additions}</span> <span class="changes-deletions">−${deletions}</span></span>${files.length ? iconButton(collapsed ? "Expand all files" : "Collapse all files", "toggleCollapse", collapseIcons, `data-changes-target="collapseToggle" aria-pressed="${collapsed}"`) : ""}${displayMenu}</div>
     </header>
     <div id="${changesBodyId(workspaceId, snapshot.id)}-error" class="changes-error" data-changes-target="error" role="alert" hidden><span data-changes-target="errorMessage"></span>${iconButton("Dismiss file error", "dismissError", Icons.Close)}</div>
     ${files.length ? `<div class="changes-surface"><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Changes diff"></div></div>` : `<div class="changes-empty">${escapeHtml(empty)}</div>`}

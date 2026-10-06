@@ -95,7 +95,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     invalidateWorkspace(workspaceId);
     if (match[1] === "refresh") state.clients.clear();
     if (match[1] === "refresh") return turboStreamResponse(replace(changesBodyId(workspaceId, previous.history.id), renderChanges(workspaceId, next, data.get("pickerOpen") === "true")));
-    return turboStreamResponse(replace(comparisonId(workspaceId, previous.history.id), renderComparison(workspaceId, next)) + replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id)));
+    return turboStreamResponse(replace(comparisonId(workspaceId, previous.history.id), renderComparison(workspaceId, next, true)) + replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id)));
   } }],
   initialize(context) {
     invalidateWorkspace = context.invalidateWorkspace;
