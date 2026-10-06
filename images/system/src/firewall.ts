@@ -1,9 +1,10 @@
 import { allowedEgressIpv6Range, blockedEgressIpv6Ranges, workspaceEgressNftIpv4Elements } from "../../../packages/shared/src/egress-policy.ts";
 
-/** Workspaces may reach only global unicast destinations; one table covers current
- * and future workspace bridges, independent of Docker's rules. The element list
- * comes from the shared egress policy, the same one the workspace egress proxy
- * enforces, so the two layers cannot drift apart. */
+/** All bridge-attached workloads (including Docker builds and helper containers)
+ * may reach only global unicast destinations. Match the kernel interface kind,
+ * not bridge names: docker0, workspace bridges, and future/custom-named bridges
+ * all share this boundary without registration or a network-creation race.
+ * The destination policy is shared with the workspace egress proxy. */
 export function workspaceFirewallRules(): string {
   return `add table inet agents-in-the-cloud_workspaces
 flush table inet agents-in-the-cloud_workspaces
@@ -14,16 +15,16 @@ table inet agents-in-the-cloud_workspaces {
   }
   chain input {
     type filter hook input priority -10; policy accept;
-    iifname "atw-*" ct state established,related counter accept
-    iifname "atw-*" ip6 hoplimit 255 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert } counter accept
-    iifname "atw-*" counter drop
+    meta iifkind "bridge" ct state established,related counter accept
+    meta iifkind "bridge" ip6 hoplimit 255 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert } counter accept
+    meta iifkind "bridge" counter drop
   }
   chain forward {
     type filter hook forward priority -10; policy accept;
-    iifname "atw-*" oifname "atw-*" counter drop
-    iifname "atw-*" ip daddr @non_public_v4 counter drop
-    iifname "atw-*" ip6 daddr != ${allowedEgressIpv6Range.address}/${allowedEgressIpv6Range.prefix} counter drop
-${blockedEgressIpv6Ranges.map(([address, prefix]) => `    iifname "atw-*" ip6 daddr ${address}/${prefix} counter drop`).join("\n")}
+    meta iifkind "bridge" meta oifkind "bridge" counter drop
+    meta iifkind "bridge" ip daddr @non_public_v4 counter drop
+    meta iifkind "bridge" ip6 daddr != ${allowedEgressIpv6Range.address}/${allowedEgressIpv6Range.prefix} counter drop
+${blockedEgressIpv6Ranges.map(([address, prefix]) => `    meta iifkind "bridge" ip6 daddr ${address}/${prefix} counter drop`).join("\n")}
   }
 }
 `;
