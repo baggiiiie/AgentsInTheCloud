@@ -7,11 +7,6 @@ import type { StopReason } from "@earendil-works/pi-ai";
 import { Value } from "typebox/value";
 import { isJsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 
-interface ImageRef {
-  mimeType: string;
-  data: string;
-}
-
 export interface SessionImageRef {
   entryId: string;
   contentIndex: number;
