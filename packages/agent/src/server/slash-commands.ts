@@ -57,6 +57,7 @@ export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], 
     const preview = command.kind === "prompt-template" ? command.prompt : command.kind === "builtin" && command.trigger !== "/tree" ? command.trigger : undefined;
     const hasPreview = preview !== undefined;
     return contentRowHtml({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: `${command.trigger}${command.argumentHint ? ` ${command.argumentHint}` : ""} — ${command.description}` },
       trailingHtml: preview === undefined ? "" : `<template data-agents-in-the-cloud-fullscreen-target="content"><pre class="agent-slash-command-preview">${escapeHtml(preview)}</pre></template>`,

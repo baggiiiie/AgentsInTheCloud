@@ -52,7 +52,7 @@ export const handleSubagentRequest: AgentRouteHandler = async (request, url) => 
 function childrenId(workspaceId: string, parentId: string): string { return `subagent-children-${workspaceId}-${parentId}`; }
 function branchSummary(agent: SubagentRecord, agents: SubagentRecord[]): DisclosureSummary {
   const tone = agent.status === "running" || agent.status === "pending" ? "running" : agent.status === "failed" ? "danger" : agent.status === "completed" ? "success" : "";
-  return { kind: "multiline", attributesHtml: `id="subagent-summary-${h(agent.id)}"`, label: { kind: "text", text: viewPath(agents, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` };
+  return { kind: "multiline", width: "fill", attributesHtml: `id="subagent-summary-${h(agent.id)}"`, label: { kind: "text", text: viewPath(agents, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` };
 }
 function branchHtml(workspaceId: string, agent: SubagentRecord, agents: SubagentRecord[], open: Set<string>): string {
   return `<div class="subagent-branch">${disclosureHtml({

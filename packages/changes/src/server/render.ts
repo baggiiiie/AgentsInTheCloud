@@ -37,6 +37,7 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
   const history = snapshot.history;
   const pickerId = domId("changes", history.id, "picker");
   const header = history.phase === "ready" ? contentRowHtml({
+    width: "fill",
     kind: "compact", label: { kind: "text", text: snapshot.label }, leadingHtml: Icons.Disclosure,
     element: { tag: "button", attributesHtml: `type="button" data-action="changes-range#togglePicker" data-changes-range-target="trigger" aria-expanded="${pickerOpen}" aria-controls="${pickerId}"` },
   }) : '<strong>Changes</strong>';
@@ -71,21 +72,22 @@ function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, collapsed: b
   const additions = snapshot.stats.reduce((total, file) => total + file.additions, 0);
   const deletions = snapshot.stats.reduce((total, file) => total + file.deletions, 0);
   const iconButton = (label: string, action: string, icon: string, attributes = "") => buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: icon, label }, attributesHtml: `data-action="changes#${action}" ${attributes}` });
-  const layoutItem = (layout: "unified" | "split", label: string) => contentRowHtml({ kind: "compact", label: { kind: "text", text: label }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: `type="button" role="menuitemradio" aria-checked="${layout === "unified"}" data-layout="${layout}" data-action="changes#chooseLayout"` } });
+  const layoutItem = (layout: "unified" | "split", label: string) => contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: label }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: `type="button" role="menuitemradio" aria-checked="${layout === "unified"}" data-layout="${layout}" data-action="changes#chooseLayout"` } });
   const displayMenu = popupHtml({
     id: domId("changes", workspaceId, snapshot.id, "display"), label: "Display options",
     trigger: { variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Settings, label: "Display options" } },
-    contentHtml: `${layoutItem("unified", "Unified diff")}${layoutItem("split", "Side-by-side diff")}<hr class="popup-menu__separator">${contentRowHtml({ kind: "compact", label: { kind: "text", text: "Wrap long lines" }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: 'type="button" role="menuitemcheckbox" aria-checked="false" data-action="changes#toggleWrap"' } })}`,
+    contentHtml: `${layoutItem("unified", "Unified diff")}${layoutItem("split", "Side-by-side diff")}<hr class="popup-menu__separator">${contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: "Wrap long lines" }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: 'type="button" role="menuitemcheckbox" aria-checked="false" data-action="changes#toggleWrap"' } })}`,
   });
   const collapseIcons = `<span class="changes-collapse-icon">${Icons.CollapseAll}</span><span class="changes-expand-icon">${Icons.ExpandAll}</span>`;
   const headers = snapshot.stats.map((file) => `<template data-changes-header="${escapeHtml(file.path)}"><div class="changes-file-header">${contentRowHtml({
+    width: "fill",
     kind: "compact", label: { kind: "text", text: file.path }, leadingHtml: Icons.Disclosure,
     trailingHtml: `${file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : ""}<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}</span>`,
     element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="${!collapsed}"` },
   })}</div></template>`).join("");
   const commentTemplates = `<template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
     <template data-changes-target="commentEditor"><form class="changes-comment changes-comment-editor" data-action="submit->changes#saveComment keydown.meta+enter->changes#commentShortcut keydown.ctrl+enter->changes#commentShortcut keydown.esc->changes#cancelComment"><header><span data-comment-anchor></span>${iconButton("Cancel comment", "cancelComment", Icons.Close)}</header><textarea class="textarea" rows="3" required maxlength="10000" aria-label="Comment" placeholder="Leave a comment" data-action="input->changes#commentInput"></textarea><footer><small>Temporary—cleared on refresh or comparison change.</small>${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Comment" } })}</footer></form></template>
-    <template data-changes-target="commentCard"><article class="changes-comment"><header><span data-comment-anchor></span>${iconButton("Delete comment", "deleteComment", Icons.Trash)}</header>${contentRowHtml({ kind: "multiline", label: { kind: "text", text: "Comment", textAttributesHtml: "data-comment-body" }, element: { tag: "button", attributesHtml: 'type="button" aria-label="Edit comment" data-action="changes#editComment"' } })}</article></template>`;
+    <template data-changes-target="commentCard"><article class="changes-comment"><header><span data-comment-anchor></span>${iconButton("Delete comment", "deleteComment", Icons.Trash)}</header>${contentRowHtml({ width: "fill", kind: "multiline", label: { kind: "text", text: "Comment", textAttributesHtml: "data-comment-body" }, element: { tag: "button", attributesHtml: 'type="button" aria-label="Edit comment" data-action="changes#editComment"' } })}</article></template>`;
   const empty = snapshot.index.phase === "not-git" ? "This workspace isn’t a Git repository." : snapshot.label === "Uncommitted changes" ? "No uncommitted changes." : snapshot.label === "Unstaged changes" ? "No unstaged changes." : snapshot.label === "Staged changes" ? "No staged changes." : "No changed files in this comparison.";
   // The history-keyed parent protects Pierre’s managed DOM during live shell morphs.
   return `<section id="${domId("changes", snapshot.id, "diff")}" class="changes-diff" data-controller="changes" data-changes-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-snapshot-id-value="${snapshot.id}" data-changes-collapsed-value="${collapsed}">

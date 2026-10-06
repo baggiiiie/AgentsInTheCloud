@@ -78,6 +78,7 @@ function agentTypeOptions(presentation: WorkspacePresentation, menu: boolean): s
   return presentation.agentTypes.map((agentType) => {
     const action = `/workspaces/${encodeURIComponent(presentation.workspace.id)}/commands/agent.create.${encodeURIComponent(agentType.id)}`;
     const item = contentRowHtml({
+      width: "fill",
       kind: "compact", label: { kind: "text", text: agentType.label }, leadingHtml: agentType.iconHtml,
       element: { tag: "button", attributesHtml: `type="submit"${menu ? ' role="menuitem"' : ""}` },
     });

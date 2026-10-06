@@ -21,6 +21,8 @@ interface ContentRowSlots {
   /** Trusted trailing status or metadata. */
   trailingHtml?: string;
   tone?: "default" | "danger";
+  /** Fit the contents by default; fill the allocated lane for collection rows. */
+  width?: "fit" | "fill";
 }
 
 /** Presentation is explicit, not inferred from text length or viewport geometry. */

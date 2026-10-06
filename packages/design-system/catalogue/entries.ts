@@ -81,7 +81,7 @@ export const entries: CatalogueEntry[] = [
       headerHtml: '<span hidden data-page-slide-back>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Back, label: "Back to template settings" }, attributesHtml: 'data-catalogue-back-param="true" data-action="catalogue#pageSlide"' }) + '</span><h3 class="panel__title" tabindex="-1" data-page-slide-title>Template settings</h3>',
       bodyLayout: "padded",
       bodyHtml: `<div data-page-slide-body style="height: 160px; overflow: hidden">
-        <section data-page-slide-page="index">${contentRowHtml({ kind: "compact", label: { kind: "text", text: "Secrets" }, element: { tag: "button", attributesHtml: 'type="button" data-catalogue-back-param="false" data-action="catalogue#pageSlide"' } })}</section>
+        <section data-page-slide-page="index">${contentRowHtml({ kind: "compact", width: "fill", label: { kind: "text", text: "Secrets" }, element: { tag: "button", attributesHtml: 'type="button" data-catalogue-back-param="false" data-action="catalogue#pageSlide"' } })}</section>
         <section data-page-slide-page="detail" hidden><p>Choose a secret to edit.</p>${contentRowHtml({ kind: "multiline", label: { kind: "text", text: "PAYMENTS_API_KEY" }, description: "Required", element: { tag: "div" } })}</section>
       </div>`,
     })}</div>` }],
@@ -132,6 +132,7 @@ export const entries: CatalogueEntry[] = [
             contentHtml: ["Edit details", "Duplicate", "Archive"]
               .map((text) =>
                 contentRowHtml({
+                  width: "fill",
                   kind: "compact",
                   element: {
                     tag: "button",
@@ -530,7 +531,7 @@ export const entries: CatalogueEntry[] = [
     title: "Content row",
     when: "Menu items, navigation entries, action rows, tree entries, standalone information and disclosure summaries. Compact is a single-line pill; multiline is an intrinsic-height soft rectangle. Both share selection, keyboard focus and quiet directional lighting.",
     contract:
-      "kind chooses compact or multiline, never the number of actions. Compact labels truncate and reveal on engagement; multiline labels and optional descriptions wrap. element supplies native semantics (button/a/div/span); primary: false renders information without primary-action behavior. For independent controls, supply primary as an element instead of element, with optional leadingActionsHtml and engagedActionsHtml. Never nest buttons. Plain labels/descriptions are escaped; leadingHtml and trailingHtml fill bounded visual/status slots. A sole hidden trailing element collapses its slot while preserving its update target. Roles, selection and integration attributes belong to the caller; no class/style overrides. Use Disclosure for native open/close and guttered content, not a hand-built summary. Search terms: row, menu item, list item, action item, navigation row, compact, multiline.",
+      "kind chooses compact or multiline, never the number of actions. width defaults to fit; use fill for rows in a collection or an allocated layout slot. Width is independent of shape and interaction. Compact labels truncate and reveal on engagement; multiline labels and optional descriptions wrap. element supplies native semantics (button/a/div/span); primary: false renders information without primary-action behavior. For independent controls, supply primary as an element instead of element, with optional leadingActionsHtml and engagedActionsHtml. Never nest buttons. Plain labels/descriptions are escaped; leadingHtml and trailingHtml fill bounded visual/status slots. A sole hidden trailing element collapses its slot while preserving its update target. Roles, selection and integration attributes belong to the caller; no class/style overrides. Use Disclosure for native open/close and guttered content, not a hand-built summary. Search terms: row, menu item, list item, action item, navigation row, compact, multiline.",
     imports: {
       "content-row": "contentRowHtml",
       button: "buttonHtml",
@@ -538,6 +539,18 @@ export const entries: CatalogueEntry[] = [
       icons: "Icons",
     },
     examples: [
+      {
+        title: "Fit by default · explicit fill · both shapes",
+        render: () => '<div class="form-stack">' + ([undefined, "fill"] as const).map(width =>
+          `<div><p>${width === "fill" ? "Fill — collection rows use the allocated lane" : "Fit — standalone rows use only the space they need"}</p><div class="action-list">` +
+          contentRowHtml({ kind: "compact", width, element: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "Connection settings" }, trailingHtml: "Connected" }) +
+          contentRowHtml({ kind: "multiline", width, element: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "Connection settings" }, description: "Connected with your account.", trailingHtml: "Connected" }) +
+          '</div></div>').join("") + '</div>',
+      },
+      {
+        title: "Fit row · independent controls keep their space",
+        render: () => contentRowHtml({ kind: "compact", primary: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "Workspace record" }, engagedActionsHtml: copyButtonHtml({ label: "Copy record name", copyText: "Workspace record" }) }),
+      },
       {
         title: "Same long label · compact truncation versus multiline wrapping",
         render: () => '<div class="form-section">' +
@@ -549,11 +562,13 @@ export const entries: CatalogueEntry[] = [
         render: () =>
           '<div class="action-list">' +
           contentRowHtml({
+            width: "fill",
             kind: "compact",
             element: { tag: "button", attributesHtml: 'type="button"' },
             label: { kind: "text", text: "Open workspace" },
           }) +
           contentRowHtml({
+            width: "fill",
             kind: "multiline",
             primary: false,
             element: { tag: "div" },
@@ -563,6 +578,7 @@ export const entries: CatalogueEntry[] = [
             trailingHtml: "In progress",
           }) +
           contentRowHtml({
+            width: "fill",
             kind: "compact",
             element: {
               tag: "button",
@@ -571,6 +587,7 @@ export const entries: CatalogueEntry[] = [
             label: { kind: "text", text: "Unavailable action" },
           }) +
           contentRowHtml({
+            width: "fill",
             kind: "compact",
             primary: { tag: "a", attributesHtml: 'href="#content-row"' },
             label: {
@@ -584,6 +601,7 @@ export const entries: CatalogueEntry[] = [
             }),
           }) +
           contentRowHtml({
+            width: "fill",
             kind: "compact",
             primary: { tag: "button", attributesHtml: 'type="button"' },
             label: { kind: "text", text: "Row with a leading control" },
@@ -596,7 +614,7 @@ export const entries: CatalogueEntry[] = [
   {
     id: "disclosure", title: "Disclosure",
     when: "Open and close related prose, forms, tool output or nested records in place. Either Content row presentation can be the summary.",
-    contract: "Native details/summary. summary.kind is compact or multiline; Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
+    contract: "Native details/summary. summary.kind is compact or multiline; summary.width defaults to fit and can be fill independently of body size. Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
     imports: { disclosure: "disclosureHtml", button: "buttonHtml" },
     sources: ["disclosure/disclosure.css"],
     examples: [
@@ -606,7 +624,7 @@ export const entries: CatalogueEntry[] = [
       },
       {
         title: "Multiline summary · wrapping provider description · account action",
-        render: () => disclosureHtml({ summary: { kind: "multiline", label: { kind: "text", text: "OpenAI" }, description: "Connected with your subscription. Usage is shared across the models you use with this account.", trailingHtml: comparisonRingHtml({ caption: "5h", referencePercent: 60, valuePercent: 32, label: "5-hour limit: 60% of the period elapsed, 32% used" }) }, bodyHtml: '<div class="form-section"><p>5-hour limit: 32% used. Resets in 2h.</p><div>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Account settings" } }) + '</div></div>', open: true }),
+        render: () => disclosureHtml({ summary: { kind: "multiline", width: "fill", label: { kind: "text", text: "OpenAI" }, description: "Connected with your subscription. Usage is shared across the models you use with this account.", trailingHtml: comparisonRingHtml({ caption: "5h", referencePercent: 60, valuePercent: 32, label: "5-hour limit: 60% of the period elapsed, 32% used" }) }, bodyHtml: '<div class="form-section"><p>5-hour limit: 32% used. Resets in 2h.</p><div>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Account settings" } }) + '</div></div>', open: true }),
       },
       {
         title: "Nested disclosures · shared gutter keeps the hierarchy visible",
@@ -930,7 +948,7 @@ export const entries: CatalogueEntry[] = [
           id: `catalogue-popup-constrained${idSuffix}`,
           label: "Model",
           trigger: { variant: "secondary", content: { kind: "caption", caption: "An unusually long model name" } },
-          contentHtml: contentRowHtml({ kind: "compact", label: { kind: "text", text: "An unusually long model name" }, element: { tag: "button", attributesHtml: 'type="button" role="menuitemradio" aria-checked="true"' } }),
+          contentHtml: contentRowHtml({ kind: "compact", width: "fill", label: { kind: "text", text: "An unusually long model name" }, element: { tag: "button", attributesHtml: 'type="button" role="menuitemradio" aria-checked="true"' } }),
         })}</div>`,
       },
       {
@@ -950,6 +968,7 @@ export const entries: CatalogueEntry[] = [
             ]
               .map((text, index) =>
                 contentRowHtml({
+                  width: "fill",
                   kind: "compact",
                   label: { kind: "text", text },
                   element: {

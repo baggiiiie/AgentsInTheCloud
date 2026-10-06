@@ -30,9 +30,10 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
   const hasAvailableModel = models.some((model) => model.available !== false);
   const menuId = `${formId}_popup`;
   const setupAction = 'data-controller="agent-model-setup" data-action="click->agent-model-setup#open"';
-  const configure = contentRowHtml({ kind: "compact", label: { kind: "text", text: "Manage models…" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
+  const configure = contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: "Manage models…" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
   const modelItems = models.map((model) => {
     return contentRowHtml({
+      width: "fill",
       ...(model.unavailableReason ? { kind: "multiline" as const, description: model.unavailableReason } : { kind: "compact" as const }),
       label: { kind: "text", text: model.name },
       leadingHtml: providerBrandIconHtml(model.provider),

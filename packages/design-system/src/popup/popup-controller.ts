@@ -150,6 +150,7 @@ export class PopupSelectController extends Controller<HTMLSelectElement> {
 
   private renderOption(option: HTMLOptionElement): HTMLButtonElement {
     const item = contentRowElement<HTMLButtonElement>({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: option.textContent ?? option.value },
       element: { tag: "button", attributesHtml: `type="button" role="menuitemradio" aria-checked="${option.selected}"${option.disabled ? " disabled" : ""}` },

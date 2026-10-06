@@ -427,6 +427,7 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
       return;
     }
     results.innerHTML = this.paletteItems.map((item, index) => contentRowHtml({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: item.title },
       trailingHtml: item.badge ? `<kbd class="palette-item-meta">${escapeHtml(item.badge)}</kbd>` : "",

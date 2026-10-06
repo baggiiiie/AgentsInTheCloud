@@ -58,6 +58,7 @@ export async function designSystemCatalogueHtml(
     },
     contentHtml: Array.from({ length: 18 }, (_, index) =>
       contentRowHtml({
+        width: "fill",
         kind: "compact",
         element: {
           tag: "button",

@@ -109,6 +109,7 @@ export function renderGitHubRepositorySearchMenu(repositories: readonly GitHubRe
     const description = repo.description || repo.htmlUrl;
     const visibility = repo.private ? " — Private repository" : "";
     return contentRowHtml({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: `${repo.fullName} — ${description}${visibility}` },
       element: {

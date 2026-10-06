@@ -19,6 +19,7 @@ export function parseTreeFilterMode(value: string | null): TreeFilterMode {
 
 function renderAgentTreeContinuationMenu(entryId: string): string {
   const continueOption = contentRowHtml({
+    width: "fill",
     kind: "multiline",
     label: { kind: "text", text: "Continue on a new branch" },
     description: "Keep earlier branches in history.",

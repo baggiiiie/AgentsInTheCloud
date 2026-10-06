@@ -48,7 +48,6 @@
 .changes-diff { flex: 1; min-width: 0; }
 .changes-error > span { flex: 1; }
 .changes-range-header { flex: none; display: flex; align-items: center; min-height: 49px; gap: 8px; padding: 8px; border-bottom: 1px solid var(--line); }
-.changes-range-header > .content-row { flex: 1; min-width: 0; }
 .changes-range-header > strong { flex: 1; }
 .changes-range-header [aria-expanded="false"] .disclosure-icon { transform: rotate(-90deg); }
 .changes-picker-host {
@@ -97,7 +96,6 @@
 .changes-comment { margin: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text); font: var(--text-body)/var(--leading-standard) var(--font-sans); overflow: hidden; }
 .changes-comment header { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
 .changes-comment header > span { flex: 1; color: var(--text-muted); font-size: var(--text-code); }
-.changes-comment > .content-row { width: 100%; }
 .changes-comment [data-comment-body] { white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; }
 .changes-comment-editor textarea { display: block; width: calc(100% - 16px); margin: 8px; }
 .changes-comment-editor footer { display: flex; align-items: center; gap: 8px; padding: 0 8px 8px; }

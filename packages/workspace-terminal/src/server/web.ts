@@ -67,6 +67,7 @@ function attachDialogId(workspaceId: string): string {
 async function renderAttachDialog(workspaceId: string): Promise<string> {
   const sessions = await listTmuxSessions(workspaceId);
   const rows = sessions.map((session, index) => contentRowHtml({
+    width: "fill",
     kind: "multiline",
     element: {
       tag: "button",

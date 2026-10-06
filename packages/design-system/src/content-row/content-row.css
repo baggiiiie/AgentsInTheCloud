@@ -1,11 +1,13 @@
 /* Orientation-independent primary actions with optional status and auxiliary controls. */
-.content-row { --content-row-reflection: none; position: relative; min-width: 0; min-height: 28px; box-sizing: border-box; display: flex; align-items: center; padding-inline: 8px; border-radius: var(--radius-round); color: var(--text); }
+.content-row { --content-row-reflection: none; position: relative; max-width: 100%; min-width: 0; min-height: 28px; box-sizing: border-box; display: flex; align-items: center; padding-inline: 8px; border-radius: var(--radius-round); color: var(--text); }
 .content-row:not(.content-row__primary) > .content-row__primary { padding-inline-end: 8px; }
-.content-row__primary { min-width: 0; min-height: 28px; box-sizing: border-box; flex: 1; display: flex; align-items: center; border: 0; background: transparent; font: inherit; letter-spacing: inherit; text-align: left; text-decoration: none; cursor: pointer; }
-.content-row > .content-row__primary { border-radius: inherit; }
+.content-row__primary { min-width: 0; min-height: 28px; box-sizing: border-box; display: flex; align-items: center; border: 0; background: transparent; font: inherit; letter-spacing: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.content-row > .content-row__primary { flex: 1; border-radius: inherit; }
 /* Single semantic rows share content spacing, not primary-action behavior. */
 .content-row--single, .content-row__primary { gap: 6px; padding-block: 4px; }
-.content-row.content-row__primary { width: 100%; max-width: 100%; }
+/* Width is independent of compact/multiline shape and native semantics. */
+.content-row--fit { width: fit-content; }
+.content-row--fill { width: 100%; }
 .content-row:not(:disabled):not([aria-disabled="true"]):focus-visible,
 .content-row:not([aria-disabled="true"]):has(:focus-visible),
 .content-row:has(> .content-row__primary:is([aria-current]:not([aria-current="false"]), [aria-selected="true"], [aria-checked="true"])),
@@ -52,14 +54,15 @@
 .content-row__actions--leading { margin-inline-end: 2px; }
 .content-row__actions--engaged { opacity: 0; pointer-events: none; }
 .content-row:is(:hover, :has(:focus-visible), :has(> .content-row__actions--engaged :popover-open)) > .content-row__actions--engaged { opacity: 1; pointer-events: auto; }
-/* Idle titles use the whole content area, including selected items. Hover,
+/* Fit rows keep independent controls in flow, reserving their space even when idle.
+ * Fill rows let idle titles use the whole content area, including selected items. Hover,
    keyboard focus and open confirmations reserve the actions plus a tiny gap,
    without changing intrinsic sizing or the item's outer width. */
 @media (hover: hover) and (pointer: fine) {
-  .content-row:has(> .content-row__actions--engaged) { position: relative; padding-inline-end: 2px; --content-row-actions-space: 0px; }
-  .content-row:has(> .content-row__actions--engaged) > .content-row__primary { flex: 0 0 calc(100% - var(--content-row-actions-space)); padding-inline-end: 0; }
-  .content-row > .content-row__actions--engaged { position: absolute; inset-inline-end: 2px; }
-  .content-row:has(> .content-row__actions--engaged):is(:hover, :has(:focus-visible), :has(> .content-row__actions--engaged :popover-open)) { --content-row-actions-space: calc(var(--content-row-actions-width, 0px) + 2px); }
+  .content-row--fill:has(> .content-row__actions--engaged) { position: relative; padding-inline-end: 2px; --content-row-actions-space: 0px; }
+  .content-row--fill:has(> .content-row__actions--engaged) > .content-row__primary { flex: 0 0 calc(100% - var(--content-row-actions-space)); padding-inline-end: 0; }
+  .content-row--fill > .content-row__actions--engaged { position: absolute; inset-inline-end: 2px; }
+  .content-row--fill:has(> .content-row__actions--engaged):is(:hover, :has(:focus-visible), :has(> .content-row__actions--engaged :popover-open)) { --content-row-actions-space: calc(var(--content-row-actions-width, 0px) + 2px); }
 }
 @media (hover: none) {
   .content-row__actions--engaged { opacity: 1; pointer-events: auto; }

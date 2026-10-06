@@ -88,6 +88,7 @@ export function renderFileCompletionMenu(completions: readonly FileCompletion[])
   return autocompleteHtml({ kind: "results", label: "Files and directories", contentHtml: completions.map((completion, index) => {
     const path = completion.directory ? `${completion.path}/` : completion.path;
     return contentRowHtml({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: path },
       element: {

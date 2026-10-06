@@ -109,6 +109,7 @@ function renderEntryRow(workspaceId: string, viewId: string, entry: FileEntry, e
   const selectedAttribute = entry.path === selectedPath ? ' aria-selected="true"' : "";
   const size = entry.kind === "directory" ? "" : `<span class="files-row-size">${formatBytes(entry.size)}</span>`;
   return contentRowHtml({
+    width: "fill",
     kind: "compact",
     primary: Boolean(destination),
     leadingHtml: `<span class="files-row-icon" aria-hidden="true">${icon}</span>`,

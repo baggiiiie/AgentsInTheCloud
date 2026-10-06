@@ -140,7 +140,12 @@ Public renderers have no `className` or `bodyClassName`. Do not replace these wi
 feature-specific variants or selectors. Put layout on a **surrounding element**.
 Panel owns its regions (`bodyLayout`, `bodyOverflow`); Dialog owns its surface.
 Content row uses `kind: "compact"` for single-line pills or `kind: "multiline"`
-for wrapping soft rectangles. Both require a plain-text label; multiline accepts
+for wrapping soft rectangles. `width` defaults to `"fit"`; opt into `"fill"` for
+collection rows (menus, navigation, pickers, file/account lists) or an allocated
+layout slot. Standalone actions and transcript disclosures fit their content.
+Width is independent of shape, native semantics, and disclosure state; the
+disclosed body uses the available space regardless of summary width. Both require
+a plain-text label; multiline accepts
 a plain-text `description`. Native `element` semantics and independent `primary`
 controls are separate from presentation. Disclosure composes either summary
 with native open/close, a chevron and the shared gutter; callers supply content

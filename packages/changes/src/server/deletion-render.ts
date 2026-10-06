@@ -19,6 +19,7 @@ function renderSpecialFile(file: ChangesFile): string {
 export function deletionFileSummary(label: ContentRowLabel, metaHtml: string, title?: string): DisclosureSummary {
   return {
     kind: "multiline",
+    width: "fill",
     label: {
       ...label,
 

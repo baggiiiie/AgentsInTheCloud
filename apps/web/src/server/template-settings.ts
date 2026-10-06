@@ -47,7 +47,7 @@ function navigation(id: string, section: TemplateSettingsSection, caption: strin
 }
 function record(id: string, section: TemplateSettingsSection, editor: string, label: string, description = "", status = ""): string {
   const noteId = `template_settings_record_note_${section}_${encodeURIComponent(editor)}`;
-  const action = contentRowHtml({ kind: "compact", label: { kind: "text", text: label }, trailingHtml: escapeHtml(status), element: { tag: "a", attributesHtml: `href="${templateSettingsUrl(id, section, editor)}" data-turbo-frame="${templateSettingsFrameId}" data-template-settings-record="${escapeHtml(editor || section)}"${description ? ` aria-describedby="${escapeHtml(noteId)}"` : ""}` } });
+  const action = contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: label }, trailingHtml: escapeHtml(status), element: { tag: "a", attributesHtml: `href="${templateSettingsUrl(id, section, editor)}" data-turbo-frame="${templateSettingsFrameId}" data-template-settings-record="${escapeHtml(editor || section)}"${description ? ` aria-describedby="${escapeHtml(noteId)}"` : ""}` } });
   return description ? `<div class="template-settings-record">${action}<p class="template-settings-record-note" id="${escapeHtml(noteId)}">${escapeHtml(description)}</p></div>` : action;
 }
 interface EditorFormOptions {

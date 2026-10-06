@@ -111,6 +111,7 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
   })}</form>`;
   const summary = {
     kind: "multiline" as const,
+    width: "fill" as const,
     label: { kind: "text" as const, text: account.label },
     description: account.connection === "needs_attention" ? "Sign-in needs attention" : account.description,
     leadingHtml: providerIcon(account.provider, account.label),
@@ -119,9 +120,10 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
   return `<div class="model-account">${disclosureHtml({ summary, open: open || account.connection === "needs_attention", bodyHtml: `<div class="form-section">${notice}${usage}<div class="model-account__actions">${reconnect}${forget}</div></div>` })}</div>`;
 }
 
-function renderProviderChoice(provider: ProviderChoice, host: ModelsHost): string {
+function renderProviderChoice(provider: ProviderChoice, host: ModelsHost, width: "fit" | "fill" = "fit"): string {
   return `<form class="model-provider-choice" method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true">${contentRowHtml({
     kind: "compact",
+    width,
     element: { tag: "button", attributesHtml: 'type="submit"' },
     label: { kind: "text", text: provider.label },
     leadingHtml: providerIcon(provider.provider, provider.label),
@@ -131,7 +133,7 @@ function renderProviderChoice(provider: ProviderChoice, host: ModelsHost): strin
 function renderOtherProviders(providers: ProviderChoice[], host: ModelsHost, query = ""): string {
   const normalized = query.trim().toLowerCase();
   const matching = providers.filter((provider) => `${provider.label} ${provider.provider}`.toLowerCase().includes(normalized));
-  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other model providers">${matching.map((provider) => renderProviderChoice(provider, host)).join("") || '<div class="managed-list__empty" role="status">No matching model providers.</div>'}</div></turbo-frame>`;
+  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other model providers">${matching.map((provider) => renderProviderChoice(provider, host, "fill")).join("") || '<div class="managed-list__empty" role="status">No matching model providers.</div>'}</div></turbo-frame>`;
 }
 
 function connectFrame(host: ModelsHost, body: string): string {
@@ -183,6 +185,7 @@ function catalogueRow(model: CatalogueEntry, host: ModelsHost): string {
   return `<form id="${ids.catalogueRow(host, model)}" method="post" action="/models/enabled-models/enable?${hostQuery(host)}" data-turbo="true">
     <input type="hidden" name="model" value="${escapeHtml(modelKey(model))}">
     ${contentRowHtml({
+      width: "fill",
       kind: "multiline",
       element: { tag: "button", attributesHtml: `type="submit"${model.enabled ? " disabled" : ""} title="${escapeHtml(model.id)}"` },
       label: { kind: "text", text: model.label },

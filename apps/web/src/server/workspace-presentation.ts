@@ -120,6 +120,7 @@ function renderWorkspaceRow(workspace: WorkspacePaneEntry, index: number): strin
   const tooltip = [workspaceTemplate?.title, label].filter(Boolean).join(" · ");
   const newFromTemplate = workspaceTemplate ? `New workspace from ${workspaceTemplate.title}` : "New empty workspace";
   const row = contentRowHtml({
+    width: "fill",
     kind: "compact",
     container: parked ? undefined : { attributesHtml: `data-workspace-order="${index}"` },
     label: { kind: "text", text: workspace.title },
@@ -144,7 +145,7 @@ function renderWorkspaceRows(presentation: WorkspacePanePresentation): string {
   const parked = presentation.workspaces.filter((workspace) => workspace.parked);
   const parkedGroup = parked.length ? disclosureHtml({
     element: { id: "workspace_pane_parked" },
-    summary: { kind: "compact", attributesHtml: "data-workspace-parked", label: { kind: "text", text: "Parked" } },
+    summary: { kind: "compact", width: "fill", attributesHtml: "data-workspace-parked", label: { kind: "text", text: "Parked" } },
     bodyHtml: parked.map(renderWorkspaceRow).join(""),
   }) : "";
   return `${active.map(renderWorkspaceRow).join("")}${parkedGroup}`;
@@ -153,6 +154,7 @@ function renderWorkspaceRows(presentation: WorkspacePanePresentation): string {
 function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string {
   const guide = presentation.workspaces.length ? "" : ' data-first-workspace-destination="new-workspace"';
   return contentRowHtml({
+    width: "fill",
     kind: "compact",
     leadingHtml: `<span class="workspace-pane-new-workspace-icon">${addBadgeHtml()}</span>`,
     label: { kind: "text", text: "New workspace" },
@@ -169,6 +171,7 @@ function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspac
     attributesHtml: workspaceTemplateDialogTarget,
   }) : undefined;
   return contentRowHtml({
+    width: "fill",
     kind: "compact",
     leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
     label: { kind: "text", text: title },
@@ -182,6 +185,7 @@ function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation)
   // Until the first template exists, the add action explains what a template is.
   const addWorkspaceTemplate = ordered.length
     ? contentRowHtml({
+      width: "fill",
       kind: "compact",
       leadingHtml: addBadgeHtml(),
       label: { kind: "text", text: "A repo I haven’t added yet…" },
@@ -320,7 +324,7 @@ function workViewType(view: WorkPaneContribution): string {
 }
 
 function renderWorkLauncherCommand(command: NonNullable<WorkspacePresentation["commands"]>[number], workspaceId: string, action = ""): string {
-  const item = contentRowHtml({ kind: "compact", label: { kind: "text", text: command.label }, leadingHtml: `<span class="popup-menu__icon">${command.iconHtml ?? Icons.Plus}</span>`, element: { tag: "button", attributesHtml: 'type="submit" role="menuitem"' } });
+  const item = contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: command.label }, leadingHtml: `<span class="popup-menu__icon">${command.iconHtml ?? Icons.Plus}</span>`, element: { tag: "button", attributesHtml: 'type="submit" role="menuitem"' } });
   const actionAttribute = action ? ` data-action="${action}"` : "";
   return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}"${actionAttribute}>${item}</form>`;
 }
@@ -331,6 +335,7 @@ function renderEmptyWorkPane(workspaceId: string, commands: NonNullable<Workspac
       ? commands.find((candidate) => candidate.id === command.shortcutCommandId)!
       : command;
     const item = contentRowHtml({
+      width: "fill",
       kind: "compact",
       label: { kind: "text", text: command.label },
       leadingHtml: command.iconHtml ?? Icons.Plus,
@@ -386,6 +391,7 @@ function renderMobileWorkViews(views: readonly WorkPaneContribution[]) {
 
       const attention = view.attentionSequence === undefined ? "" : '<i class="status-dot attention content-row__status" aria-label="Attention"></i>';
       return contentRowHtml({
+        width: "fill",
         kind: "compact",
         label: { kind: "text", text: view.label },
         leadingHtml: view.iconHtml ?? Icons.Plus,
@@ -397,7 +403,7 @@ function renderMobileWorkViews(views: readonly WorkPaneContribution[]) {
 }
 
 function renderMobileCloser(destination: string, close: ViewCloseAction): string {
-  const item = contentRowHtml({ kind: "compact", tone: "danger", label: { kind: "text", text: "Close current view" }, leadingHtml: `<span class="popup-menu__icon">${Icons.Close}</span>`, element: { tag: "button",  attributesHtml: 'type="submit" role="menuitem"' } });
+  const item = contentRowHtml({ width: "fill", kind: "compact", tone: "danger", label: { kind: "text", text: "Close current view" }, leadingHtml: `<span class="popup-menu__icon">${Icons.Close}</span>`, element: { tag: "button",  attributesHtml: 'type="submit" role="menuitem"' } });
   return `<div data-more-close-destination="${escapeHtml(destination)}" hidden>${closeForm(close, item)}</div>`;
 }
 

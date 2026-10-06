@@ -20,6 +20,7 @@ export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agent
     id: `${launchAgentTypeFrameId}_menu`, label: "Agent type", placement: "above",
     trigger: { variant: "secondary", content: { kind: "caption", caption: agentType.label, iconHtml: agentType.iconHtml } },
     contentHtml: agentTypes.map((item) => contentRowHtml({
+      width: "fill",
       kind: "compact", label: { kind: "text", text: item.label }, leadingHtml: item.iconHtml,
       element: { tag: "button", attributesHtml: `type="submit" name="agentTypeId" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === agentType.id}"` },
     })).join(""),

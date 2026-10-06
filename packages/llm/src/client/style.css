@@ -27,7 +27,6 @@
 .model-provider-usage .usage-limit:first-child { padding-top: 0; border-top: 0; }
 .model-provider-groups { display: grid; gap: 12px; min-width: 0; }
 .model-provider-groups form, .model-provider-models form { margin: 0; }
-.model-provider-groups .content-row, .model-provider-models .content-row { width: 100%; }
 .model-other-providers-body { display: grid; gap: 8px; min-width: 0; }
 .model-providers { display: grid; gap: 4px; min-width: 0; padding: 8px; max-height: min(520px, 60vh); }
 .model-providers, .model-provider-models { overflow-y: auto; }

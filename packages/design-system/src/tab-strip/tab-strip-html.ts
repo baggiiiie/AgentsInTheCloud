@@ -26,7 +26,7 @@ export function tabHtml(options: {
   closeHtml?: string;
 }): string {
   return contentRowHtml({
-    kind: "compact", label: options.label, leadingHtml: options.iconHtml, trailingHtml: tabStatusHtml(options.status),
+    kind: "compact", width: "fill", label: options.label, leadingHtml: options.iconHtml, trailingHtml: tabStatusHtml(options.status),
     container: { attributesHtml: options.containerAttributesHtml },
     primary: { tag: options.primary.tag, attributesHtml: `role="tab" aria-selected="${options.selected}" tabindex="${options.selected ? 0 : -1}" ${options.primary.attributesHtml ?? ""}` },
     engagedActionsHtml: options.closeHtml,
