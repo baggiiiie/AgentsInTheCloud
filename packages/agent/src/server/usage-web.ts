@@ -62,11 +62,15 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
       </div>`}
     </div>
     <div class="usage-metrics usage-caption" tabindex="0" role="group" aria-label="Limit metrics">
+      <div class="usage-metrics-row">
       <span>Time ${elapsed === null ? "—" : `${number(elapsed)}%`} ${helpTipHtml({ label: "What is time?", text: "How much of this limit's time window has passed. It starts over when the limit resets." })}</span>
       <span>Used ${number(window.usedPercent)}%</span>
+      <span>${reset}</span>
+      </div>
+      <div class="usage-metrics-row">
       <span>Runway ${runway} ${helpTipHtml({ label: "What is runway?", text: "How long you can keep going before you hit this limit, if you keep using it as fast as you have so far." })}</span>
       <span>Pace ${pace} ${helpTipHtml({ label: "What is pace?", text: "How your usage compares to spreading it evenly over the window. Ahead means you're using it faster than that, behind means you have room to spare." })}</span>
-      <span>${reset}</span>
+      </div>
     </div>
   </article>`;
 }
