@@ -66,9 +66,15 @@ test("terminal socket sends final diagnostics before closing", () => scenario(`
   const { terminalViewKey } = await import(${JSON.stringify(join(import.meta.dir, "../../src/shared.ts"))});
   const connection = await handler(new URL("http://localhost/workspaces/one/views/" + encodeURIComponent(terminalViewKey(terminal.id)) + "/ws"));
   const events = [];
-  connection.open({ send: chunk => events.push(new TextDecoder().decode(chunk)), close: () => events.push("closed") });
+  let resolveClosed;
+  const closed = new Promise(resolve => { resolveClosed = resolve; });
+  await connection.open({ send: chunk => events.push(new TextDecoder().decode(chunk)), close: () => {
+    events.push("closed");
+    resolveClosed();
+  } });
   callbacks.onData(new TextEncoder().encode("can't find session"));
   callbacks.onExit(1);
+  await closed;
   expect(events).toEqual(["can't find session", "closed"]);
 `));
 

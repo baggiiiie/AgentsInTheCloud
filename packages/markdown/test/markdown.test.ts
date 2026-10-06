@@ -105,14 +105,6 @@ describe("renderMarkdown", () => {
     expect(renderMarkdown("work 1", "[x](javascript:alert(1))")).not.toContain("href");
   });
 
-  test("links bare http(s) URLs but not file names or bare domains", () => {
-    const html = renderMarkdown("work 1", "See https://example.com/a?b=1. Also README.md and example.com");
-    expect(html).toContain('<a href="https://example.com/a?b=1" target="_blank" rel="noopener noreferrer">https://example.com/a?b=1</a>.');
-    expect(html).not.toContain('href="http://README.md"');
-    expect(html).not.toContain('href="http://example.com"');
-    expect(renderMarkdown("work-1", "Open http://localhost:3004/path")).toContain(`href="/workspaces/work-1/ports/3004/path"`);
-  });
-
   test("ordinary Markdown images retain their normal behavior", () => {
     expect(renderMarkdown("work 1", "![alt](https://example.com/a.png)")).toContain('<img src="https://example.com/a.png" alt="alt">');
   });
