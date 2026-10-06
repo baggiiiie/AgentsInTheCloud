@@ -581,3 +581,42 @@ function logIngress(event: string, app: WorkspaceAppRef, details: IngressLogDeta
 function isAddressInUse(error: Error): boolean {
   return error instanceof Error && "code" in error && error.code === "EADDRINUSE";
 }
+
+/** Canonical management URLs are redirect-only: workspace bytes belong on an
+ * isolated origin, including direct navigation and new-tab artifact links. */
+export async function handleCanonicalWorkspaceRequest(request: Request, ingress: Pick<WorkspaceIngress, "openCanonical">): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  let app: WorkspaceAppRef;
+  let path: string;
+  const appMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/apps\/([^/]+)(\/.*)?$/);
+  const portMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/ports\/(\d+)(\/.*)?$/);
+  const fileMatch = url.pathname.match(/^\/workspaces\/([^/]+)\/files(\/.*)$/);
+  if (appMatch) {
+    app = { workspaceId: decodeURIComponent(appMatch[1]!), appKey: decodeURIComponent(appMatch[2]!) };
+    path = `${appMatch[3] || "/"}${url.search}`;
+  } else if (portMatch) {
+    app = { workspaceId: decodeURIComponent(portMatch[1]!), appKey: `port-${Number(portMatch[2])}` };
+    path = `${portMatch[3] || "/"}${url.search}`;
+  } else if (fileMatch) {
+    app = { workspaceId: decodeURIComponent(fileMatch[1]!), appKey: "file" };
+    path = `${decodeURIComponent(fileMatch[2]!)}${url.search}`;
+  } else {
+    return;
+  }
+
+  const response = await ingress.openCanonical(app, path);
+  if (response.status !== 302) return response;
+  const destination = new URL(response.headers.get("location")!);
+  // Compare both the socket-facing and public identity: TLS termination and
+  // nested ingress can make them different. Never fall back to same-origin HTML.
+  if (destination.origin === url.origin || destination.origin === publicInstanceUrl(request)) {
+    await response.body?.cancel();
+    return new Response("Workspace content must use an isolated origin", {
+      status: 502,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-store");
+  return new Response(response.body, { status: response.status, headers });
+}
