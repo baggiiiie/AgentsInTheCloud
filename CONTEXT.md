@@ -52,6 +52,16 @@ _Avoid_: System panel (as the feature name), Workspace terminal (for Host access
 The feature for checking for AgentsInTheCloud releases and managing Update operations. Updates is separate from managing packages or agent CLIs inside a Workspace.
 _Avoid_: Upgrades, software updater (as feature names)
 
+**Usage**:
+The app-level feature for inspecting Model provider usage, limits, and reported balances. Usage reflects provider accounts rather than an individual Workspace’s token totals.
+
+**Estimated time to hit limit**:
+The estimated time until a provider usage limit is reached, based on the average consumption rate so far in its current window. The estimate does not project beyond the next reset. It is distinct from the reset countdown and from Pace.
+_Avoid_: Runway, time to limit (without indicating that it is an estimate)
+
+**Pace**:
+How usage compares with consuming an allowance evenly over its time window. Ahead means faster consumption and behind means slower consumption; Pace is not an estimate of when the limit will be reached.
+
 **Update channel**:
 The published image track followed by Updates. Stable follows the image promoted to the stable track; Latest follows the most recently published image on the latest track. An Update channel selects which Updates to receive, not when to apply them.
 _Avoid_: Release channel (for the app setting)

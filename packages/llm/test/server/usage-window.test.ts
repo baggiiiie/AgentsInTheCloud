@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { SubscriptionUsage } from "../../src/server/subscription-usage.ts";
-import { usageWindowTiming, selectPacingWindow, secondsUntilUsageLimit } from "../../src/server/usage-window.ts";
+import { usageWindowTiming, selectPacingWindow, estimatedTimeToHitLimitSeconds } from "../../src/server/usage-window.ts";
 
 const window = {
   limitName: "Codex", meteredFeature: null, kind: "primary", usedPercent: 60,
@@ -111,19 +111,19 @@ test("missing reset timestamps preserve unknown timing and never participate in 
 
 
 test("forecasts remaining usage at the average rate since the window began", () => {
-  expect(secondsUntilUsageLimit(pacedWindow("Main", 80, 40))).toBeCloseTo(1800);
+  expect(estimatedTimeToHitLimitSeconds(pacedWindow("Main", 80, 40))).toBeCloseTo(1800);
 });
 
 test("stops forecasting at the next reset, including exhaustion exactly at reset", () => {
   for (const [usage, elapsed] of [[60, 90], [60, 60], [0, 50], [40, 0]]) {
-    expect(secondsUntilUsageLimit(pacedWindow("Main", usage!, elapsed!))).toBe(Infinity);
+    expect(estimatedTimeToHitLimitSeconds(pacedWindow("Main", usage!, elapsed!))).toBe(Infinity);
   }
 });
 
-test("already exhausted allowances have zero runway, even at the window start", () => {
+test("already exhausted allowances have zero estimated time to hit limit, even at the window start", () => {
   for (const elapsed of [0, 50, 99]) {
     const exhausted = pacedWindow("Exhausted", 100, elapsed);
-    expect(secondsUntilUsageLimit(exhausted)).toBe(0);
+    expect(estimatedTimeToHitLimitSeconds(exhausted)).toBe(0);
     expect(selectPacingWindow([pacedWindow("Other", 90, 10), exhausted])).toBe(exhausted);
   }
 });
@@ -134,7 +134,7 @@ test("compares time to blockage rather than percentage lead across different dur
   expect(selectPacingWindow([weekly, short])).toBe(short);
 });
 
-test("infinite-runway ties prefer higher usage", () => {
+test("no-projected-hit ties prefer higher usage", () => {
   const lower = pacedWindow("Lower", 20, 50);
   const higher = pacedWindow("Higher", 70, 90);
   expect(selectPacingWindow([lower, higher])).toBe(higher);

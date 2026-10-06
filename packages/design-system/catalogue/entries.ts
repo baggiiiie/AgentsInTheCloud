@@ -823,7 +823,7 @@ export const entries: CatalogueEntry[] = [
     contract: "Place right after the text it explains. label names the question for screen readers; text is plain. Click or tap toggles; outside click or Escape closes.",
     imports: { "help-tip": "helpTipHtml" },
     sources: ["help-tip/help-tip-controller.ts", "help-tip/help-tip.css", "popup/popup-position.ts"],
-    examples: [{ title: "Inline with a metric", render: () => `<span>Runway 2h 10m ${helpTipHtml({ label: "What is runway?", text: "How long you can keep going before you hit this limit, if you keep using it as fast as you have so far." })}</span>` }],
+    examples: [{ title: "Inline with a metric", render: () => `<span>Estimated time to hit limit 2h 10m ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>` }],
   },
   {
     id: "qr-code", title: "QR code", when: "Let people open a URL on their phone.",

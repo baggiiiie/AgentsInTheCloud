@@ -23,7 +23,7 @@ test("always uses the 30 minutes before the last inference", () => {
   forgetSubscriptionInference("openai");
 });
 
-test("selects the subscription with the shortest runway, not the highest raw usage", () => {
+test("selects the subscription with the shortest estimated time to hit limit, not the highest raw usage", () => {
   const selected = selectSubscriptionLimit([
     { provider: supportedUsageProviders[0], windows: [window(90, 95)] },
     { provider: supportedUsageProviders[1], windows: [window(70, 50)] },

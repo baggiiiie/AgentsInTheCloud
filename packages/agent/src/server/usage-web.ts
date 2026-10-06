@@ -1,7 +1,7 @@
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { requestAcceptsJson } from "@agents-in-the-cloud/core";
-import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, secondsUntilUsageLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview } from "@agents-in-the-cloud/llm/server";
+import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, estimatedTimeToHitLimitSeconds, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview } from "@agents-in-the-cloud/llm/server";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { comparisonRingHtml } from "@agents-in-the-cloud/design-system/comparison-ring";
 import { helpTipHtml } from "@agents-in-the-cloud/design-system/help-tip";
@@ -50,9 +50,9 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
   const reset = remaining === null ? "Reset time unavailable" : remaining > 0 ? `Resets in ${usageDuration(remaining)}` : "Reset due";
   const difference = timing.paceDifferenceSeconds;
   const pace = difference === null ? "—" : Math.abs(difference) < 1 ? "on pace" : `${usageDuration(Math.abs(difference))} ${difference > 0 ? "ahead" : "behind"}`;
-  const runwaySeconds = secondsUntilUsageLimit(paced);
-  const runway = timing.state !== "active" || (timing.elapsedPercent === 0 && window.usedPercent > 0 && window.usedPercent < 100)
-    ? "—" : runwaySeconds === Infinity ? "to reset" : usageDuration(runwaySeconds);
+  const estimatedTimeToHitLimitSecondsValue = estimatedTimeToHitLimitSeconds(paced);
+  const estimatedTimeToHitLimit = timing.state !== "active" || (timing.elapsedPercent === 0 && window.usedPercent > 0 && window.usedPercent < 100)
+    ? "—" : estimatedTimeToHitLimitSecondsValue === Infinity ? "Not before reset" : usageDuration(estimatedTimeToHitLimitSecondsValue);
   const elapsed = timing.elapsedPercent;
   return `<article class="usage-limit">
     <div class="usage-limit-title"><h3>${escapeHtml(label)}</h3>
@@ -69,7 +69,7 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
       <span>${reset}</span>
       </div>
       <div class="usage-metrics-row">
-      <span>Runway ${runway} ${helpTipHtml({ label: "What is runway?", text: "How long you can keep going before you hit this limit, if you keep using it as fast as you have so far." })}</span>
+      <span>Estimated time to hit limit ${estimatedTimeToHitLimit} ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>
       <span>Pace ${pace} ${helpTipHtml({ label: "What is pace?", text: "How your usage compares to spreading it evenly over the window. Ahead means you're using it faster than that, behind means you have room to spare." })}</span>
       </div>
     </div>

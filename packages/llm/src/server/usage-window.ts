@@ -37,7 +37,7 @@ export interface PacedUsageWindow {
 /** Forecast at the average consumption rate since this window began.
  * Infinity means no projected blockage before the next reset (or no usable rate).
  * Does not project consumption through resets. */
-export function secondsUntilUsageLimit({ reported, timing }: PacedUsageWindow): number {
+export function estimatedTimeToHitLimitSeconds({ reported, timing }: PacedUsageWindow): number {
   if (timing.state !== "active") return Infinity;
   if (reported.usedPercent >= 100) return 0;
   if (reported.usedPercent === 0 || timing.elapsedPercent === 0) return Infinity;
@@ -54,8 +54,8 @@ export function selectPacingWindow(windows: readonly PacedUsageWindow[]): PacedU
   const used = active.filter((window) => window.reported.usedPercent > 0);
   if (!used.length) return active.find((window) => window.reported.meteredFeature === null) ?? active[0];
   return used.reduce((selected, window) => {
-    const runway = secondsUntilUsageLimit(window);
-    const selectedRunway = secondsUntilUsageLimit(selected);
-    return runway < selectedRunway || (runway === selectedRunway && window.reported.usedPercent > selected.reported.usedPercent) ? window : selected;
+    const estimatedSeconds = estimatedTimeToHitLimitSeconds(window);
+    const selectedEstimatedTimeToHitLimitSeconds = estimatedTimeToHitLimitSeconds(selected);
+    return estimatedSeconds < selectedEstimatedTimeToHitLimitSeconds || (estimatedSeconds === selectedEstimatedTimeToHitLimitSeconds && window.reported.usedPercent > selected.reported.usedPercent) ? window : selected;
   });
 }

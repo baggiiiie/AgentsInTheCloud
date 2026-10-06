@@ -219,7 +219,7 @@ The Usage feature does not record or persist installation-wide token totals.
 A provider card groups provider-reported 0% windows under **Unused limits**
 (collapsed when there are used limits, expanded when all limits are unused)
 and renders reset countdowns such as `3d 12h`. The workspace Usage button traces
-Time and Usage for the subscription whose active allowance is furthest ahead of pace
+Time and Usage for the subscription whose active allowance has the shortest Estimated time to hit limit
 among subscriptions used for successful inference in the 30 minutes ending at the
 last recorded inference. Limits are checked at display time, not frozen at the time
 of that inference. Built-in Agent inference and connected-subscription CLI traffic
@@ -230,8 +230,8 @@ available active limits means no comparison ring. Both arcs start at twelve
 o’clock and run clockwise on the same circle. Their shared portion is neutral;
 Time beyond Usage is green, and Usage beyond Time is red. A dim full-circle
 track preserves the button outline beneath the arcs.
-Among active windows with nonzero usage, the button selects the greatest
-Usage-minus-Time difference; ties prefer higher Usage. When all active windows are
+Among active windows with nonzero usage, the button selects the shortest
+Estimated time to hit limit; ties prefer higher Usage. When all active windows are
 unused, the main allowance takes precedence over feature-specific allowances.
 Expired/not-started windows and windows with unknown reset timing are excluded.
 `GET /usage/button` returns the server-rendered button frame
@@ -243,6 +243,8 @@ schedule (`paceDifferencePoints / 100 × durationSeconds`). Provider cards and t
 label show compact durations such as `30m ahead of pace` or `1d 4h behind pace`.
 Positive means consumption is ahead; negative means behind. This is not time
 until exhaustion. Both difference fields are null outside an active window.
+**Estimated time to hit limit** is a separate forecast based on average consumption since the window began. It stops at the next reset; **Not before reset** means no hit is projected before then. An unavailable estimate is shown as a dash. Unlike **Resets in**, this is not an actual countdown.
+
 Each provider card shows Time and Usage percentages above one comparison bar per allowance.
 Both grow from the left: overlap is neutral, Time beyond Usage is green, and Usage
 beyond Time is red. Outside an active window the bar stays neutral. This is a linear pacing
