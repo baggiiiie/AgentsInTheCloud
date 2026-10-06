@@ -150,6 +150,13 @@ export type MessagePhase = "commentary" | "final_answer";
  */
 export type ModeKind = "plan" | "default";
 
+// Source: MultiAgentMode.ts
+/**
+ * Controls the effective multi-agent delegation instructions for a turn. `custom` means the
+ * configured mode hint defines the policy instead of a built-in policy.
+ */
+export type MultiAgentMode = { "custom": string } | "explicitRequestOnly" | "proactive";
+
 // Source: Personality.ts
 /**
  * Deprecated: `friendly` and `pragmatic` no longer select a style.
@@ -1407,6 +1414,71 @@ appearance: ThreadSectionAppearance | null, };
  * Extensible visual presentation for a custom thread section.
  */
 export type ThreadSectionAppearance = { icon: string | null, color: string | null, };
+
+// Source: v2/ThreadSettingsUpdateParams.ts
+export type ThreadSettingsUpdateParams = { threadId: string,
+/**
+ * Replace this thread's disabled plugin IDs.
+ * Omitted/null preserves the list; [] clears it.
+ */
+disabledPluginIds?: Array<string> | null,
+/**
+ * Override the working directory for subsequent turns.
+ */
+cwd?: string | null,
+/**
+ * Override the approval policy for subsequent turns.
+ */
+approvalPolicy?: AskForApproval | null,
+/**
+ * Override where approval requests are routed for subsequent turns.
+ */
+approvalsReviewer?: ApprovalsReviewer | null,
+/**
+ * Override the sandbox policy for subsequent turns.
+ */
+sandboxPolicy?: SandboxPolicy | null,
+/**
+ * Select a named permissions profile id for subsequent turns. Cannot be
+ * combined with `sandboxPolicy`.
+ */
+permissions?: string | null,
+/**
+ * Override the model for subsequent turns.
+ */
+model?: string | null,
+/**
+ * Override the service tier for subsequent turns. `null` clears the
+ * current service tier; omission leaves it unchanged.
+ */
+serviceTier?: string | null | null,
+/**
+ * Override the reasoning effort for subsequent turns.
+ */
+effort?: ReasoningEffort | null,
+/**
+ * Override the reasoning summary for subsequent turns.
+ */
+summary?: ReasoningSummary | null,
+/**
+ * EXPERIMENTAL - Set a pre-set collaboration mode for subsequent turns.
+ *
+ * For `collaboration_mode.settings.developer_instructions`, `null` means
+ * "use the built-in instructions for the selected mode".
+ */
+collaborationMode?: CollaborationMode | null,
+/**
+ * @deprecated Ignored. Use `effort: "ultra"` for proactive multi-agent behavior.
+ */
+multiAgentMode?: MultiAgentMode | null,
+/**
+ * @deprecated `friendly` and `pragmatic` no longer select a style.
+ * Changing this does not rewrite the thread's existing instructions.
+ */
+personality?: Personality | null, };
+
+// Source: v2/ThreadSettingsUpdateResponse.ts
+export type ThreadSettingsUpdateResponse = Record<string, never>;
 
 // Source: v2/ThreadSortKey.ts
 export type ThreadSortKey = "created_at" | "updated_at" | "recency_at" | "section_position";

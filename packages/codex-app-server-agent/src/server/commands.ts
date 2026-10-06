@@ -85,3 +85,17 @@ export function parseCodexCommand(text: string): CodexCommand | undefined {
       return { kind: name };
   }
 }
+
+/** Catalog inspection is repeatable; operations that change native state need durable admission. */
+export function codexCommandMutates(command: CodexCommand): boolean {
+  switch (command.kind) {
+    case "new": case "compact": case "fork": return true;
+    case "review": return Boolean(command.target);
+    case "resume": return Boolean(command.threadId);
+    case "goal": return Boolean(command.clear || command.objective || command.status);
+    case "skills": return command.enabled !== undefined;
+    case "plugins": return Boolean(command.action);
+    case "apps": return command.enabled !== undefined;
+    case "hooks": case "mcp": return false;
+  }
+}

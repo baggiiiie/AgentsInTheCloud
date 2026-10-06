@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, copyFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve, relative } from "node:path";
 import { codexVersion } from "../src/server/protocol.ts";
@@ -16,7 +16,7 @@ const roots = [
   "v2/TurnStartedNotification", "v2/TurnCompletedNotification",
   "v2/AgentMessageDeltaNotification", "v2/PlanDeltaNotification", "v2/ErrorNotification", "v2/ReasoningSummaryTextDeltaNotification",
   "v2/CommandExecutionOutputDeltaNotification",
-  ...["ThreadCompactStart", "ReviewStart", "ThreadFork", "ThreadList", "ThreadGoalGet", "ThreadGoalSet", "ThreadGoalClear", "SkillsList", "ListMcpServerStatus", "HooksList", "PluginList", "PluginInstall", "PluginUninstall", "SkillsConfigWrite", "AppsList"].flatMap(name => [`v2/${name}Params`, `v2/${name}Response`]),
+  ...["ThreadSettingsUpdate", "ThreadCompactStart", "ReviewStart", "ThreadFork", "ThreadList", "ThreadGoalGet", "ThreadGoalSet", "ThreadGoalClear", "SkillsList", "ListMcpServerStatus", "HooksList", "PluginList", "PluginInstall", "PluginUninstall", "SkillsConfigWrite", "AppsList"].flatMap(name => [`v2/${name}Params`, `v2/${name}Response`]),
   "v2/ConfigValueWriteParams", "v2/ConfigWriteResponse",
 ];
 try {
@@ -24,6 +24,14 @@ try {
   if (await install.exited !== 0) throw new Error("Could not install the pinned Codex generator");
   const generator = Bun.spawn([join(temporary, "node_modules/.bin/codex"), "app-server", "generate-ts", "--out", generated], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });
   if (await generator.exited !== 0) throw new Error("Could not generate the Codex protocol");
+  // Settings updates are experimental in this pin. Keep stable shapes for all
+  // existing operations and import only this method and its extra dependency.
+  const experimental = join(temporary, "experimental");
+  const experimentalGenerator = Bun.spawn([join(temporary, "node_modules/.bin/codex"), "app-server", "generate-ts", "--experimental", "--out", experimental], { stdin: "ignore", stdout: "inherit", stderr: "inherit" });
+  if (await experimentalGenerator.exited !== 0) throw new Error("Could not generate the experimental Codex protocol");
+  for (const path of ["v2/ThreadSettingsUpdateParams.ts", "v2/ThreadSettingsUpdateResponse.ts", "MultiAgentMode.ts"]) {
+    await copyFile(join(experimental, path), join(generated, path));
+  }
   const sources = new Map<string, string>();
   async function collect(path: string): Promise<void> {
     if (sources.has(path)) return;

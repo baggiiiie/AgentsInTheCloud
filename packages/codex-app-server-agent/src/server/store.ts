@@ -6,6 +6,7 @@ import { Value } from "typebox/value";
 const schema = Type.Object({ agents: Type.Array(Type.Object({
   id: Type.String(), title: Type.String(), threadId: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()),
+  commandSubmissions: Type.Optional(Type.Array(Type.Object({ id: Type.String(), digest: Type.String(), result: Type.Optional(Type.String()) }))),
   submissions: Type.Array(Type.Object({ id: Type.String(), digest: Type.String(), accepted: Type.Boolean() })),
 })) });
 export type CodexAgentRecord = Static<typeof schema>["agents"][number];

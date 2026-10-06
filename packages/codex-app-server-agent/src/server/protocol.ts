@@ -5,6 +5,7 @@ import type * as Protocol from "../protocol.ts";
 export const codexVersion = "0.160.1";
 export interface Requests {
   initialize: [Protocol.InitializeParams, Protocol.InitializeResponse];
+  "thread/settings/update": [Protocol.ThreadSettingsUpdateParams, Protocol.ThreadSettingsUpdateResponse];
   "thread/compact/start": [Protocol.ThreadCompactStartParams, Protocol.ThreadCompactStartResponse];
   "review/start": [Protocol.ReviewStartParams, Protocol.ReviewStartResponse];
   "thread/fork": [Protocol.ThreadForkParams, Protocol.ThreadForkResponse];

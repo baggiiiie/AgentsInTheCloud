@@ -12,7 +12,13 @@ async function scenario(script: string) {
       const connections = [];
       const requests = [];
       const turns = [];
+      const reviewSettings = [];
       let resumeError;
+      let requestFailure;
+      let compactNotifications = true;
+      let startCount = 0;
+      const launchSettings = { model: "openai-codex::model", thinkingLevel: "medium" };
+      const models = [{ model: "model", hidden: false, displayName: "Model", defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "high" }] }];
       let reviewNotifications = true;
       let goal = null;
       let skills = { data: [] };
@@ -24,21 +30,36 @@ async function scenario(script: string) {
       mock.module(setupPath, () => ({
         agentTypeId: "codex-app-server", label: "Codex Native", codexHome: id => "/codex/" + id,
         prepareCodex: async () => ({ instructions: "instructions", mcp: { url: "http://localhost/mcp", token: "test" } }), requireSetup: async () => {},
-        settings: { prepare: async () => ({ model: "openai-codex::model", thinkingLevel: "medium" }), renderFooter: async () => "" },
+        settings: { prepare: async () => ({ ...launchSettings }), renderFooter: async () => "" },
       }));
       mock.module(${JSON.stringify(join(import.meta.dir, "../src/server/transport.ts"))}, () => ({
         openCodexTransport: async (workspaceId, home, notification, failed) => {
+          let nativeModel = "model";
+          let nativeEffort = "medium";
           const connection = { notification, failed, closed: false, rpc: {
             notify() {}, async request(method, params) {
               requests.push({ method, params });
+              if (requestFailure?.method === method) { const error = requestFailure.error; requestFailure = undefined; throw error; }
               if (method === "initialize") return {};
-              if (method === "model/list") return { data: [{ model: "model", hidden: false, displayName: "Model", defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "medium" }] }], nextCursor: null };
+              if (method === "model/list") return { data: models, nextCursor: null };
               if (method === "thread/resume" && resumeError) throw resumeError;
-              if (method === "thread/start" || method === "thread/resume") return { thread: { id: params.threadId ?? "thread-" + connections.length, turns: [...turns] }, model: "model", reasoningEffort: "medium" };
+              if (method === "thread/start" || method === "thread/resume" || method === "thread/fork") {
+                nativeModel = params.model ?? nativeModel;
+                nativeEffort = params.config?.model_reasoning_effort ?? nativeEffort;
+                return { thread: { id: method === "thread/fork" ? "forked-thread" : params.threadId ?? "thread-" + ++startCount, turns: method === "thread/start" ? [] : [...turns] }, model: nativeModel, reasoningEffort: nativeEffort };
+              }
+              if (method === "thread/settings/update") { nativeModel = params.model; nativeEffort = params.effort; return {}; }
+              if (method === "thread/compact/start") {
+                if (compactNotifications) {
+                  const value = turn("compact-" + turns.length); turns.push(value);
+                  notification({ method: "turn/started", params: { threadId: params.threadId, turn: { ...value, status: "inProgress" } } });
+                  notification({ method: "turn/completed", params: { threadId: params.threadId, turn: value } });
+                }
+                return {};
+              }
               if (method === "turn/start") { const value = turn("turn-" + turns.length); turns.push(value); return { turn: value }; }
-              if (method === "thread/fork") return { thread: { id: "forked-thread", turns: [...turns] }, model: "model", reasoningEffort: "medium" };
               if (method === "thread/list") return { data: [{ id: "saved-thread", turns: [] }], nextCursor: params.cursor ? null : "next-page", backwardsCursor: null };
-              if (method === "review/start") { const value = turn("review", "inProgress"); turns.push(value); if (reviewNotifications) notification({ method: "turn/started", params: { threadId: params.threadId, turn: value } }); return { turn: turn("review-operation", "inProgress"), reviewThreadId: params.threadId }; }
+              if (method === "review/start") { reviewSettings.push({ model: nativeModel, effort: nativeEffort }); const value = turn("review", "inProgress"); turns.push(value); if (reviewNotifications) notification({ method: "turn/started", params: { threadId: params.threadId, turn: value } }); return { turn: turn("review-operation", "inProgress"), reviewThreadId: params.threadId }; }
               if (method === "thread/goal/set") { goal = { ...(goal ?? {}), objective: params.objective ?? goal?.objective, status: params.status }; return { goal }; }
               if (method === "thread/goal/get") return { goal };
               if (method === "thread/goal/clear") { goal = null; return { cleared: true }; }
@@ -61,7 +82,8 @@ async function scenario(script: string) {
       const rendering = await import(${JSON.stringify(join(import.meta.dir, "../src/server/render.ts"))});
       mock.module(${JSON.stringify(join(import.meta.dir, "../src/server/render.ts"))}, () => ({ ...rendering, liveRegions: runtime => [{ target: "state", html: JSON.stringify(runtime.state.turns) }] }));
       const busy = await import("@agents-in-the-cloud/agent/server/workspace-agent-busy");
-      mock.module("@agents-in-the-cloud/agent/server/workspace-agent-busy", () => ({ ...busy, publishWorkspaceAgentBusy() {} }));
+      const busyEvents = [];
+      mock.module("@agents-in-the-cloud/agent/server/workspace-agent-busy", () => ({ ...busy, publishWorkspaceAgentBusy(event) { busyEvents.push(event); } }));
       const handlers = new Map();
       const events = { on(name, handler) { handlers.set(name, [...(handlers.get(name) ?? []), handler]); }, async emit(name, payload) { for (const handler of handlers.get(name) ?? []) await handler(payload); } };
       const { createCodexAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/runtime.ts"))});
@@ -297,5 +319,198 @@ test("native new starts a Codex thread without submitting an inference prompt", 
   expect(requests.filter(value => value.method === "thread/start")).toHaveLength(2);
   expect(requests.some(value => value.method === "turn/start")).toBe(false);
   expect(runtime.state.turns).toHaveLength(0);
+  await agents.disposeAll();
+`));
+
+test("launch and thread transitions apply the selected native reasoning effort", () => scenario(`
+  launchSettings.thinkingLevel = "high";
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  expect(requests.find(value => value.method === "thread/start").params.config).toEqual({ model_reasoning_effort: "high" });
+  await runtime.command({ kind: "fork" }, "fork");
+  expect(runtime.record.thinkingLevel).toBe("high");
+  await runtime.command({ kind: "resume", threadId: "saved" }, "resume");
+  expect(runtime.record.thinkingLevel).toBe("high");
+  await runtime.command({ kind: "new" }, "new");
+  connections[0].failed(new Error("Disconnected"));
+  await agents.ready("workspace", id);
+  for (const value of requests.filter(value => ["thread/start", "thread/resume", "thread/fork"].includes(value.method))) {
+    expect(value.params.config).toEqual({ model_reasoning_effort: "high" });
+  }
+  await agents.disposeAll();
+`));
+
+test("picker changes update native thread settings before reviews without sending a prompt", () => scenario(`
+  models.push({ model: "other", hidden: false, displayName: "Other", defaultReasoningEffort: "medium", supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "high" }] });
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  await runtime.configure({ model: "openai-codex::other" });
+  await runtime.configure({ thinkingLevel: "high" });
+  expect(requests.filter(value => value.method === "thread/settings/update").map(value => value.params)).toEqual([
+    { threadId: "thread-1", model: "other", effort: "medium" },
+    { threadId: "thread-1", model: "other", effort: "high" },
+  ]);
+  expect(runtime.record).toMatchObject({ model: "openai-codex::other", thinkingLevel: "high" });
+  await runtime.command({ kind: "review", target: { type: "uncommittedChanges" } }, "review");
+  expect(reviewSettings).toEqual([{ model: "other", effort: "high" }]);
+  expect(requests.findIndex(value => value.method === "review/start")).toBeGreaterThan(requests.findLastIndex(value => value.method === "thread/settings/update"));
+  expect(requests.some(value => value.method === "turn/start")).toBe(false);
+  await agents.disposeAll();
+`));
+
+test("a rejected native settings update leaves the picker selection unchanged", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  const { CodexRpcError } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/rpc.ts"))});
+  requestFailure = { method: "thread/settings/update", error: new CodexRpcError("Unsupported settings") };
+  await expect(runtime.configure({ thinkingLevel: "high" })).rejects.toThrow("Unsupported settings");
+  expect(runtime.record.thinkingLevel).toBe("medium");
+  await runtime.configure({ thinkingLevel: "high" });
+  expect(runtime.record.thinkingLevel).toBe("high");
+  await agents.disposeAll();
+`));
+
+test("compaction stays busy between its RPC reply and native turn notifications", () => scenario(`
+  compactNotifications = false;
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  const command = { kind: "compact" };
+  const result = await runtime.command(command, "compact");
+  expect(runtime.isBusy).toBe(true);
+  expect(runtime.state.activeTurn).toBeUndefined();
+  expect(busyEvents.at(-1)).toMatchObject({ agentKey: "agent:" + id, busy: true });
+  expect(await runtime.command(command, "compact")).toEqual(result);
+  expect(requests.filter(value => value.method === "thread/compact/start")).toHaveLength(1);
+  for (const next of [{ kind: "new" }, { kind: "fork" }, { kind: "resume", threadId: "saved" }, { kind: "compact" }, { kind: "review", target: { type: "uncommittedChanges" } }]) {
+    await expect(runtime.command(next, "next")).rejects.toThrow("Stop Codex");
+  }
+  expect(requests.filter(value => value.method === "thread/start")).toHaveLength(1);
+  const active = turn("compaction", "inProgress");
+  connections[0].notification({ method: "turn/started", params: { threadId: "thread-1", turn: active } });
+  expect(runtime.isBusy).toBe(true);
+  turns.push(turn("compaction"));
+  connections[0].notification({ method: "turn/completed", params: { threadId: "thread-1", turn: turns[0] } });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(runtime.isBusy).toBe(false);
+  expect(busyEvents.at(-1).busy).toBe(false);
+  await runtime.command({ kind: "new" }, "next");
+  await agents.disposeAll();
+`));
+
+test("explicit compaction rejection clears busy state and allows the same request to retry", () => scenario(`
+  compactNotifications = false;
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  const { CodexRpcError } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/rpc.ts"))});
+  requestFailure = { method: "thread/compact/start", error: new CodexRpcError("Cannot compact") };
+  await expect(runtime.command({ kind: "compact" }, "compact")).rejects.toThrow("Cannot compact");
+  expect(runtime.isBusy).toBe(false);
+  expect(runtime.record.commandSubmissions).toHaveLength(0);
+  await runtime.command({ kind: "compact" }, "compact");
+  expect(runtime.isBusy).toBe(true);
+  expect(requests.filter(value => value.method === "thread/compact/start")).toHaveLength(2);
+  await agents.disposeAll();
+`));
+
+test("new and fork deduplicate concurrent retries and replay saved results after restart", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  for (const kind of ["new", "fork"]) {
+    const results = await Promise.all([runtime.command({ kind }, kind), runtime.command({ kind }, kind)]);
+    expect(results[0]).toEqual(results[1]);
+  }
+  expect(requests.filter(value => value.method === "thread/start")).toHaveLength(2);
+  expect(requests.filter(value => value.method === "thread/fork")).toHaveLength(1);
+  const selected = runtime.record.threadId;
+  await agents.disposeAll();
+  const restored = createCodexAgents(() => events);
+  const reopened = await restored.ready("workspace", id);
+  expect(await reopened.command({ kind: "new" }, "new")).toEqual({ kind: "done", message: "New Codex conversation started." });
+  expect(await reopened.command({ kind: "fork" }, "fork")).toEqual({ kind: "done", message: "Conversation forked." });
+  expect(reopened.record.threadId).toBe(selected);
+  expect(requests.filter(value => value.method === "thread/start")).toHaveLength(2);
+  expect(requests.filter(value => value.method === "thread/fork")).toHaveLength(1);
+  await restored.disposeAll();
+`));
+
+test("command request IDs cannot be reused for different payloads or prompts", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  await runtime.command({ kind: "new" }, "shared");
+  await expect(runtime.command({ kind: "fork" }, "shared")).rejects.toThrow("different command");
+  await expect(runtime.send(input, "shared")).rejects.toThrow("used for a command");
+  await runtime.send(input, "prompt");
+  await expect(runtime.command({ kind: "new" }, "prompt")).rejects.toThrow("used for a prompt");
+  expect(requests.some(value => value.method === "thread/fork")).toBe(false);
+  await agents.disposeAll();
+`));
+
+test("uncertain command outcomes stay claimed across restart instead of repeating the mutation", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  requestFailure = { method: "thread/fork", error: new Error("Lost reply") };
+  await expect(runtime.command({ kind: "fork" }, "fork")).rejects.toThrow("Lost reply");
+  await expect(runtime.command({ kind: "fork" }, "fork")).rejects.toThrow("uncertain outcome");
+  await agents.disposeAll();
+  const restored = createCodexAgents(() => events);
+  const reopened = await restored.ready("workspace", id);
+  await expect(reopened.command({ kind: "fork" }, "fork")).rejects.toThrow("uncertain outcome");
+  expect(requests.filter(value => value.method === "thread/fork")).toHaveLength(1);
+  await restored.disposeAll();
+`));
+
+test("a failed catalog read after mutation admission does not allow the mutation to repeat", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  const { CodexRpcError } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/rpc.ts"))});
+  requestFailure = { method: "thread/goal/get", error: new CodexRpcError("Cannot read goal") };
+  const command = { kind: "goal", objective: "Finish the task" };
+  await expect(runtime.command(command, "goal")).rejects.toThrow("Cannot read goal");
+  await expect(runtime.command(command, "goal")).rejects.toThrow("uncertain outcome");
+  expect(requests.filter(value => value.method === "thread/goal/set")).toHaveLength(1);
+  await agents.disposeAll();
+`));
+
+test("catalog mutations replay their results while inspection remains fresh", () => scenario(`
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  skills = { data: [{ cwd: "/work", skills: [{ name: "example", path: "/work/.agents/skills/example/SKILL.md", enabled: false }], errors: [] }] };
+  plugins.marketplaces = [{ name: "curated", path: null, plugins: [{ id: "example@curated", name: "example" }] }];
+  appPages = [{ data: [{ id: "example" }], nextCursor: null }];
+  const mutations = [
+    { kind: "resume", threadId: "saved" },
+    { kind: "goal", objective: "Finish the task" },
+    { kind: "skills", name: "example", enabled: true },
+    { kind: "plugins", action: "install", id: "example@curated" },
+    { kind: "apps", id: "example", enabled: true },
+  ];
+  for (const command of mutations) {
+    const result = await runtime.command(command, command.kind);
+    expect(await runtime.command(command, command.kind)).toEqual(result);
+  }
+  for (const method of ["thread/resume", "thread/goal/set", "skills/config/write", "plugin/install", "config/value/write"]) {
+    expect(requests.filter(value => value.method === method)).toHaveLength(1);
+  }
+  expect((await runtime.command({ kind: "goal" }, "inspect")).goal.objective).toBe("Finish the task");
+  goal.objective = "A new objective";
+  expect((await runtime.command({ kind: "goal" }, "inspect")).goal.objective).toBe("A new objective");
+  expect(runtime.record.commandSubmissions).toHaveLength(mutations.length);
+  await agents.disposeAll();
+`));
+
+test("messages and commands endpoints share durable command admission", () => scenario(`
+  const id = await agents.create("workspace");
+  const { codexRoutes } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/routes.ts"))});
+  const route = codexRoutes(agents);
+  const send = async operation => {
+    const url = new URL("http://localhost/workspaces/workspace/codex-app-server-agents/" + id + "/" + operation);
+    return route(new Request(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ text: "/new", requestId: "retry" }) }), url);
+  };
+  const first = await send("messages");
+  const retried = await send("commands");
+  expect(first.status).toBe(202);
+  expect(retried.status).toBe(202);
+  expect((await retried.json()).command).toEqual((await first.json()).command);
+  expect(requests.filter(value => value.method === "thread/start")).toHaveLength(2);
   await agents.disposeAll();
 `));

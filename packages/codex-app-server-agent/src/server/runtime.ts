@@ -18,9 +18,9 @@ import type {
   AppsListResponse,
   ListMcpServerStatusResponse,
 } from "../protocol.ts";
-import type { CodexNotification } from "./protocol.ts";
-import type { CodexCommand, CodexCommandResult } from "./commands.ts";
-import { CodexRpcError } from "./rpc.ts";
+import type { Requests, CodexNotification } from "./protocol.ts";
+import { codexCommandMutates, type CodexCommand, type CodexCommandResult } from "./commands.ts";
+import { CodexRpcError, type CodexRpc } from "./rpc.ts";
 import { CodexState } from "./state.ts";
 import { openCodexTransport } from "./transport.ts";
 import { agentTypeId, label, codexHome, prepareCodex, settings } from "./setup.ts";
@@ -37,12 +37,12 @@ export class CodexRuntime {
   private closing = false;
   private threadId!: string;
   private busy = false;
-  private reviewPending = false;
+  private turnPending = false;
   private readonly serialize = createKeyedOperationQueue();
   readonly presentation = createLivePresentation(() => liveRegions(this), 50);
   private constructor(readonly workspaceId: string, readonly record: CodexAgentRecord, private readonly save: () => void, private readonly events: AgentsInTheCloudEventBus) {}
   get agentId() { return this.record.id; }
-  get isBusy() { return !this.failure && Boolean(this.state.activeTurn || this.reviewPending); }
+  get isBusy() { return !this.failure && Boolean(this.state.activeTurn || this.turnPending); }
   private changed() {
     if (this.disposed) return;
     const busy = this.isBusy;
@@ -68,7 +68,7 @@ export class CodexRuntime {
     });
   }
   private async connect() {
-    this.reviewPending = false;
+    this.turnPending = false;
     const queued: CodexNotification[] = [];
     let ready = false;
     try {
@@ -119,6 +119,7 @@ export class CodexRuntime {
       const parts: UserInput[] = [{ type: "text", text: [input.text, ...input.attachmentNotes].filter(Boolean).join("\n\n"), text_elements: [] }, ...input.images.map(image => ({ type: "image" as const, url: `data:${image.mimeType};base64,${image.data}` }))];
       if (skill) parts.push({ type: "skill", name: skill.name, path: skill.path });
       const digest = createHash("sha256").update(JSON.stringify(parts)).digest("hex");
+      if (this.record.commandSubmissions?.some(entry => entry.id === requestId)) throw invalidArguments("This request ID was already used for a command");
       const previous = this.record.submissions.find(entry => entry.id === requestId);
       if (previous) {
         if (previous.digest !== digest) throw invalidArguments("This request ID was already used for a different prompt");
@@ -155,10 +156,6 @@ export class CodexRuntime {
     });
   }
   async command(command: CodexCommand, requestId: string): Promise<CodexCommandResult> {
-    if (command.kind === "new") {
-      await this.reset();
-      return { kind: "done", message: "New Codex conversation started." };
-    }
     if (command.kind === "skills" && command.name && command.enabled === undefined) {
       this.assertOpen();
       const inventory = await this.transport.rpc.request("skills/list", { cwds: [workspaceRoot], forceReload: true });
@@ -170,102 +167,155 @@ export class CodexRuntime {
     }
     return this.serialize(this.agentId, async () => {
       this.assertOpen();
-      const { rpc } = this.transport;
-      switch (command.kind) {
-        case "compact":
-          this.requireIdle("compacting the conversation");
-          this.record.threadId = this.threadId;
+      const request = this.transport.rpc.request.bind(this.transport.rpc);
+      if (!codexCommandMutates(command)) return this.runCommand(command, requestId, request);
+      if (this.record.submissions.some(entry => entry.id === requestId)) throw invalidArguments("This request ID was already used for a prompt");
+      const digest = createHash("sha256").update(JSON.stringify(command)).digest("hex");
+      const submissions = this.record.commandSubmissions ??= [];
+      const previous = submissions.find(entry => entry.id === requestId);
+      if (previous) {
+        if (previous.digest !== digest) throw invalidArguments("This request ID was already used for a different command");
+        if (previous.result !== undefined) {
+          // SAFETY: Results are serialized by this runtime into app-owned workspace metadata.
+          return JSON.parse(previous.result) as CodexCommandResult;
+        }
+        throw invalidArguments("The previous command has an uncertain outcome. Reload to inspect the conversation before trying a new request.");
+      }
+      const submission: NonNullable<CodexAgentRecord["commandSubmissions"]>[number] = { id: requestId, digest };
+      submissions.push(submission);
+      this.save();
+      let attempted = false;
+      let accepted = false;
+      let rejected = false;
+      const mutate = async <M extends keyof Requests>(method: M, params: Requests[M][0]): Promise<Requests[M][1]> => {
+        attempted = true;
+        try {
+          const result = await request(method, params);
+          accepted = true;
+          return result;
+        } catch (error) {
+          if (error instanceof CodexRpcError && !accepted) rejected = true;
+          throw error;
+        }
+      };
+      try {
+        const result = await this.runCommand(command, requestId, mutate);
+        submission.result = JSON.stringify(result);
+        this.save();
+        return result;
+      } catch (error) {
+        // Preflight failures and explicit mutation rejections are safe to retry.
+        // A lost reply or a failure after admission must not repeat the mutation.
+        if (!attempted || rejected) {
+          this.record.commandSubmissions = submissions.filter(entry => entry !== submission);
           this.save();
-          await rpc.request("thread/compact/start", { threadId: this.threadId });
-          return { kind: "done", message: "Compaction started." };
-        case "review": {
-          this.requireIdle("starting a review");
-          if (!command.target) return { kind: "review" };
-          this.record.threadId = this.threadId;
-          this.save();
-          // review/start returns an operation ID, not the canonical turn ID.
-          // Only native turn notifications may materialize the review transcript.
-          this.reviewPending = true;
-          this.changed();
-          try { await rpc.request("review/start", { threadId: this.threadId, target: command.target, delivery: "inline" }); }
-          catch (error) { this.reviewPending = false; this.changed(); throw error; }
-          return { kind: "done", message: "Review started." };
         }
-        case "fork": {
-          this.requireIdle("forking the conversation");
-          const response = await rpc.request("thread/fork", { threadId: this.threadId, ...this.threadParameters });
-          this.adoptThread(response);
-          this.state.notices.push("Continuing in a fork. The original conversation is available through /resume.");
-          this.changed();
-          return { kind: "done", message: "Conversation forked." };
-        }
-        case "resume": {
-          this.requireIdle("switching conversations");
-          if (!command.threadId) return { kind: "resume", threads: await rpc.request("thread/list", { cwd: workspaceRoot, cursor: command.cursor, limit: 50, sortKey: "updated_at" }) };
-          const response = await rpc.request("thread/resume", { threadId: command.threadId, ...this.threadParameters });
-          this.adoptThread(response);
-          return { kind: "done", message: "Conversation resumed." };
-        }
-        case "goal": {
-          if (command.clear) await rpc.request("thread/goal/clear", { threadId: this.threadId });
-          else if (command.objective || command.status) {
-            await rpc.request("thread/goal/set", { threadId: this.threadId, objective: command.objective, status: command.status ?? "active" });
-            this.record.threadId = this.threadId;
-            this.save();
-          }
-          return { kind: "goal", goal: (await rpc.request("thread/goal/get", { threadId: this.threadId })).goal };
-        }
-        case "skills": {
-          if (command.enabled !== undefined) {
-            this.requireIdle("changing skill settings");
-            const inventory = await rpc.request("skills/list", { cwds: [workspaceRoot], forceReload: true });
-            const matches = inventory.data.flatMap(entry => entry.skills).filter(skill => skill.name === command.name && (!command.path || skill.path === command.path));
-            if (matches.length !== 1) throw invalidArguments("Choose a skill from the native Codex catalog");
-            await rpc.request("skills/config/write", { path: matches[0]!.path, enabled: command.enabled });
-          }
-          return { kind: "skills", skills: await rpc.request("skills/list", { cwds: [workspaceRoot], forceReload: true }) };
-        }
-        case "hooks": return { kind: "hooks", hooks: await rpc.request("hooks/list", { cwds: [workspaceRoot] }) };
-        case "plugins": {
-          let notice: string | undefined;
-          if (command.action) {
-            this.requireIdle("changing plugins");
-            const catalog = await rpc.request("plugin/list", { cwds: [workspaceRoot] });
-            const match = catalog.marketplaces.flatMap(marketplace => marketplace.plugins.map(plugin => ({ marketplace, plugin }))).find(entry => entry.plugin.id === command.id);
-            if (!match) throw invalidArguments("Choose a plugin from the native Codex catalog");
-            if (command.action === "install") {
-              const response = await rpc.request("plugin/install", { pluginName: match.plugin.name, marketplacePath: match.marketplace.path, remoteMarketplaceName: match.marketplace.path ? null : match.marketplace.name, installAttemptId: requestId });
-              notice = response.appsNeedingAuth.length ? `Plugin installed. Connect ${response.appsNeedingAuth.map(app => app.name).join(", ")} through /apps.` : "Plugin installed.";
-            } else {
-              await rpc.request("plugin/uninstall", { pluginId: match.plugin.id });
-              notice = "Plugin removed.";
-            }
-          }
-          return { kind: "plugins", plugins: await rpc.request("plugin/list", { cwds: [workspaceRoot] }), notice };
-        }
-        case "mcp": {
-          const servers: McpServerStatus[] = [];
-          let cursor: string | null = null;
-          do {
-            const page: ListMcpServerStatusResponse = await rpc.request("mcpServerStatus/list", { threadId: this.threadId, cursor, limit: 100 });
-            servers.push(...page.data);
-            cursor = page.nextCursor;
-          } while (cursor);
-          return { kind: "mcp", servers, verbose: command.verbose };
-        }
-        case "apps": {
-          let notice: string | undefined;
-          if (command.enabled !== undefined) {
-            this.requireIdle("changing app settings");
-            const apps = await this.listApps();
-            if (!apps.some(app => app.id === command.id)) throw invalidArguments("Choose an app from the native Codex catalog");
-            const response = await rpc.request("config/value/write", { keyPath: `apps.${JSON.stringify(command.id!)}.enabled`, value: command.enabled, mergeStrategy: "replace" });
-            notice = response.status === "okOverridden" ? "Saved, but a higher-priority Codex setting overrides this change." : "Changes apply to new Codex turns.";
-          }
-          return { kind: "apps", apps: await this.listApps(), notice };
-        }
+        throw error;
       }
     });
+  }
+  private async runCommand(command: CodexCommand, requestId: string, mutate: CodexRpc["request"]): Promise<CodexCommandResult> {
+    const { rpc } = this.transport;
+    switch (command.kind) {
+      case "new":
+        await this.startFreshThread(mutate);
+        return { kind: "done", message: "New Codex conversation started." };
+      case "compact":
+        this.requireIdle("compacting the conversation");
+        this.record.threadId = this.threadId;
+        this.save();
+        this.turnPending = true;
+        this.changed();
+        try { await mutate("thread/compact/start", { threadId: this.threadId }); }
+        catch (error) { this.turnPending = false; this.changed(); throw error; }
+        return { kind: "done", message: "Compaction started." };
+      case "review": {
+        this.requireIdle("starting a review");
+        if (!command.target) return { kind: "review" };
+        this.record.threadId = this.threadId;
+        this.save();
+        // review/start returns an operation ID, not the canonical turn ID.
+        // Only native turn notifications may materialize the review transcript.
+        this.turnPending = true;
+        this.changed();
+        try { await mutate("review/start", { threadId: this.threadId, target: command.target, delivery: "inline" }); }
+        catch (error) { this.turnPending = false; this.changed(); throw error; }
+        return { kind: "done", message: "Review started." };
+      }
+      case "fork": {
+        this.requireIdle("forking the conversation");
+        const response = await mutate("thread/fork", { threadId: this.threadId, ...this.threadParameters });
+        this.adoptThread(response);
+        this.state.notices.push("Continuing in a fork. The original conversation is available through /resume.");
+        this.changed();
+        return { kind: "done", message: "Conversation forked." };
+      }
+      case "resume": {
+        this.requireIdle("switching conversations");
+        if (!command.threadId) return { kind: "resume", threads: await rpc.request("thread/list", { cwd: workspaceRoot, cursor: command.cursor, limit: 50, sortKey: "updated_at" }) };
+        const response = await mutate("thread/resume", { threadId: command.threadId, ...this.threadParameters });
+        this.adoptThread(response);
+        return { kind: "done", message: "Conversation resumed." };
+      }
+      case "goal": {
+        if (command.clear) await mutate("thread/goal/clear", { threadId: this.threadId });
+        else if (command.objective || command.status) {
+          await mutate("thread/goal/set", { threadId: this.threadId, objective: command.objective, status: command.status ?? "active" });
+          this.record.threadId = this.threadId;
+          this.save();
+        }
+        return { kind: "goal", goal: (await rpc.request("thread/goal/get", { threadId: this.threadId })).goal };
+      }
+      case "skills": {
+        if (command.enabled !== undefined) {
+          this.requireIdle("changing skill settings");
+          const inventory = await rpc.request("skills/list", { cwds: [workspaceRoot], forceReload: true });
+          const matches = inventory.data.flatMap(entry => entry.skills).filter(skill => skill.name === command.name && (!command.path || skill.path === command.path));
+          if (matches.length !== 1) throw invalidArguments("Choose a skill from the native Codex catalog");
+          await mutate("skills/config/write", { path: matches[0]!.path, enabled: command.enabled });
+        }
+        return { kind: "skills", skills: await rpc.request("skills/list", { cwds: [workspaceRoot], forceReload: true }) };
+      }
+      case "hooks": return { kind: "hooks", hooks: await rpc.request("hooks/list", { cwds: [workspaceRoot] }) };
+      case "plugins": {
+        let notice: string | undefined;
+        if (command.action) {
+          this.requireIdle("changing plugins");
+          const catalog = await rpc.request("plugin/list", { cwds: [workspaceRoot] });
+          const match = catalog.marketplaces.flatMap(marketplace => marketplace.plugins.map(plugin => ({ marketplace, plugin }))).find(entry => entry.plugin.id === command.id);
+          if (!match) throw invalidArguments("Choose a plugin from the native Codex catalog");
+          if (command.action === "install") {
+            const response = await mutate("plugin/install", { pluginName: match.plugin.name, marketplacePath: match.marketplace.path, remoteMarketplaceName: match.marketplace.path ? null : match.marketplace.name, installAttemptId: requestId });
+            notice = response.appsNeedingAuth.length ? `Plugin installed. Connect ${response.appsNeedingAuth.map(app => app.name).join(", ")} through /apps.` : "Plugin installed.";
+          } else {
+            await mutate("plugin/uninstall", { pluginId: match.plugin.id });
+            notice = "Plugin removed.";
+          }
+        }
+        return { kind: "plugins", plugins: await rpc.request("plugin/list", { cwds: [workspaceRoot] }), notice };
+      }
+      case "mcp": {
+        const servers: McpServerStatus[] = [];
+        let cursor: string | null = null;
+        do {
+          const page: ListMcpServerStatusResponse = await rpc.request("mcpServerStatus/list", { threadId: this.threadId, cursor, limit: 100 });
+          servers.push(...page.data);
+          cursor = page.nextCursor;
+        } while (cursor);
+        return { kind: "mcp", servers, verbose: command.verbose };
+      }
+      case "apps": {
+        let notice: string | undefined;
+        if (command.enabled !== undefined) {
+          this.requireIdle("changing app settings");
+          const apps = await this.listApps();
+          if (!apps.some(app => app.id === command.id)) throw invalidArguments("Choose an app from the native Codex catalog");
+          const response = await mutate("config/value/write", { keyPath: `apps.${JSON.stringify(command.id!)}.enabled`, value: command.enabled, mergeStrategy: "replace" });
+          notice = response.status === "okOverridden" ? "Saved, but a higher-priority Codex setting overrides this change." : "Changes apply to new Codex turns.";
+        }
+        return { kind: "apps", apps: await this.listApps(), notice };
+      }
+    }
   }
   private async listApps(): Promise<AppInfo[]> {
     const apps: AppInfo[] = [];
@@ -291,7 +341,7 @@ export class CodexRuntime {
     this.save();
     this.changed();
   }
-  async stop() { this.assertOpen(); const turn = this.state.activeTurn; if (turn || this.reviewPending) await this.transport.rpc.request("turn/interrupt", { threadId: this.threadId, turnId: turn?.id ?? "" }); }
+  async stop() { this.assertOpen(); const turn = this.state.activeTurn; if (turn || this.turnPending) await this.transport.rpc.request("turn/interrupt", { threadId: this.threadId, turnId: turn?.id ?? "" }); }
   async configure(parameters: { model?: string; thinkingLevel?: string }) {
     return this.serialize(this.agentId, async () => {
       this.assertOpen();
@@ -300,7 +350,9 @@ export class CodexRuntime {
       const model = modelId?.provider === "openai-codex" && this.catalog.find(model => model.model === modelId.id);
       if (!model) throw invalidArguments("Choose an available Codex model");
       const effort = parameters.thinkingLevel ?? (parameters.model ? model.defaultReasoningEffort : this.record.thinkingLevel ?? model.defaultReasoningEffort);
-      if (!model.supportedReasoningEfforts.some(option => option.reasoningEffort === effort)) throw invalidArguments("Unsupported Codex thinking level");
+      const supported = model.supportedReasoningEfforts.find(option => option.reasoningEffort === effort);
+      if (!supported) throw invalidArguments("Unsupported Codex thinking level");
+      await this.transport.rpc.request("thread/settings/update", { threadId: this.threadId, model: model.model, effort: supported.reasoningEffort });
       this.record.model = `openai-codex::${model.model}`;
       this.record.thinkingLevel = effort;
       await setAgentModelPreference(agentTypeId, { provider: "openai-codex", id: model.model }, effort);
@@ -311,16 +363,19 @@ export class CodexRuntime {
   async reset() {
     return this.serialize(this.agentId, async () => {
       this.assertOpen();
-      if (this.isBusy) throw invalidArguments("Stop Codex before starting a fresh session");
-      const response = await this.transport.rpc.request("thread/start", this.threadParameters);
-      this.threadId = response.thread.id;
-      delete this.record.threadId;
-      this.state.hydrate([]);
-      this.state.usage = undefined;
-      this.state.notices.length = 0;
-      this.save();
-      this.changed();
+      await this.startFreshThread(this.transport.rpc.request.bind(this.transport.rpc));
     });
+  }
+  private async startFreshThread(mutate: CodexRpc["request"]) {
+    if (this.isBusy) throw invalidArguments("Stop Codex before starting a fresh session");
+    const response = await mutate("thread/start", this.threadParameters);
+    this.threadId = response.thread.id;
+    delete this.record.threadId;
+    this.state.hydrate([]);
+    this.state.usage = undefined;
+    this.state.notices.length = 0;
+    this.save();
+    this.changed();
   }
   async rename(title: string) {
     this.record.title = title;
@@ -339,14 +394,14 @@ export class CodexRuntime {
     if (this.disposed) return;
     // Codex can publish native subagent activity too. Only this root owns this pane.
     if ("threadId" in notification.params && notification.params.threadId !== this.threadId) return;
-    if ((notification.method === "item/started" || notification.method === "item/completed") && notification.params.item.type === "enteredReviewMode") this.reviewPending = false;
-    if (notification.method === "turn/started" || notification.method === "turn/completed") this.reviewPending = false;
+    if ((notification.method === "item/started" || notification.method === "item/completed") && notification.params.item.type === "enteredReviewMode") this.turnPending = false;
+    if (notification.method === "turn/started" || notification.method === "turn/completed") this.turnPending = false;
     this.state.receive(notification);
     this.changed();
     if (notification.method === "turn/completed") void this.refreshTurnItems(notification.params.turn.id, true).catch(error => { console.error("Could not hydrate Codex turn", error); this.failure = error; this.changed(); });
   }
   private get threadParameters() {
-    return { model: this.record.model ? parseModelRef(this.record.model)!.id : undefined, cwd: workspaceRoot, approvalPolicy: "never" as const, sandbox: "danger-full-access" as const, developerInstructions: this.instructions };
+    return { model: this.record.model ? parseModelRef(this.record.model)!.id : undefined, config: this.record.thinkingLevel ? { model_reasoning_effort: this.record.thinkingLevel } : undefined, cwd: workspaceRoot, approvalPolicy: "never" as const, sandbox: "danger-full-access" as const, developerInstructions: this.instructions };
   }
   private get selectedModel() {
     const id = this.record.model ? parseModelRef(this.record.model)?.id : undefined;
