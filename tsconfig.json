@@ -21,6 +21,7 @@
       "@agents-in-the-cloud/review/server": ["./packages/review/src/server/index.ts"],
       "@agents-in-the-cloud/review/client": ["./packages/review/src/client/index.ts"],
       "@agents-in-the-cloud/review": ["./packages/review/src/server/index.ts"],
+      "@agents-in-the-cloud/workspace/git": ["./packages/workspace/src/git.ts"],
       "@agents-in-the-cloud/workspace": ["./packages/workspace/src/index.ts"],
       "@agents-in-the-cloud/workspace/client": ["./packages/workspace/src/client/index.ts"],
       "@agents-in-the-cloud/workspace/server/provisioning": ["./packages/workspace/src/server/provisioning-web.ts"],

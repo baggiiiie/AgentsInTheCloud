@@ -6,7 +6,8 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { isReviewDiffHighlighting, isReviewDiffOverflow, reviewCommentsPrompt, type ReviewSide } from "../model.ts";
 import { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, reviewDeletionReview } from "./deletion.ts";
-import { workspaceRepository, collectReviewFile, collectReviewIndex, collectReviewStats, reviewSnippet, type ReviewFileStats, type ReviewIndex } from "./diff.ts";
+import { collectReviewFile, collectReviewIndex, collectReviewStats, reviewSnippet, type ReviewFileStats, type ReviewIndex } from "./diff.ts";
+import { workspaceRepository } from "@agents-in-the-cloud/workspace/git";
 import { renderReviewBody, renderReviewFileContent, renderReviewFilePage, renderReviewMoreFiles, renderReviewTitle, reviewFileFrameId, reviewFilePageSize, reviewPageId, reviewReference, reviewWorkViewPresentation } from "./render.ts";
 import {
   isReviewDiffLayout,

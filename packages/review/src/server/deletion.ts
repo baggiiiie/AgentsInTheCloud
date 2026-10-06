@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
 import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { workspaceRepository, type Repository, collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, git, gitResult, type ReviewFileStats } from "./diff.ts";
+import { collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, type ReviewFileStats } from "./diff.ts";
+import { repositoryPaths, workspaceRepository, type Repository, git, gitResult } from "@agents-in-the-cloud/workspace/git";
 import { renderFileStats, renderFileSummary, renderReadOnlyReviewFile } from "./render.ts";
 
 type DeletionRepository = {
@@ -18,14 +19,6 @@ type DeletionAssessment = {
 
 export function createDeletionReview(repositoryFor: (workspaceId: string, path: string) => Repository) {
   const assessments = new Map<string, DeletionAssessment>();
-
-  async function repositoryPaths(root: Repository): Promise<string[]> {
-    const inside = await gitResult(root, ["rev-parse", "--is-inside-work-tree"]);
-    if (inside.exitCode !== 0 || inside.stdout.toString("utf8").trim() !== "true") return [];
-    const submodules = await gitResult(root, ["submodule", "foreach", "--quiet", "--recursive", "printf '%s\\0' \"$displaypath\""]);
-    if (submodules.exitCode !== 0) throw new Error(submodules.stderr || "could not enumerate workspace submodules");
-    return ["", ...submodules.stdout.toString("utf8").split("\0").filter(Boolean)];
-  }
 
   async function inspect(workspaceId: string): Promise<WorkspaceDeletionAssessment> {
     const workspaceRoot = repositoryFor(workspaceId, "");

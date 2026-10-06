@@ -1,4 +1,5 @@
-import { collectReviewStats, git, type Repository, type ReviewFileSummary } from "@agents-in-the-cloud/review/diff";
+import { collectReviewStats, type ReviewFileSummary } from "@agents-in-the-cloud/review/diff";
+import { git, type Repository } from "@agents-in-the-cloud/workspace/git";
 import type { ChangesNodeStats } from "../history.ts";
 
 function numstat(output: Buffer) {

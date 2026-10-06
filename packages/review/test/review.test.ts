@@ -1,4 +1,4 @@
-import { localRepository } from "../src/server/diff.ts";
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";

@@ -1,4 +1,4 @@
-import type { GitResult } from "./repository.ts";
+import type { GitResult } from "./git-repository.ts";
 
 export type RepositoryRequest = { kind: "git"; args: string[] } | { kind: "working-file"; path: string } | { kind: "index-tree" };
 

@@ -2,8 +2,9 @@ import { afterEach, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "../src/server/repository-batch.ts";
-import { localRepository, safeGitArguments } from "../src/server/repository.ts";
+import { decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "../src/git-batch.ts";
+import { safeGitArguments } from "../src/git-repository.ts";
+import { localRepository } from "./support/local-repository.ts";
 
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(path => rm(path, { recursive: true, force: true }))); });

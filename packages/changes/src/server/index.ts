@@ -3,7 +3,7 @@ import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml, turboStreamResponse, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { workspaceRepository } from "@agents-in-the-cloud/review/diff";
+import { workspaceRepository } from "@agents-in-the-cloud/workspace/git";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory } from "./render.ts";

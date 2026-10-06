@@ -1,6 +1,7 @@
 import { selectComparison } from "../comparison-selection.ts";
 import { captureSyntheticStats } from "./synthetic-stats.ts";
-import { collectReviewComparison, collectReviewIndex, git, type ReviewFile, type ReviewFileStats, type ReviewIndex, type Repository } from "@agents-in-the-cloud/review/diff";
+import { collectReviewComparison, collectReviewIndex, type ReviewFile, type ReviewFileStats, type ReviewIndex } from "@agents-in-the-cloud/review/diff";
+import { git, type Repository } from "@agents-in-the-cloud/workspace/git";
 import { endpointName, rangeDescription, stagedChanges, workingTree, type ChangesCommit, type ChangesRange, type ChangesRef, type HistoryModel } from "../history.ts";
 export { stagedChanges, workingTree } from "../history.ts";
 export type { ChangesCommit, ChangesRange } from "../history.ts";
