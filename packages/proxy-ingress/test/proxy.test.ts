@@ -49,7 +49,6 @@ describe("workspace ingress", () => {
     });
     await ingress.initialize();
 
-    const canonical = new Request("http://127.0.0.1:3000/workspaces/ws/apps/demo/path?x=1");
     const first = await ingress.openCanonical({ workspaceId: "ws", appKey: "demo" }, "/path?x=1");
     const second = await ingress.openCanonical({ workspaceId: "ws", appKey: "demo" }, "/other");
 
@@ -75,7 +74,6 @@ describe("workspace ingress", () => {
       resolveApp: () => ({ kind: "fetch", fetch: () => new Response("ok") }),
     });
     await ingress.initialize();
-    const request = new Request("http://127.0.0.1:3000/");
     const first = await ingress.openCanonical({ workspaceId: "ws", appKey: "first" }, "/");
     const firstPort = Number(new URL(first.headers.get("location")!).port);
     await ingress.stopWorkspace("ws");

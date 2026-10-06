@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath, secretPathInjectionDefaultHosts } from "./secret-path-policy.ts";
+import { workspaceTemplateSecretAllowsPath, secretPathInjectionDefaultHosts } from "./secret-path-policy.ts";
 import { randomUUID } from "node:crypto";
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
 import { decryptWorkspaceTemplateValue, encryptWorkspaceTemplateValue } from "./secret-crypto.ts";

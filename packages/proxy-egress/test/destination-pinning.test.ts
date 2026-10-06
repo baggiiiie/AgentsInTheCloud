@@ -159,7 +159,7 @@ test("WebSocket upgrades resolve through the pinned address only", async () => {
   // that would answer privately.
   const workspace = await proxiedWorkspace({ "rebind.test": { first: "93.184.215.14", later: "10.6.6.6" } }, { mitmHost: "rebind.test", stableCalls: 2 });
   try {
-    const leaf = await ensureLeafCertificate(workspace.ca, "rebind.test");
+    await ensureLeafCertificate(workspace.ca, "rebind.test");
     const caPem = await readFile(workspace.ca.certPath, "utf8");
     const tunnel = await proxyConnect(workspace.socketPath, "rebind.test:443");
     expect(tunnel.response).toContain("200 Connection Established");

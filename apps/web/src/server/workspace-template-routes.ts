@@ -17,7 +17,7 @@ import {
   updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret,
   type WorkspaceTemplateEnvironmentVariable, type WorkspaceTemplateSecretInput, type WorkspaceTemplateSecretSummary, type WorkspaceTemplateSshKeySummary, type WorkspaceTemplateSummary,
 } from "@agents-in-the-cloud/workspace-templates";
-import { escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";

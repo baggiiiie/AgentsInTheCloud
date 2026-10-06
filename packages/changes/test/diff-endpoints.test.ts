@@ -257,7 +257,7 @@ test("local branch tips join the graph; remote-only history does not", async () 
 test("cross-branch comparisons use the exact selected snapshots without requiring ancestry", async () => {
   const root = await repository();
   await writeFile(join(root, "file.txt"), "base\n");
-  const base = await commit(root, "Base");
+  await commit(root, "Base");
   await git(localRepository(root), ["checkout", "-b", "side"]);
   await writeFile(join(root, "file.txt"), "side\n");
   const side = await commit(root, "Side");

@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import type { StopReason } from "@earendil-works/pi-ai";
 import { buildTranscript, finalAssistantText, findTranscriptItem, formatDuration, formatTokens, isFinalAssistantMessage, isToolViewDetails, toolDetailsIndicateError, type TranscriptRecord } from "../../src/server/transcript.ts";
 
 describe("transcript", () => {
