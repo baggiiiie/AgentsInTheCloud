@@ -70,12 +70,11 @@ function persistIntendedAgent(workspaceId: string, agentId: string): void {
   sessionStorage.setItem(storageKey, JSON.stringify({ ...state, activeAgentId: agentId, phoneDestination: "agents" } satisfies StoredPersonalNavigation));
 }
 
-export function markActiveWorkspaceRow(root: ParentNode, workspaceId: string): void {
+export function markActiveWorkspaceRow(root: ParentNode, workspaceId?: string): void {
   root.querySelectorAll<HTMLElement>("[data-workspace-entry-id][aria-current=\"page\"]").forEach((row) => {
     row.removeAttribute("aria-current");
   });
-  const active = root.querySelector<HTMLElement>(`[data-workspace-entry-id="${CSS.escape(workspaceId)}"]`);
-  active?.setAttribute("aria-current", "page");
+  if (workspaceId) root.querySelector<HTMLElement>(`[data-workspace-entry-id="${CSS.escape(workspaceId)}"]`)?.setAttribute("aria-current", "page");
 }
 
 export function createWorkspacePresentationController(

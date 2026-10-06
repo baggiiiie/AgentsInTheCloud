@@ -2,7 +2,7 @@ import type { WorkspaceClientApplication, WorkspaceClientControllerConstructor }
 
 interface WorkspaceNavigationControllerSurface {
   selectWorkspaceById(workspaceId: string): Promise<void>;
-  setActiveWorkspace(workspaceId: string): void;
+  setActiveWorkspace(workspaceId?: string): void;
   showWorkspacePane(): void;
 }
 

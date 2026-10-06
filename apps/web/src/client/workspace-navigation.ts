@@ -205,6 +205,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
   static targets = ["scroll"];
   declare readonly scrollTarget: HTMLElement;
   private scrollTimer?: ReturnType<typeof setTimeout>;
+  private pinnedWorkspace?: { id: string; index: number };
 
   connect(): void {
     this.scrollTarget.addEventListener("scroll", this.scrolled, { passive: true });
@@ -258,8 +259,7 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   private readonly mobileResidentDestinationSelected = (): void => this.setWorkspacePaneOpen(false);
   private readonly workspacePaneChanged = (): void => {
-    const workspaceId = residencyController()?.visibleWorkspaceId();
-    if (workspaceId) this.setActiveWorkspace(workspaceId);
+    this.setActiveWorkspace(residencyController()?.visibleWorkspaceId());
   };
 
   async selectWorkspace(event: Event): Promise<void> {
@@ -270,7 +270,6 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
 
   async selectWorkspaceById(workspaceId: string): Promise<void> {
     this.setWorkspacePaneOpen(false);
-    this.setActiveWorkspace(workspaceId);
     await residencyController()?.selectWorkspace(workspaceId, `/workspaces/${encodeURIComponent(workspaceId)}`);
   }
 
@@ -306,12 +305,42 @@ class WorkspaceNavigationController extends Controller<HTMLElement> {
     }
   }
 
-  setActiveWorkspace(workspaceId: string): void {
+  setActiveWorkspace(workspaceId?: string): void {
+    if (this.pinnedWorkspace?.id !== workspaceId) {
+      this.pinnedWorkspace = undefined;
+      const rows = this.arrangeWorkspaceRows();
+      const index = rows.findIndex(row => row.querySelector<HTMLElement>("[data-workspace-entry-id]")!.dataset.workspaceEntryId === workspaceId);
+      if (workspaceId && index >= 0) this.pinnedWorkspace = { id: workspaceId, index };
+    } else this.arrangeWorkspaceRows();
     markActiveWorkspaceRow(this.element, workspaceId);
-    const row = this.element.querySelector<HTMLElement>(`[data-workspace-entry-id="${CSS.escape(workspaceId)}"]`);
+    const row = workspaceId ? this.element.querySelector<HTMLElement>(`[data-workspace-entry-id="${CSS.escape(workspaceId)}"]`) : null;
     if (!row) return;
     if (row.dataset.workspaceTemplateId) localStorage.setItem(recentWorkspaceTemplateStorageKey, row.dataset.workspaceTemplateId);
     else localStorage.removeItem(recentWorkspaceTemplateStorageKey);
+  }
+
+  private activeWorkspaceRows(): HTMLElement[] {
+    return [...this.scrollTarget.querySelectorAll<HTMLElement>(":scope > [data-workspace-order]")];
+  }
+
+  /** Server ranks remain authoritative; only the selected row's slot is browser-owned. */
+  private arrangeWorkspaceRows(): HTMLElement[] {
+    const rows = this.activeWorkspaceRows().sort((a, b) => Number(a.dataset.workspaceOrder) - Number(b.dataset.workspaceOrder));
+    const pinned = this.pinnedWorkspace;
+    if (pinned) {
+      const selectedIndex = rows.findIndex(row => row.querySelector<HTMLElement>("[data-workspace-entry-id]")!.dataset.workspaceEntryId === pinned.id);
+      if (selectedIndex < 0) this.pinnedWorkspace = undefined;
+      else {
+        const [selected] = rows.splice(selectedIndex, 1);
+        rows.splice(pinned.index, 0, selected);
+      }
+    }
+    // Move only out-of-order rows; leave the Parked disclosure after active rows.
+    rows.forEach((row, index) => {
+      const current = this.scrollTarget.children[index];
+      if (current !== row) this.scrollTarget.insertBefore(row, current);
+    });
+    return rows;
   }
 
   private scrolled = (): void => {

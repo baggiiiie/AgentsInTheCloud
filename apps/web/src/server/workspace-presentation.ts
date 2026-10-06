@@ -108,7 +108,7 @@ function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspa
     : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
 }
 
-function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
+function renderWorkspaceRow(workspace: WorkspacePaneEntry, index: number): string {
   const { parked, workspaceTemplate } = workspace;
   const id = workspaceRowDomId(workspace.id);
   const attentionAt = workspace.attentionAt === undefined ? "" : ` data-workspace-attention-at="${workspace.attentionAt}"`;
@@ -120,6 +120,7 @@ function renderWorkspaceRow(workspace: WorkspacePaneEntry): string {
   const newFromTemplate = workspaceTemplate ? `New workspace from ${workspaceTemplate.title}` : "New empty workspace";
   const row = actionItemHtml({
     kind: "compound",
+    container: parked ? undefined : { attributesHtml: `data-workspace-order="${index}"` },
     label: { kind: "text", text: workspace.title },
     trailingHtml: renderWorkspaceRowStatus(workspace),
     leadingActionsHtml: `<button type="button" class="workspace-template-icon-button" title="${escapeHtml(newFromTemplate)}" aria-label="${escapeHtml(newFromTemplate)}" data-action="workspace-pane#openPickerFor" data-workspace-pane-workspace-template-param="${escapeHtml(workspaceTemplate?.id ?? "")}">${workspaceTemplateIconHtml(workspaceTemplate)}</button>`,
