@@ -5,6 +5,7 @@
 .changes-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; }
 .changes-controls > .changes-summary { margin-inline-end: auto; }
 .changes-controls > [data-changes-target="collapseToggle"] { margin-inline-end: 8px; }
+.changes-collapse-icon, .changes-expand-icon { display: inline-flex; align-items: center; justify-content: center; }
 .changes-expand-icon { display: none; }
 [data-collapsed="true"] .changes-collapse-icon { display: none; }
 [data-collapsed="true"] .changes-expand-icon { display: inline-flex; }
