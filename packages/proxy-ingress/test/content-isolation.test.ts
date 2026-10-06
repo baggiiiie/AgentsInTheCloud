@@ -174,3 +174,57 @@ test("two ingress hops preserve artifact-origin denial for terminal HTTP and Web
     expect(dispatched).toBe(1);
   } finally { await artifacts.stopAll(); await inner.stopAll(); await outer.stopAll(); management.stop(true); }
 });
+
+for (const kind of ["fetch", "http"] as const) {
+  test(`${kind} ingress strips workspace cross-origin grants from content, errors, redirects and preflights`, async () => {
+    const grants = {
+      "AcCeSs-CoNtRoL-AlLoW-OrIgIn": "https://management.example",
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Headers": "X-Turbo-Request-Id, Content-Type",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Expose-Headers": "*",
+      "Access-Control-Max-Age": "86400",
+      "Access-Control-Allow-Private-Network": "true",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "Cross-Origin-Opener-Policy": "unsafe-none",
+      "Cross-Origin-Embedder-Policy": "unsafe-none",
+      "Timing-Allow-Origin": "*",
+    };
+    const serve = (request: Request) => {
+      const status = Number(new URL(request.url).pathname.slice(1));
+      const headers = new Headers({
+        ...grants,
+        "content-type": "text/html",
+        "x-frame-options": "DENY",
+        "content-security-policy": "default-src 'self'; frame-ancestors 'none'",
+        "x-workspace-header": "preserved",
+      });
+      if (status === 302) headers.set("location", "/200");
+      return new Response(status === 204 ? null : "untrusted workspace bytes", { status, headers });
+    };
+    const upstream = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: serve });
+    const ingress = createWorkspaceIngress({
+      hostname: "127.0.0.1", resolveWorkspace() {},
+      resolveApp(_app, url) {
+        return kind === "fetch" ? { kind, fetch: serve } : { kind, target: new URL(url.pathname, `http://127.0.0.1:${upstream.port}`) };
+      },
+    });
+    try {
+      for (const [method, status] of [["GET", 200], ["GET", 302], ["GET", 500], ["OPTIONS", 204]] as const) {
+        const canonical = (await handleCanonicalWorkspaceRequest(new Request(`https://management.example/workspaces/one/apps/demo/${status}`), ingress))!;
+        const response = await fetch(canonical.headers.get("location")!, {
+          method, redirect: "manual",
+          headers: { origin: "https://management.example", "access-control-request-headers": "X-Turbo-Request-Id", "access-control-request-method": "GET" },
+        });
+        expect(response.status).toBe(status);
+        for (const name of Object.keys(grants)) expect(response.headers.get(name)).toBeNull();
+        expect(response.headers.get("x-frame-options")).toBeNull();
+        expect(response.headers.get("content-security-policy")).toBe("default-src 'self'");
+        expect(response.headers.get("x-workspace-header")).toBe("preserved");
+        expect(response.headers.get("content-type")).toBe("text/html");
+        if (status === 302) expect(new URL(response.headers.get("location")!, response.url).pathname).toBe("/200");
+        expect(await response.text()).toBe(status === 204 ? "" : "untrusted workspace bytes");
+      }
+    } finally { upstream.stop(true); await ingress.stopAll(); }
+  });
+}

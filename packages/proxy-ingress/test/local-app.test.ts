@@ -100,9 +100,8 @@ describe("local app compatibility", () => {
     [null, null],
   ])("translates only an exact serialized origin match (%s)", (origin, expected) => {
     const headers = new Headers(origin === null ? {} : { origin });
-    const translation = translateLocalAppOrigin(backend, headers, "https://preview.example:41000");
+    translateLocalAppOrigin(backend, headers, "https://preview.example:41000");
     expect(headers.get("origin")).toBe(expected);
-    expect(Boolean(translation)).toBe(origin === "https://preview.example:41000");
   });
 
   test("uses serialized HTTP and HTTPS default-port origins", () => {
@@ -111,29 +110,6 @@ describe("local app compatibility", () => {
       const app = { ...backend, target: new URL(`${protocol}//127.0.0.1/`) };
       translateLocalAppOrigin(app, headers, "https://preview.example");
       expect(headers.get("origin")).toBe(`${protocol}//localhost`);
-    }
-  });
-
-  test("reverses CORS and timing origins only for requests actually translated", () => {
-    const translation = { receiving: "https://preview.example:41000", upstream: "http://localhost:5173" };
-    for (const translated of [translation, undefined]) {
-      const response = adaptLocalAppResponse(backend, new Response(null, { headers: {
-        "access-control-allow-origin": translation.upstream,
-        "timing-allow-origin": `https://metrics.example, ${translation.upstream}`,
-        "access-control-allow-credentials": "true", "access-control-allow-methods": "POST",
-        "access-control-allow-headers": "X-App", vary: "Accept-Encoding",
-      } }), translation.receiving, translated);
-      expect(response.headers.get("access-control-allow-origin")).toBe(translated ? translation.receiving : translation.upstream);
-      expect(response.headers.get("timing-allow-origin")).toBe(`https://metrics.example, ${translated ? translation.receiving : translation.upstream}`);
-      expect(response.headers.get("vary")).toBe("Accept-Encoding, Origin");
-      expect(response.headers.get("access-control-allow-credentials")).toBe("true");
-      expect(response.headers.get("access-control-allow-methods")).toBe("POST");
-      expect(response.headers.get("access-control-allow-headers")).toBe("X-App");
-    }
-    for (const value of ["*", "null", "https://other.example", "http://localhost:8080"]) {
-      const response = adaptLocalAppResponse(backend, new Response(null, { headers: { "access-control-allow-origin": value, vary: "*" } }), translation.receiving, translation);
-      expect(response.headers.get("access-control-allow-origin")).toBe(value);
-      expect(response.headers.get("vary")).toBe("*");
     }
   });
 

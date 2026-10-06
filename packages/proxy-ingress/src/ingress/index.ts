@@ -162,7 +162,7 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
                 const backend = await resolveBackend(lease.app, new URL(request.url), lease.protocol);
                 if (backend.kind !== "http") throw new Error("This workspace app does not support WebSockets");
                 lease.target = backend.target.toString();
-                const { headers: upstreamHeaders } = await appRequestHeaders(lease, backend, request);
+                const upstreamHeaders = await appRequestHeaders(lease, backend, request);
                 for (const name of ["sec-websocket-key", "sec-websocket-version", "sec-websocket-extensions", "sec-websocket-protocol"]) upstreamHeaders.delete(name);
                 const transport = backendTransport(backend, upstreamHeaders);
                 const upstream = await openUpstreamSocket(websocketTarget(transport.target), transport.headers, websocketProtocols(request));
@@ -228,15 +228,15 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
     try {
       const backend = await resolveBackend(lease.app, new URL(request.url), lease.protocol);
       if (backend.kind === "fetch") {
-        const response = adaptWorkspaceEmbedding(await backend.fetch(request));
+        const response = adaptWorkspaceResponse(await backend.fetch(request));
         lease.lastFailure = undefined;
         recentFailures.delete(appIdentity(lease.app));
         return trackResponse(lease, response);
       }
 
       lease.target = backend.target.toString();
-      const upstreamRequest = await appRequestHeaders(lease, backend, request);
-      const transport = backendTransport(backend, upstreamRequest.headers);
+      const upstreamHeaders = await appRequestHeaders(lease, backend, request);
+      const transport = backendTransport(backend, upstreamHeaders);
 
       const method = request.method.toUpperCase();
       const init: RequestInit & { duplex?: "half"; proxy?: string } = {
@@ -256,8 +256,8 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
       // metadata or the local forwarded headers seen by the app.
       request.headers.set(publicOriginHeader, appPublicOrigin(lease, request));
       if (backend.adaptResponse) response = await backend.adaptResponse(response, request);
-      response = adaptLocalAppResponse(backend, response, appPublicOrigin(lease, request), upstreamRequest.originTranslation);
-      response = adaptWorkspaceEmbedding(response);
+      response = adaptLocalAppResponse(backend, response, appPublicOrigin(lease, request));
+      response = adaptWorkspaceResponse(response);
       lease.lastFailure = undefined;
       recentFailures.delete(appIdentity(lease.app));
       return trackResponse(lease, response);
@@ -342,7 +342,7 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
   };
 }
 
-async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBackend, request: Request) {
+async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBackend, request: Request): Promise<Headers> {
   let headers = stripHopByHopHeaders(request.headers, ["host"]);
   // Give apps one coherent local origin, including frameworks that prefer
   // forwarded headers to Host. Public routing identity is AgentsInTheCloud metadata only.
@@ -357,13 +357,13 @@ async function appRequestHeaders(lease: OriginLease, backend: WorkspaceHttpAppBa
   headers.delete("x-agents-in-the-cloud-parent-workspace");
   const receivingOrigin = receivingAppOrigin(lease, request);
   const sameOrigin = receivingOrigin !== undefined && headers.get("origin") === receivingOrigin;
-  const originTranslation = receivingOrigin === undefined ? undefined : translateLocalAppOrigin(backend, headers, receivingOrigin);
+  if (receivingOrigin !== undefined) translateLocalAppOrigin(backend, headers, receivingOrigin);
   // Attest the decision to nested AgentsInTheCloud. A foreign Origin could coincidentally
   // equal a nested listener's localhost address; it must stay foreign at that hop.
   headers.set(originContextHeader, sameOrigin ? headers.get("origin")! : "null");
   if (backend.adaptRequestHeaders) headers = await backend.adaptRequestHeaders(headers, request);
 
-  return { headers, originTranslation };
+  return headers;
 }
 
 function receivingAppOrigin(lease: OriginLease, request: Request): string | undefined {
@@ -537,10 +537,18 @@ function closeAppSocket(ws: ServerWebSocket<AppSocketData>, code: number, reason
   ws.data.lease.lastUsedAt = Date.now();
 }
 
-function adaptWorkspaceEmbedding(response: Response): Response {
+function adaptWorkspaceResponse(response: Response): Response {
   const headers = new Headers(response.headers);
-  let changed = headers.has("x-frame-options");
-  headers.delete("x-frame-options");
+  let changed = false;
+  // Workspace content may be embedded or navigated to, but must never grant
+  // another origin (especially the management app) permission to read its bytes.
+  // Apply after all backend adapters, including redirects and preflight replies.
+  for (const name of response.headers.keys()) {
+    if (name === "x-frame-options" || name.startsWith("access-control-") || name.startsWith("cross-origin-") || name === "timing-allow-origin") {
+      headers.delete(name);
+      changed = true;
+    }
+  }
   for (const name of ["content-security-policy", "content-security-policy-report-only"]) {
     const policy = headers.get(name);
     if (!policy) continue;

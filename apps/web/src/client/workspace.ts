@@ -12,6 +12,7 @@ import {
 import { createProvisionTerminalController } from "@agents-in-the-cloud/workspace/client";
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import * as Turbo from "@hotwired/turbo";
+import { NavigationOriginController } from "./navigation-origin-controller.ts";
 import { ConnectionModeSettingsController } from "./connection-mode-settings.ts";
 import { PwaReminderController } from "./pwa-reminder.ts";
 import { registerWorkspaceAppFrameController } from "./workspace-app-frame.ts";
@@ -39,6 +40,7 @@ window.Turbo = Turbo;
 
 const Controller: WorkspaceClientControllerConstructor = StimulusController;
 const application = StimulusApplication.start();
+application.register("navigation-origin", NavigationOriginController);
 installSoftwareKeyboardTracking();
 initializeWorkspaceControllerRegistry(application);
 

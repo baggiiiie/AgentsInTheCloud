@@ -84,8 +84,9 @@ test("nested socket publication routes HTTP and WebSocket directly, retains orig
     const headers = { origin };
     const response = await fetch(`${actual}/products?sort=true&x=a%20b`, { method: "POST", headers, body: "payload=one&two=2" });
     expect(await response.text()).toBe("POST /products?sort=true&x=a%20b payload=one&two=2");
-    expect(response.headers.get("access-control-allow-origin")).toBe(origin);
-    expect(response.headers.get("timing-allow-origin")).toBe(origin);
+    // Neither ingress hop may preserve workspace-controlled cross-origin grants.
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    expect(response.headers.get("timing-allow-origin")).toBeNull();
     const redirect = await fetch(`${actual}/redirect`, { headers, redirect: "manual" });
     expect(redirect.headers.get("location")).toBe(`${origin}/products?sort=true`);
     expect(redirect.headers.get("set-cookie")).toBe("session=ok; HttpOnly");
