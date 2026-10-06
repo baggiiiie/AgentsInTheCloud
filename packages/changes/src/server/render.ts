@@ -1,3 +1,4 @@
+import { renderHistoryGraph } from "./history-render.ts";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
@@ -5,7 +6,7 @@ import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { parseDiffFromFile, type CodeViewItem } from "@pierre/diffs";
 import type { ReviewFile } from "@agents-in-the-cloud/review/diff";
-import { branchColor, historyGraph, rowHeight, selectedGraph, type HistoryModel } from "../history.ts";
+import { type HistoryModel } from "../history.ts";
 import type { ChangesHistory, ChangesSnapshot } from "./snapshot.ts";
 
 export const changesBodyId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "body");
@@ -13,7 +14,7 @@ export const comparisonId = (workspaceId: string, historyId: string) => domId("c
 export const historyContentId = (history: ChangesHistory) => domId("changes", history.id, "history");
 export const errorId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "error");
 const json = <Value>(value: Value) => JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("&", "\\u0026");
-export const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, references: history.references, range: snapshot.range, head: history.head, branch: history.branch, upstream: history.upstream, hasStaged: history.hasStaged, unpushed: history.unpushed });
+export const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, topology: history.topology, references: history.references, range: snapshot.range, head: history.head, branch: history.branch, upstream: history.upstream, hasStaged: history.hasStaged, unpushed: history.unpushed });
 
 export function renderChangesTitle(snapshot: ChangesSnapshot): string {
   const additions = snapshot.stats.reduce((sum, file) => sum + file.additions, 0);
@@ -23,27 +24,9 @@ export function renderChangesTitle(snapshot: ChangesSnapshot): string {
 
 export function renderHistory(workspaceId: string, snapshot: ChangesSnapshot): string {
   const history = snapshot.history;
-  const graph = historyGraph(history.commits);
-  const selected = selectedGraph(graph, snapshot.range, history.unpushed);
-  const edges = graph.edges.map(edge => `<path data-edge-from="${edge.from}" data-edge-to="${edge.to}" d="${edge.d}" stroke="var(--changes-branch-${edge.lane % 8})"/>`).join("");
-  const nodes = graph.nodes.map(node => {
-    const commit = node.commit, endpoint = commit.id === snapshot.range.newest || commit.id === snapshot.range.oldest;
-    const selectedNode = selected.path.includes(commit.id) || endpoint;
-    return `<circle data-dot="${commit.id}" data-ahead="${commit.ahead}" data-color="${node.lane % 8}" cx="${12 + node.lane * 16}" cy="${node.row * rowHeight + 18}" r="${endpoint ? 6 : 3.5}" stroke="${selectedNode ? "var(--accent)" : `var(--changes-branch-${node.lane % 8})`}" fill="${commit.ahead ? selectedNode ? "var(--accent)" : `var(--changes-branch-${node.lane % 8})` : "var(--panel)"}"><title>${escapeHtml(commit.ahead ? `Not in ${history.upstream}` : commit.subject)}</title></circle>`;
-  }).join("");
-  const clipId = domId("changes", history.id, "selected-path-clip");
-  const svg = `<svg data-changes-range-target="graph" aria-hidden="true" width="${graph.width}" height="${graph.height}" viewBox="0 0 ${graph.width} ${graph.height}"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect data-selection-clip x="0" y="${selected.first * rowHeight + 18}" width="${graph.width}" height="${(selected.last - selected.first) * rowHeight}"/></clipPath></defs><g class="changes-history-edges" fill="none" stroke-width="1.4">${edges}</g><path clip-path="url(#${clipId})" data-selected-backbone d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="1" opacity=".5"/><path clip-path="url(#${clipId})" data-selected-beads d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0 7"/>${nodes}</svg>`;
-  const rows = graph.nodes.map((node, index) => {
-    const c = node.commit;
-    const labels = c.refs.map(ref => `<span class="changes-ref" data-ref-kind="${ref.kind}" style="--changes-ref-color:var(--changes-branch-${branchColor(ref.name, ref.kind)})" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join("");
-    const stats = c.kind === "commit" ? "" : `<span class="changes-node-stats"><span>${c.stats!.files} ${c.stats!.files === 1 ? "file" : "files"}</span><span class="changes-additions">+${c.stats!.additions}</span><span class="changes-deletions">−${c.stats!.deletions}</span></span>`;
-    return `<tr tabindex="0" data-changes-range-target="row" data-commit="${c.id}" aria-selected="${selected.path.includes(c.id) || c.id === snapshot.range.newest || c.id === snapshot.range.oldest}" aria-label="${escapeHtml(c.subject + (c.ahead ? ` · Not in ${history.upstream}` : ""))}" title="${escapeHtml(c.subject + (c.ahead ? ` · Not in ${history.upstream}` : ""))}" data-action="keydown->changes-range#navigate">
-      ${index === 0 ? `<td class="changes-graph-cell" rowspan="${graph.nodes.length}">${svg}</td>` : ""}
-      <td class="changes-description"><div class="changes-commit-line">${c.id === history.head ? '<span class="changes-head">HEAD</span>' : ""}${labels}<span class="changes-commit-subject">${escapeHtml(c.subject)}</span>${stats}</div></td>
-      <td data-col="author">${escapeHtml(c.author)}</td><td data-col="date">${escapeHtml(c.date)}</td><td data-col="sha"><code>${c.kind === "commit" ? c.id.slice(0, 7) : "—"}</code></td>
-    </tr>`;
-  }).join("");
-  return `<div id="${historyContentId(history)}" class="changes-history-content" data-changes-range-target="historyContent"><div class="changes-selection-box" data-changes-range-target="selectionBox" aria-hidden="true" style="top:${selected.first * rowHeight}px;height:${(selected.last - selected.first + 1) * rowHeight}px"></div><table class="changes-history-table" role="grid" aria-multiselectable="true" aria-label="Local commit history" data-changes-range-target="table" data-action="pointerdown->changes-range#beginSelection pointerup->changes-range#finishSelection pointercancel->changes-range#cancelGesture"><colgroup><col style="width:${graph.width}px"><col><col data-col="author" style="width:116px"><col data-col="date" style="width:112px"><col data-col="sha" style="width:78px"></colgroup><tbody>${rows}</tbody></table>${history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-range#loadMore" data-changes-range-target="more"' })}</div>` : ""}<script type="application/json" data-changes-range-target="historyModel">${json(historyModel(history, snapshot))}</script></div>`;
+  const more = history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-range#loadMore" data-changes-range-target="more"' })}</div>` : "";
+  const model = historyModel(history, snapshot);
+  return renderHistoryGraph(model, history.id, `${more}<script type="application/json" data-changes-range-target="historyModel">${json(model)}</script>`);
 }
 
 export function renderError(workspaceId: string, historyId: string, message = ""): string {
@@ -59,7 +42,7 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
   }) : '<strong>Changes</strong>';
   const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-range-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-range-target="historyScroll">${renderHistory(workspaceId, snapshot)}</div></div>` : "";
   // History is the permanent shell; live comparisons replace only the Pierre island underneath it.
-  return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-range" data-changes-range-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-range-history-id-value="${history.id}" data-changes-range-open-value="${pickerOpen}" data-action="live:before-stream-render@document->changes-range#preservePresentation turbo:before-stream-render@document->changes-range#preservePresentation keydown.esc->changes-range#escape pointermove@window->changes-range#moveSelection pointermove@window->changes-range#hover">
+  return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-range" data-changes-range-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-range-history-id-value="${history.id}" data-changes-range-open-value="${pickerOpen}" data-action="live:before-stream-render@document->changes-range#preservePresentation turbo:before-stream-render@document->changes-range#preservePresentation keydown.esc->changes-range#escape pointermove@window->changes-range#moveSelection">
     <header class="changes-range-header">${header}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh history and diff" }, attributesHtml: 'data-action="changes-range#refresh" data-changes-range-target="refresh"' })}</header>${picker}${renderComparison(workspaceId, snapshot)}
     <div class="changes-loading" data-changes-range-target="loading" role="status" hidden><span class="changes-spinner" aria-hidden="true"></span><span>Generating comparison…</span></div>${renderError(workspaceId, history.id)}
   </section>`;

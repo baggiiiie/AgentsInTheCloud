@@ -1,5 +1,5 @@
 import type { Repository } from "@agents-in-the-cloud/review/diff";
-import { isUnpushedRange, type ChangesRange } from "../history.ts";
+import type { ChangesRange } from "../history.ts";
 import { captureChanges, captureHistory, commitHistory, stagedChanges, workingTree, type ChangesSnapshot } from "./snapshot.ts";
 
 /** Manual and turn-end refresh share the same endpoint-preservation rules. */
@@ -7,15 +7,13 @@ export async function refreshChanges(root: Repository, previous: ChangesSnapshot
   const history = await captureHistory(root);
   let range: ChangesRange = { ...requested };
   const initial = previous.history.range;
-  const followsDefault = range.newest === initial.newest && range.oldest === initial.oldest && range.unpushed === initial.unpushed;
-  if (followsDefault || isUnpushedRange(previous.history.unpushed, range)) range = history.range;
-  // Preserve all-uncommitted selection when staging introduces its node.
-  if (!previous.history.hasStaged && history.hasStaged && range.newest === workingTree && range.oldest === workingTree) range.oldest = stagedChanges;
+  const followsDefault = range.end === initial.end && range.start === initial.start;
+  if (followsDefault) range = history.range;
   if (!history.hasStaged) {
-    if (range.newest === stagedChanges) range.newest = workingTree;
-    if (range.oldest === stagedChanges) range.oldest = workingTree;
+    if (range.end === stagedChanges) range = { end: workingTree };
+    else if (range.start === stagedChanges) range.start = history.head ?? null;
   }
-  while (!isUnpushedRange(history.unpushed, range) && history.hasMore && (!history.commits.some(commit => commit.id === range.oldest) || !history.commits.some(commit => commit.id === range.newest))) {
+  while (history.hasMore && (!history.commits.some(commit => commit.id === range.end) || (!followsDefault && range.start != null && !history.commits.some(commit => commit.id === range.start)))) {
     const page = await commitHistory(root, history, history.loaded);
     history.commits.push(...page.commits);
     history.loaded += page.commits.length;

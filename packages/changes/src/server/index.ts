@@ -25,7 +25,7 @@ function current(workspaceId: string): Promise<ChangesState> {
   return state;
 }
 const replace = (target: string, html: string) => `<turbo-stream action="replace" target="${escapeHtml(target)}"><template>${html}</template></turbo-stream>`;
-const rangeSchema = Type.Object({ newest: Type.String(), oldest: Type.String(), unpushed: Type.Optional(Type.Literal(true)) });
+const rangeSchema = Type.Object({ end: Type.String(), start: Type.Optional(Type.Union([Type.String(), Type.Null()])) });
 const requestSchema = Type.Object({ client: Type.String({ minLength: 1, maxLength: 64 }), sequence: Type.Integer({ minimum: 1 }) });
 
 export const agentsInTheCloudServerModule: WorkspaceModule = {
@@ -76,7 +76,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (order.sequence <= (state.clients.get(order.client) ?? 0)) return new Response(null, { status: 204 });
     state.clients.set(order.client, order.sequence);
     const ticket = ++state.request;
-    const requestedRange = { newest: data.get("newest"), oldest: data.get("oldest"), unpushed: data.get("unpushed") === "true" ? true as const : undefined };
+    const requestedRange = { end: data.get("end"), start: data.has("start") ? data.get("start") === "" ? null : data.get("start") : undefined };
     let next: ChangesSnapshot;
     try {
       if (!Value.Check(rangeSchema, requestedRange)) throw new InvalidChangesRange("Invalid comparison endpoints.");

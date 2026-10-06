@@ -98,7 +98,18 @@ class AgentsInTheCloudFullscreenController extends Controller<HTMLElement> {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
     let session: FullscreenSession;
     let bar: HTMLElement;
+    const preserveFullscreen = (event: Event): void => {
+      if (event.target !== target) return;
+      // SAFETY: Turbo supplies the incoming element for morphs, but not removals.
+      const { newElement } = (event as CustomEvent<{ newElement?: Element }>).detail;
+      if (!(newElement instanceof HTMLElement)) { close(); return; }
+      // Fullscreen belongs to this browser session. Merge only its two attributes
+      // into incoming markup; all server-owned panel state still updates normally.
+      newElement.classList.add("agents-in-the-cloud-fullscreen-live");
+      newElement.dataset.agentsInTheCloudFullscreenActive = "true";
+    };
     const close = (): void => {
+      target.removeEventListener("turbo:before-morph-element", preserveFullscreen);
       this.detachIframeShortcuts();
       target.classList.remove("agents-in-the-cloud-fullscreen-live");
       target.removeAttribute("data-agents-in-the-cloud-fullscreen-active");
@@ -116,6 +127,7 @@ class AgentsInTheCloudFullscreenController extends Controller<HTMLElement> {
     target.dataset.agentsInTheCloudFullscreenActive = "true";
     session = { owner: this, close };
     activeFullscreenSession = session;
+    target.addEventListener("turbo:before-morph-element", preserveFullscreen);
     this.attachIframeShortcuts(target);
     target.querySelector<HTMLElement>("iframe, .observable-terminal-host, textarea, input, button, [tabindex]")?.focus({ preventScroll: true });
   }

@@ -44,6 +44,18 @@
   --changes-branch-6: light-dark(#ae397c, #f2a2cc);
   --changes-branch-7: light-dark(#5355b9, #a4b0ff);
 }
+/* Endpoint comparisons reserve a 180° sector around the accent's opposite hue.
+   Ordinary dots remain at least 90° away from the path hue in every theme. */
+.changes-comparison-graph {
+  --changes-branch-0: light-dark(oklch(from var(--accent) .5 .14 calc(h + 90)), oklch(from var(--accent) .76 .13 calc(h + 90)));
+  --changes-branch-1: light-dark(oklch(from var(--accent) .5 .14 calc(h + 115)), oklch(from var(--accent) .76 .13 calc(h + 115)));
+  --changes-branch-2: light-dark(oklch(from var(--accent) .5 .14 calc(h + 140)), oklch(from var(--accent) .76 .13 calc(h + 140)));
+  --changes-branch-3: light-dark(oklch(from var(--accent) .5 .14 calc(h + 165)), oklch(from var(--accent) .76 .13 calc(h + 165)));
+  --changes-branch-4: light-dark(oklch(from var(--accent) .5 .14 calc(h + 190)), oklch(from var(--accent) .76 .13 calc(h + 190)));
+  --changes-branch-5: light-dark(oklch(from var(--accent) .5 .14 calc(h + 215)), oklch(from var(--accent) .76 .13 calc(h + 215)));
+  --changes-branch-6: light-dark(oklch(from var(--accent) .5 .14 calc(h + 240)), oklch(from var(--accent) .76 .13 calc(h + 240)));
+  --changes-branch-7: light-dark(oklch(from var(--accent) .5 .14 calc(h + 265)), oklch(from var(--accent) .76 .13 calc(h + 265)));
+}
 .changes-diff-slot { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .changes-diff { flex: 1; min-width: 0; }
 .changes-error > span { flex: 1; }
@@ -59,7 +71,6 @@
 .changes-history-scroll { min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
 .changes-history-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--text-code); }
 .changes-history-content { position: relative; }
-.changes-selection-box { position: absolute; inset-inline: 0; box-sizing: border-box; border: 1px solid var(--accent); pointer-events: none; z-index: 2; }
 .changes-history-table tbody tr { height: 36px; cursor: default; outline: none; }
 .changes-history-table td { padding: 0 8px; height: 36px; border-top: 1px solid transparent; border-bottom: 1px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .changes-history-table td[data-col] { color: var(--text-muted); }
@@ -74,11 +85,7 @@
 .changes-history-table tr[data-path=true] td:not(.changes-graph-cell) { background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
 .changes-history-table tbody tr:hover td:not(.changes-graph-cell) { background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
 .changes-history-table tbody tr:focus-visible td:not(.changes-graph-cell) { outline: 1px solid var(--accent); outline-offset: -1px; }
-.changes-history-table tr[data-offpath=true] .changes-commit-line, .changes-history-table tr[data-offpath=true] td[data-col] { opacity: 0; }
-.changes-history-table tr[data-offpath=true]:hover .changes-commit-line, .changes-history-table tr[data-offpath=true]:hover td[data-col], .changes-history-table tr[data-offpath=true]:focus-visible .changes-commit-line, .changes-history-table tr[data-offpath=true]:focus-visible td[data-col] { opacity: .75; }
 .changes-history-edges path { opacity: .35; }
-.changes-history-table [data-dot][data-offpath=true], .changes-history-edges path[data-offpath=true] { opacity: 0; }
-.changes-history-table [data-dot][data-offpath=true][data-hover=true], .changes-history-edges path[data-offpath=true][data-hover=true] { opacity: .6; }
 .changes-history-table tbody { touch-action: pan-y; }
 .changes-description { touch-action: none; }
 .changes-history-more { display: flex; align-items: center; justify-content: center; height: 64px; padding: 8px; }

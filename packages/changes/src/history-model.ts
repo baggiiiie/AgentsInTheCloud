@@ -1,0 +1,32 @@
+import type { ComparisonEndpoints, ComparisonCommit } from "./comparison-selection.ts";
+export const workingTree = "working";
+export const stagedChanges = "staged";
+export type ChangesRange = ComparisonEndpoints;
+export interface ChangesRef { name: string; kind: "local" | "remote" | "tag" }
+export interface ChangesNodeStats { files: number; additions: number; deletions: number }
+export interface ChangesCommit {
+  id: string;
+  parents: string[];
+  subject: string;
+  author: string;
+  date: string;
+  refs: ChangesRef[];
+  ahead: boolean;
+  kind: "commit" | "working" | "staged";
+  stats?: ChangesNodeStats;
+}
+export interface UnpushedHistory { base: string; count: number }
+export interface HistoryModel {
+  commits: ChangesCommit[];
+  topology: ComparisonCommit[];
+  references: (ChangesRef & { id: string })[];
+  range: ChangesRange;
+  head?: string;
+  branch?: string;
+  upstream?: string;
+  hasStaged: boolean;
+  unpushed?: UnpushedHistory;
+}
+export interface GraphNode { commit: ChangesCommit; row: number; lane: number }
+export interface GraphEdge { from: string; to: string; d: string; lane: number }
+export interface HistoryGraph { nodes: GraphNode[]; edges: GraphEdge[]; width: number; height: number }

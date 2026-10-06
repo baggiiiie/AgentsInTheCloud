@@ -1,13 +1,13 @@
 import { setActionItemLabel } from "@agents-in-the-cloud/design-system/action-item/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
-import { endpointName, isUnpushedRange, historyGraph, rangeDescription, selectedGraph, rowHeight, type ChangesRange, type HistoryGraph, type HistoryModel } from "../history.ts";
+import { endpointName, workingTree, historyGraph, rangeDescription, comparisonGraph, rowHeight, type ChangesRange, type HistoryGraph, type HistoryModel } from "../history.ts";
 
 type ComparisonModel = { range: ChangesRange; label: string; baseLabel: string; endLabel: string };
 
 export function createRangeController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesRangeController extends Controller {
     declare readonly element: HTMLElement;
-    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "selectionBox", "more"];
+    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more"];
     static values = { workspaceId: String, historyId: String, open: Boolean };
     declare readonly workspaceIdValue: string;
     declare readonly historyIdValue: string;
@@ -24,7 +24,6 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     declare readonly tableTarget: HTMLTableElement;
     declare readonly rowTargets: HTMLTableRowElement[];
     declare readonly historyScrollTarget: HTMLElement;
-    declare readonly selectionBoxTarget: HTMLElement;
     declare readonly moreTarget: HTMLButtonElement;
     declare readonly hasMoreTarget: boolean;
     private model?: HistoryModel;
@@ -60,7 +59,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       this.model = JSON.parse(script.textContent!) as HistoryModel;
       this.graph = historyGraph(this.model.commits);
       this.range ??= this.model.range;
-      this.anchor ??= this.range.unpushed ? this.range.newest : this.range.oldest;
+      this.anchor ??= this.range.end;
       this.paint();
     }
     comparisonModelTargetConnected(script: HTMLScriptElement): void {
@@ -92,9 +91,9 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       this.paint();
       this.syncAvailability();
       this.measure();
-      const row = this.rowTargets.find(row => row.dataset.commit === this.range!.newest)!;
+      const row = this.rowTargets.find(row => row.dataset.commit === this.range!.end)!;
       row.focus({ preventScroll: true });
-      if (this.range!.unpushed) this.historyScrollTarget.scrollTop = 0;
+      if (this.range!.end === workingTree) this.historyScrollTarget.scrollTop = 0;
       else row.scrollIntoView({ block: "nearest" });
     }
     closePicker(): void {
@@ -127,10 +126,9 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
     }
     private choose(id: string, extend: boolean): void {
       if (!extend) this.anchor = id;
-      const commits = this.model!.commits;
-      const first = commits.findIndex(commit => commit.id === this.anchor);
-      const second = commits.findIndex(commit => commit.id === id);
-      this.range = { newest: commits[Math.min(first, second)]!.id, oldest: commits[Math.max(first, second)]!.id };
+      const candidate: ChangesRange = !extend || id === this.anchor ? { end: id } : { end: id, start: this.anchor! };
+      const selected = comparisonGraph(this.graph!, candidate, this.model!.topology);
+      this.range = candidate.start === undefined ? { end: selected.end } : { end: selected.end, start: selected.start };
       this.paint();
     }
     beginSelection(event: PointerEvent): void {
@@ -186,50 +184,39 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
         if (this.modified(event)) { this.choose(next.dataset.commit!, true); void this.generate("compare"); }
       }
     }
-    hover(event: PointerEvent): void {
-      if (!this.isOpen || !this.graph) return;
-      const element = document.elementFromPoint(event.clientX, event.clientY);
-      const id = element && this.tableTarget.contains(element) ? this.commitAt(element, event.clientY) : undefined;
-      for (const dot of this.graphTarget.querySelectorAll<SVGCircleElement>("[data-dot]")) dot.dataset.hover = String(dot.dataset.dot === id);
-      for (const edge of this.graphTarget.querySelectorAll<SVGPathElement>("[data-edge-from]")) edge.dataset.hover = String(edge.dataset.edgeFrom === id || edge.dataset.edgeTo === id);
-    }
-
     private paint(): void {
       const model = this.model!, range = this.range!, graph = this.graph!;
-      const selected = selectedGraph(graph, range, model.unpushed);
-      const clip = this.graphTarget.querySelector<SVGRectElement>("[data-selection-clip]")!;
-      clip.setAttribute("y", String(selected.first * rowHeight + rowHeight / 2));
-      clip.setAttribute("height", String((selected.last - selected.first) * rowHeight));
-      this.selectionBoxTarget.style.top = `${selected.first * rowHeight}px`;
-      this.selectionBoxTarget.style.height = `${(selected.last - selected.first + 1) * rowHeight}px`;
+      const selected = comparisonGraph(graph, range, model.topology);
+      const backgrounds = this.graphTarget.querySelector<SVGGElement>("[data-endpoint-backgrounds]")!;
+      backgrounds.replaceChildren(...graph.nodes.filter(node => selected.selectedRows.includes(node.commit.id)).map(node => {
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", "0"); rect.setAttribute("y", String(node.row * rowHeight));
+        rect.setAttribute("width", String(graph.width)); rect.setAttribute("height", String(rowHeight));
+        rect.setAttribute("fill", "color-mix(in srgb,var(--accent) 12%,var(--panel))");
+        return rect;
+      }));
       const focused = this.rowTargets.find(row => row === document.activeElement);
       for (const row of this.rowTargets) {
-        row.tabIndex = focused ? row === focused ? 0 : -1 : row.dataset.commit === range.newest ? 0 : -1;
-        const id = row.dataset.commit!, endpoint = id === range.newest || id === range.oldest;
-        row.dataset.path = String(selected.path.includes(id) || endpoint);
-        row.dataset.top = String(id === range.newest);
-        row.dataset.bottom = String(id === range.oldest);
-        row.dataset.offpath = String(selected.hidden.has(id));
+        row.tabIndex = focused ? row === focused ? 0 : -1 : row.dataset.commit === range.end ? 0 : -1;
+        const id = row.dataset.commit!;
+        row.dataset.path = String(selected.selectedRows.includes(id));
+        row.dataset.top = String(id === selected.end);
+        row.dataset.bottom = String(id === selected.start);
         row.setAttribute("aria-selected", row.dataset.path);
       }
       for (const dot of this.graphTarget.querySelectorAll<SVGCircleElement>("[data-dot]")) {
-        const id = dot.dataset.dot!, endpoint = id === range.newest || id === range.oldest;
+        const id = dot.dataset.dot!, endpoint = id === selected.end;
         const color = selected.path.includes(id) || endpoint ? "var(--accent)" : `var(--changes-branch-${dot.dataset.color})`;
         dot.setAttribute("r", endpoint ? "6" : "3.5");
         dot.setAttribute("stroke", color);
         dot.setAttribute("stroke-width", endpoint ? "2" : "1.5");
-        dot.setAttribute("fill", dot.dataset.ahead === "true" ? color : "var(--panel)");
-        dot.dataset.offpath = String(selected.hidden.has(id));
+        dot.setAttribute("fill", endpoint || dot.dataset.ahead === "true" ? color : "var(--panel)");
       }
-      for (const edge of this.graphTarget.querySelectorAll<SVGPathElement>("[data-edge-from]")) edge.dataset.offpath = String(selected.hidden.has(edge.dataset.edgeFrom!) || selected.hidden.has(edge.dataset.edgeTo!));
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
-      const applied = this.comparison?.range.newest === range.newest && this.comparison.range.oldest === range.oldest && this.comparison.range.unpushed === range.unpushed;
+      const applied = this.comparison?.range.end === range.end && this.comparison.range.start === range.start;
       const description = applied ? this.comparison!.label : rangeDescription(model, range);
       setActionItemLabel(this.triggerTarget, description);
-      const unpushed = isUnpushedRange(model.unpushed, range) ? model.unpushed : undefined;
-      const oldest = unpushed?.oldest ?? model.commits.find(commit => commit.id === range.oldest)!;
-      const base = unpushed ? unpushed.base : oldest.kind === "working" ? model.hasStaged ? "staged" : model.head : oldest.kind === "staged" ? model.head : oldest.parents[0];
-      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.endLabel}` : `${endpointName(model, base)} → ${endpointName(model, range.newest)}`;
+      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.endLabel}` : `${endpointName(model, selected.start ?? undefined)} → ${endpointName(model, selected.end)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
       this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
     }
@@ -274,9 +261,8 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       data.set("history", this.historyIdValue);
       data.set("client", this.client);
       data.set("sequence", String(++this.sequence));
-      data.set("newest", this.range!.newest);
-      data.set("oldest", this.range!.oldest);
-      if (this.range!.unpushed) data.set("unpushed", "true");
+      data.set("end", this.range!.end);
+      if (this.range!.start !== undefined) data.set("start", this.range!.start ?? "");
       data.set("pickerOpen", String(this.isOpen));
       try {
         const result = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/changes/${operation}`, { method: "POST", body: data, signal: request.signal, headers: { Accept: "text/vnd.turbo-stream.html" } });
