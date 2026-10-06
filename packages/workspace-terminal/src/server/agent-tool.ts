@@ -1,5 +1,5 @@
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
-import type { WorkspacePresenterDefinition, WorkspacePresenterDeps } from "@agents-in-the-cloud/agent/server";
+import type { WorkspacePresenterDefinition, WorkspacePresenterDeps } from "@agents-in-the-cloud/agent/server/tools";
 import { Type } from "typebox";
 import { terminalViewKey } from "../shared.ts";
 import { attachWorkspaceTerminal, listWorkspaceTerminals, tmuxSessionExists } from "./workspace-terminals.ts";

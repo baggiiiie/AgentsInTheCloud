@@ -8,7 +8,7 @@ import { createRegistry, defineExtension, defineTool, type AgentChange } from "@
 import { Type } from "typebox";
 import { AgentsInTheCloudCoreError, createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import type { WorkspaceAgentToolOptions } from "@agents-in-the-cloud/agent/server/tools";
-import { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+import { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { currentNotificationTurn } from "../../src/server/turn-notifications.ts";
 import { openDurableAgentRuntime, type DurableAgentRuntime } from "../../src/server/durable-runtime.ts";
 import { durableEntryContent } from "../../src/server/durable-images.ts";

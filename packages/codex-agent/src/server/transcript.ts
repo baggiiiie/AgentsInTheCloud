@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
 import { latestNativeSessionFile, loadNativeTranscriptFiles, loadNativeTranscriptImage, nativeImageTypes, nativeJsonlRows, nativeSessionFiles, nativeTimestamp } from "@agents-in-the-cloud/cli-agent/server";
-import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server/transcript";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 

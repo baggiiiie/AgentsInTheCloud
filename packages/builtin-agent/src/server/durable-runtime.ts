@@ -1,6 +1,6 @@
 import { enabledModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
 import { getAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
-import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { startNotificationTurn, finishNotificationTurn } from "./turn-notifications.ts";
 import { sendTurnNotification } from "./web-push.ts";
 import { durableTimingEntry } from "./durable-timing.ts";

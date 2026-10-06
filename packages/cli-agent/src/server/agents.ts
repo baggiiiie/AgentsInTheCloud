@@ -1,4 +1,6 @@
-import { agentKey, publishWorkspaceAgentBusy, prepareCliAgentConnection, revokeAgentMcp, suggestAgentSlug, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
+import { agentKey } from "@agents-in-the-cloud/agent/server/render-context";
+import { publishWorkspaceAgentBusy, prepareCliAgentConnection, revokeAgentMcp, type AgentTurnFinishReason } from "@agents-in-the-cloud/agent/server";
+import { suggestAgentSlug } from "@agents-in-the-cloud/agent/server/slug-suggestion";
 import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";

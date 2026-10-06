@@ -8,7 +8,7 @@ import { builtinAgentWorkspaceModule, createWorkspaceAgentTabProvider, workspace
 import { handleAgentRequest } from "../../src/server/routes.ts";
 import { agentAttachmentDraftId, findStagedAttachment, stageAttachment } from "@agents-in-the-cloud/prompt/server";
 import { readInitialPromptDraft, stageInitialPrompt } from "../../src/server/initial-prompt-draft.ts";
-import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { agentWorkspaceModule } from "@agents-in-the-cloud/agent/server";
 
 function deferred() {

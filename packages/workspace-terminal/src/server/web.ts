@@ -1,4 +1,4 @@
-import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
+import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server/tools";
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";

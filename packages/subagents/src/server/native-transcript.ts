@@ -1,5 +1,6 @@
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
-import { transcriptRowContent, transcriptRow, type AgentTranscriptAnchor, type AgentTranscriptSnapshot } from "@agents-in-the-cloud/agent/server";
+import { transcriptRowContent, transcriptRow } from "@agents-in-the-cloud/agent/server/render-markup";
+import { type AgentTranscriptAnchor, type AgentTranscriptSnapshot } from "@agents-in-the-cloud/agent/server/transcript-contributions";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { ConversationView } from "@earendil-works/pi-durable";
 import { inheritedBoundaryEntry, communicationEntry, communicationStateEntry, type Receipt } from "./native-state.ts";

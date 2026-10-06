@@ -1,7 +1,7 @@
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/builtin-agent/server";
-import { ids } from "@agents-in-the-cloud/agent/server";
+import { ids } from "@agents-in-the-cloud/agent/server/render-context";
 import { listWorkspaceAgents } from "@agents-in-the-cloud/builtin-agent/server";
 import { requestAcceptsJson, type JsonValue } from "@agents-in-the-cloud/core";
 import type { DisclosureSummary } from "@agents-in-the-cloud/design-system/disclosure";

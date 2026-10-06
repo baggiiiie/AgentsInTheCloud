@@ -25,11 +25,11 @@ async function scenario(script: string): Promise<void> {
       let inspectionResult;
       let result = { stdout: "", stderr: "", exitCode: 0, durationMs: 0 };
       mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return args[1].includes("tmux list-panes") && inspectionResult ? inspectionResult : result; } }));
-      const agentServer = await import("@agents-in-the-cloud/agent/server");
+      const slugSuggestion = await import("@agents-in-the-cloud/agent/server/slug-suggestion");
       const slugRequests = [];
       let suggestedSlug;
       let slugDelay;
-      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...agentServer, suggestAgentSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
+      mock.module("@agents-in-the-cloud/agent/server/slug-suggestion", () => ({ ...slugSuggestion, suggestAgentSlug: async (...args) => { slugRequests.push(args); await slugDelay?.promise; return suggestedSlug; } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
       const adapter = {
         id: "example", label: "Example CLI", iconHtml: "",

@@ -1,4 +1,4 @@
-import { suggestAgentSlug } from "@agents-in-the-cloud/agent/server";
+import { suggestAgentSlug } from "@agents-in-the-cloud/agent/server/slug-suggestion";
 import { knownWorkspaceAgentRequest } from "./runtime.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";

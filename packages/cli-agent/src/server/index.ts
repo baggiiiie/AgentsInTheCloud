@@ -1,4 +1,5 @@
-import { registerAgentTurnSettler, renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
+import { registerAgentTurnSettler } from "@agents-in-the-cloud/agent/server";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
 import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, isJsonObject, readTextIfExists, writeJsonAtomic } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server";
+import { sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server/session-share";
 
 export interface WorkspaceAgentInfo {
   workspaceId: string;

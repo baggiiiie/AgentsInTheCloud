@@ -1,4 +1,4 @@
-import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
+import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server/tools";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
