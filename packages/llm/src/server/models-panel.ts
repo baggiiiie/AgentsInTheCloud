@@ -86,6 +86,7 @@ function providerIcon(provider: string, label: string): string {
 function usageNote(account: Account): string | undefined {
   if (account.connection === "needs_attention") return "Sign in again to use this provider and see its usage.";
   if (account.method !== "subscription") return "API keys don’t have usage limits to show.";
+  if (account.provider === "openai") return "Check your subscription usage on ChatGPT.";
   if (!supportedUsageProviders.some((supported) => supported.id === account.provider)) return `AgentsInTheCloud can’t read ${account.label} usage limits yet.`;
   return undefined;
 }
@@ -95,8 +96,11 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
   const usagePath = `/usage/providers/${encodeURIComponent(account.id)}`;
   const note = usageNote(account);
   const rings = note ? "" : `<turbo-frame class="usage-rings" id="${providerUsageFrameId("rings", account.id, host)}" src="${usagePath}/rings?scope=${host}"></turbo-frame>`;
+  const usageLink = account.provider === "openai" && account.method === "subscription"
+    ? actionLinkHtml({ href: "https://chatgpt.com/settings/usage", variant: "secondary", content: { kind: "caption", caption: "View usage on ChatGPT" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
+    : "";
   const usage = note
-    ? `<p class="usage-caption">${escapeHtml(note)}</p>`
+    ? `<p class="usage-caption">${escapeHtml(note)}</p>${usageLink}`
     : `<turbo-frame class="model-provider-usage" id="${providerUsageFrameId("limits", account.id, host)}" src="${usagePath}/limits?scope=${host}" loading="lazy"><p class="usage-caption" role="status"><span class="status-spinner" aria-hidden="true"></span> Checking usage…</p></turbo-frame>`;
   const notice = account.provider === "anthropic" && account.method === "subscription" ? warningBannerHtml(anthropicSubscriptionNotice) : "";
   const reconnect = account.method === "subscription"

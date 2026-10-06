@@ -10,12 +10,11 @@ import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 // Only providers with implemented subscription adapters appear in the overview.
 // Radius reports a credit balance without allowance windows, so it never drives the usage button.
-export const supportedUsageProviders = [{ id: "openai", label: "OpenAI Codex" }, { id: "anthropic", label: "Anthropic" }, { id: "openai-codex", label: "ChatGPT / Codex" }, { id: "xai", label: "xAI" }, { id: "radius", label: "Radius" }] as const;
+export const supportedUsageProviders = [{ id: "anthropic", label: "Anthropic" }, { id: "openai-codex", label: "ChatGPT / Codex" }, { id: "xai", label: "xAI" }, { id: "radius", label: "Radius" }] as const;
 export type UsageProvider = typeof supportedUsageProviders[number];
 type UsageRequest = { runtime: ModelRuntime; refresh: boolean };
 const subscriptionAdapters = {
   // Codex reports usage cheaply on every request, so it is always current.
-  "openai": (token) => fetchCodexSubscriptionUsage(token),
   "openai-codex": (token) => fetchCodexSubscriptionUsage(token),
   xai: (token) => fetchXaiSubscriptionUsage(token),
   radius: (token) => fetchRadiusUsage(token),

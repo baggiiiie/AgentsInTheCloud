@@ -51,7 +51,7 @@ test("workspace proxy translates Codex discovery only on ChatGPT's account endpo
 });
 
 test("proxy records only successful Codex inference using AgentsInTheCloud's subscription", async () => {
-  forgetSubscriptionInference("openai");
+  forgetSubscriptionInference("openai-codex");
   // SAFETY: registerSubscriptionCli only calls getAuth on the runtime.
   registerSubscriptionCli(async () => ({ getAuth: async () => ({ source: "OAuth", auth: { apiKey: "real-token" } }) }) as any);
   const context = await createWorkspaceSecretContext("codex-inference-test");
@@ -61,8 +61,8 @@ test("proxy records only successful Codex inference using AgentsInTheCloud's sub
   await context.hooks.onResponse!(new Response("ok"), new Request(request.url, { method: "POST", headers: { authorization: "Bearer other-token" } }));
   expect(providersInLastInferenceWindow()).toEqual([]);
   await context.hooks.onResponse!(new Response("ok"), request);
-  expect(providersInLastInferenceWindow()).toContain("openai");
-  forgetSubscriptionInference("openai");
+  expect(providersInLastInferenceWindow()).toContain("openai-codex");
+  forgetSubscriptionInference("openai-codex");
 });
 
 test("invalid account discovery remains an upstream response", async () => {
@@ -128,8 +128,8 @@ test("Codex placeholders use legacy OAuth when both OpenAI subscriptions are con
   for (const host of ["auth.openai.com", "other.openai.com", "api.openai.com.example.com"]) {
     await expect(context.hooks.onRequest!(new Request(`https://${host}/`, { headers: { authorization: "Bearer agents-in-the-cloud-subscription-codex-access" } }))).rejects.toThrow("not allowed for host");
   }
-  forgetSubscriptionInference("openai");
+  forgetSubscriptionInference("openai-codex");
   await context.hooks.onResponse!(new Response("ok"), new Request("https://api.openai.com/v1/responses", { method: "POST", headers: { authorization: `Bearer ${token}` } }));
-  expect(providersInLastInferenceWindow()).toContain("openai");
-  forgetSubscriptionInference("openai");
+  expect(providersInLastInferenceWindow()).toContain("openai-codex");
+  forgetSubscriptionInference("openai-codex");
 });
