@@ -19,7 +19,7 @@ test("each adapter exposes its own interactive terminal protocol", async () => {
         return { write: text => writes.push(text), resize: (...size) => sizes.push(size), close: () => { closed++; } };
       } }));
       const { createCliAgentModule } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
-      for (const providerId of ["codex", "claude", "pi"]) {
+      for (const providerId of ["codex-cli", "claude", "pi"]) {
         const module = createCliAgentModule({
           id: providerId, label: providerId, iconHtml: "", requireSetup: async () => {},
           settings: { renderFooter: async () => "", prepare: async () => ({}) },

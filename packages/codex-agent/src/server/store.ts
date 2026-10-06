@@ -11,7 +11,7 @@ const schema = Type.Object({ agents: Type.Array(Type.Object({
 })) });
 export type CodexAgentRecord = Static<typeof schema>["agents"][number];
 export function createCodexStore() {
-  const metadata = createWorkspaceMetadataState("codex-app-server-agents.json", value => Value.Parse(schema, value), () => ({ agents: [] }));
+  const metadata = createWorkspaceMetadataState("codex-agents.json", value => Value.Parse(schema, value), () => ({ agents: [] }));
   const list = (workspaceId: string) => metadata.read(workspaceId).agents;
   return {
     list,

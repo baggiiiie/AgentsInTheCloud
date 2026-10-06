@@ -341,7 +341,7 @@ describe("HTTP contracts", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       defaultAgentTypeId: "builtin",
-      agentTypes: expect.arrayContaining([expect.objectContaining({ id: "builtin" }), expect.objectContaining({ id: "codex" })]),
+      agentTypes: expect.arrayContaining([expect.objectContaining({ id: "builtin" }), expect.objectContaining({ id: "codex" }), expect.objectContaining({ id: "codex-cli" })]),
     });
     expect((await app.fetch(new Request("http://test.local/agent-providers"))).status).toBe(404);
   });

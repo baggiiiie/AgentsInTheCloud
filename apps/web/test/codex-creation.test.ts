@@ -6,10 +6,10 @@ const data = temporaryAgentsInTheCloudDataDir();
 beforeEach(data.setUp);
 afterEach(data.tearDown);
 
-test("Codex workspace creation requires its subscription before provisioning", async () => {
+test.each(["codex", "codex-cli"])("%s workspace creation requires its subscription before provisioning", async agentTypeId => {
   let provisioned = false;
   const { app, registry } = createTestApp({ provision: async () => { provisioned = true; } });
-  const response = await app.fetch(postJson("/workspaces", { agent: { agentTypeId: "codex", initialPrompt: "Do not run without authentication" } }));
+  const response = await app.fetch(postJson("/workspaces", { agent: { agentTypeId, initialPrompt: "Do not run without authentication" } }));
   expect(response.status).toBe(409);
   expect((await response.json()).error).toMatchObject({ code: "agent_setup_required", setupUrl: "/models?connect=openai-codex" });
   expect(provisioned).toBe(false);
@@ -17,10 +17,10 @@ test("Codex workspace creation requires its subscription before provisioning", a
   expect((await defaultAgentType()).id).toBe("builtin");
 });
 
-test("adding a Codex tab requires authentication without changing the default", async () => {
+test.each(["codex", "codex-cli"])("adding a %s tab requires authentication without changing the default", async agentTypeId => {
   const { app, registry } = createTestApp();
   await registry.seed([{ id: "codex-auth-test", title: "Codex auth" }]);
-  const response = await app.fetch(postJson("/workspaces/codex-auth-test/commands/agent.create.codex", {}));
+  const response = await app.fetch(postJson(`/workspaces/codex-auth-test/commands/agent.create.${agentTypeId}`, {}));
   expect(response.status).toBe(409);
   expect((await response.json()).error.code).toBe("agent_setup_required");
   expect((await defaultAgentType()).id).toBe("builtin");

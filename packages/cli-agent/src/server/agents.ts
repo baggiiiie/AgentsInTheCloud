@@ -14,7 +14,7 @@ import type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
 const inputSchema = Type.Object({ text: Type.String(), images: Type.Array(Type.Object({ mimeType: Type.String(), data: Type.String() })), attachmentNotes: Type.Array(Type.String()) });
 const agentSchema = Type.Object({
   id: Type.String(), title: Type.String(), tmuxSession: Type.String(), input: inputSchema,
-  // Older Codex tabs have no kind. Reading them must never execute their saved prompts.
+  // Older CLI tabs have no kind. Reading them must never execute their saved prompts.
   kind: Type.Optional(Type.String()), error: Type.Optional(Type.String()),
   model: Type.Optional(Type.String()), thinkingLevel: Type.Optional(Type.String()),
   historySlug: Type.Optional(Type.String()),

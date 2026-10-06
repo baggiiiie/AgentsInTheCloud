@@ -8,9 +8,9 @@ import { codexSlashCommands } from "./commands.ts";
 import { projectCodexTurns } from "./transcript.ts";
 import type { CodexRuntime } from "./runtime.ts";
 
-export const channelName = "codex-app-server-agent";
+export const channelName = "codex-agent";
 export function renderContext(runtime: CodexRuntime): AgentRenderContext {
-  return { workspaceId: runtime.workspaceId, agentId: runtime.agentId, inlineWorkingItems: true, model: runtime.record.model ? parseModelRef(runtime.record.model) : undefined, transcriptBasePath: `/workspaces/${encodeURIComponent(runtime.workspaceId)}/codex-app-server-agents/${encodeURIComponent(runtime.agentId)}` };
+  return { workspaceId: runtime.workspaceId, agentId: runtime.agentId, inlineWorkingItems: true, model: runtime.record.model ? parseModelRef(runtime.record.model) : undefined, transcriptBasePath: `/workspaces/${encodeURIComponent(runtime.workspaceId)}/codex-agents/${encodeURIComponent(runtime.agentId)}` };
 }
 export function transcriptItems(runtime: CodexRuntime) {
   return [...projectCodexTurns(runtime.state.turns, runtime.state.completedItems), ...runtime.state.notices.map((text, index) => ({ type: "note" as const, key: `notice:${index}`, text, tone: "warning" as const })), ...(runtime.failure ? [{ type: "error" as const, key: "connection-error", text: runtime.failure.message }] : [])];

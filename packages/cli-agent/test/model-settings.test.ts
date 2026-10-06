@@ -34,7 +34,7 @@ test("CLI model preferences persist across processes, remain Agent-type-specific
     `);
     await run(`
       expect(await settings().prepare()).toEqual({ model: "example::second", thinkingLevel: "high" });
-      expect(await settings("codex").prepare()).toEqual({ model: "example::first", thinkingLevel: "medium" });
+      expect(await settings("codex-cli").prepare()).toEqual({ model: "example::first", thinkingLevel: "medium" });
       expect(await settings().prepare({ model: "example::first", thinkingLevel: "low" })).toEqual({ model: "example::first", thinkingLevel: "low" });
       expect(await settings().prepare({ model: "example::second" })).toEqual({ model: "example::second", thinkingLevel: "high" });
       await expect(settings().prepare({ model: "example::missing" })).rejects.toThrow("Choose an available enabled");

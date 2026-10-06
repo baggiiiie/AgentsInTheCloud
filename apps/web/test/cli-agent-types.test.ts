@@ -3,13 +3,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-for (const id of ["codex", "claude", "pi"]) {
+for (const id of ["codex-cli", "claude", "pi"]) {
   test(`${id} adapter validates settings, installs credentials and builds its CLI launch`, async () => {
     const directory = await mkdtemp(join(tmpdir(), `${id}-adapter-`));
     const source = join(import.meta.dir, `../../../packages/${id}-agent/src/server`);
-    const model = id === "pi" ? "custom::model" : id === "codex" ? "openai-codex::gpt-5.4" : "anthropic::claude-opus-4-6";
-    const npmPackage = id === "pi" ? "@earendil-works/pi-coding-agent@latest" : id === "codex" ? "@openai/codex@latest" : "@anthropic-ai/claude-code@latest";
-    const mcpConfigMarker = id === "codex" ? "config.toml" : id === "claude" ? "claude-mcp.json" : "/pi-agents-in-the-cloud";
+    const model = id === "pi" ? "custom::model" : id === "codex-cli" ? "openai-codex::gpt-5.4" : "anthropic::claude-opus-4-6";
+    const npmPackage = id === "pi" ? "@earendil-works/pi-coding-agent@latest" : id === "codex-cli" ? "@openai/codex@latest" : "@anthropic-ai/claude-code@latest";
+    const mcpConfigMarker = id === "codex-cli" ? "config.toml" : id === "claude" ? "claude-mcp.json" : "/pi-agents-in-the-cloud";
     try {
       const child = Bun.spawn([process.execPath, "-e", `
         import { expect, mock } from "bun:test";
@@ -22,7 +22,7 @@ for (const id of ["codex", "claude", "pi"]) {
         const credentials = [];
         let authChecks = 0;
         mock.module("@agents-in-the-cloud/workspace", () => ({ ...workspace, execWorkspaceShell: async (...args) => { calls.push(args); return { exitCode: 0, stdout: "", stderr: "", durationMs: 0 }; } }));
-        mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId), requireProviderSubscription: async (_runtime, provider) => { expect(provider).toBe(${JSON.stringify(id === "codex" ? "openai-codex" : "anthropic")}); authChecks++; } }));
+        mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm, installSubscriptionCli: async (workspaceId) => credentials.push(workspaceId), requireProviderSubscription: async (_runtime, provider) => { expect(provider).toBe(${JSON.stringify(id === "codex-cli" ? "openai-codex" : "anthropic")}); authChecks++; } }));
         const cliAgent = await import("@agents-in-the-cloud/cli-agent/server");
         mock.module("@agents-in-the-cloud/cli-agent/server", () => ({ ...cliAgent, createCliModelSettings: () => ({ prepare: async (settings = {}) => settings, renderFooter: async () => "" }) }));
         if (${JSON.stringify(id)} === "pi") mock.module(${JSON.stringify(join(source, "pi-cli.ts"))}, () => ({ installPiCliConfiguration: async (workspaceId) => credentials.push(workspaceId) }));
@@ -48,7 +48,7 @@ for (const id of ["codex", "claude", "pi"]) {
         const mcpSetup = calls.find((call) => call[1].includes(${JSON.stringify(mcpConfigMarker)}));
         expect(mcpSetup).toBeDefined();
         expect(mcpSetup[2].stdin).toContain("test-credential");
-        if (${id === "codex"}) expect(calls.at(-1)[1]).toContain("CODEX_HOME=/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-agents/" + tab.id + "/codex");
+        if (${id === "codex-cli"}) expect(calls.at(-1)[1]).toContain("CODEX_HOME=/home/agents-in-the-cloud/.local/share/agents-in-the-cloud-agents/" + tab.id + "/codex");
         if (${id === "pi"}) expect(calls.at(-1)[1]).toContain("/pi-agents-in-the-cloud/extension.mjs");
         await agentType.launch.prepareWorkspace("adapter", context);
         expect(calls).toHaveLength(3);

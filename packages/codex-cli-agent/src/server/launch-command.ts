@@ -20,5 +20,5 @@ export function codexLaunchScript(input: WorkspaceAgentInput, imagePaths: string
     ...(settings.thinkingLevel ? ["-c", `model_reasoning_effort=${JSON.stringify(settings.thinkingLevel)}`] : []),
     ...imagePaths.flatMap((path) => ["--image", path]), ...(prompt ? ["--", prompt] : [])];
   const setup = writeFileScript(`"\${CODEX_HOME:-$HOME/.codex}/themes/${codexThemeName}.tmTheme"`, codexAgentsInTheCloudTmTheme());
-  return cliLaunchScript({ executable: "codex", label: "Codex", npmPackage: "@openai/codex", args, setup });
+  return cliLaunchScript({ executable: "codex", label: "Codex CLI", npmPackage: "@openai/codex", args, setup });
 }

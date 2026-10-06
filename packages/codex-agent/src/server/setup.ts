@@ -5,8 +5,8 @@ import { createPiModelRuntime, installCodexSubscriptionAuth, requireProviderSubs
 import { loadWorkspaceAgentsFiles } from "@agents-in-the-cloud/builtin-agent/server/workspace-agents-files";
 import { codexVersion } from "./protocol.ts";
 
-export const agentTypeId = "codex-app-server";
-export const label = "Codex Native";
+export const agentTypeId = "codex";
+export const label = "Codex";
 export const settings = createCliModelSettings({ agentTypeId, provider: "openai-codex", label: "Codex", mapThinkingLevel: (level, mapped) => mapped === null ? undefined : mapped ?? (level === "off" ? "none" : level) });
 export async function requireSetup() {
   await requireProviderSubscription(await createPiModelRuntime(), "openai-codex", "Codex");

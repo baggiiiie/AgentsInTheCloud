@@ -112,7 +112,7 @@ test("reads individual legacy preferences and preserves unrelated persisted fiel
 
 test("all agent types share storage but isolate selections and model thinking levels", async () => {
   const model = { provider: "openai", id: "shared" };
-  const agents = ["builtin", "pi", "codex", "claude"];
+  const agents = ["builtin", "pi", "codex", "codex-cli", "claude"];
   await Promise.all(agents.map(async (agent, index) => {
     await setAgentModelPreference(agent, model, `level-${index}`);
   }));

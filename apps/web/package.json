@@ -34,7 +34,7 @@
     "@agents-in-the-cloud/llm": "workspace:*",
     "@agents-in-the-cloud/host": "workspace:*",
     "@agents-in-the-cloud/prompt": "workspace:*",
-    "@agents-in-the-cloud/codex-agent": "workspace:*",
+    "@agents-in-the-cloud/codex-cli-agent": "workspace:*",
     "@agents-in-the-cloud/claude-agent": "workspace:*",
     "@agents-in-the-cloud/cli-agent": "workspace:*",
     "@agents-in-the-cloud/pi-agent": "workspace:*",
@@ -42,6 +42,6 @@
     "@agents-in-the-cloud/artifact-preview": "workspace:*",
     "@agents-in-the-cloud/builtin-agent": "workspace:*",
     "@agents-in-the-cloud/changes": "workspace:*",
-    "@agents-in-the-cloud/codex-app-server-agent": "workspace:*"
+    "@agents-in-the-cloud/codex-agent": "workspace:*"
   }
 }

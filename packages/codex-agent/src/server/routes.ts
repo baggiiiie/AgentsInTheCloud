@@ -16,7 +16,7 @@ import { renderContext, transcriptItems } from "./render.ts";
 
 export function codexRoutes(agents: CodexAgents) {
   return async (request: Request, url: URL): Promise<Response | undefined> => {
-    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/codex-app-server-agents\/([^/]+)\/(.+)$/);
+    const match = url.pathname.match(/^\/workspaces\/([^/]+)\/codex-agents\/([^/]+)\/(.+)$/);
     if (!match) return undefined;
     const workspaceId = decodeURIComponent(match[1]!);
     const agentId = decodeURIComponent(match[2]!);

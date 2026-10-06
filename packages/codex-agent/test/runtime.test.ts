@@ -28,7 +28,7 @@ async function scenario(script: string) {
       const turn = (id, status = "completed") => ({ id, status, items: [], itemsView: "full", error: null, startedAt: 100, completedAt: status === "inProgress" ? null : 101, durationMs: 1000 });
       const setupPath = ${JSON.stringify(join(import.meta.dir, "../src/server/setup.ts"))};
       mock.module(setupPath, () => ({
-        agentTypeId: "codex-app-server", label: "Codex Native", codexHome: id => "/codex/" + id,
+        agentTypeId: "codex", label: "Codex", codexHome: id => "/codex/" + id,
         prepareCodex: async () => ({ instructions: "instructions", mcp: { url: "http://localhost/mcp", token: "test" } }), requireSetup: async () => {},
         settings: { prepare: async () => ({ ...launchSettings }), renderFooter: async () => "" },
       }));
@@ -145,7 +145,7 @@ test("reveal resolves nested activity to its owning turn, but not final answers"
   ] }]);
   const { codexRoutes } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/routes.ts"))});
   const route = codexRoutes(agents);
-  const reveal = async key => { const url = new URL("http://localhost/workspaces/workspace/codex-app-server-agents/" + id + "/reveal/" + key); return (await route(new Request(url), url)).json(); };
+  const reveal = async key => { const url = new URL("http://localhost/workspaces/workspace/codex-agents/" + id + "/reveal/" + key); return (await route(new Request(url), url)).json(); };
   for (const key of ["reasoning", "command", "steering"]) expect(await reveal(key)).toEqual({ turnId: "working" });
   for (const key of ["initial", "answer", "missing"]) expect(await reveal(key)).toEqual({ turnId: null });
   await agents.disposeAll();
@@ -237,7 +237,7 @@ test("slash-command HTTP operations expose native results rather than send liter
   const id = await agents.create("workspace");
   const { codexRoutes } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/routes.ts"))});
   const route = codexRoutes(agents);
-  const url = new URL("http://localhost/workspaces/workspace/codex-app-server-agents/" + id + "/messages");
+  const url = new URL("http://localhost/workspaces/workspace/codex-agents/" + id + "/messages");
   const response = await route(new Request(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ text: "/mcp" }) }), url);
   expect(response.status).toBe(200);
   expect((await response.json()).command.kind).toBe("mcp");
@@ -249,7 +249,7 @@ test("form commands accept absent pagination fields and validate native skill ch
   const id = await agents.create("workspace");
   const { codexRoutes } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/routes.ts"))});
   const route = codexRoutes(agents);
-  const url = new URL("http://localhost/workspaces/workspace/codex-app-server-agents/" + id + "/commands");
+  const url = new URL("http://localhost/workspaces/workspace/codex-agents/" + id + "/commands");
   const body = new FormData(); body.set("text", "/resume");
   const response = await route(new Request(url, { method: "POST", body }), url);
   expect(response.status).toBe(200);
@@ -503,7 +503,7 @@ test("messages and commands endpoints share durable command admission", () => sc
   const { codexRoutes } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/routes.ts"))});
   const route = codexRoutes(agents);
   const send = async operation => {
-    const url = new URL("http://localhost/workspaces/workspace/codex-app-server-agents/" + id + "/" + operation);
+    const url = new URL("http://localhost/workspaces/workspace/codex-agents/" + id + "/" + operation);
     return route(new Request(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ text: "/new", requestId: "retry" }) }), url);
   };
   const first = await send("messages");

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, dirname, resolve, relative } from "node:path";
 import { codexVersion } from "../src/server/protocol.ts";
 
-const temporary = await mkdtemp(join(tmpdir(), "codex-app-server-protocol-"));
+const temporary = await mkdtemp(join(tmpdir(), "codex-protocol-"));
 const generated = join(temporary, "generated");
 const destination = resolve(import.meta.dir, "../src/protocol.ts");
 const roots = [
@@ -53,6 +53,6 @@ try {
       .trim();
     return `// Source: ${relative(generated, path)}\n${body}`;
   });
-  await writeFile(destination, `// GENERATED CODE! DO NOT MODIFY BY HAND!\n// Codex ${codexVersion}; regenerate with bun packages/codex-app-server-agent/scripts/generate-protocol.ts\n\n${sections.join("\n\n")}\n`);
+  await writeFile(destination, `// GENERATED CODE! DO NOT MODIFY BY HAND!\n// Codex ${codexVersion}; regenerate with bun packages/codex-agent/scripts/generate-protocol.ts\n\n${sections.join("\n\n")}\n`);
   console.log(`Generated ${sources.size} protocol types in ${destination} for Codex ${codexVersion}`);
 } finally { await rm(temporary, { recursive: true, force: true }); }

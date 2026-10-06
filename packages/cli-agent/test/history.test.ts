@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeHistoryFiles } from "../../claude-agent/src/server/transcript.ts";
-import { codexHistoryFiles } from "../../codex-agent/src/server/transcript.ts";
+import { codexHistoryFiles } from "../../codex-cli-agent/src/server/transcript.ts";
 import { piHistoryFiles } from "../../pi-agent/src/server/transcript.ts";
 import { exportCliHistory } from "../src/server/history.ts";
 
@@ -25,7 +25,7 @@ async function source(path: string, content: string) {
   await writeFile(path, content);
 }
 
-test("exports native Pi and Codex sessions beside built-in sessions, without config or sidecars", async () => {
+test("exports native Pi and Codex CLI sessions beside built-in sessions, without config or sidecars", async () => {
   const root = await setup();
   const local = join(root, "workspaces", "workspace", "home-local", ".local", "share");
   await source(join(local, "pi", "sessions", "tab", "-work", "native-pi.jsonl"), "pi turn 1\n");
@@ -33,9 +33,9 @@ test("exports native Pi and Codex sessions beside built-in sessions, without con
   await source(join(local, "agents-in-the-cloud-agents", "tab", "codex", "config.toml"), "secret");
   const shared = join(root, "session-shares", "team-project");
   await exportCliHistory("workspace", "pi", "tab", "named-task", await piHistoryFiles("workspace", "tab"));
-  await exportCliHistory("workspace", "codex", "tab", "named-task", await codexHistoryFiles("workspace", "tab"));
+  await exportCliHistory("workspace", "codex-cli", "tab", "named-task", await codexHistoryFiles("workspace", "tab"));
   expect((await readdir(shared)).sort()).toEqual([
-    "codex--named-task--workspace--tab--rollout-123.jsonl",
+    "codex-cli--named-task--workspace--tab--rollout-123.jsonl",
     "pi--named-task--workspace--tab--native-pi.jsonl",
   ]);
   await source(join(local, "pi", "sessions", "tab", "-work", "native-pi.jsonl"), "pi turn 1\npi turn 2\n");

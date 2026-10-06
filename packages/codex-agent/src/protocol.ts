@@ -1,5 +1,5 @@
 // GENERATED CODE! DO NOT MODIFY BY HAND!
-// Codex 0.160.1; regenerate with bun packages/codex-app-server-agent/scripts/generate-protocol.ts
+// Codex 0.160.1; regenerate with bun packages/codex-agent/scripts/generate-protocol.ts
 
 // Source: AbsolutePathBuf.ts
 /**

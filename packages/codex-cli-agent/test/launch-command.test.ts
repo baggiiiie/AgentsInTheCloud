@@ -76,16 +76,16 @@ test("installation failure exits visibly without running a fallback shell", asyn
   const [code, output, error] = await run(launch(empty, []));
   expect(code).toBe(42);
   expect(error).toContain("registry-unavailable");
-  expect(output).toContain("Codex failed (exit 42)");
+  expect(output).toContain("Codex CLI failed (exit 42)");
   expect(await Bun.file(`${home}/.local/bin/codex`).exists()).toBe(false);
 });
 
-test("Codex startup failure retains its exit code and diagnostics", async () => {
+test("Codex CLI startup failure retains its exit code and diagnostics", async () => {
   await executable(`${home}/.local/bin/codex`, "echo invalid-configuration >&2; exit 7");
   const [code, output, error] = await run(launch(empty, []));
   expect(code).toBe(7);
   expect(error).toContain("invalid-configuration");
-  expect(output).toContain("Codex failed (exit 7)");
+  expect(output).toContain("Codex CLI failed (exit 7)");
 });
 
 test("passes the chosen Codex model and thinking level to the CLI", async () => {

@@ -207,9 +207,9 @@ test("Agent types and Workspaces have independent Agent stores", () => scenario(
   expect((await saved("two")).agents.map(s => s.id)).toEqual([third]);
 `));
 
-test("existing Codex placeholders, Claude and Pi agents retain paths, IDs and tmux names", () => scenario(`
-  for (const id of ["codex", "claude", "pi"]) {
-    const session = { id: "old-" + id, title: "Existing tab", tmuxSession: id + "-existing", input: { text: "Never submit", images: [], attachmentNotes: [] }, model: "saved-model", thinkingLevel: "high", firstPresentation: true, ...(id !== "codex" ? { kind: id } : {}) };
+test("existing CLI placeholders, Claude and Pi agents retain paths, IDs and tmux names", () => scenario(`
+  for (const id of ["codex-cli", "claude", "pi"]) {
+    const session = { id: "old-" + id, title: "Existing tab", tmuxSession: id + "-existing", input: { text: "Never submit", images: [], attachmentNotes: [] }, model: "saved-model", thinkingLevel: "high", firstPresentation: true, ...(id !== "codex-cli" ? { kind: id } : {}) };
     const path = process.env.ATELIER_DATA_DIR + "/workspaces/legacy/metadata/" + id + "-agents.json";
     await Bun.write(path, JSON.stringify({ sessions: [session] }));
     const legacy = createCliAgentModule({ ...adapter, id }).agentType;
