@@ -4,7 +4,7 @@ import { exportCliHistory } from "./history.ts";
 import { emptyAgentInput } from "./launch-script.ts";
 import { AgentsInTheCloudCoreError, createKeyedOperationQueue, shellQuote } from "@agents-in-the-cloud/core";
 import { buildObservableSessionCommand } from "@agents-in-the-cloud/observable-terminal/server";
-import { imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
+import { imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 import { errorMessage, type AgentWorkspaceParameters, type WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { createWorkspaceMetadataState, execWorkspaceShell, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";

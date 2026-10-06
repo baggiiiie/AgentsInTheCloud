@@ -1,5 +1,5 @@
 import type { ImageContent } from "@earendil-works/pi-ai";
-import { imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
+import { imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 
 const allowedMimeTypes = new Set(Object.values(imageMimeByExtension));
 export function sessionImageResponse(part: ImageContent | undefined): Response {

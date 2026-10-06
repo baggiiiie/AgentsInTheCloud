@@ -1,3 +1,4 @@
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -5,21 +6,6 @@ import { getAgentsInTheCloudRuntimeContext, isNotFoundError, shellQuote } from "
 import { execWorkspaceShell } from "@agents-in-the-cloud/workspace";
 import type { WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 type ImageRef = WorkspaceAgentInput["images"][number];
-
-export interface ImageMimeTypeRegistry {
-  [extension: string]: string;
-}
-
-export const imageMimeByExtension: ImageMimeTypeRegistry = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  svg: "image/svg+xml",
-  avif: "image/avif",
-  bmp: "image/bmp",
-};
 
 export interface StagedAttachment {
   id: string;
@@ -32,10 +18,6 @@ export interface StagedAttachment {
 export interface DeliveredAttachments {
   images: ImageRef[];
   attachmentNotes: string[];
-}
-
-export function extensionOf(path: string): string {
-  return (path.split(".").pop() ?? "").toLowerCase();
 }
 
 export function attachmentDraftsDir(): string {

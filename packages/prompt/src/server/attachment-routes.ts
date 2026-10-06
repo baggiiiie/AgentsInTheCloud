@@ -1,7 +1,6 @@
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 import {
   findStagedAttachment,
-  extensionOf,
-  imageMimeByExtension,
   removeAttachmentDraft,
   removeStagedAttachment,
   stageAttachment,
