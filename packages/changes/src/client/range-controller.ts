@@ -71,6 +71,15 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
       this.syncAvailability();
       queueMicrotask(() => { if (this.element.isConnected) this.measure(); });
     }
+    preservePresentation(event: CustomEvent<{ newStream: { templateElement: HTMLTemplateElement } }>): void {
+      for (const shell of event.detail.newStream.templateElement.content.querySelectorAll<HTMLElement>(".changes-body")) {
+        if (shell.dataset.changesRangeWorkspaceIdValue !== this.workspaceIdValue) continue;
+        shell.dataset.changesRangeOpenValue = String(this.isOpen);
+        shell.dataset.changesLayout = this.element.dataset.changesLayout ?? "unified";
+        shell.dataset.changesWrap = this.element.dataset.changesWrap ?? "false";
+      }
+    }
+
     triggerTargetConnected(button: HTMLButtonElement): void { button.setAttribute("aria-expanded", String(this.isOpen || this.openValue)); }
 
     togglePicker(): void { if (this.isOpen) this.closePicker(); else this.openPicker(); }
@@ -239,7 +248,7 @@ export function createRangeController(Controller: WorkspaceClientControllerConst
         const refreshing = this.busy && this.lastOperation === "refresh";
         this.historyScrollTarget.inert = refreshing;
       }
-      for (const element of this.diffTarget.querySelectorAll<HTMLElement>(".changes-surface,.changes-empty,.changes-footer")) element.inert = this.busy || this.failed;
+      for (const element of this.diffTarget.querySelectorAll<HTMLElement>(".changes-surface,.changes-empty")) element.inert = this.busy || this.failed;
       for (const element of this.diffTarget.querySelectorAll<HTMLElement>(".changes-controls")) element.inert = this.busy;
     }
 

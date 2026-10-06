@@ -2,6 +2,7 @@ export const workingTree = "working";
 export const stagedChanges = "staged";
 export interface ChangesRange { newest: string; oldest: string; unpushed?: true }
 export interface ChangesRef { name: string; kind: "local" | "remote" | "tag" }
+export interface ChangesNodeStats { files: number; additions: number; deletions: number }
 export interface ChangesCommit {
   id: string;
   parents: string[];
@@ -11,6 +12,7 @@ export interface ChangesCommit {
   refs: ChangesRef[];
   ahead: boolean;
   kind: "commit" | "working" | "staged";
+  stats?: ChangesNodeStats;
 }
 export interface UnpushedHistory { oldest: ChangesCommit; base: string; count: number }
 export interface HistoryModel {

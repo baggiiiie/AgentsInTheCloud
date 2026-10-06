@@ -153,9 +153,13 @@ async function reviewFile(root: Repository, entry: StatusEntry): Promise<ReviewF
 }
 
 async function statusEntries(root: Repository): Promise<StatusEntry[] | undefined> {
-  const inside = await git(root, ["rev-parse", "--is-inside-work-tree"], true);
+  const [inside, status] = await Promise.all([
+    git(root, ["rev-parse", "--is-inside-work-tree"], true),
+    gitResult(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+  ]);
   if (inside.toString("utf8").trim() !== "true") return undefined;
-  return parseStatus(await git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]));
+  if (status.exitCode !== 0) throw new Error(status.stderr.trim() || "git status failed");
+  return parseStatus(status.stdout);
 }
 
 function statusChange(entry: StatusEntry): ReviewFileChange {
@@ -306,45 +310,44 @@ export async function collectCommitReviewFile(root: Repository, commit: string, 
 
 /** Collect a fixed Git comparison, or compare its base with the working tree without touching the index. */
 export async function collectReviewComparison(root: Repository, base: string, end?: string): Promise<{ index: ReviewIndex; stats: ReviewFileStats[]; files: Map<string, ReviewFile> }> {
-  const entries = await comparisonEntries(root, base, end);
+  const [entries, status, numstat] = await Promise.all([
+    comparisonEntries(root, base, end),
+    end ? undefined : statusEntries(root),
+    git(root, ["diff", "--numstat", "-z", "-M", base, ...(end ? [end] : []), "--"]),
+  ]);
   if (!end) {
-    const untracked = (await statusEntries(root))!.filter((entry) => entry.code === "??" && !entries.some((tracked) => tracked.path === entry.path));
+    const untracked = status!.filter((entry) => entry.code === "??" && !entries.some((tracked) => tracked.path === entry.path));
     for (const entry of untracked) entries.push({ ...entry, oldMode: "000000", newMode: "100644", oldHash: "", newHash: "" });
   }
   entries.sort((a, b) => a.path.localeCompare(b.path));
-  const counts = parseNumstat(await git(root, ["diff", "--numstat", "-z", "-M", base, ...(end ? [end] : []), "--"]));
+  const counts = parseNumstat(numstat);
   const files = new Map<string, ReviewFile>();
   const stats: ReviewFileStats[] = new Array(entries.length);
-  let cursor = 0;
-  await Promise.all(Array.from({ length: Math.min(4, entries.length) }, async () => {
-    while (cursor < entries.length) {
-      const position = cursor++;
-      const entry = entries[position]!;
-      const summary: ReviewFileSummary = { path: entry.path, change: statusChange(entry) };
-      if (entry.previousPath) summary.previousPath = entry.previousPath;
-      if (entry.code === "??") summary.untracked = true;
-      if (entry.oldMode === "160000" || entry.newMode === "160000") {
-        files.set(entry.path, { ...summary, kind: "mode", detail: "Submodule changed" });
-        stats[position] = { ...summary, additions: 0, deletions: 0 };
-        continue;
-      }
-      const blob = (hash: string, mode: string) => mode === "000000" ? undefined : git(root, ["cat-file", "blob", hash]);
-      const [before, working, committed] = await Promise.all([blob(entry.oldHash, entry.oldMode), end ? undefined : workingFileEntry(root, entry.path), end ? blob(entry.newHash, entry.newMode) : undefined]);
-      const after = end ? committed : working?.contents;
-      if (working) entry.newMode = working.mode;
-      if (!entry.previousPath && before !== undefined && after !== undefined && before.equals(after) && entry.oldMode === entry.newMode) continue;
-      const detail = entry.previousPath ? "File renamed" : before === undefined ? "Empty file added" : after === undefined ? "Empty file deleted" : entry.oldMode !== entry.newMode ? "File mode changed" : "No textual changes";
-      const file = reviewFileFromContents(entry, before, after, detail);
-      if (!file) throw new Error(`File changed while capturing comparison: ${entry.path}`);
-      summary.change = file.change;
-      files.set(entry.path, file);
-      const count = counts.get(entry.path);
-      stats[position] = { ...summary, additions: count?.additions ?? (lineCount(decodeText(after)) - Number(decodeText(after)?.endsWith("\n") ?? false)), deletions: count?.deletions ?? 0 };
-      if (file.diff) {
-        stats[position] = { ...summary, additions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.additionLines, 0), deletions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.deletionLines, 0) };
-      }
-      if (file.kind === "binary") stats[position] = { ...summary, additions: 0, deletions: 0, binarySizes: { before: before?.byteLength, after: after?.byteLength } };
+  await Promise.all(entries.map(async (entry, position) => {
+    const summary: ReviewFileSummary = { path: entry.path, change: statusChange(entry) };
+    if (entry.previousPath) summary.previousPath = entry.previousPath;
+    if (entry.code === "??") summary.untracked = true;
+    if (entry.oldMode === "160000" || entry.newMode === "160000") {
+      files.set(entry.path, { ...summary, kind: "mode", detail: "Submodule changed" });
+      stats[position] = { ...summary, additions: 0, deletions: 0 };
+      return;
     }
+    const blob = (hash: string, mode: string) => mode === "000000" ? undefined : git(root, ["cat-file", "blob", hash]);
+    const [before, working, committed] = await Promise.all([blob(entry.oldHash, entry.oldMode), end ? undefined : workingFileEntry(root, entry.path), end ? blob(entry.newHash, entry.newMode) : undefined]);
+    const after = end ? committed : working?.contents;
+    if (working) entry.newMode = working.mode;
+    if (!entry.previousPath && before !== undefined && after !== undefined && before.equals(after) && entry.oldMode === entry.newMode) return;
+    const detail = entry.previousPath ? "File renamed" : before === undefined ? "Empty file added" : after === undefined ? "Empty file deleted" : entry.oldMode !== entry.newMode ? "File mode changed" : "No textual changes";
+    const file = reviewFileFromContents(entry, before, after, detail);
+    if (!file) throw new Error(`File changed while capturing comparison: ${entry.path}`);
+    summary.change = file.change;
+    files.set(entry.path, file);
+    const count = counts.get(entry.path);
+    stats[position] = { ...summary, additions: count?.additions ?? (lineCount(decodeText(after)) - Number(decodeText(after)?.endsWith("\n") ?? false)), deletions: count?.deletions ?? 0 };
+    if (file.diff) {
+      stats[position] = { ...summary, additions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.additionLines, 0), deletions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.deletionLines, 0) };
+    }
+    if (file.kind === "binary") stats[position] = { ...summary, additions: 0, deletions: 0, binarySizes: { before: before?.byteLength, after: after?.byteLength } };
   }));
   const capturedStats = stats.filter((stat) => stat !== undefined);
   return { index: { phase: "ready", files: capturedStats.map(({ additions: _a, deletions: _d, binarySizes: _b, ...summary }) => summary) }, stats: capturedStats, files };

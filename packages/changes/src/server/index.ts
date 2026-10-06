@@ -1,3 +1,4 @@
+import { refreshChanges } from "./refresh.ts";
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml, turboStreamResponse, type WorkspaceModule } from "@agents-in-the-cloud/shared";
@@ -6,8 +7,8 @@ import { workspaceRepository } from "@agents-in-the-cloud/review/diff";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory } from "./render.ts";
-import { isUnpushedRange, type ChangesRange } from "../history.ts";
-import { captureChanges, captureHistory, commitHistory, InvalidChangesRange, stagedChanges, workingTree, type ChangesSnapshot } from "./snapshot.ts";
+import type { ChangesRange } from "../history.ts";
+import { captureChanges, commitHistory, InvalidChangesRange, type ChangesSnapshot } from "./snapshot.ts";
 
 const reference = { type: "changes" } as const;
 const referenceSchema = Type.Object({ type: Type.Literal("changes") });
@@ -79,27 +80,10 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     let next: ChangesSnapshot;
     try {
       if (!Value.Check(rangeSchema, requestedRange)) throw new InvalidChangesRange("Invalid comparison endpoints.");
-      let range: ChangesRange = requestedRange;
+      const range: ChangesRange = requestedRange;
       const root = workspaceRepository(workspaceId);
       if (match[1] === "compare") next = await captureChanges(root, range, previous.history);
-      else {
-        const history = await captureHistory(root);
-        if (isUnpushedRange(previous.history.unpushed, range)) range = history.range;
-        // Preserve the all-uncommitted selection when a newly changed index adds its node.
-        if (!previous.history.hasStaged && history.hasStaged && range.newest === workingTree && range.oldest === workingTree) range.oldest = stagedChanges;
-        // The staged node disappears when the index now matches HEAD.
-        if (!history.hasStaged) {
-          if (range.newest === stagedChanges) range.newest = workingTree;
-          if (range.oldest === stagedChanges) range.oldest = workingTree;
-        }
-        while (!isUnpushedRange(history.unpushed, range) && history.hasMore && (!history.commits.some(commit => commit.id === range.oldest) || !history.commits.some(commit => commit.id === range.newest))) {
-          const page = await commitHistory(root, history, history.loaded);
-          history.commits.push(...page.commits);
-          history.loaded += page.commits.length;
-          history.hasMore = page.hasMore;
-        }
-        next = await captureChanges(root, range, history);
-      }
+      else next = await refreshChanges(root, previous, range);
     } catch (error) {
       if (!(error instanceof InvalidChangesRange)) throw error;
       if (ticket !== state.request) return new Response(null, { status: 204 });
@@ -113,7 +97,20 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (match[1] === "refresh") return turboStreamResponse(replace(changesBodyId(workspaceId, previous.history.id), renderChanges(workspaceId, next, data.get("pickerOpen") === "true")));
     return turboStreamResponse(replace(comparisonId(workspaceId, previous.history.id), renderComparison(workspaceId, next)) + replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id)));
   } }],
-  initialize(context) { invalidateWorkspace = context.invalidateWorkspace; context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); }); },
+  initialize(context) {
+    invalidateWorkspace = context.invalidateWorkspace;
+    context.events.on("workspace_agent_turn_finished", async ({ workspaceId }) => {
+      const state = await current(workspaceId);
+      const ticket = ++state.request;
+      const next = await refreshChanges(workspaceRepository(workspaceId), state.snapshot);
+      // A later user selection owns the comparison; don't overwrite it with this capture.
+      if (ticket !== state.request || !states.has(workspaceId)) return;
+      state.snapshot = next;
+      state.clients.clear();
+      invalidateWorkspace(workspaceId);
+    });
+    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); });
+  },
   async attachToWorkspace({ workspaceId }) {
     const { snapshot } = await current(workspaceId);
     return {

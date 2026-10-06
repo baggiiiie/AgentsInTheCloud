@@ -2,7 +2,7 @@
 import { StreamActions } from "@hotwired/turbo";
 import type { CableStreamRenderer } from "./cable.ts";
 
-type Stream = HTMLElement & { targetElements: HTMLElement[]; templateContent: DocumentFragment };
+type Stream = HTMLElement & { targetElements: HTMLElement[]; templateElement: HTMLTemplateElement; templateContent: DocumentFragment };
 let delivery = Promise.resolve();
 
 /** One application queue, not just a receipt-time lease check. Parent mounts and
@@ -16,6 +16,9 @@ export const renderCableStreams: CableStreamRenderer = (html, isCurrent, onAppli
     customElements.upgrade(fragment);
     for (const stream of fragment.querySelectorAll<Stream>("turbo-stream")) {
       if (!isCurrent()) return;
+      // Ordered Cable delivery bypasses Turbo's deferred stream renderer. Give
+      // mounted controllers a chance to retain presentation state before disposal.
+      document.dispatchEvent(new CustomEvent("live:before-stream-render", { detail: { newStream: stream } }));
       // Permanent islands survive only while their key remains in the parent's
       // snapshot. Turbo itself preserves them even when absent, so dispose those
       // absent keys explicitly before morphing the owning region.

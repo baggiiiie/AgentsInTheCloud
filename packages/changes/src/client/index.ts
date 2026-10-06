@@ -8,11 +8,10 @@ type CommentAnnotation = { id: string; kind: "draft" | "comment"; path: string; 
 
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
-    static targets = ["viewer", "model", "activeFile", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard"];
+    static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard"];
     static values = { workspaceId: String, snapshotId: String };
     declare readonly viewerTarget: HTMLElement;
     declare readonly modelTarget: HTMLScriptElement;
-    declare readonly activeFileTarget: HTMLElement;
     declare readonly errorTarget: HTMLElement;
     declare readonly errorMessageTarget: HTMLElement;
     declare readonly collapseToggleTarget: HTMLButtonElement;
@@ -29,8 +28,6 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     private loaded = new Set<string>();
     private pending = new Set<string>();
     private abort?: AbortController;
-    private unsubscribe?: () => void;
-    private activePath?: string;
     private options: CodeViewOptions<CommentAnnotation, undefined> = {};
     private layout: "unified" | "split" = "unified";
     private wrap = false;
@@ -40,7 +37,6 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
     disconnect(): void {
       this.abort?.abort();
-      this.unsubscribe?.();
       this.viewer?.cleanUp();
       this.viewer = undefined;
       this.loaded.clear();
@@ -88,8 +84,6 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: this.collapsed })));
-      this.unsubscribe = this.viewer.subscribeToScroll((top) => this.syncActiveFile(top));
-      this.syncActiveFile(0);
     }
 
     dismissError(): void { this.errorTarget.hidden = true; }
@@ -142,14 +136,6 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       } finally {
         this.pending.delete(path);
       }
-    }
-
-    private syncActiveFile(top: number): void {
-      const path = this.files.findLast((file) => (this.viewer!.getTopForItem(file.path) ?? Infinity) <= top + 1)?.path ?? this.files[0]!.path;
-      if (path === this.activePath) return;
-      this.activePath = path;
-      this.activeFileTarget.textContent = path;
-
     }
 
     addComment(event: Event): void {

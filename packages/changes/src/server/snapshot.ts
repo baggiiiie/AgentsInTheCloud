@@ -1,3 +1,4 @@
+import { captureSyntheticStats } from "./synthetic-stats.ts";
 import { collectReviewComparison, collectReviewIndex, git, type ReviewFile, type ReviewFileStats, type ReviewIndex, type Repository } from "@agents-in-the-cloud/review/diff";
 import { ancestryPath, endpointName, isUnpushedRange, rangeDescription, stagedChanges, workingTree, type ChangesCommit, type ChangesRange, type ChangesRef, type HistoryModel } from "../history.ts";
 export { stagedChanges, workingTree } from "../history.ts";
@@ -50,7 +51,7 @@ export async function captureHistory(root: Repository): Promise<ChangesHistory> 
   const [head, branch, refs, emptyTree, indexTree] = await Promise.all([
     git(root, ["rev-parse", "--verify", "HEAD"], true),
     git(root, ["symbolic-ref", "--quiet", "--short", "HEAD"], true),
-    git(root, ["for-each-ref", "--format=%(refname)%00%(objectname)%00%(*objectname)", "refs/heads", "refs/remotes", "refs/tags"]),
+    git(root, ["for-each-ref", "--format=%(refname)%00%(objectname)%00%(*objectname)%00%(upstream:short)%00%(upstream)"]),
     git(root, ["hash-object", "-t", "tree", "/dev/null"]),
     root.captureIndexTree(),
   ]);
@@ -58,28 +59,33 @@ export async function captureHistory(root: Repository): Promise<ChangesHistory> 
   history.branch = branch.toString().trim() || undefined;
   history.emptyTree = emptyTree.toString().trim();
   history.indexTree = indexTree.toString().trim();
-  history.hasStaged = (await git(root, ["diff", "--name-only", history.head ?? history.emptyTree, history.indexTree, "--"])).byteLength > 0;
+  const refIds = new Map<string, string>();
+  let upstreamRef: string | undefined;
   for (const line of refs.toString().trimEnd().split("\n")) {
     if (!line) continue;
-    const [ref, hash, peeled] = line.split("\0");
+    const [ref, hash, peeled, upstreamName, upstream] = line.split("\0");
+    refIds.set(ref!, hash!);
+    if (ref === `refs/heads/${history.branch}` && upstreamName) {
+      history.upstream = upstreamName;
+      upstreamRef = upstream;
+    }
+    if (!/^refs\/(heads|remotes|tags)\//.test(ref!)) continue;
     const kind = ref!.startsWith("refs/heads/") ? "local" : ref!.startsWith("refs/remotes/") ? "remote" : "tag";
     const name = ref!.replace(/^refs\/(heads|remotes|tags)\//, "");
     if (kind === "remote" && name.endsWith("/HEAD")) continue;
     history.references.push({ name, kind, id: peeled || hash! });
   }
   history.tips = [...new Set([...(history.head ? [history.head] : []), ...history.references.filter(ref => ref.kind === "local").map(ref => ref.id)])];
-  if (history.head && history.branch) {
-    const upstream = (await git(root, ["for-each-ref", "--format=%(upstream:short)%00%(upstream)", `refs/heads/${history.branch}`])).toString().trimEnd().split("\0");
-    if (upstream[0]) {
-      const upstreamId = (await git(root, ["rev-parse", "--verify", upstream[1]!], true)).toString().trim();
-      if (upstreamId) {
-        history.upstream = upstream[0];
-        history.upstreamId = upstreamId;
-        history.aheadIds = new Set((await git(root, ["rev-list", "--topo-order", history.head, "--not", upstreamId, "--"])).toString().trim().split("\n").filter(Boolean));
-      }
-    }
-  }
-  const synthetic = (id: string, kind: "working" | "staged", subject: string, parents: string[]): ChangesCommit => ({ id, kind, subject, parents, author: "You", date: "Now", refs: [], ahead: false });
+  history.upstreamId = upstreamRef ? refIds.get(upstreamRef) : undefined;
+  if (!history.upstreamId) history.upstream = undefined;
+  const [syntheticStats, ahead, pageOutput] = await Promise.all([
+    captureSyntheticStats(root, history.head ?? history.emptyTree, history.indexTree, index.files),
+    history.head && history.upstreamId ? git(root, ["rev-list", "--topo-order", history.head, "--not", history.upstreamId, "--"]) : Buffer.alloc(0),
+    history.tips.length ? git(root, ["log", "--topo-order", "--max-count=9", `--format=${commitFormat}`, ...history.tips, "--"]) : Buffer.alloc(0),
+  ]);
+  history.hasStaged = syntheticStats.staged.files > 0;
+  history.aheadIds = new Set(ahead.toString().trim().split("\n").filter(Boolean));
+  const synthetic = (id: string, kind: "working" | "staged", subject: string, parents: string[]): ChangesCommit => ({ id, kind, subject, parents, author: "You", date: "Now", refs: [], ahead: false, stats: syntheticStats[kind] });
   history.commits.push(synthetic(workingTree, "working", "Working tree", history.hasStaged ? [stagedChanges] : history.head ? [history.head] : []));
   if (history.hasStaged) history.commits.push(synthetic(stagedChanges, "staged", "Staged changes", history.head ? [history.head] : []));
   history.range = { newest: workingTree, oldest: history.hasStaged ? stagedChanges : workingTree };
@@ -92,10 +98,11 @@ export async function captureHistory(root: Repository): Promise<ChangesHistory> 
     history.unpushed = { oldest: commitRecord(history, oldest.toString().trimEnd()), base: base.toString().trim(), count: history.aheadIds.size };
     history.range = { newest: workingTree, oldest: oldestId, unpushed: true };
   }
-  const page = await commitHistory(root, history, 0, 8);
-  history.commits.push(...page.commits);
-  history.loaded = page.commits.length;
-  history.hasMore = page.hasMore;
+  const output = pageOutput.toString("utf8").trimEnd();
+  const commits = output ? output.split("\n").map(line => commitRecord(history, line)) : [];
+  history.commits.push(...commits.slice(0, 8));
+  history.loaded = Math.min(commits.length, 8);
+  history.hasMore = commits.length > 8;
   return history;
 }
 
