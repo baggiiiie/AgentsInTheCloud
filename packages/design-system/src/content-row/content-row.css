@@ -96,3 +96,8 @@
 .content-row--multiline .content-row__description { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; color: var(--text); }
 .content-row--multiline .content-row__icon,
 .content-row--multiline .content-row__metadata { padding-top: 3px; }
+/* Label-only rows center against large leading visuals; descriptions retain top alignment. */
+.content-row--multiline:not(:has(.content-row__description)),
+.content-row--multiline:not(:has(.content-row__description)) > .content-row__primary { align-items: center; }
+.content-row--multiline:not(:has(.content-row__description)) .content-row__icon,
+.content-row--multiline:not(:has(.content-row__description)) .content-row__metadata { padding-top: 0; }

@@ -122,7 +122,7 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
 
 function renderProviderChoice(provider: ProviderChoice, host: ModelsHost, width: "fit" | "fill" = "fit"): string {
   return `<form class="model-provider-choice" method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true">${contentRowHtml({
-    kind: "compact",
+    kind: "multiline",
     width,
     element: { tag: "button", attributesHtml: 'type="submit"' },
     label: { kind: "text", text: provider.label },

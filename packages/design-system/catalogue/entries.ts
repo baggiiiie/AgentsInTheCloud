@@ -548,6 +548,10 @@ export const entries: CatalogueEntry[] = [
           '</div></div>').join("") + '</div>',
       },
       {
+        title: "Label-only multiline · centered beside a tall visual",
+        render: () => contentRowHtml({ kind: "multiline", element: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "Connect a provider" }, leadingHtml: '<span aria-hidden="true" style="display: grid; place-items: center; width: 34px; height: 34px">' + Icons.Cloud + '</span>' }),
+      },
+      {
         title: "Fit row · independent controls keep their space",
         render: () => contentRowHtml({ kind: "compact", primary: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "Workspace record" }, engagedActionsHtml: copyButtonHtml({ label: "Copy record name", copyText: "Workspace record" }) }),
       },
