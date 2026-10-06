@@ -113,5 +113,8 @@ export async function deleteWorkspaceTemplateSecret(workspaceTemplateId: string,
 
 export async function revealWorkspaceTemplateSecrets(workspaceTemplateId: string, file = workspaceTemplatesFile(), keyFile?: string): Promise<WorkspaceTemplateSecretPlaintext[]> {
   const workspaceTemplate = findWorkspaceTemplateRecord(await readWorkspaceTemplateStore(file), workspaceTemplateId);
-  return await Promise.all((workspaceTemplate.secrets ?? []).filter((secret) => secret.encryptedSecret).map(async (secret) => ({ ...workspaceTemplateSecretSummary(secret), secretValue: await decryptWorkspaceTemplateValue(secret.projectId, secret.id, secret.encryptedSecret!, keyFile) })));
+  return await Promise.all((workspaceTemplate.secrets ?? []).filter((secret) => secret.encryptedSecret).map(async (secret) => {
+    const summary = workspaceTemplateSecretSummary(secret);
+    return { ...summary, secretValue: await decryptWorkspaceTemplateValue(summary.workspaceTemplateId, secret.id, secret.encryptedSecret!, keyFile) };
+  }));
 }

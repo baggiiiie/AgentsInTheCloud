@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { isGitWorkspaceTemplateInit, secretNeedsValue, type WorkspaceTemplateConfiguration } from "@agents-in-the-cloud/workspace-templates";
+import { isGitWorkspaceTemplateInit, workspaceTemplateIdFromInit, secretNeedsValue, type WorkspaceTemplateConfiguration } from "@agents-in-the-cloud/workspace-templates";
 import type { WorkspaceEntry } from "./workspace-registry.ts";
 
 export interface WorkspaceWarning {
@@ -17,13 +17,14 @@ export function workspaceWarnings(entry: WorkspaceEntry, workspaceTemplate: Work
     warnings.push({ kind, title, message, state: createHash("sha256").update(state).digest("hex"), action });
   }
   if (isGitWorkspaceTemplateInit(entry.init)) {
-    const workspaceTemplateId = entry.init.projectId;
+    const workspaceTemplateId = workspaceTemplateIdFromInit(entry.init);
     const configuration = workspaceTemplate!;
     const missing = configuration.secrets.filter(secretNeedsValue);
     if (missing.length) add("missing-secrets", "Required secrets need values", `${missing.map((secret) => secret.envName).join(", ")}. Your workspace can run, but features needing these secrets may not work.`, JSON.stringify(missing.map(({ id, envName, updatedAt }) => ({ id, envName, updatedAt }))), { href: `/workspace-templates/${encodeURIComponent(workspaceTemplateId)}/settings?section=secrets`, caption: "Configure secrets" });
     // Older workspaces have no fingerprint; do not claim to know whether their settings changed.
     if (entry.init.configurationFingerprint && entry.init.configurationFingerprint !== configuration.configurationFingerprint) {
       // The kind is persisted with dismissals, so it keeps its original name.
+      // This identifier is persisted with dismissed warnings; keep it stable.
       add("project-settings-changed", "Template settings have changed", "Secrets and SSH keys already apply to this workspace. Other changes only apply to new workspaces.", configuration.configurationFingerprint!, { href: `/workspace-templates/${encodeURIComponent(workspaceTemplateId)}/settings`, caption: "Template settings" });
     }
   }

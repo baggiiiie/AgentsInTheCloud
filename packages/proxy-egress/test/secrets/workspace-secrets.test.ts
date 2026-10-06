@@ -44,7 +44,7 @@ describe("workspace secrets", () => {
     });
   });
 
-  test("includes encrypted project secrets with default and custom placeholders", async () => {
+  test("includes encrypted Workspace template secrets with default and custom placeholders", async () => {
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern: "api.example.com, *.example.org", secretValue: "real-secret" });
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "STRICT_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "strict-secret" });
@@ -77,7 +77,7 @@ describe("workspace secrets", () => {
     expect(() => context.hooks.onRequest(new Request("https://other.example.net/", { headers: { authorization: `Bearer ${context.env.API_TOKEN}` } }))).toThrow("secret API_TOKEN not allowed for host: other.example.net");
   });
 
-  test("reloads persisted project secrets when rebuilding context after restart", async () => {
+  test("reloads persisted Workspace template secrets when rebuilding context after restart", async () => {
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/repo.git")).workspaceTemplate;
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "PACKAGE_TOKEN", hostPattern: "registry.example.com", placeholder: "PACKAGE_TOKEN", secretValue: "real-package-secret" });
     const init = workspaceTemplateInit(workspaceTemplate.id);

@@ -4,7 +4,7 @@ AgentsInTheCloud is a self-hosted browser app for working with coding agents in 
 
 ## 1. What AgentsInTheCloud Is
 
-- A **workspace** is an isolated development environment. Its project files live under `/work` inside the workspace.
+- A **workspace** is an isolated development environment. Its files live under `/work` inside the workspace.
 - An **Agent** is a coding collaborator running inside a Workspace, with its own replaceable **Agent session**. A Workspace can have more than one Agent.
 - A **Workspace template** ("template" in the app) is a saved Git source and configuration that new Workspaces are seeded with. A Workspace can also start with nothing.
 - A **Work view** is a file, terminal, Browser view, VS Code view, or other working surface shown in the Work pane.

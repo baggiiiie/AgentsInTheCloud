@@ -32,7 +32,7 @@ function sectionFor(value?: string): TemplateSettingsSection | undefined {
   }
 }
 const sections = [
-  ["general", "General"], ["secrets", "Secrets"], ["ssh", "SSH access"], ["environment", "Environment"], ["container", "Container"], ["developer", "Developer Settings"],
+  ["general", "General"], ["secrets", "Secrets"], ["ssh", "SSH access"], ["environment", "Environment Variables"], ["container", "Container"], ["developer", "Developer Settings"],
 ] as const;
 const captionButton = (caption: string, attributesHtml: string, variant: "secondary" | "primary" = "secondary") => buttonHtml({ type: "button", variant, content: { kind: "caption", caption }, attributesHtml });
 const paragraph = (text: string) => `<p class="template-settings-note">${escapeHtml(text)}</p>`;
@@ -158,7 +158,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
       backSection = section;
       if (editor === "docker") {
         title = "Docker support";
-        content += form(id, "/privileged", `${selection("Docker support", "privileged", String(t.privileged ?? false), [{ value: "false", label: "Off — stronger isolation" }, { value: "true", label: "On — privileged" }])}${paragraph("Privileged workspaces can access host devices and may read or modify host data. Enable only for projects and agents you trust.")}`, { section, saved, editor });
+        content += form(id, "/privileged", `${selection("Docker support", "privileged", String(t.privileged ?? false), [{ value: "false", label: "Off — stronger isolation" }, { value: "true", label: "On — privileged" }])}${paragraph("Privileged workspaces can access host devices and may read or modify host data. Enable only for Workspace templates and Agents you trust.")}`, { section, saved, editor });
       } else if (editor === "images") {
         title = "Preloaded images";
         content += t.privileged ? form(id, "/preload-images", `${paragraph("Loaded into new workspaces when Docker support is on.")}${textarea("Image references, one per line", "preloadImages", (t.preloadImages ?? []).join("\n"), 6, 'spellcheck="false" autofocus')}`, { section, saved, editor }) : `${paragraph("Turn on and save Docker support to edit preloaded images. Saved image references are kept while Docker is off.")}${textarea("Saved image references", "savedImages", (t.preloadImages ?? []).join("\n"), 4, "disabled")}${navigation(id, section, "Configure Docker support", "docker")}`;

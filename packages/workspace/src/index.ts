@@ -249,7 +249,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   const modelsJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsJson", path, "seedPiConfig.modelsJson") : undefined;
   const modelsStoreJson = seedPiConfigRecord ? optionalString(seedPiConfigRecord, "modelsStoreJson", path, "seedPiConfig.modelsStoreJson") : undefined;
   const seedAgentsInTheCloudConfigRecord = optionalRecord(record, "seedAgentsInTheCloudConfig", path);
-  const projectsJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
+  const workspaceTemplatesJson = seedAgentsInTheCloudConfigRecord ? optionalString(seedAgentsInTheCloudConfigRecord, "projectsJson", path, "seedAgentsInTheCloudConfig.projectsJson") : undefined;
   const manifest: RepoWorkspaceManifest = { version: 1 };
   if (initScripts) manifest.initScripts = initScripts;
   if (seedPiConfigRecord) {
@@ -260,7 +260,7 @@ export function parseRepoWorkspaceManifest(text: string, path = workspaceManifes
   }
   if (seedAgentsInTheCloudConfigRecord) {
     manifest.seedAgentsInTheCloudConfig = {};
-    if (projectsJson) manifest.seedAgentsInTheCloudConfig.projectsJson = projectsJson;
+    if (workspaceTemplatesJson) manifest.seedAgentsInTheCloudConfig.projectsJson = workspaceTemplatesJson;
   }
   return manifest;
 }

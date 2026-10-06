@@ -1,5 +1,5 @@
 import { clearWorkspaceGitHubToken as clearStoredWorkspaceGitHubToken, discoverHostGitHubToken, hasWorkspaceGitHubToken as hasStoredWorkspaceGitHubToken, setWorkspaceGitHubToken as setStoredWorkspaceGitHubToken } from "@agents-in-the-cloud/core";
-import { isGitWorkspaceTemplateInit, revealWorkspaceTemplateSecrets, onWorkspaceTemplateStoreChanged, workspaceTemplateSecretPlaceholder, workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath } from "@agents-in-the-cloud/workspace-templates";
+import { isGitWorkspaceTemplateInit, workspaceTemplateIdFromInit, revealWorkspaceTemplateSecrets, onWorkspaceTemplateStoreChanged, workspaceTemplateSecretPlaceholder, workspaceTemplateSecretHosts, workspaceTemplateSecretAllowsPath } from "@agents-in-the-cloud/workspace-templates";
 import { getWorkspaceInit, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
 import { matchHostname } from "./patterns.ts";
 import { isWorkspaceEgressAddress } from "@agents-in-the-cloud/shared/egress-policy";
@@ -77,7 +77,7 @@ export async function createWorkspaceSecretContext(workspaceId: string, init?: W
     ? { [githubTokenEnvVar]: { value: token, hosts: githubAllowedHosts(), placeholder: workspaceTemplateSecretPlaceholder(githubTokenEnvVar) } }
     : {};
   if (isGitWorkspaceTemplateInit(init)) {
-    for (const secret of await revealWorkspaceTemplateSecrets(init.projectId)) {
+    for (const secret of await revealWorkspaceTemplateSecrets(workspaceTemplateIdFromInit(init))) {
       secrets[secret.envName] = { value: secret.secretValue, allowInPath: workspaceTemplateSecretAllowsPath(secret), hosts: workspaceTemplateSecretHosts(secret.hostPattern), placeholder: secret.placeholder ?? workspaceTemplateSecretPlaceholder(secret.envName) };
     }
   }

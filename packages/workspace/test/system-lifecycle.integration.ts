@@ -154,7 +154,7 @@ async function replaceApp() {
 
 try {
   const contract = await api<{ paths: Record<string, { get?: { operationId?: string }; post?: { operationId?: string } }> }>("/openapi.json");
-  for (const path of ["/workspaces", "/workspace-templates/{projectId}/preload-images", "/workspaces/{id}/park"]) assert(path in contract.paths, `API advertises ${path}`);
+  for (const path of ["/workspaces", "/workspace-templates/{workspaceTemplateId}/preload-images", "/workspaces/{id}/park"]) assert(path in contract.paths, `API advertises ${path}`);
   console.log("Create projectless workspace; verify networking, mounts and lazy daemons");
   const emptyId = await create({ type: "empty" });
   const empty = await containerFor(emptyId);
@@ -255,6 +255,6 @@ try {
   await exec("agents-in-the-cloud", "rm", "-rf", repository);
   console.log("PASS: System workspace lifecycle, lazy daemons, shared EROFS, stable ingress, app replacement and egress injection");
 } catch (error) {
-  console.error("FAILED; fixtures retained for diagnosis:", { workspaces: fixtures, projectId: workspaceTemplateId, repository });
+  console.error("FAILED; fixtures retained for diagnosis:", { workspaces: fixtures, workspaceTemplateId, repository });
   throw error;
 }

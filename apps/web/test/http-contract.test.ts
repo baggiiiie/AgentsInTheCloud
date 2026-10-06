@@ -36,7 +36,7 @@ const deletedWorkspaceTemplateEnvironmentVariableResponseSchema = Type.Object({
 }, { additionalProperties: false });
 const workspaceTemplateSecretSummarySchema = Type.Object({
   id: Type.String(),
-  projectId: Type.String(),
+  workspaceTemplateId: Type.String(),
   envName: Type.String(),
   hostPattern: Type.String(),
   allowInPath: Type.Boolean(),
@@ -64,6 +64,7 @@ const workspaceTemplateDetailResponseSchema = Type.Object({
     configurationFingerprint: Type.String(),
     preloadImages: Type.Array(Type.String()),
     privileged: Type.Boolean(),
+    seedConfigEnabled: Type.Boolean(),
     environment: Type.Array(environmentVariableSchema),
     secrets: Type.Array(workspaceTemplateSecretSummarySchema),
   }, { additionalProperties: false }),

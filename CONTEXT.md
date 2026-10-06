@@ -28,6 +28,10 @@ _Avoid_: Upgrade (as the operation name), Workspace package update
 What a new workspace is seeded with: a repository to clone plus configuration such as environment variables, a Dockerfile, secrets and SSH keys. Called "template" in the app. Secrets and SSH keys stay live in workspaces created from it; everything else applies only to new workspaces.
 _Avoid_: Project, workspace folder, repository
 
+**Environment Variables**:
+The Workspace template page for managing environment variables added to new Workspace containers. Passwords and API keys belong in Secrets; changes do not affect existing containers.
+_Avoid_: Environment (as the page name)
+
 **Template icon**:
 The marker that identifies a workspace's template in the Workspace pane. By default it is a **swatch**: a colored square derived from the template id.
 _Avoid_: Chip, badge, avatar

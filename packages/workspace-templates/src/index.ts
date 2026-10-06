@@ -5,6 +5,7 @@ export {
   formatWorkspaceTemplateSpec,
   getWorkspaceTemplateConfiguration,
   isGitWorkspaceTemplateInit,
+  workspaceTemplateIdFromInit,
   listWorkspaceTemplates,
   parseWorkspaceTemplateSpec,
   workspaceTemplatesFile,

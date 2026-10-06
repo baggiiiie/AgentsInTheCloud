@@ -17,8 +17,9 @@ export async function applySeedConfigManifest(manifest: RepoWorkspaceManifest, p
   ] as const) {
     if (target) entries.push({ source: agentsInTheCloudDataPath(runtime, "pi-config", `${name}.json`), staging: `/.agents-in-the-cloud/seed-pi-${name}.json`, target });
   }
-  const projectsJson = manifest.seedAgentsInTheCloudConfig?.projectsJson;
-  if (projectsJson) {
+  // The repository manifest key and filenames retain their persisted spelling.
+  const workspaceTemplatesJson = manifest.seedAgentsInTheCloudConfig?.projectsJson;
+  if (workspaceTemplatesJson) {
     // Sanitize on the host: neither encrypted credentials nor the master key may
     // cross into the agent workspace, even as temporary staging files.
     const catalogue = JSON.parse(await readFile(agentsInTheCloudDataPath(runtime, "projects.json"), "utf8"));
@@ -28,7 +29,7 @@ export async function applySeedConfigManifest(manifest: RepoWorkspaceManifest, p
     await mkdir(seedDirectory, { recursive: true });
     const source = join(seedDirectory, "projects.json");
     await writeFile(source, `${sanitized}\n`, { mode: 0o600 });
-    entries.push({ source, staging: "/.agents-in-the-cloud/seed-projects.json", target: projectsJson });
+    entries.push({ source, staging: "/.agents-in-the-cloud/seed-projects.json", target: workspaceTemplatesJson });
   }
   for (const entry of entries) {
     plan.containerFiles.push({ source: entry.source, target: entry.staging });

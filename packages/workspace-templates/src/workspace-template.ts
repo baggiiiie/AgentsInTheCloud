@@ -11,12 +11,13 @@ export type WorkspaceTemplateSummary = Omit<WorkspaceTemplateRecord, "secrets" |
   lastUsedAt?: number;
 };
 export type StoredWorkspaceTemplateSecret = Static<typeof storedWorkspaceTemplateSecretSchema>;
-export type WorkspaceTemplateSecretSummary = Omit<StoredWorkspaceTemplateSecret, "encryptedSecret" | "optional" | "annotation"> & { annotation: string; optional: boolean; configured: boolean };
+export type WorkspaceTemplateSecretSummary = Omit<StoredWorkspaceTemplateSecret, "projectId" | "encryptedSecret" | "optional" | "annotation"> & { workspaceTemplateId: string; annotation: string; optional: boolean; configured: boolean };
 export type StoredWorkspaceTemplateSshKey = Static<typeof storedWorkspaceTemplateSshKeySchema>;
-export type WorkspaceTemplateSshKeySummary = Omit<StoredWorkspaceTemplateSshKey, "encryptedPrivateKey">;
-export type WorkspaceTemplateEnvironmentVariable = Static<typeof workspaceTemplateEnvironmentVariableSchema>;
+export type WorkspaceTemplateSshKeySummary = Omit<StoredWorkspaceTemplateSshKey, "projectId" | "encryptedPrivateKey"> & { workspaceTemplateId: string };
+export type StoredWorkspaceTemplateEnvironmentVariable = Static<typeof workspaceTemplateEnvironmentVariableSchema>;
+export type WorkspaceTemplateEnvironmentVariable = Omit<StoredWorkspaceTemplateEnvironmentVariable, "projectId"> & { workspaceTemplateId: string };
 export type WorkspaceTemplateRecord = Static<typeof workspaceTemplateRecordSchema>;
-export type WorkspaceTemplateStore = Static<typeof workspaceTemplateStoreSchema>;
+export type WorkspaceTemplateStore = { workspaceTemplates: WorkspaceTemplateRecord[] };
 
 export interface WorkspaceTemplateListResult {
   workspaceTemplates: WorkspaceTemplateSummary[];
@@ -34,6 +35,8 @@ export interface UpdateWorkspaceTemplateResult {
   workspaceTemplate: WorkspaceTemplateSummary;
 }
 
+// Serialized schemas retain their original keys: existing files and encrypted values need no migration.
+// App-facing summaries expose workspaceTemplateId instead.
 const storedWorkspaceTemplateSecretSchema = Type.Object({
   id: Type.String(),
   projectId: Type.String(),
@@ -85,6 +88,7 @@ const workspaceTemplateRecordSchema = Type.Object({
   preloadImages: Type.Optional(Type.Array(Type.String())),
 });
 
+// This discriminator and projectId are part of the existing init.json format.
 const gitWorkspaceTemplateInitSchema = Type.Object({
   type: Type.Literal("project.git"),
   configurationFingerprint: Type.Optional(Type.String()),
@@ -141,15 +145,16 @@ export function parseWorkspaceTemplateSpec(spec: string): { gitUrl: string; bran
 
 export async function readWorkspaceTemplateStore(file: string): Promise<WorkspaceTemplateStore> {
   try {
-    const store = Value.Parse(workspaceTemplateStoreSchema, JSON.parse(await readFile(file, "utf8")));
+    const stored = Value.Parse(workspaceTemplateStoreSchema, JSON.parse(await readFile(file, "utf8")));
+    const store: WorkspaceTemplateStore = { workspaceTemplates: stored.projects };
     // Older records may contain derived SSH metadata; keep only the encrypted key and its label.
-    for (const workspaceTemplate of store.projects) for (const key of workspaceTemplate.sshKeys ?? []) {
+    for (const workspaceTemplate of store.workspaceTemplates) for (const key of workspaceTemplate.sshKeys ?? []) {
       Reflect.deleteProperty(key, "publicKey");
       Reflect.deleteProperty(key, "fingerprint");
     }
     return store;
   } catch (error) {
-    if (isNotFoundError(error)) return { projects: [] };
+    if (isNotFoundError(error)) return { workspaceTemplates: [] };
     throw error;
   }
 }
@@ -167,7 +172,8 @@ export async function updateWorkspaceTemplateStore<Result>(file: string, mutate:
   try {
     const store = await readWorkspaceTemplateStore(file);
     const result = await mutate(store);
-    await writeJsonAtomic(file, store);
+    // Preserve the existing on-disk envelope; this is serialization, not a data migration.
+    await writeJsonAtomic(file, { projects: store.workspaceTemplates });
     for (const listener of workspaceTemplateStoreListeners) listener();
     return result;
   } finally {
@@ -176,7 +182,7 @@ export async function updateWorkspaceTemplateStore<Result>(file: string, mutate:
 }
 
 export function findWorkspaceTemplateRecord(store: WorkspaceTemplateStore, workspaceTemplateId: string): WorkspaceTemplateRecord {
-  const workspaceTemplate = store.projects.find((candidate) => candidate.id === workspaceTemplateId);
+  const workspaceTemplate = store.workspaceTemplates.find((candidate) => candidate.id === workspaceTemplateId);
   if (!workspaceTemplate) throw new AgentsInTheCloudCoreError("workspace_template_not_found", `template not found: ${workspaceTemplateId}`);
   return workspaceTemplate;
 }
@@ -220,8 +226,8 @@ export type WorkspaceTemplateConfiguration = WorkspaceTemplateSummary & {
 };
 
 export function workspaceTemplateSecretSummary(secret: StoredWorkspaceTemplateSecret): WorkspaceTemplateSecretSummary {
-  const { encryptedSecret, ...metadata } = secret;
-  return { ...metadata, annotation: secret.annotation ?? "", optional: secret.optional ?? false, configured: !!encryptedSecret };
+  const { encryptedSecret, projectId: workspaceTemplateId, ...metadata } = secret;
+  return { ...metadata, workspaceTemplateId, annotation: secret.annotation ?? "", optional: secret.optional ?? false, configured: !!encryptedSecret };
 }
 
 export function workspaceTemplateSecretSummaries(workspaceTemplate: WorkspaceTemplateRecord): WorkspaceTemplateSecretSummary[] {
@@ -233,14 +239,14 @@ export async function getWorkspaceTemplateConfiguration(workspaceTemplateId: str
   const workspaceTemplate = findWorkspaceTemplateRecord(await readWorkspaceTemplateStore(file), workspaceTemplateId);
   return {
     ...workspaceTemplateSummary(workspaceTemplate),
-    environment: [...(workspaceTemplate.environment ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+    environment: (workspaceTemplate.environment ?? []).map(workspaceTemplateEnvironmentVariableSummary).sort((a, b) => a.name.localeCompare(b.name)),
     secrets: workspaceTemplateSecretSummaries(workspaceTemplate),
   };
 }
 
 export async function listWorkspaceTemplates(file = workspaceTemplatesFile()): Promise<WorkspaceTemplateListResult> {
   const store = await readWorkspaceTemplateStore(file);
-  const workspaceTemplates = [...store.projects].sort((a, b) => a.name.localeCompare(b.name) || (a.branch ?? "").localeCompare(b.branch ?? "") || a.gitUrl.localeCompare(b.gitUrl)).map(workspaceTemplateSummary);
+  const workspaceTemplates = [...store.workspaceTemplates].sort((a, b) => a.name.localeCompare(b.name) || (a.branch ?? "").localeCompare(b.branch ?? "") || a.gitUrl.localeCompare(b.gitUrl)).map(workspaceTemplateSummary);
   return { workspaceTemplates };
 }
 
@@ -248,15 +254,15 @@ export async function addWorkspaceTemplate(spec: string, file = workspaceTemplat
   const { gitUrl, branch } = parseWorkspaceTemplateSpec(spec);
   const id = workspaceTemplateId(gitUrl, branch);
   return await updateWorkspaceTemplateStore(file, (store) => {
-    if (store.projects.some((workspaceTemplate) => workspaceTemplate.id === id || (workspaceTemplate.gitUrl === gitUrl && workspaceTemplate.branch === branch))) {
+    if (store.workspaceTemplates.some((workspaceTemplate) => workspaceTemplate.id === id || (workspaceTemplate.gitUrl === gitUrl && workspaceTemplate.branch === branch))) {
       throw new AgentsInTheCloudCoreError("workspace_template_exists", `template already exists: ${formatWorkspaceTemplateSpec({ gitUrl, branch })}`);
     }
     const baseName = workspaceTemplateNameFromGitUrl(gitUrl);
-    const name = store.projects.some((workspaceTemplate) => workspaceTemplate.gitUrl === gitUrl)
+    const name = store.workspaceTemplates.some((workspaceTemplate) => workspaceTemplate.gitUrl === gitUrl)
       ? `${baseName} (${branch ?? "default branch"})`
       : baseName;
     const workspaceTemplate = { id, name, gitUrl, branch, sessionShareKey: baseName, createdAt: Date.now() };
-    store.projects.push(workspaceTemplate);
+    store.workspaceTemplates.push(workspaceTemplate);
     return { workspaceTemplate: workspaceTemplateSummary(workspaceTemplate) };
   });
 }
@@ -275,7 +281,7 @@ export async function updateWorkspaceTemplate(id: string, values: { name: string
     const name = values.name.trim();
     if (!name) throw new AgentsInTheCloudCoreError("invalid_arguments", "template name is required");
     const { gitUrl, branch } = parseWorkspaceTemplateSpec(values.spec);
-    if (store.projects.some((candidate) => candidate.id !== id && candidate.gitUrl === gitUrl && candidate.branch === branch)) {
+    if (store.workspaceTemplates.some((candidate) => candidate.id !== id && candidate.gitUrl === gitUrl && candidate.branch === branch)) {
       throw new AgentsInTheCloudCoreError("workspace_template_exists", `template already exists: ${formatWorkspaceTemplateSpec({ gitUrl, branch })}`);
     }
     workspaceTemplate.name = name;
@@ -289,13 +295,23 @@ export async function updateWorkspaceTemplate(id: string, values: { name: string
 export async function deleteWorkspaceTemplate(id: string, file = workspaceTemplatesFile()): Promise<DeleteWorkspaceTemplateResult> {
   return await updateWorkspaceTemplateStore(file, (store) => {
     const workspaceTemplate = findWorkspaceTemplateRecord(store, id);
-    store.projects = store.projects.filter((candidate) => candidate.id !== id);
+    store.workspaceTemplates = store.workspaceTemplates.filter((candidate) => candidate.id !== id);
     return { workspaceTemplate: workspaceTemplateSummary(workspaceTemplate) };
   });
 }
 
 export function workspaceInitFromTemplate(workspaceTemplate: WorkspaceTemplateSummary): GitWorkspaceTemplateInitInstruction {
   return { type: "project.git", configurationFingerprint: workspaceTemplate.configurationFingerprint, projectId: workspaceTemplate.id, name: workspaceTemplate.name, gitUrl: workspaceTemplate.gitUrl, branch: workspaceTemplate.branch, sessionShareKey: workspaceTemplate.sessionShareKey };
+}
+
+/** Read the template identity from the unchanged persisted initialization format. */
+export function workspaceTemplateIdFromInit(init: GitWorkspaceTemplateInitInstruction): string {
+  return init.projectId;
+}
+
+export function workspaceTemplateEnvironmentVariableSummary(variable: StoredWorkspaceTemplateEnvironmentVariable): WorkspaceTemplateEnvironmentVariable {
+  const { projectId: workspaceTemplateId, ...metadata } = variable;
+  return { ...metadata, workspaceTemplateId };
 }
 
 export function isGitWorkspaceTemplateInit(init: unknown): init is GitWorkspaceTemplateInitInstruction {

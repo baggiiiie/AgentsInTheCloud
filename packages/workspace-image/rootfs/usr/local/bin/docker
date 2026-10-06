@@ -15,20 +15,20 @@ MESSAGE
         if [[ -n "${configuration[1]}" ]]; then
             cat >&2 <<'MESSAGE'
 To enable it:
-  1. Open Project settings → Docker support & isolation.
-  2. Select “On — Docker support”.
-  3. Create a new workspace for this project.
+  1. Open Template settings → Container → Docker support.
+  2. Select “On — privileged”.
+  3. Create a new workspace from this Workspace template.
 
 MESSAGE
-            printf 'Project settings: %s\n\n' "${configuration[1]}" >&2
+            printf 'Template settings: %s\n\n' "${configuration[1]}" >&2
         else
             cat >&2 <<'MESSAGE'
-To use Docker, create a workspace for a project with Docker support enabled
-in Project settings → Docker support & isolation.
+To use Docker, create a workspace from a Workspace template with Docker support enabled
+in Template settings → Container → Docker support.
 
 MESSAGE
         fi
-        echo 'Changing the project setting does not enable Docker in this existing workspace.' >&2
+        echo 'Changing the template setting does not enable Docker in this existing workspace.' >&2
         exit 1
         ;;
     *) echo "Invalid Docker support configuration: ${configuration[0]}" >&2; exit 1 ;;

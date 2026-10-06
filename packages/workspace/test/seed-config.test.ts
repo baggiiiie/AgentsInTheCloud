@@ -34,9 +34,9 @@ function hostRuntime() {
   return { agentsInTheCloudDataDir: host, dockerHostAgentsInTheCloudDataDir: host, dockerBridgeHost: "127.0.0.1" };
 }
 
-async function seedPlan(projectsJson = join(nested, "projects.json")): Promise<WorkspaceDockerPlan> {
+async function seedPlan(workspaceTemplatesJson = join(nested, "projects.json")): Promise<WorkspaceDockerPlan> {
   const plan = emptyPlan(true);
-  await applySeedConfigManifest({ version: 1, seedAgentsInTheCloudConfig: { projectsJson } }, plan, hostRuntime(), join(directory, "seed-config"));
+  await applySeedConfigManifest({ version: 1, seedAgentsInTheCloudConfig: { projectsJson: workspaceTemplatesJson } }, plan, hostRuntime(), join(directory, "seed-config"));
   return plan;
 }
 
