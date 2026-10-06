@@ -5,10 +5,68 @@ import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { parseDiffFromFile, type CodeViewItem } from "@pierre/diffs";
 import type { ReviewFile } from "@agents-in-the-cloud/review/diff";
-import type { ChangesSnapshot } from "./snapshot.ts";
+import { branchColor, historyGraph, rowHeight, selectedGraph, type HistoryModel } from "../history.ts";
+import type { ChangesHistory, ChangesSnapshot } from "./snapshot.ts";
 
-export const changesBodyId = (workspaceId: string, snapshotId: string) => domId("changes", workspaceId, snapshotId, "body");
+export const changesBodyId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "body");
+export const comparisonId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "comparison");
+export const historyContentId = (history: ChangesHistory) => domId("changes", history.id, "history");
+export const errorId = (workspaceId: string, historyId: string) => domId("changes", workspaceId, historyId, "error");
 const json = <Value>(value: Value) => JSON.stringify(value).replaceAll("<", "\\u003c").replaceAll("&", "\\u0026");
+export const historyModel = (history: ChangesHistory, snapshot: ChangesSnapshot): HistoryModel => ({ commits: history.commits, references: history.references, range: snapshot.range, head: history.head, branch: history.branch, upstream: history.upstream, hasStaged: history.hasStaged, unpushed: history.unpushed });
+
+export function renderChangesTitle(snapshot: ChangesSnapshot): string {
+  const additions = snapshot.stats.reduce((sum, file) => sum + file.additions, 0);
+  const deletions = snapshot.stats.reduce((sum, file) => sum + file.deletions, 0);
+  return snapshot.index.phase === "ready" ? `Changes +${additions} −${deletions}` : "Changes";
+}
+
+export function renderHistory(workspaceId: string, snapshot: ChangesSnapshot): string {
+  const history = snapshot.history;
+  const graph = historyGraph(history.commits);
+  const selected = selectedGraph(graph, snapshot.range, history.unpushed);
+  const edges = graph.edges.map(edge => `<path data-edge-from="${edge.from}" data-edge-to="${edge.to}" d="${edge.d}" stroke="var(--changes-branch-${edge.lane % 8})"/>`).join("");
+  const nodes = graph.nodes.map(node => {
+    const commit = node.commit, endpoint = commit.id === snapshot.range.newest || commit.id === snapshot.range.oldest;
+    const selectedNode = selected.path.includes(commit.id) || endpoint;
+    return `<circle data-dot="${commit.id}" data-ahead="${commit.ahead}" data-color="${node.lane % 8}" cx="${12 + node.lane * 16}" cy="${node.row * rowHeight + 18}" r="${endpoint ? 6 : 3.5}" stroke="${selectedNode ? "var(--accent)" : `var(--changes-branch-${node.lane % 8})`}" fill="${commit.ahead ? selectedNode ? "var(--accent)" : `var(--changes-branch-${node.lane % 8})` : "var(--panel)"}"><title>${escapeHtml(commit.ahead ? `Not in ${history.upstream}` : commit.subject)}</title></circle>`;
+  }).join("");
+  const clipId = domId("changes", history.id, "selected-path-clip");
+  const svg = `<svg data-changes-range-target="graph" aria-hidden="true" width="${graph.width}" height="${graph.height}" viewBox="0 0 ${graph.width} ${graph.height}"><defs><clipPath id="${clipId}" clipPathUnits="userSpaceOnUse"><rect data-selection-clip x="0" y="${selected.first * rowHeight + 18}" width="${graph.width}" height="${(selected.last - selected.first) * rowHeight}"/></clipPath></defs><g class="changes-history-edges" fill="none" stroke-width="1.4">${edges}</g><path clip-path="url(#${clipId})" data-selected-backbone d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="1" opacity=".5"/><path clip-path="url(#${clipId})" data-selected-beads d="${selected.route}" fill="none" stroke="var(--accent)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0 7"/>${nodes}</svg>`;
+  const rows = graph.nodes.map((node, index) => {
+    const c = node.commit;
+    const labels = c.refs.map(ref => `<span class="changes-ref" data-ref-kind="${ref.kind}" style="--changes-ref-color:var(--changes-branch-${branchColor(ref.name, ref.kind)})" title="${escapeHtml(ref.name)}">${escapeHtml(ref.name)}</span>`).join("");
+    return `<tr tabindex="0" data-changes-range-target="row" data-commit="${c.id}" aria-selected="${selected.path.includes(c.id) || c.id === snapshot.range.newest || c.id === snapshot.range.oldest}" aria-label="${escapeHtml(c.subject + (c.ahead ? ` · Not in ${history.upstream}` : ""))}" title="${escapeHtml(c.subject + (c.ahead ? ` · Not in ${history.upstream}` : ""))}" data-action="keydown->changes-range#navigate">
+      ${index === 0 ? `<td class="changes-graph-cell" rowspan="${graph.nodes.length}">${svg}</td>` : ""}
+      <td class="changes-description"><div class="changes-commit-line">${c.id === history.head ? '<span class="changes-head">HEAD</span>' : ""}${labels}<span class="changes-commit-subject">${escapeHtml(c.subject)}</span></div></td>
+      <td data-col="author">${escapeHtml(c.author)}</td><td data-col="date">${escapeHtml(c.date)}</td><td data-col="sha"><code>${c.kind === "commit" ? c.id.slice(0, 7) : "—"}</code></td>
+    </tr>`;
+  }).join("");
+  return `<div id="${historyContentId(history)}" class="changes-history-content" data-changes-range-target="historyContent"><div class="changes-selection-box" data-changes-range-target="selectionBox" aria-hidden="true" style="top:${selected.first * rowHeight}px;height:${(selected.last - selected.first + 1) * rowHeight}px"></div><table class="changes-history-table" role="grid" aria-multiselectable="true" aria-label="Local commit history" data-changes-range-target="table" data-action="pointerdown->changes-range#beginSelection pointerup->changes-range#finishSelection pointercancel->changes-range#cancelGesture"><colgroup><col style="width:${graph.width}px"><col><col data-col="author" style="width:116px"><col data-col="date" style="width:112px"><col data-col="sha" style="width:78px"></colgroup><tbody>${rows}</tbody></table>${history.hasMore ? `<div class="changes-history-more">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Load more" }, attributesHtml: 'data-action="changes-range#loadMore" data-changes-range-target="more"' })}</div>` : ""}<script type="application/json" data-changes-range-target="historyModel">${json(historyModel(history, snapshot))}</script></div>`;
+}
+
+export function renderError(workspaceId: string, historyId: string, message = ""): string {
+  return `<div id="${errorId(workspaceId, historyId)}" class="changes-range-error" data-changes-range-target="error" role="alert" ${message ? "" : "hidden"}><span>${escapeHtml(message)}</span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Retry" }, attributesHtml: 'data-action="changes-range#retry"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Dismiss comparison error" }, attributesHtml: 'data-action="changes-range#dismissError"' })}</div>`;
+}
+
+export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pickerOpen = false): string {
+  const history = snapshot.history;
+  const pickerId = domId("changes", history.id, "picker");
+  const header = history.phase === "ready" ? actionItemHtml({
+    kind: "single", label: { kind: "text", text: snapshot.label }, leadingHtml: Icons.Disclosure,
+    element: { tag: "button", attributesHtml: `type="button" data-action="changes-range#togglePicker" data-changes-range-target="trigger" aria-expanded="${pickerOpen}" aria-controls="${pickerId}"` },
+  }) : '<strong>Changes</strong>';
+  const picker = history.phase === "ready" ? `<div id="${pickerId}" class="changes-picker-host" data-changes-range-target="picker" role="region" aria-label="Commit history" ${pickerOpen ? "" : "hidden"}><div class="changes-history-scroll" data-changes-range-target="historyScroll">${renderHistory(workspaceId, snapshot)}</div></div>` : "";
+  // History is the permanent shell; live comparisons replace only the Pierre island underneath it.
+  return `<section id="${changesBodyId(workspaceId, history.id)}" data-turbo-permanent class="changes-body" data-controller="changes-range" data-changes-range-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-range-history-id-value="${history.id}" data-changes-range-open-value="${pickerOpen}" data-action="keydown.esc->changes-range#escape pointermove@window->changes-range#moveSelection pointermove@window->changes-range#hover">
+    <header class="changes-range-header">${header}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh history and diff" }, attributesHtml: 'data-action="changes-range#refresh" data-changes-range-target="refresh"' })}</header>${picker}${renderComparison(workspaceId, snapshot)}
+    <div class="changes-loading" data-changes-range-target="loading" role="status" hidden><span class="changes-spinner" aria-hidden="true"></span><span>Generating comparison…</span></div>${renderError(workspaceId, history.id)}
+  </section>`;
+}
+
+export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot): string {
+  return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-range-target="diff">${renderDiff(workspaceId, snapshot)}</div>`;
+}
 
 export function renderChangesFile(file: ReviewFile, snapshotId: string): string {
   const item: CodeViewItem<undefined> = file.diff
@@ -17,7 +75,7 @@ export function renderChangesFile(file: ReviewFile, snapshotId: string): string 
   return `<script type="application/json" data-changes-file>${json(item)}</script>`;
 }
 
-export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot): string {
+function renderDiff(workspaceId: string, snapshot: ChangesSnapshot): string {
   const files = snapshot.stats;
   const items: CodeViewItem<undefined>[] = files.map((file) => {
     const captured = snapshot.files.get(file.path)!;
@@ -28,7 +86,6 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot): s
   });
   const additions = snapshot.stats.reduce((total, file) => total + file.additions, 0);
   const deletions = snapshot.stats.reduce((total, file) => total + file.deletions, 0);
-  const sidebarId = domId("changes", workspaceId, snapshot.id, "files");
   const iconButton = (label: string, action: string, icon: string, attributes = "") => buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: icon, label }, attributesHtml: `data-action="changes#${action}" ${attributes}` });
   const layoutItem = (layout: "unified" | "split", label: string) => actionItemHtml({ kind: "single", label: { kind: "text", text: label }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: `type="button" role="menuitemradio" aria-checked="${layout === "unified"}" data-layout="${layout}" data-action="changes#chooseLayout"` } });
   const displayMenu = popupHtml({
@@ -42,16 +99,17 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot): s
     trailingHtml: `<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}${file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : ""}</span>`,
     element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="true"` },
   })}</div></template>`).join("");
-  const empty = snapshot.index.phase === "not-git" ? "This workspace isn’t a Git repository." : "No changes. The working tree matches HEAD.";
-  // A snapshot-keyed permanent island keeps live shell morphs from erasing Pierre’s managed DOM.
-  return `<section id="${changesBodyId(workspaceId, snapshot.id)}" data-turbo-permanent class="changes-body" data-controller="changes" data-action="keydown.esc->changes#closeFiles" data-changes-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-snapshot-id-value="${snapshot.id}">
+  const commentTemplates = `<template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
+    <template data-changes-target="commentEditor"><form class="changes-comment changes-comment-editor" data-action="submit->changes#saveComment keydown.meta+enter->changes#commentShortcut keydown.ctrl+enter->changes#commentShortcut keydown.esc->changes#cancelComment"><header><span data-comment-anchor></span>${iconButton("Cancel comment", "cancelComment", Icons.Close)}</header><textarea class="textarea" rows="3" required maxlength="10000" aria-label="Comment" placeholder="Leave a comment" data-action="input->changes#commentInput"></textarea><footer><small>Temporary—cleared on refresh or comparison change.</small>${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Comment" } })}</footer></form></template>
+    <template data-changes-target="commentCard"><article class="changes-comment"><header><span data-comment-anchor></span>${iconButton("Delete comment", "deleteComment", Icons.Trash)}</header>${actionItemHtml({ kind: "single", label: { kind: "text", text: "Comment", textAttributesHtml: "data-comment-body" }, element: { tag: "button", attributesHtml: 'type="button" aria-label="Edit comment" data-action="changes#editComment"' } })}</article></template>`;
+  const empty = snapshot.index.phase === "not-git" ? "This workspace isn’t a Git repository." : snapshot.label === "Uncommitted changes" ? "No uncommitted changes." : snapshot.label === "Unstaged changes" ? "No unstaged changes." : snapshot.label === "Staged changes" ? "No staged changes." : "No changed files in this comparison.";
+  // The history-keyed parent protects Pierre’s managed DOM during live shell morphs.
+  return `<section id="${domId("changes", snapshot.id, "diff")}" class="changes-diff" data-controller="changes" data-changes-workspace-id-value="${escapeHtml(workspaceId)}" data-changes-snapshot-id-value="${snapshot.id}">
     <header class="changes-toolbar">
-      <span class="changes-mobile-navigation">${files.length ? iconButton("Show changed files", "toggleFiles", Icons.Files, `data-changes-target="filesToggle" aria-expanded="false" aria-controls="${sidebarId}"`) : ""}</span>
-      <div class="changes-comparison"><strong>Uncommitted changes</strong><span class="changes-summary">${files.length} ${files.length === 1 ? "file" : "files"} <span class="changes-additions">+${additions}</span> <span class="changes-deletions">−${deletions}</span></span></div>
-      <div class="changes-controls">${files.length ? iconButton("Collapse all files", "toggleCollapse", collapseIcons, 'data-changes-target="collapseToggle" aria-pressed="false"') : ""}${displayMenu}<form method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/changes/refresh?snapshot=${snapshot.id}">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Refresh, label: "Refresh changes" } })}</form></div>
+      <div class="changes-controls"><span class="changes-summary">${files.length} ${files.length === 1 ? "file" : "files"} <span class="changes-additions">+${additions}</span> <span class="changes-deletions">−${deletions}</span></span>${files.length ? iconButton("Collapse all files", "toggleCollapse", collapseIcons, 'data-changes-target="collapseToggle" aria-pressed="false"') : ""}${displayMenu}</div>
     </header>
-    <div class="changes-error" data-changes-target="error" role="alert" hidden></div>
-    ${files.length ? `<div class="changes-surface"><button type="button" class="changes-backdrop" data-action="changes#closeFiles" aria-label="Close changed files" tabindex="-1"></button><aside id="${sidebarId}" class="changes-sidebar" aria-label="Changed files"><header class="changes-sidebar-header"><strong>Changed files</strong><div><span class="changes-mobile-navigation">${iconButton("Close changed files", "closeFiles", Icons.Close)}</span></div></header><div class="changes-tree" data-changes-target="tree" data-action="click->changes#activateTreeFile keydown.enter->changes#activateTreeFile:capture keydown.space->changes#activateTreeFile:capture"></div></aside><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Uncommitted diffs"></div></div><footer class="changes-footer"><span data-changes-target="activeFile">${escapeHtml(files[0]!.path)}</span><span>HEAD → working tree</span></footer>` : `<div class="changes-empty">${escapeHtml(empty)}</div>`}
-    <script type="application/json" data-changes-target="model">${json({ files, items })}</script>${headers}
+    <div id="${changesBodyId(workspaceId, snapshot.id)}-error" class="changes-error" data-changes-target="error" role="alert" hidden><span data-changes-target="errorMessage"></span>${iconButton("Dismiss file error", "dismissError", Icons.Close)}</div>
+    ${files.length ? `<div class="changes-surface"><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Changes diff"></div></div><footer class="changes-footer"><span data-changes-target="activeFile">${escapeHtml(files[0]!.path)}</span><span>${escapeHtml(snapshot.baseLabel)} → ${escapeHtml(snapshot.endLabel)}${snapshot.end ? " · Read-only" : ""}</span></footer>` : `<div class="changes-empty">${escapeHtml(empty)}</div>`}
+    <script type="application/json" data-changes-target="model">${json({ files, items })}</script><script type="application/json" data-changes-range-target="comparisonModel">${json({ range: snapshot.range, label: snapshot.label, baseLabel: snapshot.baseLabel, endLabel: snapshot.endLabel })}</script>${headers}${commentTemplates}
   </section>`;
 }

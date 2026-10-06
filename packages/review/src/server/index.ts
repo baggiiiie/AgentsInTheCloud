@@ -2,12 +2,11 @@ import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { turboStreamResponse, type WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { isReviewDiffHighlighting, isReviewDiffOverflow, reviewCommentsPrompt, type ReviewSide } from "../model.ts";
 import { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, reviewDeletionReview } from "./deletion.ts";
-import { collectReviewFile, collectReviewIndex, collectReviewStats, reviewSnippet, type ReviewFileStats, type ReviewIndex } from "./diff.ts";
+import { workspaceRepository, collectReviewFile, collectReviewIndex, collectReviewStats, reviewSnippet, type ReviewFileStats, type ReviewIndex } from "./diff.ts";
 import { renderReviewBody, renderReviewFileContent, renderReviewFilePage, renderReviewMoreFiles, renderReviewTitle, reviewFileFrameId, reviewFilePageSize, reviewPageId, reviewReference, reviewWorkViewPresentation } from "./render.ts";
 import {
   isReviewDiffLayout,
@@ -24,7 +23,7 @@ const indexes = new Map<string, ReviewIndex>();
 const stats = new WeakMap<ReviewIndex, Promise<ReviewFileStats[]>>();
 
 async function refresh(workspaceId: string): Promise<{ index: ReviewIndex; comments: ReviewComment[] }> {
-  const index = await collectReviewIndex(workspaceWorkHostPath(workspaceId));
+  const index = await collectReviewIndex(workspaceRepository(workspaceId));
   indexes.set(workspaceId, index);
   return { index, comments: reconcileReviewComments(workspaceId, index) };
 }
@@ -37,7 +36,7 @@ async function current(workspaceId: string): Promise<{ index: ReviewIndex; comme
 function currentStats(workspaceId: string, index: ReviewIndex): Promise<ReviewFileStats[]> {
   let pending = stats.get(index);
   if (!pending) {
-    pending = collectReviewStats(workspaceWorkHostPath(workspaceId), index);
+    pending = collectReviewStats(workspaceRepository(workspaceId), index);
     stats.set(index, pending);
     void pending.catch(() => stats.delete(index));
   }
@@ -63,7 +62,7 @@ async function createComment(workspaceId: string, request: Request): Promise<Res
   const endLine = positiveLine(form.get("endLine"));
   const body = String(form.get("body") ?? "").trim();
   if (!path || !side || !startLine || !endLine || endLine < startLine || !body || body.length > 20_000) return textResponse("Invalid review comment", { status: 422 });
-  const file = await collectReviewFile(workspaceWorkHostPath(workspaceId), path);
+  const file = await collectReviewFile(workspaceRepository(workspaceId), path);
   if (!file || file.kind !== "text") return textResponse("Review file is no longer available", { status: 409 });
   const snippet = reviewSnippet(file, side, startLine, endLine);
   if (!snippet && startLine !== 1) return textResponse("Review line is no longer available", { status: 409 });
@@ -76,7 +75,7 @@ async function updateComment(workspaceId: string, id: string, request: Request):
   if (!body || body.length > 20_000) return textResponse("Invalid review comment", { status: 422 });
   const comment = listReviewComments(workspaceId).find((candidate) => candidate.id === id);
   if (!comment) return textResponse("Review comment not found", { status: 404 });
-  const file = await collectReviewFile(workspaceWorkHostPath(workspaceId), comment.path);
+  const file = await collectReviewFile(workspaceRepository(workspaceId), comment.path);
   if (!file || file.kind !== "text") return textResponse("Review file is no longer available", { status: 409 });
   updateReviewComment(workspaceId, id, body);
   return turboStreamResponse("");
@@ -85,7 +84,7 @@ async function updateComment(workspaceId: string, id: string, request: Request):
 export const reviewWorkspaceModule: WorkspaceModule = {
   id: "review",
   liveSurfaces: [{ name: "review-file", async load({ workspaceId, key }) {
-    const file = await collectReviewFile(workspaceWorkHostPath(workspaceId), key);
+    const file = await collectReviewFile(workspaceRepository(workspaceId), key);
     if (!file) return [{ target: reviewFileFrameId(workspaceId, key), html: '<p role="note">This change is no longer available.</p>' }];
     const { comments, changed } = remapReviewFileComments(workspaceId, file);
     if (changed) invalidateWorkspace(workspaceId);

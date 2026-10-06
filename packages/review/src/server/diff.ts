@@ -1,8 +1,8 @@
-import { lstat, readFile, readlink, stat } from "node:fs/promises";
 import { isUtf8 } from "node:buffer";
-import { join, relative, sep } from "node:path";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
-import { isNotFoundError } from "@agents-in-the-cloud/core";
+import type { Repository, GitResult, WorkingFile } from "./repository.ts";
+export { workspaceRepository, localRepository } from "./repository.ts";
+export type { Repository, GitResult } from "./repository.ts";
 import type { ReviewSide } from "../model.ts";
 
 const maxRenderedBytes = 1_000_000;
@@ -41,19 +41,11 @@ interface StatusEntry {
   previousPath?: string;
 }
 
-export interface GitResult { stdout: Buffer; stderr: string; exitCode: number }
-
-export async function gitResult(root: string, args: string[]): Promise<GitResult> {
-  const process = Bun.spawn(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(process.stdout).arrayBuffer(),
-    new Response(process.stderr).text(),
-    process.exited,
-  ]);
-  return { stdout: Buffer.from(stdout), stderr, exitCode };
+export async function gitResult(root: Repository, args: string[]): Promise<GitResult> {
+  return root.gitResult(args);
 }
 
-export async function git(root: string, args: string[], allowFailure = false): Promise<Buffer> {
+export async function git(root: Repository, args: string[], allowFailure = false): Promise<Buffer> {
   const result = await gitResult(root, args);
   if (result.exitCode !== 0 && !allowFailure) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
   return result.exitCode === 0 ? result.stdout : Buffer.alloc(0);
@@ -79,24 +71,17 @@ function parseStatus(output: Buffer): StatusEntry[] {
   return entries;
 }
 
-async function gitObject(root: string, path: string): Promise<Buffer | undefined> {
+async function gitObject(root: Repository, path: string): Promise<Buffer | undefined> {
   const result = await gitResult(root, ["show", `HEAD:${path}`]);
   return result.exitCode === 0 ? result.stdout : undefined;
 }
 
-async function workingFile(root: string, path: string): Promise<Buffer | undefined> {
-  const absolute = join(root, path);
-  const resolved = relative(root, absolute);
-  if (resolved.startsWith(`..${sep}`) || resolved === "..") throw new Error(`review path escapes repository: ${path}`);
-  try {
-    const info = await lstat(absolute);
-    if (info.isSymbolicLink()) return Buffer.from(await readlink(absolute));
-    if (!info.isFile()) return undefined;
-    return await readFile(absolute);
-  } catch (error) {
-    if (isNotFoundError(error)) return undefined;
-    throw error;
-  }
+async function workingFileEntry(root: Repository, path: string): Promise<WorkingFile | undefined> {
+  return root.workingFile(path);
+}
+
+async function workingFile(root: Repository, path: string): Promise<Buffer | undefined> {
+  return (await workingFileEntry(root, path))?.contents;
 }
 
 function decodeText(content: Buffer | undefined): string | undefined {
@@ -111,13 +96,12 @@ function lineCount(text: string | undefined): number {
 
 type ChangeCounts = { additions: number; deletions: number };
 
-async function modes(root: string, entry: StatusEntry): Promise<{ oldMode?: string; newMode?: string }> {
+async function modes(root: Repository, entry: StatusEntry): Promise<{ oldMode?: string; newMode?: string }> {
   const raw = (await git(root, ["diff", "--raw", "HEAD", "--", entry.path], true)).toString("utf8").trim();
   const match = raw.match(/^:(\d{6}) (\d{6}) /);
   if (match) return { oldMode: match[1], newMode: match[2] };
   if (entry.code === "??") {
-    const info = await lstat(join(root, entry.path));
-    return { newMode: info.isSymbolicLink() ? "120000" : info.mode & 0o111 ? "100755" : "100644" };
+    return { newMode: (await workingFileEntry(root, entry.path))?.mode };
   }
   return {};
 }
@@ -145,7 +129,7 @@ function reviewFileFromContents(
     : { ...base, kind: "mode", detail: noTextDetail };
 }
 
-async function reviewFile(root: string, entry: StatusEntry): Promise<ReviewFile | undefined> {
+async function reviewFile(root: Repository, entry: StatusEntry): Promise<ReviewFile | undefined> {
   const oldPath = entry.previousPath ?? entry.path;
   const [oldBuffer, newBuffer, fileModes] = await Promise.all([
     entry.code === "??" ? undefined : gitObject(root, oldPath),
@@ -168,13 +152,7 @@ async function reviewFile(root: string, entry: StatusEntry): Promise<ReviewFile 
   return reviewFileFromContents(entry, oldBuffer, newBuffer, detail);
 }
 
-async function statusEntries(root: string): Promise<StatusEntry[] | undefined> {
-  try {
-    await stat(root);
-  } catch (error) {
-    if (isNotFoundError(error)) return undefined;
-    throw error;
-  }
+async function statusEntries(root: Repository): Promise<StatusEntry[] | undefined> {
   const inside = await git(root, ["rev-parse", "--is-inside-work-tree"], true);
   if (inside.toString("utf8").trim() !== "true") return undefined;
   return parseStatus(await git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]));
@@ -186,7 +164,7 @@ function statusChange(entry: StatusEntry): ReviewFileChange {
   return "modified";
 }
 
-export async function collectReviewIndex(root: string): Promise<ReviewIndex> {
+export async function collectReviewIndex(root: Repository): Promise<ReviewIndex> {
   const entries = await statusEntries(root);
   if (!entries) return { phase: "not-git" };
   const files = entries.map((entry): ReviewFileSummary => {
@@ -198,7 +176,7 @@ export async function collectReviewIndex(root: string): Promise<ReviewIndex> {
   return { phase: "ready", files };
 }
 
-export async function collectReviewFile(root: string, path: string): Promise<ReviewFile | undefined> {
+export async function collectReviewFile(root: Repository, path: string): Promise<ReviewFile | undefined> {
   const entries = await statusEntries(root);
   const entry = entries?.find((candidate) => candidate.path === path);
   return entry ? await reviewFile(root, entry) : undefined;
@@ -228,7 +206,7 @@ function parseNumstat(output: Buffer): Map<string, Numstat> {
   return stats;
 }
 
-export async function collectReviewStats(root: string, index: ReviewIndex): Promise<ReviewFileStats[]> {
+export async function collectReviewStats(root: Repository, index: ReviewIndex): Promise<ReviewFileStats[]> {
   if (index.phase !== "ready") return [];
   let tracked = new Map<string, Numstat>();
   if (index.files.some((file) => !file.untracked)) {
@@ -271,10 +249,14 @@ interface CommitEntry extends StatusEntry {
   newHash: string;
 }
 
-async function commitEntries(root: string, commit: string): Promise<{ base: string; entries: CommitEntry[] }> {
+async function commitEntries(root: Repository, commit: string): Promise<{ base: string; entries: CommitEntry[] }> {
   const [, parent] = (await git(root, ["rev-list", "--parents", "-n", "1", commit])).toString("utf8").trim().split(" ");
   const base = parent ?? (await git(root, ["hash-object", "-t", "tree", "/dev/null"])).toString("utf8").trim();
-  const fields = (await git(root, ["diff", "--raw", "--no-abbrev", "-z", "-M", base, commit, "--"])).toString("utf8").split("\0");
+  return { base, entries: await comparisonEntries(root, base, commit) };
+}
+
+async function comparisonEntries(root: Repository, base: string, end?: string): Promise<CommitEntry[]> {
+  const fields = (await git(root, ["diff", "--raw", "--no-abbrev", "-z", "-M", base, ...(end ? [end] : []), "--"])).toString("utf8").split("\0");
   const entries: CommitEntry[] = [];
   for (let index = 0; index < fields.length - 1;) {
     const [oldMode, newMode, oldHash, newHash, code] = fields[index++]!.slice(1).split(" ");
@@ -286,10 +268,10 @@ async function commitEntries(root: string, commit: string): Promise<{ base: stri
     }
     entries.push(entry);
   }
-  return { base, entries };
+  return entries;
 }
 
-export async function collectCommitReviewStats(root: string, commit: string): Promise<ReviewFileStats[]> {
+export async function collectCommitReviewStats(root: Repository, commit: string): Promise<ReviewFileStats[]> {
   const { base, entries } = await commitEntries(root, commit);
   const stats = parseNumstat(await git(root, ["diff", "--numstat", "-z", "-M", base, commit, "--"]));
   return Promise.all(entries.map(async (entry) => {
@@ -306,7 +288,7 @@ export async function collectCommitReviewStats(root: string, commit: string): Pr
 }
 
 /** Compare against the first parent; root commits compare against an empty tree. */
-export async function collectCommitReviewFile(root: string, commit: string, path: string): Promise<ReviewFile | undefined> {
+export async function collectCommitReviewFile(root: Repository, commit: string, path: string): Promise<ReviewFile | undefined> {
   const { entries } = await commitEntries(root, commit);
   const entry = entries.find((candidate) => candidate.path === path);
   if (!entry) return undefined;
@@ -320,4 +302,50 @@ export async function collectCommitReviewFile(root: string, commit: string, path
     : after === undefined ? "Empty file deleted"
     : entry.oldMode !== entry.newMode ? "File mode changed" : "No textual changes";
   return reviewFileFromContents(entry, before, after, detail);
+}
+
+/** Collect a fixed Git comparison, or compare its base with the working tree without touching the index. */
+export async function collectReviewComparison(root: Repository, base: string, end?: string): Promise<{ index: ReviewIndex; stats: ReviewFileStats[]; files: Map<string, ReviewFile> }> {
+  const entries = await comparisonEntries(root, base, end);
+  if (!end) {
+    const untracked = (await statusEntries(root))!.filter((entry) => entry.code === "??" && !entries.some((tracked) => tracked.path === entry.path));
+    for (const entry of untracked) entries.push({ ...entry, oldMode: "000000", newMode: "100644", oldHash: "", newHash: "" });
+  }
+  entries.sort((a, b) => a.path.localeCompare(b.path));
+  const counts = parseNumstat(await git(root, ["diff", "--numstat", "-z", "-M", base, ...(end ? [end] : []), "--"]));
+  const files = new Map<string, ReviewFile>();
+  const stats: ReviewFileStats[] = new Array(entries.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(4, entries.length) }, async () => {
+    while (cursor < entries.length) {
+      const position = cursor++;
+      const entry = entries[position]!;
+      const summary: ReviewFileSummary = { path: entry.path, change: statusChange(entry) };
+      if (entry.previousPath) summary.previousPath = entry.previousPath;
+      if (entry.code === "??") summary.untracked = true;
+      if (entry.oldMode === "160000" || entry.newMode === "160000") {
+        files.set(entry.path, { ...summary, kind: "mode", detail: "Submodule changed" });
+        stats[position] = { ...summary, additions: 0, deletions: 0 };
+        continue;
+      }
+      const blob = (hash: string, mode: string) => mode === "000000" ? undefined : git(root, ["cat-file", "blob", hash]);
+      const [before, working, committed] = await Promise.all([blob(entry.oldHash, entry.oldMode), end ? undefined : workingFileEntry(root, entry.path), end ? blob(entry.newHash, entry.newMode) : undefined]);
+      const after = end ? committed : working?.contents;
+      if (working) entry.newMode = working.mode;
+      if (!entry.previousPath && before !== undefined && after !== undefined && before.equals(after) && entry.oldMode === entry.newMode) continue;
+      const detail = entry.previousPath ? "File renamed" : before === undefined ? "Empty file added" : after === undefined ? "Empty file deleted" : entry.oldMode !== entry.newMode ? "File mode changed" : "No textual changes";
+      const file = reviewFileFromContents(entry, before, after, detail);
+      if (!file) throw new Error(`File changed while capturing comparison: ${entry.path}`);
+      summary.change = file.change;
+      files.set(entry.path, file);
+      const count = counts.get(entry.path);
+      stats[position] = { ...summary, additions: count?.additions ?? (lineCount(decodeText(after)) - Number(decodeText(after)?.endsWith("\n") ?? false)), deletions: count?.deletions ?? 0 };
+      if (file.diff) {
+        stats[position] = { ...summary, additions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.additionLines, 0), deletions: file.diff.hunks.reduce((sum, hunk) => sum + hunk.deletionLines, 0) };
+      }
+      if (file.kind === "binary") stats[position] = { ...summary, additions: 0, deletions: 0, binarySizes: { before: before?.byteLength, after: after?.byteLength } };
+    }
+  }));
+  const capturedStats = stats.filter((stat) => stat !== undefined);
+  return { index: { phase: "ready", files: capturedStats.map(({ additions: _a, deletions: _d, binarySizes: _b, ...summary }) => summary) }, stats: capturedStats, files };
 }

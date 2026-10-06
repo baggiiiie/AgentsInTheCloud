@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, reviewDeletionReview } from "../src/server/deletion.ts";
+import { localRepository } from "../src/server/diff.ts";
+import { createDeletionReview } from "../src/server/deletion.ts";
 import { command } from "./support/repository.ts";
 
 const workspaceId = "de1e7e01";
 let dataDir: string;
 let previousDataDir: string | undefined;
+const { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, reviewDeletionReview } = createDeletionReview((id, path) => localRepository(join(dataDir, "workspaces", id, "work", path)));
 
 beforeEach(async () => {
   previousDataDir = process.env.ATELIER_DATA_DIR;

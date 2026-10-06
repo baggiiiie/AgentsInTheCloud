@@ -1,3 +1,4 @@
+import { localRepository } from "../src/server/diff.ts";
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,9 +23,9 @@ async function repository(): Promise<string> {
 }
 
 async function reviewFiles(root: string): Promise<ReviewFile[]> {
-  const index = await collectReviewIndex(root);
+  const index = await collectReviewIndex(localRepository(root));
   if (index.phase !== "ready") throw new Error("expected ready review");
-  const files = await Promise.all(index.files.map((file) => collectReviewFile(root, file.path)));
+  const files = await Promise.all(index.files.map((file) => collectReviewFile(localRepository(root), file.path)));
   return files.filter((file): file is ReviewFile => file !== undefined);
 }
 
@@ -32,7 +33,7 @@ describe("Review collection", () => {
   test("reports a non-repository without throwing", async () => {
     const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-not-git-"));
     roots.push(root);
-    expect((await collectReviewIndex(root)).phase).toBe("not-git");
+    expect((await collectReviewIndex(localRepository(root))).phase).toBe("not-git");
   });
 
   test("lists tracked and untracked changes without collecting file details", async () => {
@@ -41,12 +42,12 @@ describe("Review collection", () => {
     await writeFile(join(root, "untracked.ts"), "export const newFile = true;\n");
     await writeFile(join(root, "ignored.txt"), "not reviewed\n");
 
-    const index = await collectReviewIndex(root);
+    const index = await collectReviewIndex(localRepository(root));
     expect(index).toEqual({ phase: "ready", files: [
       { path: "changed.ts", change: "modified" },
       { path: "untracked.ts", change: "added", untracked: true },
     ] });
-    expect(await collectReviewStats(root, index)).toEqual([
+    expect(await collectReviewStats(localRepository(root), index)).toEqual([
       { path: "changed.ts", change: "modified", additions: 2, deletions: 1 },
       { path: "untracked.ts", change: "added", untracked: true, additions: 1, deletions: 0 },
     ]);
@@ -61,7 +62,7 @@ describe("Review collection", () => {
     for (const [path, text] of Object.entries({ "empty-new.txt": "", "newline.txt": "héllo\nworld\n", "no-newline.txt": "héllo\nworld" })) {
       await writeFile(join(root, path), text);
     }
-    const stats = await collectReviewStats(root, await collectReviewIndex(root));
+    const stats = await collectReviewStats(localRepository(root), await collectReviewIndex(localRepository(root)));
     expect(stats.map(({ path, additions }) => ({ path, additions }))).toEqual([
       { path: "empty-new.txt", additions: 0 },
       { path: "newline.txt", additions: 2 },
@@ -75,8 +76,8 @@ describe("Review collection", () => {
     await command(root, "git", "init");
     await writeFile(join(root, "first.ts"), "export const first = true;\n");
     await command(root, "git", "add", "first.ts");
-    const index = await collectReviewIndex(root);
-    expect(await collectReviewStats(root, index)).toEqual([{ path: "first.ts", change: "added", additions: 1, deletions: 0 }]);
+    const index = await collectReviewIndex(localRepository(root));
+    expect(await collectReviewStats(localRepository(root), index)).toEqual([{ path: "first.ts", change: "added", additions: 1, deletions: 0 }]);
   });
 
   test("classifies whole-file additions and removals", async () => {
@@ -84,7 +85,7 @@ describe("Review collection", () => {
     await writeFile(join(root, "added.ts"), "export const added = true;\n");
     await rm(join(root, "changed.ts"));
 
-    const index = await collectReviewIndex(root);
+    const index = await collectReviewIndex(localRepository(root));
     if (index.phase !== "ready") throw new Error("expected ready review");
     expect(index.files.map(({ path, change }) => ({ path, change }))).toEqual([
       { path: "added.ts", change: "added" },
@@ -95,8 +96,8 @@ describe("Review collection", () => {
   test("keeps empty files and rename metadata", async () => {
     const root = await repository();
     await command(root, "git", "mv", "empty.txt", "renamed.txt");
-    const index = await collectReviewIndex(root);
-    expect(await collectReviewStats(root, index)).toEqual([{ path: "renamed.txt", previousPath: "empty.txt", change: "modified", additions: 0, deletions: 0 }]);
+    const index = await collectReviewIndex(localRepository(root));
+    expect(await collectReviewStats(localRepository(root), index)).toEqual([{ path: "renamed.txt", previousPath: "empty.txt", change: "modified", additions: 0, deletions: 0 }]);
     const files = await reviewFiles(root);
     expect(files).toHaveLength(1);
     expect(files[0]!.path).toBe("renamed.txt");
@@ -126,7 +127,7 @@ describe("Review collection", () => {
     await writeFile(join(root, "new.bin"), Buffer.alloc(32));
     await writeFile(join(root, "staged.bin"), Buffer.alloc(64));
     await command(root, "git", "add", "staged.bin");
-    const stats = await collectReviewStats(root, await collectReviewIndex(root));
+    const stats = await collectReviewStats(localRepository(root), await collectReviewIndex(localRepository(root)));
     expect(Object.fromEntries(stats.map((file) => [file.path, file.binarySizes]))).toEqual({
       "modified.bin": { before: 1024, after: 2048 },
       "removed.bin": { before: 1024, after: undefined },

@@ -1,33 +1,37 @@
-import type { CodeView, CodeViewItem, CodeViewOptions } from "@pierre/diffs";
-import type { FileTree } from "@pierre/trees";
+import type { CodeView, CodeViewItem, CodeViewOptions, SelectedLineRange } from "@pierre/diffs";
 import type { WorkspaceClientModule, WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
+import { createRangeController } from "./range-controller.ts";
 import { reviewDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
-type FileSummary = { path: string; previousPath?: string; change: "added" | "modified" | "removed"; untracked?: boolean; additions: number; deletions: number; binarySizes?: object };
+type FileSummary = { path: string };
+type CommentAnnotation = { id: string; kind: "draft" | "comment"; path: string; side: "additions" | "deletions"; start: number; end: number; body: string };
 
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
-    static targets = ["viewer", "tree", "model", "activeFile", "error", "collapseToggle", "filesToggle"];
+    static targets = ["viewer", "model", "activeFile", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard"];
     static values = { workspaceId: String, snapshotId: String };
     declare readonly viewerTarget: HTMLElement;
-    declare readonly treeTarget: HTMLElement;
     declare readonly modelTarget: HTMLScriptElement;
     declare readonly activeFileTarget: HTMLElement;
     declare readonly errorTarget: HTMLElement;
+    declare readonly errorMessageTarget: HTMLElement;
     declare readonly collapseToggleTarget: HTMLButtonElement;
-    declare readonly filesToggleTarget: HTMLButtonElement;
+    declare readonly commentGutterTarget: HTMLTemplateElement;
+    declare readonly commentEditorTarget: HTMLTemplateElement;
+    declare readonly commentCardTarget: HTMLTemplateElement;
     declare readonly workspaceIdValue: string;
     declare readonly snapshotIdValue: string;
-    private viewer?: CodeView;
-    private tree?: FileTree;
+    private viewer?: CodeView<CommentAnnotation, undefined>;
+    private comments = new Map<string, CommentAnnotation>();
+    private draft?: CommentAnnotation;
+    private gutters = new WeakMap<HTMLElement, { path: string; hovered: () => { lineNumber: number; side?: "additions" | "deletions" } | undefined }>();
     private files: FileSummary[] = [];
     private loaded = new Set<string>();
     private pending = new Set<string>();
     private abort?: AbortController;
     private unsubscribe?: () => void;
-    private syncingSelection = false;
     private activePath?: string;
-    private options: CodeViewOptions<undefined, undefined> = {};
+    private options: CodeViewOptions<CommentAnnotation, undefined> = {};
     private layout: "unified" | "split" = "unified";
     private wrap = false;
     private collapsed = false;
@@ -38,26 +42,39 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.abort?.abort();
       this.unsubscribe?.();
       this.viewer?.cleanUp();
-      this.tree?.cleanUp();
       this.viewer = undefined;
-      this.tree = undefined;
       this.loaded.clear();
       this.pending.clear();
     }
 
     private async mount(): Promise<void> {
+      const shell = this.element.closest<HTMLElement>(".changes-body")!;
+      this.layout = shell.dataset.changesLayout === "split" ? "split" : "unified";
+      this.wrap = shell.dataset.changesWrap === "true";
+      for (const radio of this.element.querySelectorAll<HTMLElement>("[data-layout]")) radio.setAttribute("aria-checked", String(radio.dataset.layout === this.layout));
+      this.element.querySelector('[data-action="changes#toggleWrap"]')!.setAttribute("aria-checked", String(this.wrap));
       // SAFETY: renderChanges emits this private model with type-matched loading items.
-      const model = JSON.parse(this.modelTarget.textContent!) as { files: FileSummary[]; items: CodeViewItem<undefined>[] };
+      const model = JSON.parse(this.modelTarget.textContent!) as { files: FileSummary[]; items: CodeViewItem<CommentAnnotation>[] };
       this.files = model.files;
       for (const item of model.items) if (item.type === "file") this.loaded.add(item.id);
       if (!this.files.length) return;
       const abort = this.abort = new AbortController();
-      const [{ CodeView }, { FileTree }] = await Promise.all([import("@pierre/diffs"), import("@pierre/trees"), import("@agents-in-the-cloud/syntax/pierre")]);
+      const [{ CodeView }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (abort.signal.aborted) return;
       this.options = {
         ...reviewDiffOptions,
         disableFileHeader: false,
         disableLineNumbers: false,
+        enableLineSelection: true,
+        enableGutterUtility: true,
+        renderGutterUtility: (hovered, context) => {
+          if (context.type !== "diff" || !this.loaded.has(context.item.id)) return null;
+          // SAFETY: renderDiff emits a Button as the gutter template’s sole root.
+          const button = this.commentGutterTarget.content.firstElementChild!.cloneNode(true) as HTMLElement;
+          this.gutters.set(button, { path: context.item.id, hovered });
+          return button;
+        },
+        renderAnnotation: (annotation) => this.renderComment(annotation.metadata),
         diffStyle: this.layout,
         overflow: this.wrap ? "wrap" : "scroll",
         lineDiffType: "word-line",
@@ -68,51 +85,14 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         onPostRender: (_node, _instance, _phase, context) => { void this.loadFile(context.item.id, abort.signal); },
         renderCustomHeader: (_file, context) => this.header(context.item.id, context.item.collapsed === true),
       };
-      this.tree = new FileTree({
-        paths: this.files.map((file) => file.path),
-        initialExpansion: "open",
-        flattenEmptyDirectories: true,
-        search: true,
-        searchBlurBehavior: "retain",
-        gitStatus: this.files.map((file) => ({ path: file.path, status: file.untracked ? "untracked" : file.previousPath ? "renamed" : file.change === "removed" ? "deleted" : file.change })),
-        renderRowDecoration: ({ row }) => {
-          const file = this.files.find((file) => file.path === row.path);
-          if (!file) return null;
-          if (file.binarySizes) return { text: "Binary" };
-          return { text: `+${file.additions} −${file.deletions}`, parts: [{ text: `+${file.additions}`, color: "var(--success)" }, { text: ` −${file.deletions}`, color: "var(--danger)" }] };
-        },
-        onSelectionChange: (paths) => {
-          if (this.syncingSelection) return;
-          const path = paths.at(-1);
-          if (!path || !this.files.some((file) => file.path === path)) return;
-          this.openFile(path);
-        },
-      });
-      this.tree.render({ containerWrapper: this.treeTarget });
-      this.viewer = new CodeView(this.options);
+      this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: this.collapsed })));
       this.unsubscribe = this.viewer.subscribeToScroll((top) => this.syncActiveFile(top));
       this.syncActiveFile(0);
     }
 
-    activateTreeFile(event: Event): void {
-      const row = event.composedPath().find((target) => target instanceof HTMLElement && target.dataset.itemType === "file");
-      if (!(row instanceof HTMLElement)) return;
-      this.openFile(row.dataset.itemPath!);
-    }
-
-    private openFile(path: string): void {
-      const item = this.viewer!.getItem(path)!;
-      if (item.collapsed) {
-        this.viewer!.updateItem({ ...item, collapsed: false, version: (item.version ?? 0) + 1 });
-        this.viewer!.render(true);
-        this.syncCollapseControl();
-      }
-      this.viewer!.scrollTo({ type: "item", id: path, align: "start", behavior: "instant" });
-      this.activeFileTarget.textContent = path;
-      if (this.element.clientWidth <= 700) this.closeFiles();
-    }
+    dismissError(): void { this.errorTarget.hidden = true; }
 
     private header(path: string, collapsed: boolean): HTMLElement {
       const template = Array.from(this.element.querySelectorAll<HTMLTemplateElement>("template[data-changes-header]")).find((entry) => entry.dataset.changesHeader === path)!;
@@ -149,7 +129,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         if (!result.ok) throw new Error(await result.text());
         const document = new DOMParser().parseFromString(await result.text(), "text/html");
         // SAFETY: The Changes file endpoint serializes a CodeViewItem captured by this snapshot.
-        const item = JSON.parse(document.querySelector("script[data-changes-file]")!.textContent!) as CodeViewItem<undefined>;
+        const item = JSON.parse(document.querySelector("script[data-changes-file]")!.textContent!) as CodeViewItem<CommentAnnotation>;
         if (signal.aborted) return;
         this.loaded.add(path);
         const previous = this.viewer!.getItem(path)!;
@@ -157,7 +137,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       } catch (error) {
         if (signal.aborted) return;
         this.errorTarget.hidden = false;
-        this.errorTarget.textContent = `Couldn’t load ${path}: ${error instanceof Error ? error.message : String(error)}. Use Refresh to try again.`;
+        this.errorMessageTarget.textContent = `Couldn’t load ${path}: ${error instanceof Error ? error.message : String(error)}. Use Refresh to try again.`;
         console.error(error);
       } finally {
         this.pending.delete(path);
@@ -169,11 +149,101 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       if (path === this.activePath) return;
       this.activePath = path;
       this.activeFileTarget.textContent = path;
-      this.syncingSelection = true;
-      for (const selected of this.tree!.getSelectedPaths()) this.tree!.getItem(selected)!.deselect();
-      this.tree!.getItem(path)!.select();
-      this.tree!.scrollToPath(path, { focus: false });
-      this.syncingSelection = false;
+
+    }
+
+    addComment(event: Event): void {
+      // SAFETY: This action is bound to the server-rendered gutter Button.
+      const gutter = this.gutters.get(event.currentTarget as HTMLElement)!;
+      const hovered = gutter.hovered()!;
+      const selected = this.viewer!.getSelectedLines();
+      const insideSelection = selected?.id === gutter.path && (selected.range.side ?? "additions") === (hovered.side ?? "additions")
+        && hovered.lineNumber >= Math.min(selected.range.start, selected.range.end) && hovered.lineNumber <= Math.max(selected.range.start, selected.range.end);
+      const range = insideSelection ? selected.range : { start: hovered.lineNumber, end: hovered.lineNumber, side: hovered.side };
+      this.beginComment(gutter.path, range);
+    }
+
+    private beginComment(path: string, range: SelectedLineRange): void {
+      if (this.draft) {
+        this.viewer!.scrollTo({ type: "line", id: this.draft.path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
+        this.updateComments(this.draft.path);
+        return;
+      }
+      if (range.endSide && range.endSide !== range.side) {
+        this.errorMessageTarget.textContent = "Comment on one side of the diff at a time.";
+        this.errorTarget.hidden = false;
+        return;
+      }
+      this.draft = { id: crypto.randomUUID(), kind: "draft", path, side: range.side ?? "additions", start: Math.min(range.start, range.end), end: Math.max(range.start, range.end), body: "" };
+      this.updateComments(path);
+      this.viewer!.scrollTo({ type: "line", id: path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
+    }
+
+    private updateComments(path: string): void {
+      const item = this.viewer!.getItem(path)!;
+      if (item.type !== "diff") throw new Error("Comments require a text diff");
+      const comments = [...this.comments.values()].filter(comment => comment.path === path && comment.id !== this.draft?.id);
+      if (this.draft?.path === path) comments.push(this.draft);
+      this.viewer!.updateItem({ ...item, annotations: comments.map(metadata => ({ lineNumber: metadata.end, side: metadata.side, metadata })), version: (item.version ?? 0) + 1 });
+    }
+
+    private renderComment(comment: CommentAnnotation): HTMLElement {
+      const template = comment.kind === "draft" ? this.commentEditorTarget : this.commentCardTarget;
+      // SAFETY: The server emits a form/article root for these owned annotation templates.
+      const element = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
+      element.dataset.commentId = comment.id;
+      element.querySelector<HTMLElement>("[data-comment-anchor]")!.textContent = `${comment.side === "deletions" ? "Old" : "New"} ${comment.start === comment.end ? `line ${comment.start}` : `lines ${comment.start}–${comment.end}`}`;
+      if (comment.kind === "draft") {
+        const textarea = element.querySelector<HTMLTextAreaElement>("textarea")!;
+        textarea.value = comment.body;
+        queueMicrotask(() => textarea.focus({ preventScroll: true }));
+      } else element.querySelector<HTMLElement>("[data-comment-body]")!.textContent = comment.body;
+      return element;
+    }
+
+    commentInput(event: Event): void {
+      // SAFETY: This action is bound to the comment template’s textarea.
+      const textarea = event.currentTarget as HTMLTextAreaElement;
+      this.draft!.body = textarea.value;
+      textarea.setCustomValidity("");
+    }
+    commentShortcut(event: KeyboardEvent): void {
+      event.preventDefault();
+      // SAFETY: The keyboard shortcut is bound to the comment template’s form.
+      (event.currentTarget as HTMLFormElement).requestSubmit();
+    }
+    saveComment(event: SubmitEvent): void {
+      event.preventDefault();
+      // SAFETY: Submit is bound to the comment template’s form.
+      const form = event.currentTarget as HTMLFormElement;
+      const textarea = form.querySelector<HTMLTextAreaElement>("textarea")!;
+      const body = textarea.value.trim();
+      if (!body) { textarea.setCustomValidity("Add a comment first."); textarea.reportValidity(); return; }
+      const comment = this.draft!;
+      this.comments.set(comment.id, { ...comment, kind: "comment", body });
+      this.draft = undefined;
+      this.updateComments(comment.path);
+    }
+    cancelComment(event: Event): void {
+      event.preventDefault();
+      event.stopPropagation();
+      const path = this.draft!.path;
+      this.draft = undefined;
+      this.updateComments(path);
+    }
+    editComment(event: Event): void {
+      if (this.draft) return;
+      // SAFETY: These actions are bound to buttons inside an owned comment card.
+      const id = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!;
+      this.draft = { ...this.comments.get(id)!, kind: "draft" };
+      this.updateComments(this.draft.path);
+    }
+    deleteComment(event: Event): void {
+      // SAFETY: These actions are bound to buttons inside an owned comment card.
+      const id = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!;
+      const comment = this.comments.get(id)!;
+      this.comments.delete(id);
+      this.updateComments(comment.path);
     }
 
     chooseLayout(event: Event): void {
@@ -181,33 +251,18 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       const value = (event.currentTarget as HTMLButtonElement).dataset.layout;
       if (value !== "unified" && value !== "split") throw new Error("Unknown diff layout");
       this.layout = value;
+      this.element.closest<HTMLElement>(".changes-body")!.dataset.changesLayout = value;
       this.options = { ...this.options, diffStyle: value };
       this.viewer?.setOptions(this.options);
     }
 
     toggleWrap(event: Event): void {
       this.wrap = !this.wrap;
+      this.element.closest<HTMLElement>(".changes-body")!.dataset.changesWrap = String(this.wrap);
       // SAFETY: The wrap action is attached to the server-rendered checkbox menu item.
       (event.currentTarget as HTMLButtonElement).setAttribute("aria-checked", String(this.wrap));
       this.options = { ...this.options, overflow: this.wrap ? "wrap" : "scroll" };
       this.viewer?.setOptions(this.options);
-    }
-
-    toggleFiles(): void {
-      const open = this.element.classList.toggle("changes-files-open");
-      this.filesToggleTarget.setAttribute("aria-expanded", String(open));
-      this.filesToggleTarget.setAttribute("aria-label", open ? "Hide changed files" : "Show changed files");
-      this.filesToggleTarget.title = open ? "Hide changed files" : "Show changed files";
-      if (open) this.tree?.getItem(this.activePath ?? this.files[0]!.path)?.focus();
-    }
-
-    closeFiles(): void {
-      if (!this.element.classList.contains("changes-files-open")) return;
-      this.element.classList.remove("changes-files-open");
-      this.filesToggleTarget.setAttribute("aria-expanded", "false");
-      this.filesToggleTarget.setAttribute("aria-label", "Show changed files");
-      this.filesToggleTarget.title = "Show changed files";
-      this.filesToggleTarget.focus();
     }
 
     toggleCollapse(): void {
@@ -223,5 +278,5 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("changes", createChangesController(Controller)); },
+  install({ application, Controller }) { application.register("changes", createChangesController(Controller)); application.register("changes-range", createRangeController(Controller)); },
 };
