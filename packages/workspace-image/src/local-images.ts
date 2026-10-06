@@ -1,6 +1,10 @@
-import { runDocker, type CommandResult } from "@agents-in-the-cloud/core";
+import { requireDocker, runDocker, type CommandResult } from "@agents-in-the-cloud/core";
 
 export type DockerCommand = (args: string[]) => Promise<CommandResult>;
+
+export async function dockerImageId(ref: string): Promise<string> {
+  return (await requireDocker(["image", "inspect", "--format", "{{.Id}}", ref])).stdout.trim();
+}
 
 export async function dockerServerPlatform(docker: DockerCommand = runDocker): Promise<string> {
   const result = await docker(["version", "--format", "{{.Server.Os}}/{{.Server.Arch}}"]);

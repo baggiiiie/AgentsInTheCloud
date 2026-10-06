@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runDocker, runCommand, workloadBuildArgs } from "@agents-in-the-cloud/core";
+import { runDocker, runCommand, workloadCgroupArgs } from "@agents-in-the-cloud/core";
 import { reuseDefaultWorkspaceImage, type DockerCommand } from "./local-images.ts";
 import { parseWorkspaceImageMetadata, type WorkspaceImageMetadata } from "./metadata.ts";
 
@@ -50,7 +50,7 @@ export async function ensureGeneratedDefaultWorkspaceImage(options: EnsureDefaul
     if (!options.force && await (options.exists ? options.exists(image) : reuseDefaultWorkspaceImage(image, docker))) return image;
     if (options.build) await options.build(context, image);
     else {
-      const result = await docker(["build", ...await workloadBuildArgs(), "--progress=plain", "--label", "com.agents-in-the-cloud.workspace-image.kind=default", "-t", image, "-f", context.dockerfile, context.contextDir]);
+      const result = await docker(["build", ...await workloadCgroupArgs(), "--progress=plain", "--label", "com.agents-in-the-cloud.workspace-image.kind=default", "-t", image, "-f", context.dockerfile, context.contextDir]);
       if (result.exitCode !== 0) throw new Error(result.stderr || result.stdout || `Could not build ${image}`);
     }
     return image;

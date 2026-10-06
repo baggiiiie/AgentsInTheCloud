@@ -35,7 +35,7 @@ def drops():
   rule=entry.get('rule',{});expressions=rule.get('expr',[])
   if any('drop' in e for e in expressions):total+=sum(e.get('counter',{}).get('packets',0) for e in expressions)
  return total
-def serve_script(text):return 'Bun.serve({hostname:"::",port:8080,fetch:()=>new Response('+json.dumps(text)+')})'
+def serve_script(text,port=8080):return 'Bun.serve({hostname:"::",port:'+str(port)+',fetch:()=>new Response('+json.dumps(text)+')})'
 def create_worker(number,kind="workspace"):
  net=f'firewall-workspace-{number}';worker=f'fw-workspace-{number}'
  if kind=='default':net='bridge'
@@ -81,7 +81,7 @@ try:
   for target in ('fd99::2/128','fd7a:115c:a1e0::2/128'):system('ip','-6','route','replace',target,'via','2001:4860:ffff:dead::2')
   # The lifecycle test app binds loopback. Use a reachable, harmless management
   # fixture so a connection refusal cannot masquerade as firewall enforcement.
-  docker('exec','-d',name,'bun','-e',serve_script('system-only')+';'+serve_script('management-fixture').replace('port:8080','port:3002'))
+  docker('exec','-d',name,'bun','-e',serve_script('system-only')+';'+serve_script('management-fixture',3002))
   system('rm','-f','/data/firewall-uds/parent.sock')
   docker('exec','-d',name,'bun','-e','Bun.serve({unix:"/data/firewall-uds/parent.sock",fetch:()=>new Response("parent-socket")})')
  setup_routes_and_socket()

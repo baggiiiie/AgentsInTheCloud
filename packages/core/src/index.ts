@@ -62,7 +62,7 @@ export {
 } from "./github-token.ts";
 
 export { createKeyedOperationQueue } from "./keyed-operation-queue.ts";
-export { workloadBuildArgs, workloadCommand } from "./workload-resources.ts";
+export { workloadCgroupArgs, workloadCommand } from "./workload-resources.ts";
 
 export { commandSignal, withCommandSignal, waitForCommand, runCommand, killCommandGroup } from "./command-scope.ts";
 
