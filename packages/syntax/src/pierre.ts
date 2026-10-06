@@ -10,4 +10,4 @@ registerCustomCSSVariableTheme(agentsInTheCloudPierreTheme, {
   "token-link": "var(--syntax-attribute)",
 }, false);
 
-export { reviewDiffOptions, toolDiffOptions } from "./diff-options.ts";
+export { changesDiffOptions, toolDiffOptions } from "./diff-options.ts";

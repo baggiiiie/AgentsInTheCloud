@@ -1,37 +1,36 @@
 import { isUtf8 } from "node:buffer";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
 import { git, parseGitStatus, parseGitNumstat, type GitStatusEntry, type GitNumstat, type Repository } from "@agents-in-the-cloud/workspace/git";
-import type { ReviewSide } from "../model.ts";
 
 const maxRenderedBytes = 1_000_000;
 const maxRenderedLines = 5_000;
 
-type ReviewFileKind = "text" | "binary" | "large" | "mode";
-type ReviewFileChange = "added" | "modified" | "removed";
+type ChangesFileKind = "text" | "binary" | "large" | "mode";
+type ChangesFileChange = "added" | "modified" | "removed";
 
-export interface ReviewFile {
+export interface ChangesFile {
   path: string;
   previousPath?: string;
-  change: ReviewFileChange;
-  kind: ReviewFileKind;
+  change: ChangesFileChange;
+  kind: ChangesFileKind;
   oldContents?: string;
   newContents?: string;
   diff?: FileDiffMetadata;
   detail?: string;
 }
 
-export type ReviewFileSummary = {
+export type ChangesFileSummary = {
   path: string;
   previousPath?: string;
-  change: ReviewFileChange;
+  change: ChangesFileChange;
   untracked?: true;
 };
 
-export type ReviewFileStats = ReviewFileSummary & ChangeCounts & { binarySizes?: { before?: number; after?: number } };
+export type ChangesFileStats = ChangesFileSummary & ChangeCounts & { binarySizes?: { before?: number; after?: number } };
 
-export type ReviewIndex =
+export type ChangesIndex =
   | { phase: "not-git" }
-  | { phase: "ready"; files: ReviewFileSummary[] };
+  | { phase: "ready"; files: ChangesFileSummary[] };
 
 async function gitObject(root: Repository, path: string): Promise<Buffer | undefined> {
   const result = await root.gitResult(["show", `HEAD:${path}`]);
@@ -64,15 +63,15 @@ async function modes(root: Repository, entry: GitStatusEntry): Promise<{ oldMode
   return {};
 }
 
-function reviewFileFromContents(
+function changesFileFromContents(
   entry: GitStatusEntry,
   oldBuffer: Buffer | undefined,
   newBuffer: Buffer | undefined,
   modes: { oldMode?: string; newMode?: string },
-): ReviewFile | undefined {
+): ChangesFile | undefined {
   const oldPath = entry.previousPath ?? entry.path;
-  const change: ReviewFileChange = oldBuffer === undefined ? "added" : newBuffer === undefined ? "removed" : "modified";
-  const base: Pick<ReviewFile, "path" | "previousPath" | "change"> = { path: entry.path, change };
+  const change: ChangesFileChange = oldBuffer === undefined ? "added" : newBuffer === undefined ? "removed" : "modified";
+  const base: Pick<ChangesFile, "path" | "previousPath" | "change"> = { path: entry.path, change };
   if (entry.previousPath) base.previousPath = entry.previousPath;
   if (oldBuffer === undefined && newBuffer === undefined) return undefined;
   const oldText = decodeText(oldBuffer);
@@ -90,7 +89,7 @@ function reviewFileFromContents(
       : modes.oldMode !== modes.newMode ? "File mode changed" : "No textual changes" };
 }
 
-async function reviewFile(root: Repository, entry: GitStatusEntry): Promise<ReviewFile | undefined> {
+async function changesFile(root: Repository, entry: GitStatusEntry): Promise<ChangesFile | undefined> {
   const oldPath = entry.previousPath ?? entry.path;
   const [oldBuffer, newBuffer, fileModes] = await Promise.all([
     entry.code === "??" ? undefined : gitObject(root, oldPath),
@@ -101,7 +100,7 @@ async function reviewFile(root: Repository, entry: GitStatusEntry): Promise<Revi
     const base = { path: entry.path, change: "modified" as const };
     return entry.previousPath ? { ...base, previousPath: entry.previousPath, kind: "mode", detail: "Submodule changed" } : { ...base, kind: "mode", detail: "Submodule changed" };
   }
-  return reviewFileFromContents(entry, oldBuffer, newBuffer, fileModes);
+  return changesFileFromContents(entry, oldBuffer, newBuffer, fileModes);
 }
 
 async function statusEntries(root: Repository): Promise<GitStatusEntry[] | undefined> {
@@ -114,17 +113,17 @@ async function statusEntries(root: Repository): Promise<GitStatusEntry[] | undef
   return parseGitStatus(status.stdout);
 }
 
-function statusChange(entry: GitStatusEntry): ReviewFileChange {
+function statusChange(entry: GitStatusEntry): ChangesFileChange {
   if (entry.code === "??" || entry.code.includes("A")) return "added";
   if (entry.code.includes("D")) return "removed";
   return "modified";
 }
 
-export async function collectReviewIndex(root: Repository): Promise<ReviewIndex> {
+export async function collectChangesIndex(root: Repository): Promise<ChangesIndex> {
   const entries = await statusEntries(root);
   if (!entries) return { phase: "not-git" };
-  const files = entries.map((entry): ReviewFileSummary => {
-    const file: ReviewFileSummary = { path: entry.path, change: statusChange(entry) };
+  const files = entries.map((entry): ChangesFileSummary => {
+    const file: ChangesFileSummary = { path: entry.path, change: statusChange(entry) };
     if (entry.previousPath) file.previousPath = entry.previousPath;
     if (entry.code === "??") file.untracked = true;
     return file;
@@ -132,13 +131,13 @@ export async function collectReviewIndex(root: Repository): Promise<ReviewIndex>
   return { phase: "ready", files };
 }
 
-export async function collectReviewFile(root: Repository, path: string): Promise<ReviewFile | undefined> {
+export async function collectChangesFile(root: Repository, path: string): Promise<ChangesFile | undefined> {
   const entries = await statusEntries(root);
   const entry = entries?.find((candidate) => candidate.path === path);
-  return entry ? await reviewFile(root, entry) : undefined;
+  return entry ? await changesFile(root, entry) : undefined;
 }
 
-export async function collectReviewStats(root: Repository, index: ReviewIndex): Promise<ReviewFileStats[]> {
+export async function collectChangesStats(root: Repository, index: ChangesIndex): Promise<ChangesFileStats[]> {
   if (index.phase !== "ready") return [];
   let tracked = new Map<string, GitNumstat>();
   if (index.files.some((file) => !file.untracked)) {
@@ -168,11 +167,6 @@ export async function collectReviewStats(root: Repository, index: ReviewIndex): 
   }));
 }
 
-export function reviewSnippet(file: ReviewFile, side: ReviewSide, startLine: number, endLine: number): string {
-  const text = side === "additions" ? file.newContents : file.oldContents;
-  if (text === undefined) return "";
-  return text.split("\n").slice(startLine - 1, endLine).join("\n");
-}
 
 interface CommitEntry extends GitStatusEntry {
   oldMode: string;
@@ -203,12 +197,12 @@ async function comparisonEntries(root: Repository, base: string, end?: string): 
   return entries;
 }
 
-export async function collectCommitReviewStats(root: Repository, commit: string): Promise<ReviewFileStats[]> {
+export async function collectCommitChangesStats(root: Repository, commit: string): Promise<ChangesFileStats[]> {
   const { base, entries } = await commitEntries(root, commit);
   const stats = parseGitNumstat(await git(root, ["diff", "--numstat", "-z", "-M", base, commit, "--"]));
   return Promise.all(entries.map(async (entry) => {
     const { binary, ...counts } = stats.get(entry.path)!;
-    const file: ReviewFileStats = { path: entry.path, change: statusChange(entry), ...counts };
+    const file: ChangesFileStats = { path: entry.path, change: statusChange(entry), ...counts };
     if (entry.previousPath) file.previousPath = entry.previousPath;
     if (binary) {
       const size = async (hash: string, mode: string) => mode === "000000" ? undefined : Number((await git(root, ["cat-file", "-s", hash])).toString("utf8"));
@@ -220,7 +214,7 @@ export async function collectCommitReviewStats(root: Repository, commit: string)
 }
 
 /** Compare against the first parent; root commits compare against an empty tree. */
-export async function collectCommitReviewFile(root: Repository, commit: string, path: string): Promise<ReviewFile | undefined> {
+export async function collectCommitChangesFile(root: Repository, commit: string, path: string): Promise<ChangesFile | undefined> {
   const { entries } = await commitEntries(root, commit);
   const entry = entries.find((candidate) => candidate.path === path);
   if (!entry) return undefined;
@@ -229,11 +223,11 @@ export async function collectCommitReviewFile(root: Repository, commit: string, 
   }
   const contents = (hash: string, mode: string) => mode === "000000" ? undefined : git(root, ["cat-file", "blob", hash]);
   const [before, after] = await Promise.all([contents(entry.oldHash, entry.oldMode), contents(entry.newHash, entry.newMode)]);
-  return reviewFileFromContents(entry, before, after, entry);
+  return changesFileFromContents(entry, before, after, entry);
 }
 
 /** Collect a fixed Git comparison, or compare its base with the working tree without touching the index. */
-export async function collectReviewComparison(root: Repository, base: string, end?: string): Promise<{ index: ReviewIndex; stats: ReviewFileStats[]; files: Map<string, ReviewFile> }> {
+export async function collectChangesComparison(root: Repository, base: string, end?: string): Promise<{ index: ChangesIndex; stats: ChangesFileStats[]; files: Map<string, ChangesFile> }> {
   const [entries, status, numstat] = await Promise.all([
     comparisonEntries(root, base, end),
     end ? undefined : statusEntries(root),
@@ -245,10 +239,10 @@ export async function collectReviewComparison(root: Repository, base: string, en
   }
   entries.sort((a, b) => a.path.localeCompare(b.path));
   const counts = parseGitNumstat(numstat);
-  const files = new Map<string, ReviewFile>();
-  const stats: ReviewFileStats[] = new Array(entries.length);
+  const files = new Map<string, ChangesFile>();
+  const stats: ChangesFileStats[] = new Array(entries.length);
   await Promise.all(entries.map(async (entry, position) => {
-    const summary: ReviewFileSummary = { path: entry.path, change: statusChange(entry) };
+    const summary: ChangesFileSummary = { path: entry.path, change: statusChange(entry) };
     if (entry.previousPath) summary.previousPath = entry.previousPath;
     if (entry.code === "??") summary.untracked = true;
     if (entry.oldMode === "160000" || entry.newMode === "160000") {
@@ -261,7 +255,7 @@ export async function collectReviewComparison(root: Repository, base: string, en
     const after = end ? committed : working?.contents;
     if (working) entry.newMode = working.mode;
     if (!entry.previousPath && before !== undefined && after !== undefined && before.equals(after) && entry.oldMode === entry.newMode) return;
-    const file = reviewFileFromContents(entry, before, after, entry);
+    const file = changesFileFromContents(entry, before, after, entry);
     if (!file) throw new Error(`File changed while capturing comparison: ${entry.path}`);
     summary.change = file.change;
     files.set(entry.path, file);

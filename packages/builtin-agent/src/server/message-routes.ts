@@ -74,10 +74,7 @@ async function submitMessage(workspaceId: string, agentId: string, request: Requ
   const { images, attachmentNotes } = attachmentIds.length > 0
     ? await deliverAttachmentDraft(workspaceId, attachmentDraft, attachmentIds)
     : { images: [], attachmentNotes: [] };
-  const reviewCommentIds = (form?.getAll("reviewComment").map(String) ?? []).filter((id) => /^[a-f0-9-]{36}$/.test(id));
-  const sections: string[] = [];
-  if (reviewCommentIds.length) await options.events?.emit("workspace_agent_prompt_preparing", { workspaceId, reviewCommentIds, sections });
-  const expandedText = await expandSlashCommand(workspaceId, [text, ...sections].filter((section) => section.trim()).join("\n\n"));
+  const expandedText = await expandSlashCommand(workspaceId, text);
   const trimmed = expandedText.trim();
   if (!trimmed && images.length === 0 && attachmentNotes.length === 0) {
     const message = "A prompt or completed attachment is required";
@@ -92,7 +89,6 @@ async function submitMessage(workspaceId: string, agentId: string, request: Requ
     (options.suggestTitleFromPrompt ?? maybeNameAgentFromPrompt)(agent, namingContext.messages, { events: options.events, agentModel: namingContext.agentModel });
   }
   await removeStagedAttachments(attachmentDraft, attachmentIds);
-  if (reviewCommentIds.length) await options.events?.emit("workspace_agent_prompt_submitted", { workspaceId, reviewCommentIds });
   await removeInitialPromptDraft(workspaceId, agentId);
   const acceptedHeaders = { "x-agents-in-the-cloud-attachment-draft-consumed": "true" };
   return json

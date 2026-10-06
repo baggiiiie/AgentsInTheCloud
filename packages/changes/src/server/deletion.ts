@@ -2,13 +2,13 @@ import { createHash } from "node:crypto";
 import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
 import { domId, escapeHtml, type WorkspaceDeletionAssessment, type WorkspaceDeletionReview } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { collectCommitReviewFile, collectCommitReviewStats, collectReviewFile, collectReviewIndex, collectReviewStats, type ReviewFileStats } from "./diff.ts";
+import { collectCommitChangesFile, collectCommitChangesStats, collectChangesFile, collectChangesIndex, collectChangesStats, type ChangesFileStats } from "./diff.ts";
 import { repositoryPaths, workspaceRepository, type Repository, git } from "@agents-in-the-cloud/workspace/git";
-import { renderFileStats, renderFileSummary, renderReadOnlyReviewFile } from "./render.ts";
+import { renderFileStats, renderFileSummary, renderDeletionFile } from "./deletion-render.ts";
 
 type DeletionRepository = {
   relativePath: string;
-  uncommitted: ReviewFileStats[];
+  uncommitted: ChangesFileStats[];
   unpushedCommits: UnpushedCommit[];
 };
 type DeletionAssessment = {
@@ -26,9 +26,9 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
     const fingerprintMaterial: string[] = [];
     for (const relativePath of await repositoryPaths(workspaceRoot)) {
       const root = repositoryFor(workspaceId, relativePath);
-      const index = await collectReviewIndex(root);
+      const index = await collectChangesIndex(root);
       if (index.phase !== "ready") continue;
-      const uncommitted = await collectReviewStats(root, index);
+      const uncommitted = await collectChangesStats(root, index);
       const unpushedCommits = await collectUnpushedCommits((args) => root.gitResult(args));
       if (!uncommitted.length && !unpushedCommits.length) continue;
       repositories.push({ relativePath, uncommitted, unpushedCommits });
@@ -63,22 +63,22 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
   }
 
   function lazyFrame(frameId: string, url: string): string {
-    return `<turbo-frame id="${frameId}" data-src="${escapeHtml(url)}"><div class="review-file-loading" role="status"><span class="status-spinner" aria-hidden="true"></span> Loading changes…</div></turbo-frame>`;
+    return `<turbo-frame id="${frameId}" data-src="${escapeHtml(url)}"><div class="deletion-file-loading" role="status"><span class="status-spinner" aria-hidden="true"></span> Loading changes…</div></turbo-frame>`;
   }
 
-  function fileSummary(workspaceId: string, fingerprint: string, repository: string, file: ReviewFileStats, commit = ""): string {
+  function fileSummary(workspaceId: string, fingerprint: string, repository: string, file: ChangesFileStats, commit = ""): string {
     const frameId = fileFrameId(workspaceId, fingerprint, repository, file.path, commit);
     const query = new URLSearchParams({ fingerprint, repository, path: file.path, commit });
     const summary = renderFileSummary(
       { kind: "text", text: file.path },
-      `<span class="review-git-stats">${renderFileStats(file)}</span>`,
+      `<span class="deletion-git-stats">${renderFileStats(file)}</span>`,
       file.path,
     );
-    return `<details class="review-file" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/review/deletion/file?${query}`)}</details>`;
+    return `<details class="deletion-file" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/file?${query}`)}</details>`;
   }
 
-  function fileList(workspaceId: string, fingerprint: string, repository: string, files: ReviewFileStats[], commit = ""): string {
-    return `<div class="review-files action-list">${files.map((file) => fileSummary(workspaceId, fingerprint, repository, file, commit)).join("")}</div>`;
+  function fileList(workspaceId: string, fingerprint: string, repository: string, files: ChangesFileStats[], commit = ""): string {
+    return `<div class="deletion-files action-list">${files.map((file) => fileSummary(workspaceId, fingerprint, repository, file, commit)).join("")}</div>`;
   }
 
   function commitSummary(workspaceId: string, fingerprint: string, repository: string, commit: UnpushedCommit): string {
@@ -89,22 +89,22 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
     );
     const query = new URLSearchParams({ fingerprint, repository, commit: commit.hash });
     const frameId = commitFrameId(workspaceId, fingerprint, repository, commit.hash);
-    return `<details class="review-file workspace-deletion-change-group" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/review/deletion/commit?${query}`)}</details>`;
+    return `<details class="deletion-file workspace-deletion-change-group" data-action="toggle->deletion-review#requestFile">${summary}${lazyFrame(frameId, `/workspaces/${encodeURIComponent(workspaceId)}/changes/deletion/commit?${query}`)}</details>`;
   }
 
   function renderEvidence(workspaceId: string): string {
     const assessment = assessments.get(workspaceId);
     if (!assessment) throw new Error("Deletion review assessment is no longer current");
-    return `<div data-controller="deletion-review"><p>You might loose:</p>${assessment.details.repositories.map((repository) => {
+    return `<div data-controller="deletion-review"><p>You might lose:</p>${assessment.details.repositories.map((repository) => {
       const { fingerprint } = assessment;
-      const working = repository.uncommitted.length ? `<details class="review-file workspace-deletion-change-group" open>${renderFileSummary({ kind: "text", text: "Uncommitted changes" }, "")}${fileList(workspaceId, fingerprint, repository.relativePath, repository.uncommitted)}</details>` : "";
+      const working = repository.uncommitted.length ? `<details class="deletion-file workspace-deletion-change-group" open>${renderFileSummary({ kind: "text", text: "Uncommitted changes" }, "")}${fileList(workspaceId, fingerprint, repository.relativePath, repository.uncommitted)}</details>` : "";
       const commits = repository.unpushedCommits.length ? `<div class="action-list">${repository.unpushedCommits.map((commit) => commitSummary(workspaceId, fingerprint, repository.relativePath, commit)).join("")}</div>` : "";
       const repositoryHeading = repository.relativePath ? `<h2>${escapeHtml(repository.relativePath)}</h2>` : "";
       return `<section class="workspace-deletion-repository">${repositoryHeading}${working}${commits}</section>`;
     }).join("")}</div>`;
   }
 
-  const reviewDeletionReview: WorkspaceDeletionReview = { inspect, renderEvidence };
+  const changesDeletionReview: WorkspaceDeletionReview = { inspect, renderEvidence };
 
   function reviewRequest(workspaceId: string, url: URL) {
     const assessment = assessments.get(workspaceId);
@@ -123,7 +123,7 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
     if (context instanceof Response) return context;
     const { fingerprint, repository, commit, root } = context;
     if (!commit) return textResponse("Review commit is required", { status: 400 });
-    const files = await collectCommitReviewStats(root, commit);
+    const files = await collectCommitChangesStats(root, commit);
     const frameId = commitFrameId(workspaceId, fingerprint, repository.relativePath, commit);
     const body = files.length ? fileList(workspaceId, fingerprint, repository.relativePath, files, commit) : '<p class="workspace-deletion-empty">This commit has no file changes.</p>';
     return response(`<turbo-frame id="${frameId}">${body}</turbo-frame>`);
@@ -135,17 +135,17 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
     const { fingerprint, repository, commit, root } = context;
     const path = url.searchParams.get("path") ?? "";
     if (!commit && !repository.uncommitted.some((file) => file.path === path)) return textResponse("Review file is no longer available", { status: 404 });
-    const file = commit ? await collectCommitReviewFile(root, commit, path) : await collectReviewFile(root, path);
+    const file = commit ? await collectCommitChangesFile(root, commit, path) : await collectChangesFile(root, path);
     if (!file) return textResponse("Review file is no longer available", { status: commit ? 404 : 409 });
     const frameId = fileFrameId(workspaceId, fingerprint, repository.relativePath, path, commit);
-    return response(await renderReadOnlyReviewFile(frameId, file));
+    return response(await renderDeletionFile(frameId, file));
   }
 
   function clearDeletionReview(workspaceId: string): void {
     assessments.delete(workspaceId);
   }
 
-  return { reviewDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview };
+  return { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview };
 }
 
-export const { reviewDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } = createDeletionReview(workspaceRepository);
+export const { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } = createDeletionReview(workspaceRepository);

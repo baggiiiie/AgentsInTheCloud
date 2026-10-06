@@ -1,7 +1,8 @@
+import { createDeletionReviewController } from "./deletion-controller.ts";
 import type { CodeView, CodeViewItem, CodeViewOptions, SelectedLineRange } from "@pierre/diffs";
 import type { WorkspaceClientModule, WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { createRangeController } from "./range-controller.ts";
-import { reviewDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
+import { changesDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
 type FileSummary = { path: string };
 type CommentAnnotation = { id: string; kind: "draft" | "comment"; path: string; side: "additions" | "deletions"; start: number; end: number; body: string };
@@ -70,7 +71,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       const [{ CodeView }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (abort.signal.aborted) return;
       this.options = {
-        ...reviewDiffOptions,
+        ...changesDiffOptions,
         disableFileHeader: false,
         disableLineNumbers: false,
         enableLineSelection: true,
@@ -276,5 +277,5 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("changes", createChangesController(Controller)); application.register("changes-range", createRangeController(Controller)); },
+  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-range", createRangeController(Controller)); },
 };

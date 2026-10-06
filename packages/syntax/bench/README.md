@@ -43,7 +43,7 @@ bun packages/syntax/bench/child.ts syntax constructor.js 0
 | write | `renderActiveToolContent` and its real partial-JSON write parser, inline/fullscreen highlighting |
 | read | Actual read preview and fullscreen highlighting |
 | bash | Embedded heredoc detection and highlighting via `embeddedBashCommand` |
-| review | Pierre `DiffHunksRenderer` with `reviewDiffOptions` |
+| review | Pierre `DiffHunksRenderer` with `changesDiffOptions` |
 | tool-diff | Pierre `DiffHunksRenderer` with `toolDiffOptions` |
 | editor | CodeMirror language selection, full syntax parsing and `highlightTree`, without a DOM |
 

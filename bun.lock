@@ -128,7 +128,6 @@
       "dependencies": {
         "@agents-in-the-cloud/core": "workspace:*",
         "@agents-in-the-cloud/design-system": "workspace:*",
-        "@agents-in-the-cloud/review": "workspace:*",
         "@agents-in-the-cloud/shared": "workspace:*",
         "@agents-in-the-cloud/syntax": "workspace:*",
         "@agents-in-the-cloud/workspace": "workspace:*",
@@ -356,18 +355,6 @@
         "typebox": "^1.0.57",
       },
     },
-    "packages/review": {
-      "name": "@agents-in-the-cloud/review",
-      "dependencies": {
-        "@agents-in-the-cloud/core": "workspace:*",
-        "@agents-in-the-cloud/design-system": "workspace:*",
-        "@agents-in-the-cloud/shared": "workspace:*",
-        "@agents-in-the-cloud/syntax": "workspace:*",
-        "@agents-in-the-cloud/workspace": "workspace:*",
-        "@pierre/diffs": "1.5.1",
-        "typebox": "^1.0.57",
-      },
-    },
     "packages/shared": {
       "name": "@agents-in-the-cloud/shared",
       "dependencies": {
@@ -537,8 +524,6 @@
     "@agents-in-the-cloud/proxy-egress": ["@agents-in-the-cloud/proxy-egress@workspace:packages/proxy-egress"],
 
     "@agents-in-the-cloud/proxy-ingress": ["@agents-in-the-cloud/proxy-ingress@workspace:packages/proxy-ingress"],
-
-    "@agents-in-the-cloud/review": ["@agents-in-the-cloud/review@workspace:packages/review"],
 
     "@agents-in-the-cloud/shared": ["@agents-in-the-cloud/shared@workspace:packages/shared"],
 

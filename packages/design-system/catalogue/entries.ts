@@ -54,7 +54,7 @@ export const entries: CatalogueEntry[] = [
           element: { tag: "section" },
           headerHtml: tabStripHtml({
             id: "catalogue_work_views", label: "Example work views",
-            tabsHtml: ["Shell", "Investigate terminal reconnect and attention handling", "Review", "Dev server", "Changes"].map((text, index) => tabHtml({
+            tabsHtml: ["Shell", "Investigate terminal reconnect and attention handling", "Files", "Dev server", "Changes"].map((text, index) => tabHtml({
               label: { kind: "text", text }, selected: index === 0,
               primary: { tag: "button", attributesHtml: 'type="button" data-action="catalogue#selectTab"' },
               iconHtml: index === 1 ? Icons.Browser : Icons.Terminal,

@@ -8,11 +8,11 @@ export async function command(root: string, ...args: string[]): Promise<void> {
   if (exitCode !== 0) throw new Error(stderr);
 }
 
-export async function createReviewRepository(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-review-"));
+export async function createChangesRepository(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-changes-"));
   await command(root, "git", "init", "-q");
-  await command(root, "git", "config", "user.email", "review@example.test");
-  await command(root, "git", "config", "user.name", "Review Test");
+  await command(root, "git", "config", "user.email", "changes@example.test");
+  await command(root, "git", "config", "user.name", "Changes Test");
   await writeFile(join(root, "changed.ts"), "const before = true;\n");
   await writeFile(join(root, "empty.txt"), "");
   await writeFile(join(root, ".gitignore"), "ignored.txt\n");

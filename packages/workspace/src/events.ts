@@ -41,17 +41,6 @@ export interface WorkspaceAgentViewInvalidatedEvent {
   agentId: string;
 }
 
-export interface WorkspaceAgentPromptPreparingEvent {
-  workspaceId: string;
-  reviewCommentIds: string[];
-  sections: string[];
-}
-
-export interface WorkspaceAgentPromptSubmittedEvent {
-  workspaceId: string;
-  reviewCommentIds: string[];
-}
-
 export interface WorkspaceSourcePrepareEvent {
   workspaceId: string;
   init?: WorkspaceInitInstruction;
@@ -86,7 +75,5 @@ declare module "@agents-in-the-cloud/core" {
     workspace_agent_turn_finished: WorkspaceAgentTurnFinishedEvent;
     workspace_agent_title_changed: WorkspaceAgentTitleChangedEvent;
     workspace_agent_view_invalidated: WorkspaceAgentViewInvalidatedEvent;
-    workspace_agent_prompt_preparing: WorkspaceAgentPromptPreparingEvent;
-    workspace_agent_prompt_submitted: WorkspaceAgentPromptSubmittedEvent;
   }
 }

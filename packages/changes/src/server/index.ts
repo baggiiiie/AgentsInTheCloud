@@ -1,3 +1,4 @@
+import { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } from "./deletion.ts";
 import { refreshChanges } from "./refresh.ts";
 import type { JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -30,6 +31,7 @@ const requestSchema = Type.Object({ client: Type.String({ minLength: 1, maxLengt
 
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "changes",
+  deletionReview: changesDeletionReview,
   workViews: [{
     type: "changes",
     parseReference(value: JsonValue) {
@@ -40,9 +42,13 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     async render({ workspaceId }) { return renderChanges(workspaceId, (await current(workspaceId)).snapshot); },
   }],
   commands: [{ id: "changes.open", execute: () => ({ createdWorkView: reference }) }],
-  staticFiles: { "/changes.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
+  staticFiles: { "/deletion.css": { url: new URL("../client/deletion.css", import.meta.url), contentType: "text/css; charset=utf-8" }, "/changes.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   routes: [{ async handle(request, url) {
-    let match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/file$/);
+    let match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/deletion\/file$/);
+    if (match) return request.method === "GET" ? await deletionReviewFileResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
+    match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/deletion\/commit$/);
+    if (match) return request.method === "GET" ? await deletionReviewCommitResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
+    match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/file$/);
     if (match) {
       if (request.method !== "GET") return textResponse("Method not allowed", { status: 405 });
       const { snapshot } = await current(match[0]!);
@@ -111,13 +117,13 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       state.clients.clear();
       invalidateWorkspace(workspaceId);
     });
-    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); });
+    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); clearDeletionReview(workspaceId); });
   },
   async attachToWorkspace({ workspaceId }) {
     const { snapshot } = await current(workspaceId);
     return {
-      workViews: [{ reference, sourceKey: "changes:workspace", label: renderChangesTitle(snapshot), kind: "contextual", iconHtml: Icons.Review, availability: { phase: "live" }, initiallyOpen: false }],
-      commands: [{ id: "changes.open", label: "Changes", description: "Compare local commits and uncommitted changes.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Review, label: "Changes" } } }],
+      workViews: [{ reference, sourceKey: "changes:workspace", label: renderChangesTitle(snapshot), kind: "contextual", iconHtml: Icons.Changes, availability: { phase: "live" }, initiallyOpen: false }],
+      commands: [{ id: "changes.open", label: "Changes", description: "Compare local commits and uncommitted changes.", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Changes, label: "Changes" } } }],
     };
   },
 };

@@ -1,0 +1,89 @@
+.deletion-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.deletion-files { padding: 16px; }
+
+.deletion-file { min-width: 0; scroll-margin-top: 54px; }
+
+.deletion-file > summary { box-sizing: border-box; list-style: none; }
+
+.deletion-file > summary::-webkit-details-marker { display: none; }
+
+.deletion-file-meta { justify-content: flex-end; white-space: nowrap; }
+
+.workspace-deletion-commit-branches { max-width: min(35vw, 40ch); overflow: hidden; text-overflow: ellipsis; text-align: end; }
+
+.deletion-git-stats { display: inline-flex; align-items: center; gap: 12px; }
+
+.deletion-file-size { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-code); white-space: nowrap; }
+
+.deletion-additions { color: var(--success); font-family: var(--font-mono); font-size: var(--text-code); font-weight: var(--weight-semibold); }
+
+.deletion-deletions { color: var(--danger); font-family: var(--font-mono); font-size: var(--text-code); font-weight: var(--weight-semibold); }
+
+.deletion-file-diff {
+  margin-top: 8px;
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--panel);
+  background-image: var(--panel-background-image);
+}
+
+.deletion-file-loading {
+  min-height: 96px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--panel);
+  color: var(--text-muted);
+}
+
+.deletion-special-file {
+  min-height: 144px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--text);
+}
+
+.deletion-special-file__visual {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--elev);
+  color: var(--text-muted);
+}
+
+.deletion-special-file__visual svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+.deletion-special-file__content { display: grid; gap: 4px; max-width: 420px; }
+
+.deletion-special-file__content strong { color: var(--text-bright); font-weight: var(--weight-semibold); }
+
+.deletion-special-file__content span { line-height: var(--leading-copy); }
+
+@media (max-width: 700px) {
+
+.deletion-files { padding: 8px; }
+
+.deletion-file > summary { flex-wrap: nowrap; }
+
+.deletion-file-meta { flex: 0 0 auto; }
+
+.deletion-special-file { align-items: flex-start; justify-content: flex-start; }
+
+}

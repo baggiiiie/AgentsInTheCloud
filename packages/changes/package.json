@@ -6,7 +6,6 @@
   "dependencies": {
     "@agents-in-the-cloud/core": "workspace:*",
     "@agents-in-the-cloud/design-system": "workspace:*",
-    "@agents-in-the-cloud/review": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@agents-in-the-cloud/syntax": "workspace:*",
     "@agents-in-the-cloud/workspace": "workspace:*",

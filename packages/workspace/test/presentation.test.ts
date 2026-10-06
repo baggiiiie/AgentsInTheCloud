@@ -136,6 +136,22 @@ describe("Workspace presentation", () => {
     expect((await presentation.listWorkViews("workspace-1")).map((view) => view.reference)).toEqual(files);
   });
 
+  test("retired Review references are omitted when loading persisted Work views", async () => {
+    const metadataDir = join(dataDir, "workspaces", "workspace-1", "metadata");
+    await mkdir(metadataDir, { recursive: true });
+    await writeFile(join(metadataDir, "presentation.json"), JSON.stringify({
+      version: 1,
+      workViews: [{ reference: { type: "review" } }, { reference: { type: "file", path: "/work/README.md" } }],
+      dismissedWarnings: { "missing-secrets": "state-one" },
+    }));
+    expect(await presentation.listWorkViews("workspace-1")).toEqual([{ reference: { type: "file", path: "/work/README.md" } }]);
+    expect(await presentation.dismissedWarnings("workspace-1")).toEqual({ "missing-secrets": "state-one" });
+    await presentation.dismissWarning("workspace-1", "project-settings-changed", "revision-one");
+    const stored = await Bun.file(join(metadataDir, "presentation.json")).json();
+    expect(stored.workViews).toEqual([{ reference: { type: "file", path: "/work/README.md" } }]);
+    await expect(presentation.openWorkView("workspace-1", { type: "review" })).rejects.toThrow("unknown Work view type: review");
+  });
+
   test("malformed stored presentation state fails visibly instead of being reinitialized", async () => {
     const metadataDir = join(dataDir, "workspaces", "workspace-1", "metadata");
     await mkdir(metadataDir, { recursive: true });

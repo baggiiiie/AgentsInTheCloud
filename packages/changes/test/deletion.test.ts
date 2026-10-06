@@ -9,7 +9,7 @@ import { command } from "./support/repository.ts";
 const workspaceId = "de1e7e01";
 let dataDir: string;
 let previousDataDir: string | undefined;
-const { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, reviewDeletionReview } = createDeletionReview((id, path) => localRepository(join(dataDir, "workspaces", id, "work", path)));
+const { clearDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, changesDeletionReview } = createDeletionReview((id, path) => localRepository(join(dataDir, "workspaces", id, "work", path)));
 
 beforeEach(async () => {
   previousDataDir = process.env.ATELIER_DATA_DIR;
@@ -45,7 +45,7 @@ describe("Workspace deletion review", () => {
     await command(root, "git", "add", "committed.txt");
     await command(root, "git", "commit", "-qm", "local commit");
 
-    expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
+    expect(await changesDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked",
       details: { repositories: [{ relativePath: "", uncommitted: [], unpushedCommits: [{ hash: expect.any(String), subject: "local commit" }] }] },
     });
@@ -54,9 +54,9 @@ describe("Workspace deletion review", () => {
   test("clears the assessment once commits are on a known remote branch", async () => {
     const root = await workspaceRepository();
     await command(root, "git", "commit", "--allow-empty", "-qm", "local commit");
-    expect((await reviewDeletionReview.inspect(workspaceId)).status).toBe("blocked");
+    expect((await changesDeletionReview.inspect(workspaceId)).status).toBe("blocked");
     await command(root, "git", "update-ref", "refs/remotes/origin/main", "HEAD");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
+    expect(await changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
   });
 
   test("includes commits on other local branches and detached HEAD", async () => {
@@ -65,7 +65,7 @@ describe("Workspace deletion review", () => {
     await command(root, "git", "commit", "--allow-empty", "-qm", "other branch");
     await command(root, "git", "checkout", "--detach", "refs/remotes/origin/main");
     await command(root, "git", "commit", "--allow-empty", "-qm", "detached commit");
-    const assessment = await reviewDeletionReview.inspect(workspaceId);
+    const assessment = await changesDeletionReview.inspect(workspaceId);
     expect(assessment).toMatchObject({
       status: "blocked",
       details: { repositories: [{ unpushedCommits: expect.arrayContaining([
@@ -81,7 +81,7 @@ describe("Workspace deletion review", () => {
     await command(root, "git", "commit", "--allow-empty", "-qm", "shared commit");
     await command(root, "git", "branch", "another-branch");
     await command(root, "git", "commit", "--allow-empty", "-qm", "later commit");
-    const assessment = await reviewDeletionReview.inspect(workspaceId);
+    const assessment = await changesDeletionReview.inspect(workspaceId);
     expect(assessment).toMatchObject({
       status: "blocked",
       details: { repositories: [{ unpushedCommits: expect.arrayContaining([
@@ -94,7 +94,7 @@ describe("Workspace deletion review", () => {
   test("reports all commits when there are no remote branches", async () => {
     const root = await workspaceRepository();
     await command(root, "git", "update-ref", "-d", "refs/remotes/origin/main");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
+    expect(await changesDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked",
       details: { repositories: [{ unpushedCommits: [{ hash: expect.any(String), subject: "initial" }] }] },
     });
@@ -104,9 +104,9 @@ describe("Workspace deletion review", () => {
     const root = join(dataDir, "workspaces", workspaceId, "work");
     await mkdir(root, { recursive: true });
     await command(root, "git", "init", "-q");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
+    expect(await changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
     await writeFile(join(root, "new.txt"), "new file");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
+    expect(await changesDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked", details: { repositories: [{ unpushedCommits: [], uncommitted: [{ path: "new.txt" }] }] },
     });
   });
@@ -120,9 +120,9 @@ describe("Workspace deletion review", () => {
     await command(root, "git", "-c", "protocol.file.allow=always", "submodule", "add", source, "nested");
     await command(root, "git", "commit", "-qam", "add submodule");
     await command(root, "git", "update-ref", "refs/remotes/origin/main", "HEAD");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
+    expect(await changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
     await command(join(root, "nested"), "git", "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--allow-empty", "-qm", "submodule local");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
+    expect(await changesDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked",
       details: { repositories: expect.arrayContaining([
         expect.objectContaining({ relativePath: "nested", uncommitted: [], unpushedCommits: [expect.objectContaining({ hash: expect.any(String), subject: "submodule local", branches: expect.any(Array) })] }),
@@ -133,9 +133,9 @@ describe("Workspace deletion review", () => {
   test("changes the fingerprint when unpushed commits change", async () => {
     const root = await workspaceRepository();
     await command(root, "git", "commit", "--allow-empty", "-qm", "first");
-    const first = await reviewDeletionReview.inspect(workspaceId);
+    const first = await changesDeletionReview.inspect(workspaceId);
     await command(root, "git", "commit", "--allow-empty", "-qm", "second");
-    const second = await reviewDeletionReview.inspect(workspaceId);
+    const second = await changesDeletionReview.inspect(workspaceId);
     if (first.status !== "blocked" || second.status !== "blocked") throw new Error("expected blocked assessments");
     expect(second.fingerprint).not.toBe(first.fingerprint);
   });
@@ -144,7 +144,7 @@ describe("Workspace deletion review", () => {
     const root = await workspaceRepository();
     await writeFile(join(root, "tracked.txt"), "changed\n");
 
-    expect(await reviewDeletionReview.inspect(workspaceId)).toMatchObject({
+    expect(await changesDeletionReview.inspect(workspaceId)).toMatchObject({
       status: "blocked",
       details: {
         repositories: [{
@@ -158,9 +158,9 @@ describe("Workspace deletion review", () => {
   test("only allows file requests belonging to the current assessment", async () => {
     const root = await workspaceRepository();
     await writeFile(join(root, "tracked.txt"), "changed\n");
-    const first = await reviewDeletionReview.inspect(workspaceId);
+    const first = await changesDeletionReview.inspect(workspaceId);
     if (first.status !== "blocked") throw new Error("expected blocked assessment");
-    const url = new URL("http://test.local/review/deletion/file");
+    const url = new URL("http://test.local/changes/deletion/file");
     url.searchParams.set("fingerprint", first.fingerprint);
     url.searchParams.set("path", "../outside.txt");
     expect((await deletionReviewFileResponse(workspaceId, url)).status).toBe(404);
@@ -169,7 +169,7 @@ describe("Workspace deletion review", () => {
     expect((await deletionReviewFileResponse(workspaceId, url)).status).toBe(404);
 
     await writeFile(join(root, "tracked.txt"), "changed again\n");
-    const second = await reviewDeletionReview.inspect(workspaceId);
+    const second = await changesDeletionReview.inspect(workspaceId);
     if (second.status !== "blocked") throw new Error("expected blocked assessment");
     expect(second.fingerprint).not.toBe(first.fingerprint);
     url.searchParams.delete("repository");
@@ -182,9 +182,9 @@ describe("Workspace deletion review", () => {
   test("commit review requests are restricted to the current assessment", async () => {
     const root = await workspaceRepository();
     await command(root, "git", "commit", "--allow-empty", "-qm", "local commit");
-    const assessment = await reviewDeletionReview.inspect(workspaceId);
+    const assessment = await changesDeletionReview.inspect(workspaceId);
     if (assessment.status !== "blocked") throw new Error("expected blocked assessment");
-    const url = new URL(`http://test.local/review/deletion/commit?${new URLSearchParams({ fingerprint: assessment.fingerprint, repository: "", commit: "HEAD" })}`);
+    const url = new URL(`http://test.local/changes/deletion/commit?${new URLSearchParams({ fingerprint: assessment.fingerprint, repository: "", commit: "HEAD" })}`);
     expect((await deletionReviewCommitResponse(workspaceId, url)).status).toBe(404);
     expect((await deletionReviewFileResponse(workspaceId, url)).status).toBe(404);
     url.searchParams.delete("commit");
@@ -196,11 +196,11 @@ describe("Workspace deletion review", () => {
   test("a clean assessment invalidates previous file requests", async () => {
     const root = await workspaceRepository();
     await writeFile(join(root, "tracked.txt"), "changed\n");
-    const assessment = await reviewDeletionReview.inspect(workspaceId);
+    const assessment = await changesDeletionReview.inspect(workspaceId);
     if (assessment.status !== "blocked") throw new Error("expected blocked assessment");
     await command(root, "git", "checkout", "--", "tracked.txt");
-    expect(await reviewDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
-    const url = new URL(`http://test.local/review/deletion/file?${new URLSearchParams({ fingerprint: assessment.fingerprint, path: "tracked.txt" })}`);
+    expect(await changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
+    const url = new URL(`http://test.local/changes/deletion/file?${new URLSearchParams({ fingerprint: assessment.fingerprint, path: "tracked.txt" })}`);
     expect((await deletionReviewFileResponse(workspaceId, url)).status).toBe(409);
   });
 });

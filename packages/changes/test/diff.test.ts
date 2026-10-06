@@ -1,0 +1,144 @@
+import { localRepository } from "../../workspace/test/support/local-repository.ts";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { collectChangesFile, collectChangesIndex, collectChangesStats, type ChangesFile } from "../src/server/diff.ts";
+import { command, createChangesRepository } from "./support/repository.ts";
+
+const roots: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+});
+
+async function repository(): Promise<string> {
+  const root = await createChangesRepository();
+  roots.push(root);
+  return root;
+}
+
+async function changesFiles(root: string): Promise<ChangesFile[]> {
+  const index = await collectChangesIndex(localRepository(root));
+  if (index.phase !== "ready") throw new Error("expected ready changes");
+  const files = await Promise.all(index.files.map((file) => collectChangesFile(localRepository(root), file.path)));
+  return files.filter((file): file is ChangesFile => file !== undefined);
+}
+
+describe("Changes collection", () => {
+  test("reports a non-repository without throwing", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-changes-not-git-"));
+    roots.push(root);
+    expect((await collectChangesIndex(localRepository(root))).phase).toBe("not-git");
+  });
+
+  test("lists tracked and untracked changes without collecting file details", async () => {
+    const root = await repository();
+    await writeFile(join(root, "changed.ts"), "const after = true;\nconst added = 1;\n");
+    await writeFile(join(root, "untracked.ts"), "export const newFile = true;\n");
+    await writeFile(join(root, "ignored.txt"), "not reviewed\n");
+
+    const index = await collectChangesIndex(localRepository(root));
+    expect(index).toEqual({ phase: "ready", files: [
+      { path: "changed.ts", change: "modified" },
+      { path: "untracked.ts", change: "added", untracked: true },
+    ] });
+    expect(await collectChangesStats(localRepository(root), index)).toEqual([
+      { path: "changed.ts", change: "modified", additions: 2, deletions: 1 },
+      { path: "untracked.ts", change: "added", untracked: true, additions: 1, deletions: 0 },
+    ]);
+
+    const files = await changesFiles(root);
+    expect(files.map((file) => file.path)).toEqual(["changed.ts", "untracked.ts"]);
+    expect(files[1]!.kind).toBe("text");
+  });
+
+  test("counts untracked text lines with or without a trailing newline", async () => {
+    const root = await repository();
+    for (const [path, text] of Object.entries({ "empty-new.txt": "", "newline.txt": "héllo\nworld\n", "no-newline.txt": "héllo\nworld" })) {
+      await writeFile(join(root, path), text);
+    }
+    const stats = await collectChangesStats(localRepository(root), await collectChangesIndex(localRepository(root)));
+    expect(stats.map(({ path, additions }) => ({ path, additions }))).toEqual([
+      { path: "empty-new.txt", additions: 0 },
+      { path: "newline.txt", additions: 2 },
+      { path: "no-newline.txt", additions: 2 },
+    ]);
+  });
+
+  test("collects stats before the repository has its first commit", async () => {
+    const root = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-changes-unborn-"));
+    roots.push(root);
+    await command(root, "git", "init");
+    await writeFile(join(root, "first.ts"), "export const first = true;\n");
+    await command(root, "git", "add", "first.ts");
+    const index = await collectChangesIndex(localRepository(root));
+    expect(await collectChangesStats(localRepository(root), index)).toEqual([{ path: "first.ts", change: "added", additions: 1, deletions: 0 }]);
+  });
+
+  test("classifies whole-file additions and removals", async () => {
+    const root = await repository();
+    await writeFile(join(root, "added.ts"), "export const added = true;\n");
+    await rm(join(root, "changed.ts"));
+
+    const index = await collectChangesIndex(localRepository(root));
+    if (index.phase !== "ready") throw new Error("expected ready changes");
+    expect(index.files.map(({ path, change }) => ({ path, change }))).toEqual([
+      { path: "added.ts", change: "added" },
+      { path: "changed.ts", change: "removed" },
+    ]);
+  });
+
+  test("keeps empty files and rename metadata", async () => {
+    const root = await repository();
+    await command(root, "git", "mv", "empty.txt", "renamed.txt");
+    const index = await collectChangesIndex(localRepository(root));
+    expect(await collectChangesStats(localRepository(root), index)).toEqual([{ path: "renamed.txt", previousPath: "empty.txt", change: "modified", additions: 0, deletions: 0 }]);
+    const files = await changesFiles(root);
+    expect(files).toHaveLength(1);
+    expect(files[0]!.path).toBe("renamed.txt");
+    expect(files[0]!.previousPath).toBe("empty.txt");
+    expect(files[0]!.detail).toBe("File renamed");
+  });
+
+  test("omits a staged addition deleted again before review", async () => {
+    const root = await repository();
+    const transient = join(root, "transient.ts");
+    await writeFile(transient, "temporary\n");
+    await command(root, "git", "add", "transient.ts");
+    await rm(transient);
+    expect(await changesFiles(root)).toEqual([]);
+  });
+
+  test("collects binary sizes for modified, removed, renamed, and new files", async () => {
+    const root = await repository();
+    for (const path of ["modified.bin", "removed.bin", "original.bin"]) {
+      await writeFile(join(root, path), Buffer.alloc(1024));
+    }
+    await command(root, "git", "add", ".");
+    await command(root, "git", "commit", "-m", "Binary fixtures");
+    await writeFile(join(root, "modified.bin"), Buffer.alloc(2048));
+    await rm(join(root, "removed.bin"));
+    await command(root, "git", "mv", "original.bin", "renamed.bin");
+    await writeFile(join(root, "new.bin"), Buffer.alloc(32));
+    await writeFile(join(root, "staged.bin"), Buffer.alloc(64));
+    await command(root, "git", "add", "staged.bin");
+    const stats = await collectChangesStats(localRepository(root), await collectChangesIndex(localRepository(root)));
+    expect(Object.fromEntries(stats.map((file) => [file.path, file.binarySizes]))).toEqual({
+      "modified.bin": { before: 1024, after: 2048 },
+      "removed.bin": { before: 1024, after: undefined },
+      "renamed.bin": { before: 1024, after: 1024 },
+      "new.bin": { after: 32 },
+      "staged.bin": { before: undefined, after: 64 },
+    });
+    expect(stats.every((file) => file.additions === 0 && file.deletions === 0)).toBe(true);
+  });
+
+  test("classifies binary changes without rendering them as text", async () => {
+    const root = await repository();
+    await writeFile(join(root, "asset.bin"), new Uint8Array([0, 1, 2, 3]));
+    expect((await changesFiles(root))[0]!.kind).toBe("binary");
+  });
+
+});
+

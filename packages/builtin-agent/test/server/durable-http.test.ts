@@ -43,11 +43,9 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   const draft = agentAttachmentDraftId(agent.workspaceId, agent.agentId);
   const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGP4z8BAEiJN9aiGUQ1DSgMAkPn/Afnh+ngAAAAASUVORK5CYII=", "base64");
   const attachment = await stageAttachment(draft, new File([image], "image.png", { type: "image/png" }));
-  let preparations = 0;
   let admissions = 0;
   let accepted: Awaited<ReturnType<typeof controller.submit>>;
   const events = createAgentsInTheCloudEventBus();
-  events.on("workspace_agent_prompt_preparing", () => { preparations++; });
   // The route boundary uses an actual native execution controller. No HTML or UI assertions.
   const countedController = {
     ...controller,
@@ -58,7 +56,7 @@ test("lost HTTP response retries admitted input after attachment staging is cons
     },
   };
   const request = () => new Request(`http://agents-in-the-cloud.test/workspaces/${agent.workspaceId}/agents/${agent.agentId}/messages`, {
-    method: "POST", body: new URLSearchParams({ text: "Look at the image", requestId: "lost-response", attachmentDraft: draft, attachment: attachment.id, reviewComment: "12345678-1234-1234-1234-123456789abc" }),
+    method: "POST", body: new URLSearchParams({ text: "Look at the image", requestId: "lost-response", attachmentDraft: draft, attachment: attachment.id }),
   });
   const first = request();
   const response = await handleAgentRequest(first, new URL(first.url), {
@@ -86,7 +84,6 @@ test("lost HTTP response retries admitted input after attachment staging is cons
   });
   expect(retried?.status).toBe(200);
   expect(retried?.headers.get("x-agents-in-the-cloud-attachment-draft-consumed")).toBe("true");
-  expect(preparations).toBe(1);
   expect(admissions).toBe(1);
   expect(faux.state.callCount).toBe(1);
 });

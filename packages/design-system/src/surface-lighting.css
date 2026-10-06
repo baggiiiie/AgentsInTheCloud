@@ -14,7 +14,6 @@
   /* 3.5% light × 12% strength; terminal uses the selected 99% multiplier. */
   --panel-background-image: radial-gradient(ellipse 53% 300px at 27% 0, rgb(255 255 255 / .42%), transparent 85%);
   --transcript-background-image: var(--panel-background-image);
-  --review-background-image: var(--panel-background-image);
   --files-background-image: var(--panel-background-image);
   --editor-background-image: var(--panel-background-image);
   --composer-background-image: var(--panel-background-image);

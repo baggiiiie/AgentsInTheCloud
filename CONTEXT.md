@@ -154,7 +154,7 @@ A Work view representing an independently open resource or running session, such
 _Avoid_: Document view, permanent view
 
 **Contextual Work view**:
-A workspace-level utility Work view, such as Files or Review.
+A workspace-level utility Work view, such as Files or Changes.
 _Avoid_: Permanent view, special view
 
 **Browser**:
@@ -181,20 +181,8 @@ _Avoid_: Code server (as the feature name)
 A Resource Work view displaying a Workspace’s VS Code editor. The view is an app destination, distinct from the underlying VS Code server or native window.
 _Avoid_: VS Code pane, VS Code session (for the app destination), VS Code tab, VS Code Work view
 
-**Review**:
-A contextual Work view for inspecting a Workspace’s uncommitted Git changes and drafting Review comments for an Agent. It includes staged, unstaged, and untracked changes; it is not a pull-request approval workflow.
-_Avoid_: Review view, change review, pull-request review
-
-**Review comment**:
-Feedback drafted in Review about changed lines in a Workspace file, which can be copied into an Agent’s composer. It is retained even if later file changes prevent matching its original lines.
-_Avoid_: Review note, feedback note, repository comment
-
-**Unanchored Review comment**:
-A Review comment that can no longer be matched unambiguously to its original lines in the Workspace’s current changes. Its feedback and original snippet are retained; being unanchored does not necessarily mean the feedback is obsolete.
-_Avoid_: Outdated comment, stale comment, comment without an anchor
-
 **Side-by-side**:
-The Review diff layout that places deletions and additions in separate columns next to each other.
+The diff layout that places deletions and additions in separate columns next to each other.
 _Avoid_: Split diff, split layout
 
 **Mobile destination**:
@@ -210,7 +198,7 @@ The phone control that remains at the bottom-left while the AgentsInTheCloud bar
 _Avoid_: AgentsInTheCloud button, open button
 
 **Workspace bar**:
-The phone-only bottom navigation bar containing Mobile destinations within the selected Workspace, such as Agents, Browser, Review, and More. It is visible while the Workspace pane is hidden and is replaced by the AgentsInTheCloud bar when the Workspace pane opens.
+The phone-only bottom navigation bar containing Mobile destinations within the selected Workspace, such as Agents, Browser, Changes, and More. It is visible while the Workspace pane is hidden and is replaced by the AgentsInTheCloud bar when the Workspace pane opens.
 _Avoid_: Current Workspace toolbar, resident bar
 
 **Next attention**:

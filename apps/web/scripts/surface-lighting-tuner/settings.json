@@ -6,7 +6,7 @@
   "buttonLighting": { "strength": 27, "whiteness": 32, "position": 21, "width": 147, "reach": 21, "glow": 4, "glowReach": 2, "outline": 0 },
   "panelFill": { "position": 27, "width": 53, "reach": 300, "light": 3.5, "dark": 1.5 },
   "buttonFill": { "position": 20, "width": 125, "reach": 45, "light": 5, "dark": 2 },
-  "surfaces": { "transcript": 100, "terminal": 99, "review": 100, "files": 100, "editor": 100, "composer": 100, "other": 100 },
+  "surfaces": { "transcript": 100, "terminal": 99, "files": 100, "editor": 100, "composer": 100, "other": 100 },
   "effect": "a",
   "panel": "pool",
   "button": "pool",

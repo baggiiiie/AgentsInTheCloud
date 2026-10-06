@@ -1,6 +1,6 @@
 import { selectComparison } from "../comparison-selection.ts";
 import { captureSyntheticStats } from "./synthetic-stats.ts";
-import { collectReviewComparison, collectReviewIndex, type ReviewFile, type ReviewFileStats, type ReviewIndex } from "@agents-in-the-cloud/review/diff";
+import { collectChangesComparison, collectChangesIndex, type ChangesFile, type ChangesFileStats, type ChangesIndex } from "./diff.ts";
 import { git, type Repository } from "@agents-in-the-cloud/workspace/git";
 import { endpointName, rangeDescription, stagedChanges, workingTree, type ChangesCommit, type ChangesRange, type HistoryModel } from "../history.ts";
 export { stagedChanges, workingTree } from "../history.ts";
@@ -17,13 +17,13 @@ export interface ChangesHistory extends HistoryModel {
   aheadIds: Set<string>;
   hasMore: boolean;
   loaded: number;
-  phase: ReviewIndex["phase"];
+  phase: ChangesIndex["phase"];
 }
 export interface ChangesSnapshot {
   id: string;
-  index: ReviewIndex;
-  stats: ReviewFileStats[];
-  files: Map<string, ReviewFile>;
+  index: ChangesIndex;
+  stats: ChangesFileStats[];
+  files: Map<string, ChangesFile>;
   history: ChangesHistory;
   range: ChangesRange;
   label: string;
@@ -48,7 +48,7 @@ export async function commitHistory(root: Repository, history: ChangesHistory, s
 }
 
 export async function captureHistory(root: Repository): Promise<ChangesHistory> {
-  const index = await collectReviewIndex(root);
+  const index = await collectChangesIndex(root);
   const history: ChangesHistory = { id: crypto.randomUUID(), commits: [], topology: [], tips: [], references: [], indexTree: "", emptyTree: "", aheadIds: new Set(), range: { end: workingTree }, hasStaged: false, hasMore: false, loaded: 0, phase: index.phase };
   if (index.phase !== "ready") return history;
   const [head, branch, refs, emptyTree, indexTree] = await Promise.all([
@@ -129,7 +129,7 @@ export async function captureChanges(root: Repository, range?: ChangesRange, cap
   snapshot.baseLabel = snapshot.base === history.emptyTree ? "Empty tree" : snapshot.base === history.indexTree ? "Staged changes" : endpointName(history, selected.start ?? undefined);
   snapshot.endLabel = endpointName(history, selected.end);
   snapshot.label = rangeDescription(history, selected);
-  const comparison = await collectReviewComparison(root, snapshot.base, snapshot.end);
+  const comparison = await collectChangesComparison(root, snapshot.base, snapshot.end);
   snapshot.index = comparison.index;
   snapshot.stats = comparison.stats;
   snapshot.files = comparison.files;

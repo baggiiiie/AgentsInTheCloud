@@ -141,7 +141,7 @@ export async function openDurableAgentRuntime(
       if (!nextBusy) {
         const subscription = finishNotificationTurn(renderContext);
         if (subscription) void sendTurnNotification(renderContext, subscription).catch(error => console.error("Could not send Agent notification", error));
-        // Completion consumers (review refresh, catalog loading, etc.) do not own
+        // Completion consumers (Changes refresh, catalog loading, etc.) do not own
         // execution observation. Report their failure without terminating the watch.
         await options.events?.emit("workspace_agent_turn_finished", renderContext)
           .catch(error => console.error("Could not publish Agent turn completion", error));

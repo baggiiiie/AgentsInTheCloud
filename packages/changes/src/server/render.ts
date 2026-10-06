@@ -5,7 +5,7 @@ import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { parseDiffFromFile, type CodeViewItem } from "@pierre/diffs";
-import type { ReviewFile } from "@agents-in-the-cloud/review/diff";
+import type { ChangesFile } from "./diff.ts";
 import { type HistoryModel } from "../history.ts";
 import type { ChangesHistory, ChangesSnapshot } from "./snapshot.ts";
 
@@ -52,7 +52,7 @@ export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot,
   return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-range-target="diff">${renderDiff(workspaceId, snapshot, collapsed)}</div>`;
 }
 
-export function renderChangesFile(file: ReviewFile, snapshotId: string): string {
+export function renderChangesFile(file: ChangesFile, snapshotId: string): string {
   const item: CodeViewItem<undefined> = file.diff
     ? { id: file.path, type: "diff", fileDiff: file.diff, version: 1 }
     : { id: file.path, type: "file", version: 1, file: { name: file.path, lang: "text", contents: file.detail ?? "No text changes to display.", cacheKey: `${snapshotId}:${file.path}` } };

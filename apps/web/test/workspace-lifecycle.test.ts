@@ -283,7 +283,7 @@ describe("workspace lifecycle", () => {
       method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, body: "{}",
     });
     await app.fetch(new Request("http://test.local/workspaces/confirm-park", { headers: { accept: "application/json" } }));
-    expect((await app.fetch(request("/workspaces/confirm-park/commands/review.open"))).status).toBe(200);
+    expect((await app.fetch(request("/workspaces/confirm-park/commands/changes.open"))).status).toBe(200);
     expect((await app.fetch(request("/workspaces/confirm-park/commands/vscode.open"))).status).toBe(200);
     const blocked = await app.fetch(request("/workspaces/confirm-park/park"));
     expect(blocked.status).toBe(409);
@@ -293,7 +293,7 @@ describe("workspace lifecycle", () => {
     expect(registry.get("confirm-park")?.parked).toBe(true);
     await app.fetch(request("/workspaces/confirm-park/unpark"));
     const detail = await (await app.fetch(new Request("http://test.local/workspaces/confirm-park", { headers: { accept: "application/json" } }))).json();
-    expect(detail.workspace.workViews.map((view: { reference: { type: string } }) => view.reference.type)).toEqual(["review"]);
+    expect(detail.workspace.workViews.map((view: { reference: { type: string } }) => view.reference.type)).toEqual(["changes"]);
   });
 
 });

@@ -69,8 +69,8 @@ switch (path) {
   case "review":
   case "tool-diff": {
     const { DiffHunksRenderer, parseDiffFromFile } = await import("@pierre/diffs");
-    const { reviewDiffOptions, toolDiffOptions } = await import("../src/pierre.ts");
-    const options = path === "review" ? reviewDiffOptions : toolDiffOptions;
+    const { changesDiffOptions, toolDiffOptions } = await import("../src/pierre.ts");
+    const options = path === "review" ? changesDiffOptions : toolDiffOptions;
     // Use the actual renderer defaults, including its long-line tokenization limit.
     run = async (text) => {
       const renderer = new DiffHunksRenderer(options);

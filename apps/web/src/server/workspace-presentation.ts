@@ -378,7 +378,6 @@ function renderMobileDestination(label: string, destination: string, iconHtml: s
 function mobileNavigationPriority(view: WorkPaneContribution): number {
   const type = workViewType(view);
   if (type === "browser") return 0;
-  if (type === "review") return 1;
   return 2;
 }
 

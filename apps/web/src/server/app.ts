@@ -79,7 +79,7 @@ export interface WebAppDeps {
   devReload?: boolean;
   /** Create the container + default agent etc. for an already-registered workspace id. */
   provisionWorkspace(id: string, options: { init?: WorkspaceInitInstruction; context?: WorkspaceCreationContext; run: WorkspaceProvisionRun }): Promise<void>;
-  /** Test/embedding override. Production obtains this contribution from the Review module. */
+  /** Test/embedding override. Production obtains this contribution from the Changes module. */
   deletionReview?: WorkspaceDeletionReview;
   /** Force-remove the workspace container. */
   destroyWorkspace(id: string): Promise<void>;
@@ -116,7 +116,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   // SAFETY: This value is validated or constructed by the server boundary immediately surrounding this use.
   const workViewAdapters = workspaceModules.flatMap((module) => module.workViews ?? []) as WorkspaceModuleWorkViewAdapter[];
   const moduleDeletionReviews = workspaceModules.flatMap((module) => module.deletionReview ? [module.deletionReview] : []);
-  if (!deps.deletionReview && moduleDeletionReviews.length !== 1) throw new Error(`Expected one deletion Review contribution, found ${moduleDeletionReviews.length}`);
+  if (!deps.deletionReview && moduleDeletionReviews.length !== 1) throw new Error(`Expected one deletion safety contribution, found ${moduleDeletionReviews.length}`);
   const deletionReview = deps.deletionReview ?? moduleDeletionReviews[0]!;
   const deletion = createWorkspaceDeletion({
     registry,

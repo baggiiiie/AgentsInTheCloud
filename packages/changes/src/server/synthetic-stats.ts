@@ -1,4 +1,4 @@
-import { collectReviewStats, type ReviewFileSummary } from "@agents-in-the-cloud/review/diff";
+import { collectChangesStats, type ChangesFileSummary } from "./diff.ts";
 import { git, parseGitNumstat, type Repository } from "@agents-in-the-cloud/workspace/git";
 import type { ChangesNodeStats } from "../history.ts";
 
@@ -12,11 +12,11 @@ function totals(stats: ReturnType<typeof parseGitNumstat>): ChangesNodeStats {
 }
 
 /** Each synthetic row describes its own layer, independently of the selected comparison. */
-export async function captureSyntheticStats(root: Repository, headTree: string, indexTree: string, files: ReviewFileSummary[]): Promise<{ staged: ChangesNodeStats; working: ChangesNodeStats }> {
+export async function captureSyntheticStats(root: Repository, headTree: string, indexTree: string, files: ChangesFileSummary[]): Promise<{ staged: ChangesNodeStats; working: ChangesNodeStats }> {
   const [staged, working, untracked] = await Promise.all([
     git(root, ["diff", "--numstat", "-z", "-M", headTree, indexTree, "--"]),
     git(root, ["diff", "--numstat", "-z", "-M", indexTree, "--"]),
-    collectReviewStats(root, { phase: "ready", files: files.filter(file => file.untracked) }),
+    collectChangesStats(root, { phase: "ready", files: files.filter(file => file.untracked) }),
   ]);
   const workingStats = parseGitNumstat(working);
   const captured = totals(workingStats);

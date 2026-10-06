@@ -82,7 +82,7 @@ class ButtonSurfacesController extends Controller {
     const buttons = this.lighting('buttonLighting');
     const panelFill = this.fill('panelFill');
     const buttonFill = this.fill('buttonFill');
-    const surfaces = { transcript: this.value('surfaces','transcript'), terminal: this.value('surfaces','terminal'), review: this.value('surfaces','review'), files: this.value('surfaces','files'), editor: this.value('surfaces','editor'), composer: this.value('surfaces','composer'), other: this.value('surfaces','other') };
+    const surfaces = { transcript: this.value('surfaces','transcript'), terminal: this.value('surfaces','terminal'), files: this.value('surfaces','files'), editor: this.value('surfaces','editor'), composer: this.value('surfaces','composer'), other: this.value('surfaces','other') };
     const rim = Number(this.rimAmountTarget.value)/100;
     const panelAmount = Number(this.panelAmountTarget.value)/100;
     const buttonAmount = Number(this.buttonAmountTarget.value)/100;
@@ -118,7 +118,6 @@ class ButtonSurfacesController extends Controller {
       '--button-background-image': fill(this.buttonTarget.value,buttonFill,buttonAmount),
       '--transcript-background-image': interior(surfaces.transcript),
       '--terminal-background-image': interior(surfaces.terminal),
-      '--review-background-image': interior(surfaces.review),
       '--files-background-image': interior(surfaces.files),
       '--editor-background-image': interior(surfaces.editor),
       '--composer-background-image': interior(surfaces.composer),

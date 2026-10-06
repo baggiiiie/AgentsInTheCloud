@@ -94,9 +94,11 @@ export function createWorkspacePresentationStore(options: WorkspacePresentationS
     if (version !== 1 || !Array.isArray(storedWorkViews)) {
       throw presentationError(workspaceId, "expected version 1 state");
     }
-    const workViews = storedWorkViews.map((entry, index) => {
+    const workViews = storedWorkViews.flatMap((entry, index) => {
       if (!isJsonObject(entry)) throw presentationError(workspaceId, `Work view ${index} must be an object`);
-      return { reference: parseReference(workspaceId, entry.reference, true) };
+      // Review was retired; old persisted views must not prevent a Workspace from loading.
+      if (isJsonObject(entry.reference) && entry.reference.type === "review") return [];
+      return [{ reference: parseReference(workspaceId, entry.reference, true) }];
     });
     const identities = workViews.map(({ reference }) => identity(reference));
     if (new Set(identities).size !== identities.length) throw presentationError(workspaceId, "Work view references must be unique");
