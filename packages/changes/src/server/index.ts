@@ -1,3 +1,6 @@
+import { CommentConflict, InvalidComment, placeReviewComments, reviewComments } from "./comments.ts";
+import { deletionCommentsId, renderDeletionComments, commentsActionsId, commentsModelId, orphanCommentsId, renderCommentActions, renderCommentsModel, renderOrphanComments } from "./comment-render.ts";
+import { domId, type LiveRegion } from "@agents-in-the-cloud/shared";
 import { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } from "./deletion.ts";
 import { refreshChanges } from "./refresh.ts";
 import type { JsonValue } from "@agents-in-the-cloud/core";
@@ -7,7 +10,7 @@ import { matchRoute, response, textResponse } from "@agents-in-the-cloud/shared/
 import { workspaceRepository } from "@agents-in-the-cloud/workspace/git";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory } from "./render.ts";
+import { changesBodyId, comparisonId, errorId, historyContentId, renderChanges, renderChangesTitle, renderChangesFile, renderComparison, renderError, renderHistory, renderDiff } from "./render.ts";
 import type { DiffEndpoints } from "../history.ts";
 import { captureChanges, commitHistory, InvalidDiffEndpoints, type ChangesSnapshot } from "./snapshot.ts";
 
@@ -29,9 +32,30 @@ const replace = (target: string, html: string) => `<turbo-stream action="replace
 const diffEndpointsSchema = Type.Object({ target: Type.String(), base: Type.Optional(Type.Union([Type.String(), Type.Null()])) });
 const requestSchema = Type.Object({ client: Type.String({ minLength: 1, maxLength: 64 }), sequence: Type.Integer({ minimum: 1 }) });
 
+const commentSaveSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 64 }), revision: Type.Integer({ minimum: 0 }), body: Type.String({ maxLength: 10000 }),
+  path: Type.Optional(Type.String({ minLength: 1 })), side: Type.Optional(Type.Union([Type.Literal("additions"), Type.Literal("deletions")])),
+  start: Type.Optional(Type.Integer({ minimum: 1 })), end: Type.Optional(Type.Integer({ minimum: 1 })),
+});
+const commentVersionSchema = Type.Object({ id: Type.String({ minLength: 1, maxLength: 64 }), revision: Type.Integer({ minimum: 1 }) });
+const copiedSchema = Type.Array(commentVersionSchema);
+function commentRegions(workspaceId: string, snapshot: ChangesSnapshot, key: string): LiveRegion[] {
+  if (key !== snapshot.id) return [{ target: domId("changes", key, "diff"), html: renderDiff(workspaceId, snapshot, true), action: "replace", morph: false }];
+  const comments = placeReviewComments(reviewComments.list(workspaceId), snapshot);
+  return [
+    { target: commentsModelId(key), html: renderCommentsModel(key, comments), action: "replace", morph: false },
+    { target: orphanCommentsId(key), html: renderOrphanComments(key, comments), action: "replace" },
+    { target: commentsActionsId(key), html: renderCommentActions(workspaceId, key, comments), action: "replace", morph: false },
+  ];
+}
+function commentsResponse(workspaceId: string, snapshot: ChangesSnapshot, key: string): Response {
+  return turboStreamResponse(commentRegions(workspaceId, snapshot, key).map(region => replace(region.target, region.html)).join(""));
+}
+
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "changes",
   deletionReview: changesDeletionReview,
+  liveSurfaces: [{ name: "review-comments", async load({ workspaceId, key }) { return commentRegions(workspaceId, (await current(workspaceId)).snapshot, key); } }],
   workViews: [{
     type: "changes",
     parseReference(value: JsonValue) {
@@ -44,6 +68,43 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
   commands: [{ id: "changes.open", execute: () => ({ createdWorkView: reference }) }],
   staticFiles: { "/deletion.css": { url: new URL("../client/deletion.css", import.meta.url), contentType: "text/css; charset=utf-8" }, "/changes.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
   routes: [{ async handle(request, url) {
+    const commentRoute = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/comments\/(save|delete|delete-many|copied)$/);
+    if (commentRoute) {
+      if (request.method !== "POST") return textResponse("Method not allowed", { status: 405 });
+      const workspaceId = commentRoute[0]!, operation = commentRoute[1]!;
+      const data = await request.formData();
+      const { snapshot } = await current(workspaceId);
+      const key = String(data.get("snapshot") ?? snapshot.id);
+      try {
+        if (operation === "copied" || operation === "delete-many") {
+          let versions: unknown;
+          try { versions = JSON.parse(String(data.get("versions"))); }
+          catch (error) { if (!(error instanceof SyntaxError)) throw error; return textResponse("Invalid comment revisions", { status: 400 }); }
+          if (!Value.Check(copiedSchema, versions)) return textResponse("Invalid comment revisions", { status: 400 });
+          if (operation === "copied") reviewComments.markCopied(workspaceId, versions);
+          else reviewComments.removeMany(workspaceId, versions);
+        } else if (operation === "delete") {
+          const version = { id: data.get("id"), revision: Number(data.get("revision")) };
+          if (!Value.Check(commentVersionSchema, version)) return textResponse("Invalid comment revision", { status: 400 });
+          reviewComments.remove(workspaceId, version.id, version.revision);
+        } else {
+          const input = {
+            id: data.get("id"), revision: Number(data.get("revision")), body: data.get("body"),
+            path: data.get("path") ?? undefined, side: data.get("side") ?? undefined,
+            start: data.has("start") ? Number(data.get("start")) : undefined,
+            end: data.has("end") ? Number(data.get("end")) : undefined,
+          };
+          if (!Value.Check(commentSaveSchema, input)) return textResponse("Invalid comment", { status: 400 });
+          if (input.revision === 0 && key !== snapshot.id) return textResponse("This comparison changed. Your text is still here; refresh Changes before adding this comment.", { status: 409 });
+          reviewComments.save(workspaceId, input, snapshot);
+        }
+      } catch (error) {
+        if (!(error instanceof CommentConflict) && !(error instanceof InvalidComment)) throw error;
+        return textResponse(error.message, { status: error instanceof CommentConflict ? 409 : 422 });
+      }
+      invalidateWorkspace(workspaceId);
+      return operation === "copied" ? turboStreamResponse(replace(deletionCommentsId(workspaceId), renderDeletionComments(workspaceId, reviewComments.list(workspaceId)))) : commentsResponse(workspaceId, snapshot, key);
+    }
     let match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/deletion\/file$/);
     if (match) return request.method === "GET" ? await deletionReviewFileResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
     match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/deletion\/commit$/);
@@ -118,7 +179,11 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       state.clients.clear();
       invalidateWorkspace(workspaceId);
     });
-    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); clearDeletionReview(workspaceId); });
+    context.events.on("workspace_delete_inspect", ({ workspaceId, issues }) => {
+      const uncopied = reviewComments.list(workspaceId).filter(comment => comment.copiedRevision !== comment.revision);
+      if (uncopied.length) issues.push({ kind: "uncopied_review_comments", message: `${uncopied.length} review comments haven’t been copied. Deleting this workspace will delete them.`, count: uncopied.length });
+    });
+    context.onWorkspaceRemoved(workspaceId => { states.delete(workspaceId); clearDeletionReview(workspaceId); reviewComments.delete(workspaceId); });
   },
   async attachToWorkspace({ workspaceId }) {
     const { snapshot } = await current(workspaceId);

@@ -1,15 +1,17 @@
+import { showButtonConfirmation } from "@agents-in-the-cloud/design-system/button-confirmation/client";
+import { createReviewCopyController } from "./review-copy-controller.ts";
+import { exportReviewComments, type CommentAnnotation, type CommentPlacement } from "../comments.ts";
 import { createDeletionReviewController } from "./deletion-controller.ts";
-import type { CodeView, CodeViewItem, CodeViewOptions, SelectedLineRange } from "@pierre/diffs";
-import type { WorkspaceClientModule, WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
+import type { CodeView, CodeViewItem, CodeViewOptions, CodeViewDiffItem, VirtualizedFileDiff, SelectedLineRange } from "@pierre/diffs";
+import { copyTextToClipboard, type WorkspaceClientModule, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { createDiffEndpointsController } from "./diff-endpoints-controller.ts";
 import { changesDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
 type FileSummary = { path: string };
-type CommentAnnotation = { id: string; kind: "draft" | "comment"; path: string; side: "additions" | "deletions"; start: number; end: number; body: string };
 
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
-    static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard"];
+    static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
     static values = { workspaceId: String, snapshotId: String, collapsed: Boolean };
     declare readonly viewerTarget: HTMLElement;
     declare readonly modelTarget: HTMLScriptElement;
@@ -19,12 +21,25 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     declare readonly commentGutterTarget: HTMLTemplateElement;
     declare readonly commentEditorTarget: HTMLTemplateElement;
     declare readonly commentCardTarget: HTMLTemplateElement;
+    declare readonly listEditorTarget: HTMLElement;
+    declare readonly orphanHostTarget: HTMLElement;
+    declare readonly orphanDisclosureTarget: HTMLButtonElement;
+    declare readonly orphanContentTarget: HTMLElement;
+    declare readonly hasOrphanDisclosureTarget: boolean;
+    declare readonly hasCollapseToggleTarget: boolean;
     declare readonly workspaceIdValue: string;
     declare readonly snapshotIdValue: string;
     declare readonly collapsedValue: boolean;
     private viewer?: CodeView<CommentAnnotation, undefined>;
     private comments = new Map<string, CommentAnnotation>();
     private draft?: CommentAnnotation;
+    private draftInList = false;
+    private saving = false;
+    private placements = new Map<string, CommentPlacement>();
+    private renderedComments = new Map<string, string>();
+    private revealedLines = new Set<string>();
+    private orphansOpen?: boolean;
+    private hasOrphans = false;
     private gutters = new WeakMap<HTMLElement, { path: string; hovered: () => { lineNumber: number; side?: "additions" | "deletions" } | undefined }>();
     private files: FileSummary[] = [];
     private loaded = new Set<string>();
@@ -49,10 +64,13 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     disconnect(): void {
       this.headerMedia.removeEventListener("change", this.resizeHeaders);
       this.abort?.abort();
+      if (this.viewer) this.viewerTarget.appendChild(this.orphanHostTarget);
       this.viewer?.cleanUp();
       this.viewer = undefined;
       this.loaded.clear();
       this.pending.clear();
+      this.renderedComments.clear();
+      this.revealedLines.clear();
     }
 
     private async mount(): Promise<void> {
@@ -84,6 +102,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
           return button;
         },
         renderAnnotation: (annotation) => this.renderComment(annotation.metadata),
+        renderCodeViewFooter: () => this.orphanHostTarget,
         diffStyle: this.layout,
         overflow: this.wrap ? "wrap" : "scroll",
         lineDiffType: "word-line",
@@ -91,12 +110,46 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         layout: { paddingTop: 0, paddingBottom: 8, gap: 0 },
         itemMetrics: { diffHeaderHeight: this.headerHeight },
         unsafeCSS: `${wordDiffCSS} [data-diffs-header] { background: var(--bg); }`,
-        onPostRender: (_node, _instance, _phase, context) => { void this.loadFile(context.item.id, abort.signal); },
+        onPostRender: (_node, _instance, _phase, context) => {
+          void this.loadFile(context.item.id, abort.signal);
+          if (context.type === "diff" && this.loaded.has(context.item.id)) this.revealCommentLines(context.item, context.instance);
+        },
         renderCustomHeader: (_file, context) => this.header(context.item.id, context.item.collapsed === true),
       };
       this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: this.collapsed })));
+      for (const path of this.loaded) this.updateComments(path);
+    }
+
+    commentsModelTargetConnected(script: HTMLScriptElement): void {
+      // SAFETY: This live model contains server-owned persisted comments and placements.
+      const comments = JSON.parse(script.textContent!) as CommentPlacement[];
+      const unavailable = comments.some(comment => comment.status !== "inline");
+      if (unavailable && !this.hasOrphans) this.orphansOpen = true;
+      this.hasOrphans = unavailable;
+      this.placements = new Map(comments.map(comment => [comment.id, comment]));
+      this.comments = new Map(comments.filter(comment => comment.status === "inline").map(comment => [comment.id, {
+        id: comment.id, kind: "comment", path: comment.path, side: comment.side,
+        start: comment.placedStart!, end: comment.placedEnd!, body: comment.body, revision: comment.revision,
+      }]));
+      if (this.viewer) for (const path of this.loaded) this.updateComments(path);
+    }
+
+    orphanDisclosureTargetConnected(button: HTMLButtonElement): void {
+      this.orphansOpen ??= button.getAttribute("aria-expanded") === "true";
+      this.syncOrphans();
+    }
+    toggleOrphans(): void {
+      this.orphansOpen = !this.orphansOpen;
+      this.syncOrphans();
+      this.syncCollapseControl();
+    }
+    private syncOrphans(): void {
+      if (!this.hasOrphanDisclosureTarget) return;
+      this.orphanDisclosureTarget.setAttribute("aria-expanded", String(this.orphansOpen));
+      this.orphanContentTarget.hidden = !this.orphansOpen;
+      if (this.draftInList) this.listEditorTarget.hidden = !this.orphansOpen;
     }
 
     dismissError(): void { this.errorTarget.hidden = true; }
@@ -120,7 +173,8 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     }
 
     private syncCollapseControl(): void {
-      this.collapsed = this.files.some((file) => this.viewer!.getItem(file.path)!.collapsed === true);
+      this.collapsed = (this.hasOrphanDisclosureTarget && !this.orphansOpen) || this.files.some((file) => this.viewer!.getItem(file.path)!.collapsed === true);
+      if (!this.hasCollapseToggleTarget) return;
       this.collapseToggleTarget.setAttribute("aria-pressed", String(this.collapsed));
       const label = this.collapsed ? "Expand all files" : "Collapse all files";
       this.collapseToggleTarget.setAttribute("aria-label", label);
@@ -141,6 +195,8 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         this.loaded.add(path);
         const previous = this.viewer!.getItem(path)!;
         this.viewer!.updateItem({ ...item, collapsed: previous.collapsed, version: (previous.version ?? 0) + 1 });
+        this.renderedComments.delete(path);
+        this.updateComments(path);
       } catch (error) {
         if (signal.aborted) return;
         this.errorTarget.hidden = false;
@@ -164,6 +220,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
     private beginComment(path: string, range: SelectedLineRange): void {
       if (this.draft) {
+        if (this.draftInList) { this.orphansOpen = true; this.syncOrphans(); this.listEditorTarget.querySelector("textarea")!.focus(); return; }
         this.viewer!.scrollTo({ type: "line", id: this.draft.path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
         this.updateComments(this.draft.path);
         return;
@@ -173,17 +230,37 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         this.errorTarget.hidden = false;
         return;
       }
-      this.draft = { id: crypto.randomUUID(), kind: "draft", path, side: range.side ?? "additions", start: Math.min(range.start, range.end), end: Math.max(range.start, range.end), body: "" };
+      this.draftInList = false;
+      this.draft = { revision: 0, id: crypto.randomUUID(), kind: "draft", path, side: range.side ?? "additions", start: Math.min(range.start, range.end), end: Math.max(range.start, range.end), body: "" };
       this.updateComments(path);
       this.viewer!.scrollTo({ type: "line", id: path, lineNumber: this.draft.end, side: this.draft.side, align: "center" });
     }
 
     private updateComments(path: string): void {
       const item = this.viewer!.getItem(path)!;
-      if (item.type !== "diff") throw new Error("Comments require a text diff");
-      const comments = [...this.comments.values()].filter(comment => comment.path === path && comment.id !== this.draft?.id);
-      if (this.draft?.path === path) comments.push(this.draft);
+      if (item.type !== "diff" || !this.loaded.has(path)) return;
+      const comments = [...this.comments.values()].filter(comment => comment.path === path && (this.draftInList || comment.id !== this.draft?.id));
+      if (!this.draftInList && this.draft?.path === path) comments.push(this.draft);
+      const signature = JSON.stringify(comments.map(comment => comment.kind === "draft" ? { ...comment, body: "" } : comment));
+      if (this.renderedComments.get(path) === signature) return;
+      this.renderedComments.set(path, signature);
       this.viewer!.updateItem({ ...item, annotations: comments.map(metadata => ({ lineNumber: metadata.end, side: metadata.side, metadata })), version: (item.version ?? 0) + 1 });
+    }
+
+    private revealCommentLines(item: CodeViewDiffItem<CommentAnnotation>, instance: VirtualizedFileDiff<CommentAnnotation, undefined>): void {
+      // Pierre keeps annotations in collapsed context hidden. Reveal their exact line ranges.
+      for (const annotation of item.annotations ?? []) for (const line of [annotation.metadata.start, annotation.metadata.end]) {
+        const key = `${item.id}:${annotation.side}:${line}`;
+        if (this.revealedLines.has(key)) continue;
+        this.revealedLines.add(key);
+        const hunks = item.fileDiff.hunks;
+        const start = (index: number) => annotation.side === "additions" ? hunks[index]!.additionStart : hunks[index]!.deletionStart;
+        const end = (index: number) => start(index) + (annotation.side === "additions" ? hunks[index]!.additionCount : hunks[index]!.deletionCount) - 1;
+        if (hunks.some((_hunk, index) => line >= start(index) && line <= end(index))) continue;
+        const following = hunks.findIndex((_hunk, index) => start(index) > line);
+        if (following !== -1) instance.expandHunk(following, "up", start(following) - line);
+        else instance.expandHunk(hunks.length - 1, "down", line - end(hunks.length - 1));
+      }
     }
 
     private renderComment(comment: CommentAnnotation): HTMLElement {
@@ -191,7 +268,6 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       // SAFETY: The server emits a form/article root for these owned annotation templates.
       const element = template.content.firstElementChild!.cloneNode(true) as HTMLElement;
       element.dataset.commentId = comment.id;
-      element.querySelector<HTMLElement>("[data-comment-anchor]")!.textContent = `${comment.side === "deletions" ? "Old" : "New"} ${comment.start === comment.end ? `line ${comment.start}` : `lines ${comment.start}–${comment.end}`}`;
       if (comment.kind === "draft") {
         const textarea = element.querySelector<HTMLTextAreaElement>("textarea")!;
         textarea.value = comment.body;
@@ -211,38 +287,136 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       // SAFETY: The keyboard shortcut is bound to the comment template’s form.
       (event.currentTarget as HTMLFormElement).requestSubmit();
     }
-    saveComment(event: SubmitEvent): void {
+    private showError(message: string): void {
+      this.errorMessageTarget.textContent = message;
+      this.errorTarget.hidden = false;
+    }
+    private async commentRequest(operation: "save" | "delete" | "delete-many" | "copied", data: FormData): Promise<string> {
+      data.set("snapshot", this.snapshotIdValue);
+      const result = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/changes/comments/${operation}`, { method: "POST", body: data, headers: { Accept: "text/vnd.turbo-stream.html" } });
+      const html = await result.text();
+      if (!result.ok) throw new Error(html);
+      return html;
+    }
+    async saveComment(event: SubmitEvent): Promise<void> {
       event.preventDefault();
+      if (this.saving) return;
       // SAFETY: Submit is bound to the comment template’s form.
       const form = event.currentTarget as HTMLFormElement;
       const textarea = form.querySelector<HTMLTextAreaElement>("textarea")!;
       const body = textarea.value.trim();
       if (!body) { textarea.setCustomValidity("Add a comment first."); textarea.reportValidity(); return; }
       const comment = this.draft!;
-      this.comments.set(comment.id, { ...comment, kind: "comment", body });
-      this.draft = undefined;
-      this.updateComments(comment.path);
+      const data = new FormData();
+      data.set("id", comment.id);
+      data.set("revision", String(comment.revision ?? 0));
+      data.set("body", body);
+      if (!comment.revision) {
+        data.set("path", comment.path); data.set("side", comment.side);
+        data.set("start", String(comment.start)); data.set("end", String(comment.end));
+      }
+      this.saving = true;
+      for (const button of form.querySelectorAll<HTMLButtonElement>("button")) button.disabled = true;
+      textarea.readOnly = true;
+      this.errorTarget.hidden = true;
+      try {
+        const html = await this.commentRequest("save", data);
+        this.draft = undefined;
+        this.listEditorTarget.replaceChildren();
+        this.listEditorTarget.hidden = true;
+        if (!this.draftInList && this.loaded.has(comment.path)) this.updateComments(comment.path);
+        this.draftInList = false;
+        window.Turbo!.renderStreamMessage(html);
+      } catch (error) {
+        this.showError(`Couldn’t save comment: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(error);
+      } finally {
+        this.saving = false;
+        textarea.readOnly = false;
+        for (const button of form.querySelectorAll<HTMLButtonElement>("button")) button.disabled = false;
+      }
     }
     cancelComment(event: Event): void {
       event.preventDefault();
       event.stopPropagation();
+      if (this.saving) return;
       const path = this.draft!.path;
       this.draft = undefined;
-      this.updateComments(path);
+      this.listEditorTarget.replaceChildren();
+      this.listEditorTarget.hidden = true;
+      if (!this.draftInList && this.loaded.has(path)) this.updateComments(path);
+      this.draftInList = false;
     }
     editComment(event: Event): void {
       if (this.draft) return;
-      // SAFETY: These actions are bound to buttons inside an owned comment card.
-      const id = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!;
-      this.draft = { ...this.comments.get(id)!, kind: "draft" };
-      this.updateComments(this.draft.path);
+      // SAFETY: These actions are bound to buttons inside owned comment cards.
+      const element = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!;
+      const comment = this.placements.get(element.dataset.commentId!)!;
+      this.draftInList = element.classList.contains("changes-review-entry");
+      this.draft = { id: comment.id, revision: comment.revision, kind: "draft", path: comment.path, side: comment.side, start: comment.placedStart ?? comment.start, end: comment.placedEnd ?? comment.end, body: comment.body };
+      if (this.draftInList) {
+        this.orphansOpen = true;
+        this.syncOrphans();
+        this.listEditorTarget.hidden = false;
+        this.listEditorTarget.replaceChildren(this.renderComment(this.draft));
+      } else this.updateComments(comment.path);
     }
-    deleteComment(event: Event): void {
-      // SAFETY: These actions are bound to buttons inside an owned comment card.
-      const id = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!;
-      const comment = this.comments.get(id)!;
-      this.comments.delete(id);
-      this.updateComments(comment.path);
+    async copyComment(event: Event): Promise<void> {
+      // SAFETY: This action is bound to the server-rendered copy button in a saved comment card.
+      const button = event.currentTarget as HTMLButtonElement;
+      const comment = this.placements.get(button.closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!)!;
+      button.disabled = true;
+      let copied = false;
+      try {
+        await copyTextToClipboard(exportReviewComments([comment]));
+        copied = true;
+        showButtonConfirmation(button);
+        const data = new FormData();
+        data.set("versions", JSON.stringify([{ id: comment.id, revision: comment.revision }]));
+        window.Turbo!.renderStreamMessage(await this.commentRequest("copied", data));
+      } catch (error) {
+        this.showError(copied ? "Comment was copied, but we couldn’t record it. Copy again before deleting this workspace." : "Couldn’t copy the comment. Try again.");
+        console.error(error);
+      } finally { button.disabled = false; }
+    }
+
+    async deleteComment(event: Event): Promise<void> {
+      // SAFETY: Delete actions are bound to server-rendered comment buttons.
+      const button = event.currentTarget as HTMLButtonElement;
+      const id = button.closest<HTMLElement>("[data-comment-id]")!.dataset.commentId!;
+      const comment = this.placements.get(id)!;
+      const data = new FormData();
+      data.set("id", id); data.set("revision", String(comment.revision));
+      button.disabled = true;
+      try { window.Turbo!.renderStreamMessage(await this.commentRequest("delete", data)); }
+      catch (error) { this.showError(`Couldn’t delete comment: ${error instanceof Error ? error.message : String(error)}`); console.error(error); }
+      finally { button.disabled = false; }
+    }
+    async deleteComments(event: SubmitEvent): Promise<void> {
+      event.preventDefault();
+      // SAFETY: Bulk deletion is submitted by the server-rendered confirmation form.
+      const form = event.currentTarget as HTMLFormElement;
+      const data = new FormData(form);
+      // SAFETY: The server renders versions as a JSON array of comment IDs and revisions in this form.
+      const versions = JSON.parse(String(data.get("versions"))) as { id: string; revision: number }[];
+      const deletingDraft = this.draft && versions.some(version => version.id === this.draft!.id && version.revision === this.draft!.revision);
+      form.querySelector<HTMLElement>("[popover]")!.hidePopover();
+      for (const button of form.querySelectorAll<HTMLButtonElement>("button")) button.disabled = true;
+      try {
+        const html = await this.commentRequest("delete-many", data);
+        if (deletingDraft && this.draft) {
+          const path = this.draft.path;
+          this.draft = undefined;
+          this.listEditorTarget.replaceChildren();
+          this.listEditorTarget.hidden = true;
+          if (!this.draftInList && this.loaded.has(path)) this.updateComments(path);
+          this.draftInList = false;
+        }
+        window.Turbo!.renderStreamMessage(html);
+      } catch (error) {
+        this.showError(`Couldn’t delete comments: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(error);
+      } finally { for (const button of form.querySelectorAll<HTMLButtonElement>("button")) button.disabled = false; }
     }
 
     chooseLayout(event: Event): void {
@@ -270,6 +444,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         const item = this.viewer?.getItem(file.path);
         if (item) this.viewer!.updateItem({ ...item, collapsed: this.collapsed, version: (item.version ?? 0) + 1 });
       }
+      if (this.hasOrphanDisclosureTarget) { this.orphansOpen = !this.collapsed; this.syncOrphans(); }
       this.syncCollapseControl();
     }
   };
@@ -277,5 +452,5 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
+  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("review-copy", createReviewCopyController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
 };

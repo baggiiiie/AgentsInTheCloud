@@ -7,6 +7,7 @@
     "./markdown-diff": "./src/markdown-diff.ts",
     "./diff-options": "./src/diff-options.ts",
     "./pierre": "./src/pierre.ts",
+    "./language": "./src/language.ts",
     "./shader-languages": "./src/shader-languages.ts"
   },
   "dependencies": {
