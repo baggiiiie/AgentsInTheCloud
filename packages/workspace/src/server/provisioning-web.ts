@@ -1,3 +1,4 @@
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
@@ -20,7 +21,7 @@ function stepStatusAttributes(status: WorkspaceProvisionStepStatus): string {
 
 function renderStatusMarker(status: WorkspaceProvisionStepStatus): string {
   const statusAttributes = status === "failed" || status === "warning" ? ` role="img" aria-label="${status === "warning" ? "Warning" : "Failed"}"` : "";
-  const marker = status === "done" ? "✓" : status === "failed" ? "✕" : status === "warning" ? "!" : "";
+  const marker = status === "done" ? Icons.Check : status === "failed" ? Icons.Close : status === "warning" ? Icons.Exclamation : "";
   return `<span class="status-list__marker"${statusAttributes}>${marker}</span>`;
 }
 

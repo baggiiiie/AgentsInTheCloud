@@ -463,7 +463,7 @@ async function waitForOAuthFlowReady(flow: PendingOAuthFlow): Promise<void> {
 }
 
 function oauthStatus(kind: "pending" | "done", title: string, detail: string): string {
-  return `<ul class="status-list"><li class="status-list__item" ${kind === "done" ? 'role="checkbox" aria-checked="true"' : 'aria-busy="true"'}><span class="status-list__marker">${kind === "done" ? "✓" : ""}</span><span>${escapeHtml(title)} — ${escapeHtml(detail)}</span></li></ul>`;
+  return `<ul class="status-list"><li class="status-list__item" ${kind === "done" ? 'role="checkbox" aria-checked="true"' : 'aria-busy="true"'}><span class="status-list__marker">${kind === "done" ? Icons.Check : ""}</span><span>${escapeHtml(title)} — ${escapeHtml(detail)}</span></li></ul>`;
 }
 
 function oauthAuthenticationAction(flow: PendingOAuthFlow, url: string, hidden = false, caption?: string): string {
