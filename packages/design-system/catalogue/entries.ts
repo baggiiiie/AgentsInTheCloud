@@ -618,13 +618,13 @@ export const entries: CatalogueEntry[] = [
   {
     id: "disclosure", title: "Disclosure",
     when: "Open and close related prose, forms, tool output or nested records in place. Either Content row presentation can be the summary.",
-    contract: "Native details/summary. summary.kind is compact or multiline; summary.width defaults to fit and can be fill independently of body size. Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. bodySpacing: flush removes block-edge margins and padding for compact row collections while preserving the inline gutter; regular is the default. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
+    contract: "Native details/summary. summary.kind is compact or multiline; summary.width defaults to fit and can be fill independently of body size. Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. The body always has flush block edges (no top/bottom margin or padding), while preserving the inline gutter. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
     imports: { disclosure: "disclosureHtml", button: "buttonHtml" },
     sources: ["disclosure/disclosure.css"],
     examples: [
       {
-        title: "Compact summary · multiline body · native keyboard disclosure",
-        render: () => disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Compaction summary" } }, bodyHtml: '<div class="markdown"><p>The row presentation and disclosure state are independent.</p><ul><li>A compact summary stays a pill.</li><li>Its revealed content uses the same gutter, however many lines it contains.</li></ul></div>', open: true }),
+        title: "Compact summary · workspace handoff in a transcript",
+        render: () => '<div class="markdown"><p>I’ve finished reviewing the workspace settings. Here’s the handoff for the next session.</p></div>' + disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Compaction summary" } }, bodyHtml: '<div class="markdown"><p>The workspace settings now separate repository access from commit identity. GitHub connects once for all workspaces; each workspace template chooses its own repository.</p><ul><li><strong>Done:</strong> moved the GitHub connection into app settings and updated the repository picker.</li><li><strong>Checked:</strong> existing templates still open with their saved repository and branch.</li><li><strong>Next:</strong> review the empty state when no repositories are available, then verify the layout on a narrow screen.</li></ul><p>Keep the current commit author name and email. No credentials or repository contents were changed.</p></div>', open: true }) + '<div class="markdown"><p>Next I’ll check the repository picker on mobile.</p></div>',
       },
       {
         title: "Multiline summary · wrapping provider description · account action",
@@ -632,7 +632,7 @@ export const entries: CatalogueEntry[] = [
       },
       {
         title: "Compact collection · flush body edges",
-        render: () => disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "Subagents" } }, bodySpacing: "flush", open: true, bodyHtml: disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/review" } }, bodyHtml: "Review transcript" }) + disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/research" } }, bodyHtml: "Research transcript" }) }),
+        render: () => disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "Subagents" } }, open: true, bodyHtml: disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/review" } }, bodyHtml: "Review transcript" }) + disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/research" } }, bodyHtml: "Research transcript" }) }),
       },
       {
         title: "Nested disclosures · shared gutter keeps the hierarchy visible",

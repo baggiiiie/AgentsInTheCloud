@@ -54,7 +54,6 @@ function branchHtml(workspaceId: string, agent: SubagentRecord, agents: Subagent
   return `<div class="subagent-branch">${disclosureHtml({
     element: { id: `subagent-${agent.id}`, attributesHtml: `data-subagent-id="${h(agent.id)}" data-subagents-target="branch"` },
     summary: branchSummary(agent, agents), open: open.has(agent.id),
-    bodySpacing: "flush",
     bodyHtml: `<div id="${ids.transcript({ workspaceId, agentId: agent.id })}" class="agent-transcript" data-turbo-permanent></div>${childrenHtml(workspaceId, agent.id, agents, open)}`,
   })}</div>`;
 }
