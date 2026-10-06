@@ -121,14 +121,21 @@ export async function initializeResources() {
   }
   await writeFile(join(workloads, "pids.max"), String(policy.pids));
   await mkdir(join(workloads, "commands"), { recursive: true });
+  const buildClients = join(workloads, "build-clients");
+  await mkdir(buildClients, { recursive: true });
   // The app runs as uid 1000. cgroup v2 migration requires destination and
   // common-ancestor cgroup.procs permissions; no controller files are delegated.
   await chown(join(root, "cgroup.procs"), 1000, 1000);
+  await chown(join(workloads, "cgroup.procs"), 1000, 1000);
+  await chown(join(buildClients, "cgroup.procs"), 1000, 1000);
   await chown(join(workloads, "commands", "cgroup.procs"), 1000, 1000);
   const result = {
     workloadsCgroupParent: `${relative}/workloads`,
     managementCgroupParent: `${relative}/management/apps`,
     commandsCgroup: join(workloads, "commands"),
+    buildClientsCgroup: buildClients,
+    buildClientsCgroupParent: `${relative}/workloads/build-clients`,
+    buildClientNetworkPolicy: 1,
     policy,
     effectiveMemory: memory,
   };

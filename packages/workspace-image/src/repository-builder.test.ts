@@ -38,6 +38,11 @@ for (const scenario of ["new", "warm", "stopped", "upgrade", "unavailable", "bui
             return {exitCode:publishing&&scenario==='publish-failed'?1:0,stdout:Buffer.from(''),stderr:publishing&&scenario==='publish-failed'?'load failed':''};
           },
         }));
+        const buildNetworkPath = ${JSON.stringify(join(import.meta.dir, "build-network.ts"))};
+        const buildNetwork = await import(buildNetworkPath);
+        mock.module(buildNetworkPath, () => ({...buildNetwork,
+          repositoryBuildCommand: async args => buildNetwork.protectedRepositoryBuildCommand({buildClientNetworkPolicy:1}, args),
+        }));
         const {buildRepositoryImage} = await import(${JSON.stringify(join(import.meta.dir, "repository-builder.ts"))});
         let error;
         try { await buildRepositoryImage('base:tag','result:tag',async prefix=>{
@@ -89,9 +94,11 @@ for (const scenario of ["new", "warm", "stopped", "upgrade", "unavailable", "bui
         expect(pipes).toEqual([]);
         expect(result.error).toBe("builder not ready");
       } else {
-        expect(build!.slice(0, 3)).toEqual(["BUILD", "docker", "--host"]);
-        expect(build![3]).toStartWith(`unix://${directory}/repository-builder/`);
-        expect(build![3]).toEndWith("/docker.sock");
+        expect(build!.slice(0, 3)).toEqual(["BUILD", "sh", "-ec"]);
+        expect(build![3]).toContain("build-client-processes/cgroup.procs");
+        expect(build!.slice(4, 7)).toEqual(["agents-in-the-cloud-build", "docker", "--host"]);
+        expect(build![7]).toStartWith(`unix://${directory}/repository-builder/`);
+        expect(build![7]).toEndWith("/docker.sock");
         expect(pipes.some(args => args.at(-1)!.includes("sha256:base"))).toBe(scenario !== "warm");
         expect(pipes.some(args => args.at(-1)!.includes("result:tag"))).toBe(scenario !== "build-failed");
         expect(result.error).toBe(scenario === "build-failed" ? "build failed" : scenario === "publish-failed" ? "load failed" : undefined);

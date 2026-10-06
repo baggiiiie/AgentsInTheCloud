@@ -2,12 +2,13 @@
 // and a local Debian-based image containing Bun (the System test-app image works).
 // bun packages/workspace-image/scripts/test-repository-builder.ts SYSTEM_IMAGE BASE_IMAGE
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile, readFile, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveWorkspaceImage } from "../src/index.ts";
 import { buildRepositoryImage } from "../src/repository-builder.ts";
-import { installWorkspaceFirewall } from "../../../images/system/src/firewall.ts";
+import { initializeResources } from "../../../images/system/src/resources.ts";
+import { installWorkspaceFirewall, resolverAddresses } from "../../../images/system/src/firewall.ts";
 import { runCommand, withCommandSignal, shellQuote } from "@agents-in-the-cloud/core";
 
 async function command(args: string[]) {
@@ -17,22 +18,27 @@ async function command(args: string[]) {
 }
 
 async function inside(base: string) {
-  await installWorkspaceFirewall();
+  const resources = await initializeResources();
+  // The real app receives this path as a bind mount; the harness runs in System.
+  await symlink(resources.buildClientsCgroup, "/run/agents-in-the-cloud-system/build-client-processes");
+  await installWorkspaceFirewall(resources.buildClientsCgroupParent, resolverAddresses(await readFile("/etc/resolv.conf", "utf8")));
   const received: string[] = [];
-  const fixture = Bun.serve({ hostname: "0.0.0.0", port: 38080, fetch(request) {
-    received.push(new URL(request.url).pathname);
-    return new Response("management-only-marker");
+  const fixture = Bun.serve({ hostname: "::", port: 38080, fetch(request) {
+    const path = new URL(request.url).pathname;
+    received.push(path);
+    return new Response("management-only-marker", { status: path.startsWith("/auth-") ? 403 : 200 });
   } });
   const root = await mkdtemp("/tmp/repository-builds-");
   let number = 0;
-  async function build(dockerfile: string, extra: string[] = []) {
+  async function build(dockerfile: string, extra: string[] = [], unprotectedClient = false) {
     const context = join(root, `ephemeral-workspace-${++number}`);
     await mkdir(context);
     await writeFile(join(context, "Dockerfile"), `FROM agents-in-the-cloud-workspace\n${dockerfile}\n`);
     const tag = `repository-builder-test:build-${number}`;
     let output = "";
     await buildRepositoryImage(base, tag, async (prefix) => {
-      const result = await runCommand([...prefix, "build", "--builder", "default", "--progress=plain", "--label", "com.agents-in-the-cloud.workspace-image.kind=repository", ...extra, "-t", tag, context], { env: { ...process.env, DOCKER_BUILDKIT: "1" } });
+      const client = unprotectedClient ? prefix.slice(prefix.indexOf("docker")) : prefix;
+      const result = await runCommand([...client, "build", "--builder", "default", "--progress=plain", "--label", "com.agents-in-the-cloud.workspace-image.kind=repository", ...extra, "-t", tag, context], { env: { ...process.env, DOCKER_BUILDKIT: "1" } });
       output = result.stderr + result.stdout.toString();
       if (result.exitCode !== 0) throw new Error(output);
     });
@@ -72,6 +78,46 @@ async function inside(base: string) {
     const third = await build(source);
     assert.equal(await imageFile(third.tag, "/cache-marker"), marker);
     console.log("PASS layer cache and package cache mounts survive builder recreation");
+
+    // A registry challenge is fetched by the CLI session, not the private daemon.
+    // HTTP registry is deliberately enabled only in this disposable test daemon.
+    const authBuilder = await builderName();
+    const authInspect = JSON.parse(await command(["docker", "inspect", authBuilder]))[0];
+    const daemonFile = authInspect.Mounts.find((mount: { Destination: string }) => mount.Destination === "/etc/docker/daemon.json").Source;
+    const config = JSON.parse(await readFile(daemonFile, "utf8"));
+    config["insecure-registries"] = ["11.201.0.2:8080"];
+    await writeFile(daemonFile, JSON.stringify(config));
+    await command(["docker", "restart", authBuilder]);
+    const authDockerfile = "FROM 11.201.0.2:8080/attacker/image:latest";
+    async function setRealm(realm: string) {
+      const response = await fetch(`http://11.201.0.2:8080/set-realm?value=${encodeURIComponent(realm)}`);
+      assert(response.ok);
+    }
+    const authBuild = (unprotectedClient = false) => withCommandSignal(AbortSignal.timeout(12_000), () => build(authDockerfile, ["--no-cache"], unprotectedClient));
+    await setRealm("http://127.0.0.1:38080/auth-control");
+    await assert.rejects(authBuild(true), /management-only-marker/);
+    assert(received.includes("/auth-control"), "unprotected CLI must reproduce the auth SSRF");
+    assert.equal(await (await fetch("http://[::1]:38080/ipv6-control")).text(), "management-only-marker");
+    const authBefore = received.length;
+    for (const realm of [
+      "http://127.0.0.1:38080/auth-loopback", "http://[::1]:38080/auth-ipv6",
+      "http://11.201.0.3:38080/auth-local-public", "http://10.201.0.2:8080/auth-private",
+      "http://169.254.169.254:8080/auth-metadata", "http://11.201.0.2:8080/auth-redirect",
+    ]) {
+      await setRealm(realm);
+      await assert.rejects(authBuild(), (error: Error) => {
+        assert(!error.message.includes("management-only-marker"), "auth response leaked into build output");
+        return true;
+      }, `registry auth unexpectedly succeeded: ${realm}`);
+      assert.equal(received.length, authBefore, `CLI auth reached host fixture: ${realm}`);
+    }
+    const authHits = await (await fetch("http://11.201.0.2:8080/auth-hits")).json();
+    assert(!authHits.includes("/auth-private") && !authHits.includes("/auth-metadata"), "CLI reached a non-public realm");
+    // Public token fetch must still work (403 is returned deliberately so its
+    // response marker proves the client fetched the realm and propagated errors).
+    await setRealm("http://11.201.0.2:8080/auth-public");
+    await assert.rejects(authBuild(), /public-auth-marker/);
+    console.log("PASS CLI registry Bearer auth blocks host/private/metadata realms and redirects; public auth fetch remains available");
 
     const name = await builderName();
     const inspect = JSON.parse(await command(["docker", "inspect", name]))[0];
@@ -123,6 +169,28 @@ async function inside(base: string) {
   }
 }
 
+function serveEndpoint() {
+  let realm = "http://127.0.0.1:38080/auth-loopback";
+  const hits: string[] = [];
+  Bun.serve({ hostname: "0.0.0.0", port: 8080, fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    if (path === "/auth-hits") return Response.json(hits);
+    if (path === "/set-realm") {
+      realm = url.searchParams.get("value")!;
+      return new Response("ok");
+    }
+    if (path.startsWith("/v2/")) return new Response("unauthorized", {
+      status: 401,
+      headers: { "WWW-Authenticate": `Bearer realm="${realm}",service="test",scope="repository:attacker/image:pull"` },
+    });
+    if (path.startsWith("/auth-")) hits.push(path);
+    if (path === "/auth-public") return new Response("public-auth-marker", { status: 403 });
+    if (path === "/auth-redirect" || path === "/redirect") return Response.redirect("http://11.201.0.3:38080/auth-redirected");
+    return new Response("public-marker");
+  } });
+}
+
 async function outside(systemImage: string, base: string) {
   const name = `repository-builder-test-${crypto.randomUUID().slice(0, 8)}`;
   const endpoint = `${name}-endpoint`;
@@ -132,10 +200,11 @@ async function outside(systemImage: string, base: string) {
     const bundled = await Bun.build({ entrypoints: [import.meta.path], target: "bun", outdir: directory, naming: "test.js" });
     assert(bundled.success, JSON.stringify(bundled.logs));
     await docker("network", "create", "--subnet", "11.201.0.0/24", name);
-    await docker("run", "-d", "--name", endpoint, "--network", name, "--ip", "11.201.0.2", "--cap-add", "NET_ADMIN", "--entrypoint", "bun", systemImage, "-e",
-      'Bun.serve({hostname:"0.0.0.0",port:8080,fetch:r=>new URL(r.url).pathname==="/redirect"?Response.redirect("http://11.201.0.3:38080/redirected"):new Response("public-marker")})');
+    await docker("create", "--name", endpoint, "--network", name, "--ip", "11.201.0.2", "--cap-add", "NET_ADMIN", "--entrypoint", "bun", systemImage, "/test.js", "--endpoint");
+    await docker("cp", join(directory, "test.js"), `${endpoint}:/test.js`);
+    await docker("start", endpoint);
     for (const address of ["10.201.0.2/32", "169.254.169.254/32"]) await docker("exec", endpoint, "ip", "addr", "add", address, "dev", "eth0");
-    await docker("run", "-d", "--name", name, "--privileged", "--tmpfs", "/run", "--volume", "/data", "--network", name, "--ip", "11.201.0.3", "--entrypoint", "/usr/local/bin/agents-in-the-cloud-dockerd", systemImage, "dockerd");
+    await docker("run", "-d", "--name", name, "--privileged", "--cgroupns=host", "--tmpfs", "/run", "--volume", "/data", "--network", name, "--ip", "11.201.0.3", "--entrypoint", "/usr/local/bin/agents-in-the-cloud-dockerd", systemImage, "dockerd");
     await docker("exec", name, "sh", "-ec", 'for n in $(seq 1 120); do if docker info >/dev/null 2>&1; then exit 0; fi; sleep 0.5; done; exit 1');
     for (const address of ["10.201.0.2/32", "169.254.169.254/32"]) await docker("exec", name, "ip", "route", "add", address, "via", "11.201.0.2");
     await docker("exec", name, "mkdir", "/audit");
@@ -154,7 +223,8 @@ async function outside(systemImage: string, base: string) {
   }
 }
 
-if (process.argv[2] === "--inside") await inside(process.argv[3]!);
+if (process.argv[2] === "--endpoint") serveEndpoint();
+else if (process.argv[2] === "--inside") await inside(process.argv[3]!);
 else {
   assert(process.argv.length === 4, "Pass SYSTEM_IMAGE BASE_IMAGE");
   await outside(process.argv[2]!, process.argv[3]!);

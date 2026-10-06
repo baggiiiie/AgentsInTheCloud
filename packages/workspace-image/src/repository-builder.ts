@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { agentsInTheCloudDataPath, dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, requireDocker, runCommand, shellQuote, workloadCgroupArgs } from "@agents-in-the-cloud/core";
+import { repositoryBuildCommand } from "./build-network.ts";
 import { dockerImageId } from "./local-images.ts";
 import { workspaceImagePruneArgs } from "./prune.ts";
 
@@ -10,11 +11,13 @@ const roleLabel = "com.agents-in-the-cloud.role=repository-builder";
 
 /** A persistent private daemon, not the System daemon, owns untrusted builds.
  * Its HTTP sources, image pulls and RUN steps all originate behind the workload
- * firewall. Only management receives its Unix socket; no TCP API or host socket
+ * firewall. The CLI session auth provider is separately confined by the System
+ * build-client output policy. Only management receives its Unix socket; no TCP API or host socket
  * is exposed. Call under the image-store queue (including base alias updates).
  * The cache volume survives workspace deletion and builder/runtime replacement.
  */
 export async function buildRepositoryImage(baseImage: string, tag: string, build: (dockerCommand: string[]) => Promise<void>): Promise<void> {
+  const buildCommand = await repositoryBuildCommand(["docker"]);
   const runtime = getAgentsInTheCloudRuntimeContext();
   const identity = createHash("sha256").update(`${runtime.dockerHostAgentsInTheCloudDataDir}\0${process.env.ATELIER_NAMESPACE ?? "host"}`).digest("hex").slice(0, 16);
   const name = `agents-in-the-cloud-builder-${identity}`;
@@ -71,7 +74,7 @@ export async function buildRepositoryImage(baseImage: string, tag: string, build
   }
   await docker(["tag", baseId, "agents-in-the-cloud-workspace"]);
   const buildStartedAt = new Date();
-  await build(["docker", ...builder]);
+  await build([...buildCommand, ...builder]);
   // Publishing back preserves the ordinary workspace creation/run path. Stream
   // archives rather than buffering multi-GB images in the management process.
   await pipe(["docker", ...builder, "save", tag], ["docker", "load"]);

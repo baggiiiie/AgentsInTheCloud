@@ -9,7 +9,7 @@ import { PullProgress } from "./pull-progress.ts";
 import { prepareChannelUpdate } from "./channel-update.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { installWorkspaceFirewall } from "./firewall.ts";
+import { installWorkspaceFirewall, resolverAddresses } from "./firewall.ts";
 import { filesystemFailure } from "./filesystems.ts";
 import { initializeResources } from "./resources.ts";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -294,6 +294,8 @@ async function replace(request: Replacement) {
       "host",
       "--mount",
       `type=bind,src=${resources.commandsCgroup},dst=/run/agents-in-the-cloud-system/workload-processes`,
+      "--mount",
+      `type=bind,src=${resources.buildClientsCgroup},dst=/run/agents-in-the-cloud-system/build-client-processes`,
       "--mount",
       "type=bind,src=/run/agents-in-the-cloud-system/resources.json,dst=/run/agents-in-the-cloud-system/resources.json,readonly",
       "--mount",
@@ -672,7 +674,7 @@ async function initialize() {
   resources = await initializeResources();
   await startHostService({ root: dirname(dirname(resources.commandsCgroup)), effectiveMemory: resources.effectiveMemory });
   await chown(hostSocketPath, 1000, 1000);
-  await installWorkspaceFirewall();
+  await installWorkspaceFirewall(resources.buildClientsCgroupParent, resolverAddresses(await readFile("/etc/resolv.conf", "utf8")));
   // Privileged containers only copy device nodes the host /dev already has; some
   // VMs lack loop-control until first use. Opening it autoloads the loop driver.
   if (!existsSync("/dev/loop-control")) await command(["mknod", "-m", "0660", "/dev/loop-control", "c", "10", "237"]);
