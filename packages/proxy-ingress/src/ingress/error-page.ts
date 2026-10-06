@@ -1,3 +1,4 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
@@ -116,14 +117,13 @@ main {
 p { line-height: var(--leading-copy); margin: 16px 0; }
 .actions { margin-top: 24px; }
 details { margin-top: 32px; }
-summary { cursor: pointer; font-size: var(--text-code); }
 pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font: var(--text-code)/var(--leading-copy) var(--font-mono);
   margin-top: 16px;
 }
-</style></head><body><main><h1 class="title">${escapeHtml(title)}</h1><p>${escapeHtml(explanation)}</p><p>${escapeHtml(guidance)}</p><div class="actions">${retry}</div><details><summary>Technical details</summary><pre>${escapeHtml(`Workspace: ${workspaceName}\n${error instanceof WorkspaceUpstreamError ? `Attempted address: 127.0.0.1:${error.port} inside this workspace\n` : ""}\n${error.message}`)}</pre></details></main></body></html>`, {
+</style></head><body><main><h1 class="title">${escapeHtml(title)}</h1><p>${escapeHtml(explanation)}</p><p>${escapeHtml(guidance)}</p><div class="actions">${retry}</div>${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Technical details" } }, bodyHtml: `<pre>${escapeHtml(`Workspace: ${workspaceName}\n${error instanceof WorkspaceUpstreamError ? `Attempted address: 127.0.0.1:${error.port} inside this workspace\n` : ""}\n${error.message}`)}</pre>` })}</main></body></html>`, {
     status,
     headers: { "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'", "x-content-type-options": "nosniff" },
   });

@@ -1,4 +1,4 @@
-import { actionItemElement, actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowElement, contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { escapeHtml, isApplePlatform, type WorkspaceClientCommand, type WorkspacePaletteItem } from "@agents-in-the-cloud/shared";
@@ -293,8 +293,8 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
     const actions = document.createElement("div");
     actions.className = "action-list";
     for (const command of commands) {
-      const button = actionItemElement<HTMLButtonElement>({
-        kind: "single",
+      const button = contentRowElement<HTMLButtonElement>({
+        kind: "compact",
         label: { kind: "text", text: command.label },
         trailingHtml: `<kbd class="shortcut-overlay-binding">${escapeHtml(formatShortcutBinding(command.binding))}</kbd>`,
         element: { tag: "button",  attributesHtml: 'type="button"' },
@@ -426,8 +426,8 @@ class AgentsInTheCloudShortcutsController extends Controller<HTMLElement> {
       results.innerHTML = `<div class="empty-state palette-empty"><strong>No results found</strong><span>Try another command, workspace, or destination.</span></div>`;
       return;
     }
-    results.innerHTML = this.paletteItems.map((item, index) => actionItemHtml({
-      kind: "single",
+    results.innerHTML = this.paletteItems.map((item, index) => contentRowHtml({
+      kind: "compact",
       label: { kind: "text", text: item.title },
       trailingHtml: item.badge ? `<kbd class="palette-item-meta">${escapeHtml(item.badge)}</kbd>` : "",
       element: { tag: "button", attributesHtml: `id="agents-in-the-cloud-palette-option-${index}" type="button" data-palette-index="${index}" role="option" aria-selected="${index === this.paletteIndex ? "true" : "false"}"` },

@@ -1,5 +1,5 @@
 import { posix } from "node:path";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { execWorkspaceCommand, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
@@ -87,8 +87,8 @@ export function renderFileCompletionMenu(completions: readonly FileCompletion[])
   if (completions.length === 0) return autocompleteHtml({ kind: "message", content: { kind: "text", text: "No matching files" } });
   return autocompleteHtml({ kind: "results", label: "Files and directories", contentHtml: completions.map((completion, index) => {
     const path = completion.directory ? `${completion.path}/` : completion.path;
-    return actionItemHtml({
-      kind: "single",
+    return contentRowHtml({
+      kind: "compact",
       label: { kind: "text", text: path },
       element: {
         tag: "button",

@@ -1,4 +1,5 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { addBadgeHtml } from "@agents-in-the-cloud/design-system/add-badge";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml, type ButtonVariant } from "@agents-in-the-cloud/design-system/button";
@@ -81,7 +82,7 @@ function closeForm(close: ViewCloseAction, buttonHtml: string): string {
 }
 
 function workspaceStatusSlot(content: string): string {
-  return `<span class="fixed-shell-workspace-status action-item__status">${content}</span>`;
+  return `<span class="fixed-shell-workspace-status content-row__status">${content}</span>`;
 }
 
 function renderWorkspaceRowStatus(workspace: WorkspacePaneEntry): string {
@@ -118,8 +119,8 @@ function renderWorkspaceRow(workspace: WorkspacePaneEntry, index: number): strin
   const label = parked ? `Unpark and open ${workspace.title}` : workspace.title;
   const tooltip = [workspaceTemplate?.title, label].filter(Boolean).join(" · ");
   const newFromTemplate = workspaceTemplate ? `New workspace from ${workspaceTemplate.title}` : "New empty workspace";
-  const row = actionItemHtml({
-    kind: "compound",
+  const row = contentRowHtml({
+    kind: "compact",
     container: parked ? undefined : { attributesHtml: `data-workspace-order="${index}"` },
     label: { kind: "text", text: workspace.title },
     trailingHtml: renderWorkspaceRowStatus(workspace),
@@ -141,22 +142,18 @@ function workspaceRowDomId(id: string): string { return domId("workspace_row", i
 function renderWorkspaceRows(presentation: WorkspacePanePresentation): string {
   const active = presentation.workspaces.filter((workspace) => !workspace.parked);
   const parked = presentation.workspaces.filter((workspace) => workspace.parked);
-  const parkedGroup = parked.length ? `<details id="workspace_pane_parked">
-    ${actionItemHtml({
-      kind: "single",
-      element: { tag: "summary", attributesHtml: "data-workspace-parked" },
-      label: { kind: "text", text: "Parked" },
-      leadingHtml: `<span class="workspace-parked-disclosure">${Icons.Disclosure}</span>`,
-    })}
-    ${parked.map(renderWorkspaceRow).join("")}
-  </details>` : "";
+  const parkedGroup = parked.length ? disclosureHtml({
+    element: { id: "workspace_pane_parked" },
+    summary: { kind: "compact", attributesHtml: "data-workspace-parked", label: { kind: "text", text: "Parked" } },
+    bodyHtml: parked.map(renderWorkspaceRow).join(""),
+  }) : "";
   return `${active.map(renderWorkspaceRow).join("")}${parkedGroup}`;
 }
 
 function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string {
   const guide = presentation.workspaces.length ? "" : ' data-first-workspace-destination="new-workspace"';
-  return actionItemHtml({
-    kind: "single",
+  return contentRowHtml({
+    kind: "compact",
     leadingHtml: `<span class="workspace-pane-new-workspace-icon">${addBadgeHtml()}</span>`,
     label: { kind: "text", text: "New workspace" },
     element: { tag: "button", attributesHtml: `type="button" data-workspace-pane-target="newWorkspace" data-action="workspace-pane#openPicker"${guide}` },
@@ -171,8 +168,8 @@ function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspac
     content: { kind: "icon-only", iconHtml: Icons.More, label: `${title} settings` },
     attributesHtml: workspaceTemplateDialogTarget,
   }) : undefined;
-  return actionItemHtml({
-    kind: "compound",
+  return contentRowHtml({
+    kind: "compact",
     leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
     label: { kind: "text", text: title },
     primary: { tag: "button", attributesHtml: `type="submit" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose keydown->workspace-pane#optionKeydown"` },
@@ -184,8 +181,8 @@ function renderWorkspaceTemplateOptions(presentation: WorkspacePanePresentation)
   const ordered = [...presentation.workspaceTemplates].sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0) || left.title.localeCompare(right.title));
   // Until the first template exists, the add action explains what a template is.
   const addWorkspaceTemplate = ordered.length
-    ? actionItemHtml({
-      kind: "single",
+    ? contentRowHtml({
+      kind: "compact",
       leadingHtml: addBadgeHtml(),
       label: { kind: "text", text: "A repo I haven’t added yet…" },
       element: { tag: "a", attributesHtml: `href="/workspace-templates/new" ${workspaceTemplateDialogTarget}` },
@@ -323,7 +320,7 @@ function workViewType(view: WorkPaneContribution): string {
 }
 
 function renderWorkLauncherCommand(command: NonNullable<WorkspacePresentation["commands"]>[number], workspaceId: string, action = ""): string {
-  const item = actionItemHtml({ kind: "single", label: { kind: "text", text: command.label }, leadingHtml: `<span class="popup-menu__icon">${command.iconHtml ?? Icons.Plus}</span>`, element: { tag: "button", attributesHtml: 'type="submit" role="menuitem"' } });
+  const item = contentRowHtml({ kind: "compact", label: { kind: "text", text: command.label }, leadingHtml: `<span class="popup-menu__icon">${command.iconHtml ?? Icons.Plus}</span>`, element: { tag: "button", attributesHtml: 'type="submit" role="menuitem"' } });
   const actionAttribute = action ? ` data-action="${action}"` : "";
   return `<form data-turbo="true" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/commands/${encodeURIComponent(command.id)}"${actionAttribute}>${item}</form>`;
 }
@@ -333,8 +330,8 @@ function renderEmptyWorkPane(workspaceId: string, commands: NonNullable<Workspac
     const shortcutCommand = command.shortcutCommandId
       ? commands.find((candidate) => candidate.id === command.shortcutCommandId)!
       : command;
-    const item = actionItemHtml({
-      kind: "single",
+    const item = contentRowHtml({
+      kind: "compact",
       label: { kind: "text", text: command.label },
       leadingHtml: command.iconHtml ?? Icons.Plus,
       trailingHtml: shortcutCommand.binding
@@ -387,9 +384,9 @@ function renderMobileWorkViews(views: readonly WorkPaneContribution[]) {
     destinations: ordered.map((view) => renderMobileDestination(view.label, `work:${view.key}`, view.iconHtml ?? Icons.Plus, view.attentionSequence !== undefined, view.key)).join(""),
     overflowItems: ordered.map((view) => {
 
-      const attention = view.attentionSequence === undefined ? "" : '<i class="status-dot attention action-item__status" aria-label="Attention"></i>';
-      return actionItemHtml({
-        kind: "single",
+      const attention = view.attentionSequence === undefined ? "" : '<i class="status-dot attention content-row__status" aria-label="Attention"></i>';
+      return contentRowHtml({
+        kind: "compact",
         label: { kind: "text", text: view.label },
         leadingHtml: view.iconHtml ?? Icons.Plus,
         trailingHtml: attention,
@@ -400,7 +397,7 @@ function renderMobileWorkViews(views: readonly WorkPaneContribution[]) {
 }
 
 function renderMobileCloser(destination: string, close: ViewCloseAction): string {
-  const item = actionItemHtml({ kind: "single", tone: "danger", label: { kind: "text", text: "Close current view" }, leadingHtml: `<span class="popup-menu__icon">${Icons.Close}</span>`, element: { tag: "button",  attributesHtml: 'type="submit" role="menuitem"' } });
+  const item = contentRowHtml({ kind: "compact", tone: "danger", label: { kind: "text", text: "Close current view" }, leadingHtml: `<span class="popup-menu__icon">${Icons.Close}</span>`, element: { tag: "button",  attributesHtml: 'type="submit" role="menuitem"' } });
   return `<div data-more-close-destination="${escapeHtml(destination)}" hidden>${closeForm(close, item)}</div>`;
 }
 

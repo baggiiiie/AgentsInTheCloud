@@ -1,5 +1,4 @@
-import { actionItemHtml, type ActionItemLabel } from "@agents-in-the-cloud/design-system/action-item";
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { type ContentRowContent, type ContentRowLabel } from "@agents-in-the-cloud/design-system/content-row";
 import { renderMarkdown } from "@agents-in-the-cloud/markdown";
 import { highlightCodeHtmlForPath } from "@agents-in-the-cloud/syntax";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
@@ -13,15 +12,13 @@ export function transcriptRow(html: string): string {
   return `<div class="agent-row">${html}</div>`;
 }
 
-export function transcriptActionItemHtml(label: ActionItemLabel, options: { disclosure: boolean; leadingHtml?: string; trailingHtml?: string; labelId?: string; summaryId?: string }): string {
-  return actionItemHtml({
-    kind: "single",
-    primary: options.disclosure ? undefined : false,
-    leadingHtml: `${options.disclosure ? Icons.Disclosure : ""}${options.leadingHtml ?? ""}`,
+export function transcriptRowContent(label: ContentRowLabel, options: { kind?: "compact" | "multiline"; leadingHtml?: string; trailingHtml?: string; labelId?: string }): ContentRowContent {
+  return {
+    kind: options.kind ?? "compact",
+    leadingHtml: options.leadingHtml,
     trailingHtml: options.trailingHtml,
-    label: { ...label, textAttributesHtml: [label.textAttributesHtml, options.labelId ? `id="${options.labelId}"` : ""].filter(Boolean).join(" ") },
-    element: { tag: options.disclosure ? "summary" : "div", attributesHtml: options.summaryId ? `id="${options.summaryId}"` : undefined },
-  });
+    label: { ...label, textAttributesHtml: [label.textAttributesHtml, options.labelId ? `id="${escapeHtml(options.labelId)}"` : ""].filter(Boolean).join(" ") },
+  };
 }
 
 export function renderMarkdownRow(ctx: AgentRenderContext, text: string, className: string): string {

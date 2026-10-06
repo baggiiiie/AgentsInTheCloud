@@ -3,13 +3,13 @@
 import { Controller } from "@hotwired/stimulus";
 
 /** Measure browser-sized auxiliary controls, including groups and confirmations. */
-export class ActionItemActionsController extends Controller<HTMLElement> {
+export class ContentRowActionsController extends Controller<HTMLElement> {
   private observer!: ResizeObserver;
 
   connect(): void {
     const item = this.element.parentElement!;
     const update = (): void => {
-      item.style.setProperty("--action-item-actions-width", `${this.element.getBoundingClientRect().width}px`);
+      item.style.setProperty("--content-row-actions-width", `${this.element.getBoundingClientRect().width}px`);
     };
     update();
     this.observer = new ResizeObserver(update);

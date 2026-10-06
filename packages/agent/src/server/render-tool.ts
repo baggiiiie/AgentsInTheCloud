@@ -1,3 +1,5 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { agentToolPresentations } from "./tool-presentations.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
@@ -12,7 +14,7 @@ import { embeddedBashCommand, formatBashCommandForDisplay, highlightedBashComman
 import { domId, escapeHtml } from "@agents-in-the-cloud/shared";
 import { isBashTool, formatDuration, type ToolView } from "./transcript.ts";
 import { agentPath, ids, sessionImageUrl, transcriptItemPath, type AgentRenderContext } from "./render-context.ts";
-import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptActionItemHtml } from "./render-markup.ts";
+import { codeBlockHtml, detailFullscreen, fullscreenAttributes, transcriptRowContent } from "./render-markup.ts";
 
 type ToolArgumentKey = "command" | "path" | "file_path" | "content" | "offset" | "limit" | "timeout" | "edits" | "oldText" | "newText";
 
@@ -102,15 +104,17 @@ export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolV
     })}</form>` : undefined,
   };
   const active = tool.status === "streaming" || tool.status === "running";
+  const content = transcriptRowContent(label, { ...labelOptions, kind: isBashTool(tool.name) ? "compact" : "multiline" });
   if (!toolPresentation(tool).showsDetail) {
-    return `<div class="agent-tool agent-tool-summary-only ${toolClass(tool.name)} active">${transcriptActionItemHtml(label, { ...labelOptions, disclosure: false })}</div>`;
+    return `<div class="agent-tool agent-tool-summary-only ${toolClass(tool.name)} active">${contentRowHtml({ ...content, element: { tag: "div" }, primary: false })}</div>`;
   }
-  const summaryHtml = transcriptActionItemHtml(label, { ...labelOptions, disclosure: true });
   const open = Boolean(options.open || active);
-  if (!options.live && !active && !options.open) {
-    return `<details class="agent-tool ${toolClass(tool.name)}${tool.status === "error" ? " error" : ""}" data-controller="agent-lazy-detail" data-action="toggle->agent-lazy-detail#load">${summaryHtml}${lazyTranscriptItemFrame(ctx, key)}</details>`;
-  }
-  return `<details class="agent-tool ${toolClass(tool.name)}${active ? " active" : ""}${tool.status === "error" ? " error" : ""}"${open ? " open" : ""}>${summaryHtml}<turbo-frame ${tailFrameAttributes(ctx, key)} class="agent-tool-detail-host">${renderToolDetail(ctx, key, tool, 100)}</turbo-frame></details>`;
+  const lazy = !options.live && !active && !options.open;
+  return `<div class="agent-tool ${toolClass(tool.name)}${active ? " active" : ""}${tool.status === "error" ? " error" : ""}">${disclosureHtml({
+    element: lazy ? { attributesHtml: 'data-controller="agent-lazy-detail" data-action="toggle->agent-lazy-detail#load"' } : undefined,
+    summary: content, open,
+    bodyHtml: lazy ? lazyTranscriptItemFrame(ctx, key) : `<turbo-frame ${tailFrameAttributes(ctx, key)} class="agent-tool-detail-host">${renderToolDetail(ctx, key, tool, 100)}</turbo-frame>`,
+  })}</div>`;
 }
 
 function sourceRegionHtml(title: string, body: string, className = "agent-source-region"): string {

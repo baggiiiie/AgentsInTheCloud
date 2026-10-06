@@ -1,3 +1,4 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { hostDiagnosticGroups } from "../diagnostics.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
@@ -36,8 +37,14 @@ function renderDiagnosticTable(sample: HostSample): string {
 function renderSample(sample?: HostSample, error?: string): string {
   const unavailable = sample?.sections.filter(section => section.error).length ?? 0;
   const timestamp = sample ? `<time datetime="${e(sample.sampledAt)}" title="${e(new Date(sample.sampledAt).toLocaleString())}">${e(new Date(sample.sampledAt).toLocaleTimeString())}</time> · ${(sample.durationMs / 1000).toFixed(1)}s collection` : "Read-only snapshot · no background polling";
-  return `<turbo-frame id="${statsFrame}"><section class="host-stats"><header class="host-section-heading"><div><h3>Diagnostics</h3><p>${sample ? "Sampled " : ""}${timestamp}</p></div>${sampleForm()}</header>
-    ${error ? failure(error) : ""}${sample ? `${renderDiagnosticTable(sample)}<details class="host-details"><summary><span>Detailed diagnostics</span><span class="host-probe-count">${sample.sections.length} probes${unavailable ? ` · <span class="host-reading-warning">${unavailable} unavailable</span>` : ""}</span></summary><div class="host-probes">${sample.sections.map(section => `<details class="host-probe"><summary><span>${e(section.title)}</span><span class="host-probe-state${section.error ? " host-reading-warning" : ""}">${section.error ? '<span class="status-dot warning" aria-hidden="true"></span> Unavailable' : "Collected"}</span></summary><pre>${e(section.text)}</pre></details>`).join("")}</div></details>` : ""}</section></turbo-frame>`;
+  const details = sample ? disclosureHtml({
+    summary: { kind: "compact", label: { kind: "text", text: "Detailed diagnostics" }, trailingHtml: `<span>${sample.sections.length} probes${unavailable ? ` · <span class="host-reading-warning">${unavailable} unavailable</span>` : ""}</span>` },
+    bodyHtml: `<div class="host-probes">${sample.sections.map(section => `<div class="host-probe">${disclosureHtml({
+      summary: { kind: "multiline", label: { kind: "text", text: section.title }, trailingHtml: `<span class="${section.error ? "host-reading-warning" : "host-probe-state"}">${section.error ? '<span class="status-dot warning" aria-hidden="true"></span> Unavailable' : "Collected"}</span>` },
+      bodyHtml: `<pre>${e(section.text)}</pre>`,
+    })}</div>`).join("")}</div>`,
+  }) : "";
+  return `<turbo-frame id="${statsFrame}"><section class="host-stats"><header class="host-section-heading"><div><h3>Diagnostics</h3><p>${sample ? "Sampled " : ""}${timestamp}</p></div>${sampleForm()}</header>${error ? failure(error) : ""}${sample ? renderDiagnosticTable(sample) : ""}${details}</section></turbo-frame>`;
 }
 
 function closeTerminalForm(terminal: HostTerminal): string {

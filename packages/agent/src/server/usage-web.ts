@@ -1,3 +1,4 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { response } from "@agents-in-the-cloud/shared/http";
 import { requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { providerUsageFrameId, providersInLastInferenceWindow, selectSubscriptionLimit, secondsUntilUsageLimit, type PacedUsageWindow, connectedUsageProviders, getProviderUsageOverview, supportedUsageProviders, type ProviderUsageOverview } from "@agents-in-the-cloud/llm/server";
@@ -87,7 +88,7 @@ function renderUsageLimits({ reported, error, windows }: ProviderUsageOverview):
   if (error) return `<div class="usage-unavailable" role="status"><p>Couldn’t check usage limits. This only affects the usage shown here; models may still work fine.</p><p class="usage-caption">${escapeHtml(error)}</p></div>`;
   if (!reported) return "<p>Disconnected.</p>";
   const { used, unused } = shownUsageWindows(windows);
-  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? `<details class="usage-unused"${used.length ? "" : " open"}><summary>Unused limits (${unused.length})</summary><div class="usage-section">${unused.map(renderUsageWindow).join("")}</div></details>` : ""}${used.length || unused.length || reported.balance ? "" : '<p>No limits reported.</p>'}`;
+  return `${reported.limitReached || reported.allowed === false ? '<p class="usage-error" role="status">Subscription limit reached.</p>' : ""}${used.map(renderUsageWindow).join("")}${unused.length ? disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: `Unused limits (${unused.length})` } }, open: !used.length, bodyHtml: `<div class="usage-section">${unused.map(renderUsageWindow).join("")}</div>` }) : ""}${used.length || unused.length || reported.balance ? "" : '<p>No limits reported.</p>'}`;
 }
 
 function money(amount: number, currency: string): string {

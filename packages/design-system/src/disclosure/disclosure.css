@@ -1,0 +1,9 @@
+/* Native disclosure: one shared summary anatomy and one shared content gutter. */
+.disclosure { min-width: 0; margin: 0; }
+.disclosure > summary { cursor: pointer; list-style: none; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > .content-row--compact { width: fit-content; max-width: 100%; }
+.disclosure-content { min-width: 0; margin: 8px 0 16px 12px; padding: 8px 16px; border-inline-start: 1px solid var(--line-strong); overflow-wrap: anywhere; }
+.disclosure-content > :first-child { margin-block-start: 0; }
+.disclosure-content > :last-child { margin-block-end: 0; }
+.disclosure-content:empty { display: none; }

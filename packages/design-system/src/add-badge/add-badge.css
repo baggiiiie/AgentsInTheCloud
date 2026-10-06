@@ -1,7 +1,7 @@
 .add-badge { --add-badge-size: 16px; width: var(--add-badge-size); height: var(--add-badge-size); flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--panel); transition: transform 120ms var(--motion-ease-out); }
 .add-badge > svg { width: 70%; height: 70%; stroke-width: 3; }
 @media (hover: hover) {
-  .action-item:not(:disabled):not([aria-disabled="true"]):hover .add-badge { transform: scale(1.15); }
+  .content-row:not(:disabled):not([aria-disabled="true"]):hover .add-badge { transform: scale(1.15); }
 }
 @media (max-width: 700px), (pointer: coarse) {
   .add-badge { --add-badge-size: 20px; }

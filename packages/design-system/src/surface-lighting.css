@@ -20,16 +20,16 @@
   --work-background-image: var(--panel-background-image);
   --terminal-background-image: radial-gradient(ellipse 53% 300px at 27% 0, rgb(255 255 255 / .4158%), transparent 85%);
 
-  --action-item-rim-reflection: radial-gradient(
+  --content-row-rim-reflection: radial-gradient(
     ellipse 147% 21px at 21% 0,
     color-mix(in srgb, color-mix(in srgb, var(--text-muted) 68%, #fff) 27%, transparent),
     transparent 85%
   );
-  --action-item-outline: linear-gradient(
+  --content-row-outline: linear-gradient(
     color-mix(in srgb, var(--text-muted) 12%, var(--panel)),
     color-mix(in srgb, var(--text-muted) 12%, var(--panel))
   );
-  --action-item-inner-glow: radial-gradient(ellipse 80% 2px at 21% 0, rgb(255 255 255 / 10%), transparent 75%);
+  --content-row-inner-glow: radial-gradient(ellipse 80% 2px at 21% 0, rgb(255 255 255 / 10%), transparent 75%);
 
   /* Companion rim: 27% reflection and 4% inner glow × 117% effect strength.
    * There is no added base outline; the Button keeps its semantic colored border. */

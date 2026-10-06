@@ -1,6 +1,6 @@
 import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
 import type { JsonValue } from "@agents-in-the-cloud/core";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
@@ -66,8 +66,8 @@ function attachDialogId(workspaceId: string): string {
 
 async function renderAttachDialog(workspaceId: string): Promise<string> {
   const sessions = await listTmuxSessions(workspaceId);
-  const rows = sessions.map((session, index) => actionItemHtml({
-    kind: "single",
+  const rows = sessions.map((session, index) => contentRowHtml({
+    kind: "multiline",
     element: {
       tag: "button",
       attributesHtml: `type="button" role="option" aria-selected="${index === 0}" data-action="terminal-session-picker#select focus->terminal-session-picker#select" data-terminal-session-picker-target="item" data-linear-navigation-target="item" data-terminal-session="${escapeHtml(session.name)}"`,
@@ -78,7 +78,7 @@ async function renderAttachDialog(workspaceId: string): Promise<string> {
   })).join("");
 
   const formId = domId("attach_terminal_form", workspaceId);
-  const bodyHtml = `<form id="${formId}" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/terminals/attach" data-turbo="true" data-controller="terminal-session-picker action-items" data-action="turbo:submit-end->dialog#submitted">
+  const bodyHtml = `<form id="${formId}" method="post" action="/workspaces/${encodeURIComponent(workspaceId)}/terminals/attach" data-turbo="true" data-controller="terminal-session-picker content-rows" data-action="turbo:submit-end->dialog#submitted">
     ${sessions[0] ? `<input type="hidden" name="session" value="${escapeHtml(sessions[0].name)}" data-terminal-session-picker-target="input">` : ""}
     <div class="terminal-session-list action-list" role="listbox" aria-label="Tmux sessions" data-controller="linear-navigation">${rows || `<div class="terminal-session-empty empty-state">No tmux sessions are running yet.</div>`}</div>
   </form>`;

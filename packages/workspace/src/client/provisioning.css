@@ -6,8 +6,6 @@
 .provision-step-content { min-width: 0; flex: 1; }
 .provision-step-label { display: block; line-height: 20px; }
 .provision-step-detail { display: block; margin-top: 2px; }
-.provision-output-disclosure { margin-top: 8px; }
-.provision-output-disclosure > summary { width: fit-content; }
 .provision-output-log { max-height: min(52vh, 520px); overflow: auto; white-space: pre-wrap; word-break: break-word; background: #0f172a; color: #dbeafe; border-radius: var(--radius-surface); padding: 12px; font: var(--text-body)/var(--leading-standard) ui-monospace, SFMono-Regular, Menlo, monospace; }
 .provision-terminal.observable-terminal-host { height: 300px; flex: none; margin-top: 12px; border-radius: var(--radius-surface); overflow: hidden; border: 1px solid var(--line); }
 .provision-terminal-progress { height: 300px; max-height: none; margin: 12px 0 0; }
@@ -26,6 +24,6 @@
   .provision-terminal.observable-terminal-host, .provision-terminal-progress { height: min(160px, 25dvh); }
   .provision-output-log { max-height: min(160px, 25dvh); }
   .provision-launch-prompt { max-height: min(120px, 22dvh); }
-  .provision-output-disclosure, .provision-terminal.observable-terminal-host, .provision-terminal-progress { margin-top: 6px; }
+  .provision-terminal.observable-terminal-host, .provision-terminal-progress { margin-top: 6px; }
   .provision-recovery-description, .provision-actions { margin-top: 8px; }
 }

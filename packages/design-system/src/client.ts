@@ -10,8 +10,8 @@ import { WarningBannersController } from "./warning-banner/warning-banner-contro
 import { ManagedListController } from "./managed-list/managed-list-controller.ts";
 
 import type { Application } from "@hotwired/stimulus";
-import { ActionItemActionsController } from "./action-item/action-item-actions-controller.ts";
-import { ActionItemController } from "./action-item/action-item-controller.ts";
+import { ContentRowActionsController } from "./content-row/content-row-actions-controller.ts";
+import { ContentRowController } from "./content-row/content-row-controller.ts";
 import { ButtonConfirmationController } from "./button-confirmation/button-confirmation-controller.ts";
 import { CopyButtonController } from "./copy-button/copy-button-controller.ts";
 import { DestructiveConfirmationController } from "./destructive-confirmation/destructive-confirmation-controller.ts";
@@ -24,7 +24,7 @@ import { ToggleController } from "./toggle/toggle-controller.ts";
 
 const automaticBehaviors = [
   ["body", "scrollbars", "pointermove->scrollbars#hover pointerleave->scrollbars#leave wheel->scrollbars#wheel:!passive"],
-  ["body", "action-items"],
+  ["body", "content-rows"],
   ["body", "warning-banners"],
   [".activity-button, .progress-button", "perimeter-button"],
   [".copy-button", "copy-button", "click->copy-button#copy"],
@@ -60,8 +60,8 @@ export function registerDesignSystemControllers(application: Pick<Application, "
   application.register("markdown-diff", MarkdownDiffController);
   application.register("perimeter-button", PerimeterButtonController);
   application.register("warning-banners", WarningBannersController);
-  application.register("action-items", ActionItemController);
-  application.register("action-item-actions", ActionItemActionsController);
+  application.register("content-rows", ContentRowController);
+  application.register("content-row-actions", ContentRowActionsController);
   application.register("button-confirmation", ButtonConfirmationController);
   application.register("copy-button", CopyButtonController);
   application.register("destructive-confirmation", DestructiveConfirmationController);

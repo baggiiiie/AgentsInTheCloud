@@ -1,4 +1,4 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
@@ -77,8 +77,8 @@ function renderAgentTab(workspaceId: string, agent: AgentPaneContribution): stri
 function agentTypeOptions(presentation: WorkspacePresentation, menu: boolean): string {
   return presentation.agentTypes.map((agentType) => {
     const action = `/workspaces/${encodeURIComponent(presentation.workspace.id)}/commands/agent.create.${encodeURIComponent(agentType.id)}`;
-    const item = actionItemHtml({
-      kind: "single", label: { kind: "text", text: agentType.label }, leadingHtml: agentType.iconHtml,
+    const item = contentRowHtml({
+      kind: "compact", label: { kind: "text", text: agentType.label }, leadingHtml: agentType.iconHtml,
       element: { tag: "button", attributesHtml: `type="submit"${menu ? ' role="menuitem"' : ""}` },
     });
     return `<form method="post" action="${action}" data-turbo="true">${item}</form>`;

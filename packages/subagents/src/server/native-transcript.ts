@@ -1,4 +1,5 @@
-import { transcriptActionItemHtml, transcriptRow, type AgentTranscriptAnchor, type AgentTranscriptSnapshot } from "@agents-in-the-cloud/agent/server";
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
+import { transcriptRowContent, transcriptRow, type AgentTranscriptAnchor, type AgentTranscriptSnapshot } from "@agents-in-the-cloud/agent/server";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import type { ConversationView } from "@earendil-works/pi-durable";
 import { inheritedBoundaryEntry, communicationEntry, communicationStateEntry, type Receipt } from "./native-state.ts";
@@ -26,7 +27,7 @@ export function nativeDelegationTranscript(view: ConversationView): AgentTranscr
         { label: "Handling", html: escapeHtml(receipt.handling === "idle-task" ? "Starts a turn" : receipt.handling === "idle-message" ? "Waits for the next turn" : receipt.handling === "waiting" ? "Wakes the agent’s wait" : "Queued for the next model boundary") },
         { label: "Context", html: escapeHtml(state) },
       ]);
-      return transcriptRow(`<details class="agent-communication" data-transcript-anchor="${escapeHtml(receipt.id)}" data-controller="agent-communication" data-agent-communication-key-value="${escapeHtml(receipt.id)}" data-action="toggle->agent-communication#remember" open>${transcriptActionItemHtml({ kind: "text", text: `Incoming ${receipt.kind} from ${receipt.author}` }, { disclosure: true })}${body}</details>`);
+      return transcriptRow(`<div class="agent-communication">${disclosureHtml({ element: { attributesHtml: `data-transcript-anchor="${escapeHtml(receipt.id)}" data-controller="agent-communication" data-agent-communication-key-value="${escapeHtml(receipt.id)}" data-action="toggle->agent-communication#remember"` }, summary: transcriptRowContent({ kind: "text", text: `Incoming ${receipt.kind} from ${receipt.author}` }, { kind: "multiline" }), open: true, bodyHtml: body })}</div>`);
     },
   })) };
 }

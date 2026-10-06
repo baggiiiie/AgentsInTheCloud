@@ -23,7 +23,7 @@ export class TabStripController extends Controller<HTMLElement> {
   private frame = 0;
   private animationFrame = 0;
   private selected: HTMLElement | null = null;
-  private get items() { return [...this.listTarget.querySelectorAll<HTMLElement>(":scope > .action-item:not([hidden])")]; }
+  private get items() { return [...this.listTarget.querySelectorAll<HTMLElement>(":scope > .content-row:not([hidden])")]; }
 
   connect(): void {
     this.mutations.observe(this.listTarget, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-selected", "hidden", "dir"] });
@@ -40,7 +40,7 @@ export class TabStripController extends Controller<HTMLElement> {
   private observeGeometry(): void {
     this.resize.disconnect();
     this.resize.observe(this.element);
-    for (const slot of this.listTarget.querySelectorAll(".action-item__label, .action-item__icon, .action-item__actions")) this.resize.observe(slot);
+    for (const slot of this.listTarget.querySelectorAll(".content-row__label, .content-row__icon, .content-row__actions")) this.resize.observe(slot);
   }
   readonly schedule = (): void => {
     if (this.frame) return;
@@ -50,11 +50,11 @@ export class TabStripController extends Controller<HTMLElement> {
     // Hidden panes are measured when ResizeObserver reports that they are visible.
     if (!this.element.clientWidth) return;
     for (const item of this.items) {
-      const primary = item.querySelector<HTMLElement>(".action-item__primary")!;
+      const primary = item.querySelector<HTMLElement>(".content-row__primary")!;
       primary.tabIndex = primary.getAttribute("aria-selected") === "true" ? 0 : -1;
-      const icon = item.querySelector<HTMLElement>(".action-item__icon");
+      const icon = item.querySelector<HTMLElement>(".content-row__icon");
       const status = item.querySelector<HTMLElement>(".tab-strip__status")!;
-      const actions = item.querySelector<HTMLElement>(".action-item__actions");
+      const actions = item.querySelector<HTMLElement>(".content-row__actions");
       const actionsStyle = actions && getComputedStyle(actions);
       const inlineActions = actionsStyle?.position === "static" && actionsStyle.display !== "none";
       const showStatus = !status.hidden && !inlineActions;
@@ -82,12 +82,12 @@ export class TabStripController extends Controller<HTMLElement> {
   }
   private titleBounds(item: HTMLElement): DOMRect {
     const range = document.createRange();
-    range.selectNodeContents(item.querySelector(".action-item__label-text")!);
+    range.selectNodeContents(item.querySelector(".content-row__label-text")!);
     return range.getBoundingClientRect();
   }
   private updateTitleFades(): void {
     for (const item of this.items) {
-      const viewport = item.querySelector(".action-item__label")!.getBoundingClientRect();
+      const viewport = item.querySelector(".content-row__label")!.getBoundingClientRect();
       const text = this.titleBounds(item);
       item.toggleAttribute("data-title-cut-left", text.left < viewport.left - 1);
       item.toggleAttribute("data-title-cut-right", text.right > viewport.right + 1);
@@ -96,7 +96,7 @@ export class TabStripController extends Controller<HTMLElement> {
   engage(): void {
     this.schedule();
     if (this.animationFrame) return;
-    // Action item's existing hover controller starts its marquee later in the
+    // Content row's existing hover controller starts its marquee later in the
     // same event bubble. Track the actual moving text edges, not a permanent mask.
     this.animationFrame = requestAnimationFrame(this.animateFades);
   }

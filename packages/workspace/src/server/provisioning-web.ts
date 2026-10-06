@@ -1,7 +1,6 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
@@ -40,7 +39,7 @@ function renderProvisionStep(workspaceId: string, step: WorkspaceProvisionStep, 
       ? `<div id="${domId("provision_terminal", workspaceId, step.id, step.terminalSession)}" data-turbo-permanent class="provision-terminal observable-terminal-host" data-controller="provision-terminal" data-provision-terminal-session-value="${escapeHtml(step.terminalSession)}"></div>`
       : "";
   const log = [step.output, step.error && !step.output?.includes(step.error) ? step.error : undefined].filter(Boolean).join("\n\n");
-  const output = log && step.status !== "running" ? `<details class="provision-output-disclosure"${step.error ? " open" : ""}>${actionItemHtml({ kind: "single", element: { tag: "summary" }, leadingHtml: Icons.Disclosure, label: { kind: "text", text: "View output" } })}<pre class="provision-output-log provision-output" data-controller="auto-scroll">${escapeHtml(log)}</pre></details>` : "";
+  const output = log && step.status !== "running" ? disclosureHtml({ open: Boolean(step.error), summary: { kind: "compact", label: { kind: "text", text: "View output" } }, bodyHtml: `<pre class="provision-output-log provision-output" data-controller="auto-scroll">${escapeHtml(log)}</pre>` }) : "";
   const detailText = step.status === "warning" ? "Continued despite this failure" : step.detail;
   const detail = detailText ? `<span class="r-sub provision-step-detail">${escapeHtml(detailText)}</span>` : "";
   const continueUrl = `/workspaces/${encodeURIComponent(workspaceId)}/provisioning/continue`;

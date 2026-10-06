@@ -1,4 +1,4 @@
-import { setActionItemLabel } from "@agents-in-the-cloud/design-system/action-item/client";
+import { setContentRowLabel } from "@agents-in-the-cloud/design-system/content-row/client";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { agentComposerSendPromptEvent, changeLayout, composerSubmitKey, type AgentComposerSendPromptDetail, focusLikelyOpensSoftwareKeyboard, isApplePlatform, setTextInputValue, type WorkspaceClientCommand, type WorkspaceClientControllerConstructor as StimulusControllerConstructor, type WorkspaceClientHooks } from "@agents-in-the-cloud/shared";
 import { agentCompletionRequest, insertFileCompletion, insertSlashCommand } from "./completion-input.ts";
@@ -107,7 +107,7 @@ function filterSlashCompletionCatalog(html: string, query: string, compactAvaila
   if (compact && !compactAvailable) {
     compact.disabled = true;
     compact.setAttribute("aria-disabled", "true");
-    setActionItemLabel(compact, "/compact [instructions] — Available after more conversation history.");
+    setContentRowLabel(compact, "/compact [instructions] — Available after more conversation history.");
   }
   const normalized = query.toLowerCase();
   const options = [...menu.querySelectorAll<HTMLButtonElement>("[role=\"option\"]")]

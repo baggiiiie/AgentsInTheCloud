@@ -18,7 +18,7 @@ export {
   type WorkspacePresenterDeps,
 } from "./tools.ts";
 export { ids, type AgentRenderContext } from "./render-context.ts";
-export { transcriptRow, transcriptActionItemHtml } from "./render-markup.ts";
+export { transcriptRow, transcriptRowContent } from "./render-markup.ts";
 export { assistantTextPhase, isFinalAssistantMessage, finalAssistantText, finalAssistantTextIndexes, type TranscriptItem, type TranscriptRecord } from "./transcript.ts";
 export { type AgentTranscriptSnapshot, type AgentTranscriptAnchor } from "./transcript-contributions.ts";
 export { prepareCliAgentConnection, type CliAgentConnection, revokeAgentMcp, configureAgentMcp, handleAgentMcpRequest } from "./mcp.ts";

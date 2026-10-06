@@ -1,4 +1,4 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { escapeHtml, providerBrandIconHtml } from "@agents-in-the-cloud/shared";
@@ -30,12 +30,11 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
   const hasAvailableModel = models.some((model) => model.available !== false);
   const menuId = `${formId}_popup`;
   const setupAction = 'data-controller="agent-model-setup" data-action="click->agent-model-setup#open"';
-  const configure = actionItemHtml({ kind: "single", label: { kind: "text", text: "Manage models…" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
+  const configure = contentRowHtml({ kind: "compact", label: { kind: "text", text: "Manage models…" }, element: { tag: "button", attributesHtml: `type="button" role="menuitem" ${setupAction}` } });
   const modelItems = models.map((model) => {
-    return actionItemHtml({
-      kind: "single",
+    return contentRowHtml({
+      ...(model.unavailableReason ? { kind: "multiline" as const, description: model.unavailableReason } : { kind: "compact" as const }),
       label: { kind: "text", text: model.name },
-      description: model.unavailableReason,
       leadingHtml: providerBrandIconHtml(model.provider),
       element: { tag: "button", attributesHtml: `type="submit" name="model" value="${escapeHtml(`${model.provider}::${model.id}`)}" form="${escapeHtml(formId)}" role="menuitemradio" aria-checked="${model.selected}"${model.available === false ? " disabled" : ""}` },
     });

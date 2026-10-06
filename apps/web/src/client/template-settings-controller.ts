@@ -171,7 +171,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     this.focusRecord = undefined;
     const saved = content.hasAttribute("data-template-settings-saved");
     const actions = saved ? this.frameTarget.querySelector<HTMLElement>("[data-template-settings-save-actions]") : null;
-    const focus = actions ?? record ?? this.frameTarget.querySelector<HTMLElement>("[autofocus]") ?? this.frameTarget.querySelector<HTMLElement>("[data-template-settings-heading], .action-item");
+    const focus = actions ?? record ?? this.frameTarget.querySelector<HTMLElement>("[autofocus]") ?? this.frameTarget.querySelector<HTMLElement>("[data-template-settings-heading], .content-row");
     requestAnimationFrame(() => {
       if (focus?.isConnected) focus.focus({ preventScroll: true });
       if (actions?.isConnected) {

@@ -5,8 +5,8 @@
   "exports": {
     "./action-link": "./src/action-link/action-link-html.ts",
     "./autocomplete": "./src/autocomplete/autocomplete-html.ts",
-    "./action-item": "./src/action-item/action-item-html.ts",
-    "./action-item/client": "./src/action-item/action-item-controller.ts",
+    "./content-row": "./src/content-row/content-row-html.ts",
+    "./content-row/client": "./src/content-row/content-row-controller.ts",
     "./add-badge": "./src/add-badge/add-badge-html.ts",
     "./activity-button": "./src/activity-button/activity-button-html.ts",
     "./activity-button/client": "./src/activity-button/activity-button-client.ts",
@@ -42,7 +42,8 @@
     "./catalogue": "./catalogue/page.ts",
     "./styles/server": "./src/inline-styles.ts",
     "./tab-strip": "./src/tab-strip/tab-strip-html.ts",
-    "./tab-strip/client": "./src/tab-strip/tab-strip-controller.ts"
+    "./tab-strip/client": "./src/tab-strip/tab-strip-controller.ts",
+    "./disclosure": "./src/disclosure/disclosure-html.ts"
   },
   "dependencies": {
     "@agents-in-the-cloud/shared": "workspace:*",

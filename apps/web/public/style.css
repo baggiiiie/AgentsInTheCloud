@@ -95,7 +95,7 @@ turbo-frame { display: contents; }
 .fixed-shell-app.is-workspace-pane-collapsed [data-collapse-workspace-pane] { display: none; }
 .fixed-shell-workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 1px 8px 8px; display: flex; flex-direction: column; gap: 1px; }
 .fixed-shell-workspace-scroll > * { flex: 0 0 auto; }
-[data-workspace-parked] .action-item__label, .workspace-parked-disclosure { color: var(--text-muted); }
+[data-workspace-parked] .content-row__label, .workspace-parked-disclosure { color: var(--text-muted); }
 .fixed-shell-pane-collections { height: 100%; min-height: 0; display: flex; flex-direction: column; }
 .fixed-shell-pane-collections > #global_sidebar_contributions { flex: 0 0 auto; }
 .fixed-shell-workspace-main { flex: 1; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr); }
@@ -112,7 +112,7 @@ turbo-frame { display: contents; }
 /* "New workspace" heads the workspace list: its badge takes the slot of a row's template swatch, so icons and titles line up. */
 .fixed-shell-workspace-pane { --workspace-swatch-slot: 26px; }
 .workspace-pane-new-workspace { padding: 8px 8px 0; }
-.workspace-pane-new-workspace > .action-item { padding-inline-start: 2px; gap: 2px; }
+.workspace-pane-new-workspace > .content-row { padding-inline-start: 2px; gap: 2px; }
 .workspace-pane-new-workspace-icon { width: var(--workspace-swatch-slot); display: grid; place-items: center; }
 .workspace-pane-slide > .fixed-shell-pane-collections { flex: 1; height: auto; }
 
@@ -436,7 +436,6 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .agent-empty-choices h2 { font-size:20px; color:var(--text-bright); margin:0 0 8px; }
 .agent-empty-choices > p { color:var(--text); margin:0 0 24px; }
 .agent-empty-choices .action-list { display:grid; gap:12px; }
-.agent-empty-choices .action-item { padding:18px; border:1px solid var(--line-strong); border-radius:var(--radius-surface); background:var(--panel); }
 #launch_composer_provider { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; min-width:0; }
 #launch_composer_provider > .popup-menu-anchor { flex:0 0 auto; }
 #launch_composer_provider > .launch-model-settings { display:flex; flex:1; min-width:0; margin-left:auto; justify-content:flex-end; }
@@ -495,8 +494,6 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
 .template-settings-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .template-settings-note { margin: 0; }
 #template_settings_error:empty { display: none; }
-.template-settings-content details { border-top: 1px solid var(--line); padding-top: 16px; }
-.template-settings-content summary { cursor: pointer; margin-bottom: 16px; }
 .template-settings-remove { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
 .template-settings-content .form-section > .button-toggle { justify-self: start; }
 .template-settings-content textarea[name="dockerfile"], .template-settings-content textarea[name="knownHosts"] { font-family: var(--font-mono); }

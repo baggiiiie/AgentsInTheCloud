@@ -5,7 +5,7 @@ export interface PopupMenuOptions {
   id: string;
   /** Accessible name for the menu. */
   label: string;
-  /** Trusted, already-escaped menu contents, typically Action Items, forms, and separators. */
+  /** Trusted, already-escaped menu contents, typically Content rows, forms, and separators. */
   contentHtml: string;
   /** Position relative to the caller's anchor. Omit for a caller-positioned surface. */
   placement?: "below" | "above";

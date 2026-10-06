@@ -1,5 +1,5 @@
 import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentType } from "@agents-in-the-cloud/shared";
@@ -19,8 +19,8 @@ export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agent
   const picker = popupHtml({
     id: `${launchAgentTypeFrameId}_menu`, label: "Agent type", placement: "above",
     trigger: { variant: "secondary", content: { kind: "caption", caption: agentType.label, iconHtml: agentType.iconHtml } },
-    contentHtml: agentTypes.map((item) => actionItemHtml({
-      kind: "single", label: { kind: "text", text: item.label }, leadingHtml: item.iconHtml,
+    contentHtml: agentTypes.map((item) => contentRowHtml({
+      kind: "compact", label: { kind: "text", text: item.label }, leadingHtml: item.iconHtml,
       element: { tag: "button", attributesHtml: `type="submit" name="agentTypeId" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === agentType.id}"` },
     })).join(""),
   });

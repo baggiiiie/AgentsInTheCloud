@@ -45,15 +45,6 @@
 
 /* notes (steer / rewind summaries / system) */
 .agent-note { color: var(--text); background: var(--warning-soft); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 6px 8px; }
-/* Compaction is a quiet context boundary, not a warning or assistant reply. */
-.agent-context-summary { min-width: 0; }
-.agent-context-summary-body {
-  margin: 8px 0 16px 12px;
-  padding: 8px 16px;
-  border-left: 2px solid var(--line-strong);
-  overflow-wrap: anywhere;
-}
-.agent-context-summary-body > :first-child { margin-top: 0; }
 .agent-note.warning { color: var(--text-bright); border-color: color-mix(in srgb, #d89b24 45%, var(--line)); }
 .agent-note.error { color: var(--danger); background: var(--danger-soft); border-color: #f1c7c7; }
 .agent-note p { margin: 0 0 4px; }
@@ -168,25 +159,12 @@
 .agent-item:has(.agent-user) { margin-top: 12px; margin-bottom: 8px; }
 .agent-item:has(.agent-final) { margin-top: .5rem; margin-bottom: .75rem; }
 .agent-working-block { width: 100%; margin: 2px 0; }
-.agent-working { width: 100%; margin: 0; }
-.agent-working > summary.action-item,
-.agent-lazy-detail > summary.action-item { width: fit-content; max-width: 100%; }
-/* Keep the run label readable; secondary statistics yield space first. */
-.agent-working > summary > .action-item__content { flex: 0 0 auto; }
-.agent-working > summary > .action-item__metadata { flex: 0 1 auto; min-width: 0; overflow: hidden; }
-.agent-working[open]:has(> .agent-working-items:not(:empty)) + .agent-working-commentary { display: none; }
-.agent-working > summary, .agent-tool > summary { list-style: none; cursor: pointer; }
-.agent-working > summary::-webkit-details-marker, .agent-tool > summary::-webkit-details-marker { display: none; }
+/* Expanded turn content is the shared disclosure gutter; commentary is its collapsed projection. */
+.agent-working-block > .disclosure[open]:has(> .disclosure-content:not(:empty)) + .agent-working-commentary { display: none; }
 .agent-working-timing { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-muted); }
 .agent-working-empty { margin: 4px 0; color: var(--text-muted); }
-.agent-working-items:not(:empty), .agent-working-commentary:not(:empty) {
-  margin: 8px 0 12px 14px;
-  padding-inline-start: 16px;
-  border-inline-start: 1px solid var(--line-strong);
-}
-.agent-working-items > .agent-item + .agent-item,
-.agent-working-commentary > .agent-item + .agent-item { margin-top: 8px; }
-.agent-working-items > .agent-item:has(.agent-tool) + .agent-item:has(.agent-tool) { margin-top: 2px; }
+.agent-working-block .disclosure-content > .agent-item + .agent-item { margin-top: 8px; }
+.agent-working-block .disclosure-content > .agent-item:has(.agent-tool) + .agent-item:has(.agent-tool) { margin-top: 2px; }
 .agent-itext-md { color: var(--text); }
 .agent-stream-markdown > div { display: contents; }
 .agent-stream-arrival { animation: agent-stream-arrive ease-out both; }
@@ -202,9 +180,8 @@
 }
 
 .agent-tool { margin: 0; border: 0; border-radius: 0; background: transparent; overflow: visible; }
-.agent-tool > .action-item { width: fit-content; max-width: 100%; }
 /* Reserve the absent disclosure slot while a tool has no detail to open. */
-.agent-tool-summary-only > .action-item > .action-item__icon::before { content: ""; width: 16px; flex: 0 0 auto; }
+.agent-tool-summary-only > .content-row > .content-row__icon::before { content: ""; width: 16px; flex: 0 0 auto; }
 .agent-tool-status { display: inline-flex; width: 8px; flex: 0 0 auto; align-items: center; justify-content: center; }
 .agent-tool-detail-host { display: contents; }
 
@@ -286,11 +263,6 @@
 }
 
 /* Copied context remains readable, but visually separate from this agent's activity. */
-.agent-inherited-content {
-  margin: 8px 0 16px 12px;
-  padding-inline-start: 16px;
-  border-inline-start: 2px solid var(--line);
-}
 .agent-inherited-explanation { margin: 0 0 16px; color: var(--text-muted); }
 .agent-inherited-content > .agent-item + .agent-item { margin-top: 12px; }
 

@@ -1,3 +1,4 @@
+import { disclosureHtml } from "../src/disclosure/disclosure-html.ts";
 /** Search by id. Each entry co-locates WHEN, contract, imports and executable examples.
  * page.ts renders these functions AND displays their source: no parallel demo markup.
  * Native CSS primitives intentionally do not have pass-through renderers. */
@@ -7,7 +8,7 @@ import { buttonHtml } from "../src/button/button-html.ts";
 import { actionLinkHtml } from "../src/action-link/action-link-html.ts";
 import { comparisonRingHtml } from "../src/comparison-ring/comparison-ring-html.ts";
 import { buttonGroupHtml } from "../src/button-group/button-group-html.ts";
-import { actionItemHtml } from "../src/action-item/action-item-html.ts";
+import { contentRowHtml } from "../src/content-row/content-row-html.ts";
 import { addBadgeHtml } from "../src/add-badge/add-badge-html.ts";
 import { activityButtonHtml } from "../src/activity-button/activity-button-html.ts";
 import { progressButtonHtml } from "../src/progress-button/progress-button-html.ts";
@@ -40,7 +41,7 @@ export const entries: CatalogueEntry[] = [
     id: "scrollbar", title: "Scrollbars", when: "Any native scrolling region: lists, panels, code, tabs and transcripts.",
     contract: "Shared automatic enhancement follows the hovered scroll viewport on pointer movement, including regions inserted by Turbo. Scrolling content under a stationary cursor does not switch tracks; non-overflowing nested regions do not steal an ancestor’s scrollbar. Four-pixel thumbs have twelve-pixel drag targets. Tracks overlay content in the browser top layer; neither hidden nor visible tracks reserve space. Native gutters are disabled even before overflow begins. Normal mouse wheels scroll horizontal-only regions sideways and stay horizontal at either end, without scrolling the surrounding page vertically. Two-axis regions, Shift+wheel, horizontal trackpad gestures and Ctrl+wheel stay native. Touch and keyboard scrolling remain native; touch does not reveal tracks. Horizontal dragging follows physical direction in RTL. Use overflow: auto on a bounded region; no scrollbar markup or feature controller is needed.",
     sources: ["scrollbar/scrollbar-controller.ts", "scrollbar/scroll-geometry.ts", "scrollbar/scrollbar.css"],
-    examples: [{ title: "Expand the list, then hover and drag · wheel over the wide row", render: () => `<div style="width: min(100%, 360px); height: 180px; overflow: auto; border: 1px solid var(--line); padding: 12px"><p>Content keeps its full width.</p><details><summary>Show more rows</summary>${Array.from({ length: 15 }, (_, i) => `<p>List item ${i + 1}</p>`).join("")}</details></div><div style="width: min(100%, 360px); overflow: auto; border: 1px solid var(--line); padding: 12px"><div style="width: 700px">A wide row — use your mouse wheel here to scroll sideways.</div></div>` }],
+    examples: [{ title: "Expand the list, then hover and drag · wheel over the wide row", render: () => `<div style="width: min(100%, 360px); height: 180px; overflow: auto; border: 1px solid var(--line); padding: 12px"><p>Content keeps its full width.</p>${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Show more rows" } }, bodyHtml: Array.from({ length: 15 }, (_, i) => `<p>List item ${i + 1}</p>`).join("") })}</div><div style="width: min(100%, 360px); overflow: auto; border: 1px solid var(--line); padding: 12px"><div style="width: 700px">A wide row — use your mouse wheel here to scroll sideways.</div></div>` }],
   },
   {
     id: "tab-strip", title: "Tab strip", when: "Horizontal closable views, including Agent, Work and Host terminals.",
@@ -73,15 +74,15 @@ export const entries: CatalogueEntry[] = [
   {
     id: "page-slide", title: "Page slide", when: "Drill into a bounded pane, then return, with fixed header chrome. Works with persistent pages and server-rendered replacements.",
     contract: "slidePageChange(currentBody, render, direction) snapshots only the outgoing/incoming body and slides it 280ms with the shared easing. currentBody resolves the current body; render updates feature-owned state/markup and returns the incoming body, which may be the same element. Headers update in place. Features retain ownership of URLs, dirty guards, inert state and focus. Forward/back reverse in RTL; reduced motion and browsers without View Transitions render immediately. New navigation finishes the previous animation without canceling its render. No copied forms, duplicate controllers or outgoing DOM is retained.",
-    imports: { "page-slide/client": "slidePageChange", panel: "panelHtml", button: "buttonHtml", "action-item": "actionItemHtml", icons: "Icons" },
+    imports: { "page-slide/client": "slidePageChange", panel: "panelHtml", button: "buttonHtml", "content-row": "contentRowHtml", icons: "Icons" },
     sources: ["page-slide/page-slide-client.ts", "page-slide/page-slide.css"],
     examples: [{ title: "Drill in, then Back · try RTL and reduced motion", render: () => `<div data-page-slide-demo>${panelHtml({
       element: { tag: "section" },
       headerHtml: '<span hidden data-page-slide-back>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Back, label: "Back to template settings" }, attributesHtml: 'data-catalogue-back-param="true" data-action="catalogue#pageSlide"' }) + '</span><h3 class="panel__title" tabindex="-1" data-page-slide-title>Template settings</h3>',
       bodyLayout: "padded",
       bodyHtml: `<div data-page-slide-body style="height: 160px; overflow: hidden">
-        <section data-page-slide-page="index">${actionItemHtml({ kind: "single", label: { kind: "text", text: "Secrets" }, element: { tag: "button", attributesHtml: 'type="button" data-catalogue-back-param="false" data-action="catalogue#pageSlide"' } })}</section>
-        <section data-page-slide-page="detail" hidden><p>Choose a secret to edit.</p>${actionItemHtml({ kind: "single", label: { kind: "text", text: "PAYMENTS_API_KEY" }, description: "Required", element: { tag: "div" } })}</section>
+        <section data-page-slide-page="index">${contentRowHtml({ kind: "compact", label: { kind: "text", text: "Secrets" }, element: { tag: "button", attributesHtml: 'type="button" data-catalogue-back-param="false" data-action="catalogue#pageSlide"' } })}</section>
+        <section data-page-slide-page="detail" hidden><p>Choose a secret to edit.</p>${contentRowHtml({ kind: "multiline", label: { kind: "text", text: "PAYMENTS_API_KEY" }, description: "Required", element: { tag: "div" } })}</section>
       </div>`,
     })}</div>` }],
   },
@@ -96,7 +97,7 @@ export const entries: CatalogueEntry[] = [
       dialog: "dialogHtml",
       button: "buttonHtml",
       "copy-button": "copyButtonHtml",
-      "action-item": "actionItemHtml",
+      "content-row": "contentRowHtml",
       "transient-feedback": "transientFeedbackHtml",
       icons: "Icons",
       toggle: "toggleHtml",
@@ -130,8 +131,8 @@ export const entries: CatalogueEntry[] = [
             },
             contentHtml: ["Edit details", "Duplicate", "Archive"]
               .map((text) =>
-                actionItemHtml({
-                  kind: "single",
+                contentRowHtml({
+                  kind: "compact",
                   element: {
                     tag: "button",
                     attributesHtml: 'type="button" role="menuitem"',
@@ -196,14 +197,7 @@ export const entries: CatalogueEntry[] = [
       {
         title: "05 · Expand and collapse — native disclosure",
         render: () =>
-          "<details>" +
-          actionItemHtml({
-            kind: "single",
-            element: { tag: "summary" },
-            leadingHtml: Icons.Disclosure,
-            label: { kind: "text", text: "Advanced options" },
-          }) +
-          '<div class="form-stack"><p>The arrow rotates as the section expands. Height follows the actual content, rather than a guessed maximum.</p><label>Display name<input class="text-field" value="My workspace"></label><p>Close and reopen, including with the keyboard.</p></div></details>',
+          disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Advanced options" } }, bodyHtml: '<div class="form-stack"><p>The arrow rotates as the section expands. Height follows the actual content, rather than a guessed maximum.</p><label>Display name<input class="text-field" value="My workspace"></label><p>Close and reopen, including with the keyboard.</p></div>' }),
       },
       {
         title: "06 · Running states soften — activity stays cancellable",
@@ -265,8 +259,8 @@ export const entries: CatalogueEntry[] = [
             attributesHtml: 'id="motion-suggestions" hidden',
             contentHtml: ["agents-in-the-cloud/design-system", "agents-in-the-cloud/workspace"]
               .map((text) =>
-                actionItemHtml({
-                  kind: "single",
+                contentRowHtml({
+                  kind: "compact",
                   element: {
                     tag: "div",
                     attributesHtml: 'role="option" aria-selected="false"',
@@ -344,7 +338,7 @@ export const entries: CatalogueEntry[] = [
     title: "Foundations & composition",
     when: "Role tokens and shared layout primitives, not a second set of component sizes.",
     contract:
-      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Action items, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
+      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Content rows, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
     sources: ["design-system.css", "surface-lighting.css"],
     examples: [
       {
@@ -532,48 +526,54 @@ export const entries: CatalogueEntry[] = [
     ],
   },
   {
-    id: "action-item",
+    id: "content-row",
     compareButtonSizes: true,
-    title: "Action item",
-    when: "Rows in menus, navigation, trees and action lists. Selected, hovered and keyboard-focused rows have a subtle directional rim reflection; idle rows stay plain. Use compound when a row has separately actionable leading or trailing controls.",
+    title: "Content row",
+    when: "Menu items, navigation entries, action rows, tree entries, standalone information and disclosure summaries. Compact is a single-line pill; multiline is an intrinsic-height soft rectangle. Both share selection, keyboard focus and quiet directional lighting.",
     contract:
-      "Choose native buttons or anchors for actions. Caller owns roles, href/type, selection and integration attributes. Never nest buttons. Single rows retain their content spacing with primary: false, without gaining primary-action styling. Labels and descriptions are plain text. leadingHtml and trailingHtml fill bounded icon/status and metadata slots; neither can replace the label anatomy. A sole hidden element in trailingHtml collapses the metadata slot and its gap while preserving the element as a server-update target. tone: danger is the semantic destructive treatment. Long labels reveal on engagement. Compound leadingActionsHtml controls are always visible and sit before the primary action, for markers that are their own button. Compound engaged controls reveal on hover, keyboard focus, or touch, and stay visible while their popover is open. Desktop titles use the idle control space; revealing controls does not resize the item.",
+      "kind chooses compact or multiline, never the number of actions. Compact labels truncate and reveal on engagement; multiline labels and optional descriptions wrap. element supplies native semantics (button/a/div/span); primary: false renders information without primary-action behavior. For independent controls, supply primary as an element instead of element, with optional leadingActionsHtml and engagedActionsHtml. Never nest buttons. Plain labels/descriptions are escaped; leadingHtml and trailingHtml fill bounded visual/status slots. A sole hidden trailing element collapses its slot while preserving its update target. Roles, selection and integration attributes belong to the caller; no class/style overrides. Use Disclosure for native open/close and guttered content, not a hand-built summary. Search terms: row, menu item, list item, action item, navigation row, compact, multiline.",
     imports: {
-      "action-item": "actionItemHtml",
+      "content-row": "contentRowHtml",
       button: "buttonHtml",
       "copy-button": "copyButtonHtml",
       icons: "Icons",
     },
     examples: [
       {
-        title: "Single · semantic · disabled · compound long label with hidden status",
+        title: "Same long label · compact truncation versus multiline wrapping",
+        render: () => '<div class="form-section">' +
+          contentRowHtml({ kind: "compact", element: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "packages/design-system/src/content-row/content-row-html.ts" } }) +
+          contentRowHtml({ kind: "multiline", element: { tag: "button", attributesHtml: 'type="button"' }, label: { kind: "text", text: "packages/design-system/src/content-row/content-row-html.ts" }, description: "A wrapping row with a soft rectangular shape. Hover and focus keep the same shared lighting as the compact pill." }) + '</div>',
+      },
+      {
+        title: "Compact · multiline information · disabled · independent controls",
         render: () =>
           '<div class="action-list">' +
-          actionItemHtml({
-            kind: "single",
+          contentRowHtml({
+            kind: "compact",
             element: { tag: "button", attributesHtml: 'type="button"' },
             label: { kind: "text", text: "Open workspace" },
           }) +
-          actionItemHtml({
-            kind: "single",
+          contentRowHtml({
+            kind: "multiline",
             primary: false,
             element: { tag: "div" },
             leadingHtml: '<span class="status-dot running" aria-label="In progress"></span>',
             label: { kind: "text", text: "Reading workspace files" },
-            description: "Non-interactive single row with the same content spacing.",
+            description: "This information stays readable at narrow widths. Its height follows the text, without turning into a pill when the text happens to fit.",
             trailingHtml: "In progress",
           }) +
-          actionItemHtml({
-            kind: "single",
+          contentRowHtml({
+            kind: "compact",
             element: {
               tag: "button",
               attributesHtml: 'type="button" disabled',
             },
             label: { kind: "text", text: "Unavailable action" },
           }) +
-          actionItemHtml({
-            kind: "compound",
-            primary: { tag: "a", attributesHtml: 'href="#action-item"' },
+          contentRowHtml({
+            kind: "compact",
+            primary: { tag: "a", attributesHtml: 'href="#content-row"' },
             label: {
               kind: "text",
               text: "A very long record name that needs to remain readable inside a narrow container",
@@ -584,8 +584,8 @@ export const entries: CatalogueEntry[] = [
               copyText: "Long record name",
             }),
           }) +
-          actionItemHtml({
-            kind: "compound",
+          contentRowHtml({
+            kind: "compact",
             primary: { tag: "button", attributesHtml: 'type="button"' },
             label: { kind: "text", text: "Row with a leading control" },
             leadingActionsHtml: buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Star, label: "Favorite" } }),
@@ -595,15 +595,36 @@ export const entries: CatalogueEntry[] = [
     ],
   },
   {
+    id: "disclosure", title: "Disclosure",
+    when: "Open and close related prose, forms, tool output or nested records in place. Either Content row presentation can be the summary.",
+    contract: "Native details/summary. summary.kind is compact or multiline; Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
+    imports: { disclosure: "disclosureHtml", button: "buttonHtml" },
+    sources: ["disclosure/disclosure.css"],
+    examples: [
+      {
+        title: "Compact summary · multiline body · native keyboard disclosure",
+        render: () => disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Compaction summary" } }, bodyHtml: '<div class="markdown"><p>The row presentation and disclosure state are independent.</p><ul><li>A compact summary stays a pill.</li><li>Its revealed content uses the same gutter, however many lines it contains.</li></ul></div>', open: true }),
+      },
+      {
+        title: "Multiline summary · wrapping provider description · account action",
+        render: () => disclosureHtml({ summary: { kind: "multiline", label: { kind: "text", text: "OpenAI" }, description: "Connected with your subscription. Usage is shared across the models you use with this account.", trailingHtml: comparisonRingHtml({ caption: "5h", referencePercent: 60, valuePercent: 32, label: "5-hour limit: 60% of the period elapsed, 32% used" }) }, bodyHtml: '<div class="form-section"><p>5-hour limit: 32% used. Resets in 2h.</p><div>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Account settings" } }) + '</div></div>', open: true }),
+      },
+      {
+        title: "Nested disclosures · shared gutter keeps the hierarchy visible",
+        render: () => disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Completed · 1m23s" } }, bodyHtml: '<p>I checked the Models panel and the shared row styles.</p>' + disclosureHtml({ summary: { kind: "multiline", label: { kind: "text", text: "read · packages/design-system/src/content-row/content-row-html.ts" } }, bodyHtml: '<pre><code>contentRowHtml({ kind: "multiline", … })</code></pre>', open: true }), open: true }),
+      },
+    ],
+  },
+  {
     id: "add-badge", title: "Add badge", when: "Lead a row that creates something new, so it stands apart from rows for existing things.",
-    contract: "Usually an action item's leadingHtml. Decorative: the row's label names the action. Grows slightly while its action item is hovered. --add-badge-size exposes its size for aligning it with neighbouring icons or text.",
-    imports: { "add-badge": "addBadgeHtml", "action-item": "actionItemHtml", icons: "Icons" },
+    contract: "Usually a content row's leadingHtml. Decorative: the row's label names the action. Grows slightly while its content row is hovered. --add-badge-size exposes its size for aligning it with neighbouring icons or text.",
+    imports: { "add-badge": "addBadgeHtml", "content-row": "contentRowHtml", icons: "Icons" },
     sources: ["add-badge/add-badge.css"],
     examples: [{
       title: "Leading a create row",
       render: () => '<div class="action-list">'
-        + actionItemHtml({ kind: "single", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: addBadgeHtml(), label: { kind: "text", text: "New workspace" } })
-        + actionItemHtml({ kind: "single", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: Icons.Cloud, label: { kind: "text", text: "Existing workspace" } })
+        + contentRowHtml({ kind: "compact", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: addBadgeHtml(), label: { kind: "text", text: "New workspace" } })
+        + contentRowHtml({ kind: "compact", element: { tag: "button", attributesHtml: 'type="button"' }, leadingHtml: Icons.Cloud, label: { kind: "text", text: "Existing workspace" } })
         + "</div>",
     }],
   },
@@ -902,7 +923,7 @@ export const entries: CatalogueEntry[] = [
     when: "Compact choices anchored to a disclosure. Prefer popupHtml: one call owns trigger, anchor, ARIA and native popover behavior.",
     contract:
       "Unique id per instance. Items need menuitem or menuitemradio roles and native actions. Escape closes; arrows move through enabled items. Placement flips at viewport edges. Trigger captions stay on one line and truncate in constrained containers; menus expose the full choices. The package owns trigger linkage and positioning; trigger.attributesHtml and menuAttributesHtml connect application behavior without supplying class or style. Try the REAL viewport corners in the edge laboratory.",
-    imports: { popup: "popupHtml", "action-item": "actionItemHtml" },
+    imports: { popup: "popupHtml", "content-row": "contentRowHtml" },
     examples: [
       {
         title: "Constrained trigger · single-line caption",
@@ -910,7 +931,7 @@ export const entries: CatalogueEntry[] = [
           id: `catalogue-popup-constrained${idSuffix}`,
           label: "Model",
           trigger: { variant: "secondary", content: { kind: "caption", caption: "An unusually long model name" } },
-          contentHtml: actionItemHtml({ kind: "single", label: { kind: "text", text: "An unusually long model name" }, element: { tag: "button", attributesHtml: 'type="button" role="menuitemradio" aria-checked="true"' } }),
+          contentHtml: contentRowHtml({ kind: "compact", label: { kind: "text", text: "An unusually long model name" }, element: { tag: "button", attributesHtml: 'type="button" role="menuitemradio" aria-checked="true"' } }),
         })}</div>`,
       },
       {
@@ -929,8 +950,8 @@ export const entries: CatalogueEntry[] = [
               "Unavailable",
             ]
               .map((text, index) =>
-                actionItemHtml({
-                  kind: "single",
+                contentRowHtml({
+                  kind: "compact",
                   label: { kind: "text", text },
                   element: {
                     tag: "button",
@@ -1025,7 +1046,7 @@ export const entries: CatalogueEntry[] = [
       "Results provide listbox semantics; caller supplies options, combobox linkage and keyboard selection. Return HTML in a Turbo Frame. Message is a separate variant, optionally role status. No search protocol is hidden here.",
     imports: {
       autocomplete: "autocompleteHtml",
-      "action-item": "actionItemHtml",
+      "content-row": "contentRowHtml",
     },
     examples: [
       {
@@ -1034,8 +1055,8 @@ export const entries: CatalogueEntry[] = [
           autocompleteHtml({
             kind: "results",
             label: "Repositories",
-            contentHtml: actionItemHtml({
-              kind: "single",
+            contentHtml: contentRowHtml({
+              kind: "compact",
               label: { kind: "text", text: "agents-in-the-cloud/design-system" },
               element: {
                 tag: "div",
@@ -1101,7 +1122,7 @@ export const entries: CatalogueEntry[] = [
   {
     id: "managed-list",
     title: "Managed list",
-    when: "Non-selectable records with metadata and actions. Use Action item when the row itself is actionable.",
+    when: "Non-selectable records with metadata and actions. Use Content row when the row itself is actionable.",
     contract:
       "CSS anatomy: managed-list, __filter, __items, __item, __content, __label / __label-text, __description, __meta, __actions, __empty. Local filter uses data-search-text or row text. Server search sets data-managed-list-server-filter=true and uses Turbo. __label-text truncates.",
     sources: [
@@ -1174,7 +1195,7 @@ export const entries: CatalogueEntry[] = [
     contract:
       "data-controller=linear-navigation on the sequence; data-linear-navigation-target=item on focusable children. Up/Down move without wrapping; hidden, disabled and aria-disabled items are skipped. This does not implement selection or a tree protocol.",
     sources: ["linear-navigation/linear-navigation-controller.ts"],
-    imports: { "action-item": "actionItemHtml" },
+    imports: { "content-row": "contentRowHtml" },
     examples: [
       {
         title: "Focus, then Up / Down",
@@ -1182,8 +1203,8 @@ export const entries: CatalogueEntry[] = [
           '<div class="action-list" data-controller="linear-navigation">' +
           ["First", "Second", "Last"]
             .map((text) =>
-              actionItemHtml({
-                kind: "single",
+              contentRowHtml({
+                kind: "compact",
                 element: {
                   tag: "button",
                   attributesHtml:

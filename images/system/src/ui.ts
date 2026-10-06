@@ -1,7 +1,6 @@
 import { actionLinkHtml } from "../../../packages/design-system/src/action-link/action-link-html.ts";
 import { buttonHtml } from "../../../packages/design-system/src/button/button-html.ts";
-import { actionItemHtml } from "../../../packages/design-system/src/action-item/action-item-html.ts";
-import { Icons } from "../../../packages/design-system/src/icons/icons-html.ts";
+import { disclosureHtml } from "../../../packages/design-system/src/disclosure/disclosure-html.ts";
 import { escapeHtml } from "../../../packages/shared/src/html.ts";
 import type { AgentsInTheCloudTheme } from "../../../packages/shared/src/theme.ts";
 
@@ -23,7 +22,6 @@ h1 { margin:0; color:var(--text-bright); font:var(--weight-semibold) var(--text-
 .system-detail { display:block; margin-top:4px; color:var(--text-muted); font-size:var(--text-code); overflow-wrap:anywhere; }
 .system-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
 .system-foldout { margin-top:8px; }
-.system-foldout-body { padding:12px; overflow-wrap:anywhere; }
 .system-error { color:var(--danger); }
 .system-log { font:var(--text-code)/var(--leading-standard) var(--font-mono); }
 input { width:min(100%,32rem); }
@@ -48,7 +46,7 @@ export interface SupervisorView {
 }
 
 function foldout(id: string, label: string, body: string): string {
-  return `<details class="system-foldout" id="${id}">${actionItemHtml({ kind: "single", element: { tag: "summary" }, leadingHtml: Icons.Disclosure, label: { kind: "text", text: label } })}<div class="system-foldout-body">${body}</div></details>`;
+  return `<div class="system-foldout">${disclosureHtml({ element: { id }, summary: { kind: "compact", label: { kind: "text", text: label } }, bodyHtml: body })}</div>`;
 }
 
 export function supervisorFragment(view: SupervisorView): string {

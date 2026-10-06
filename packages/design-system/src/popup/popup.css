@@ -9,9 +9,9 @@
 .popup-menu-anchor > .button > .button__caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .popup-menu { visibility: hidden; }
 
-.popup-menu .action-item.is-danger { color: var(--danger); }
-.popup-menu .action-item.is-danger:not(:disabled):not([aria-disabled="true"]):hover,
-.popup-menu .action-item.is-danger:not(:disabled):not([aria-disabled="true"]):focus-visible { background: var(--danger-soft); color: var(--danger); }
+.popup-menu .content-row.is-danger { color: var(--danger); }
+.popup-menu .content-row.is-danger:not(:disabled):not([aria-disabled="true"]):hover,
+.popup-menu .content-row.is-danger:not(:disabled):not([aria-disabled="true"]):focus-visible { background: var(--danger-soft); color: var(--danger); }
 .popup-menu__icon { width: 16px; height: 16px; flex: 0 0 auto; display: grid; place-items: center; color: var(--text); }
 .popup-menu__icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .popup-menu__separator { height: 1px; margin: 4px 8px; border: 0; background: var(--line); }

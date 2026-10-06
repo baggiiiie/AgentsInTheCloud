@@ -1,4 +1,4 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
@@ -108,8 +108,8 @@ function renderEntryRow(workspaceId: string, viewId: string, entry: FileEntry, e
     : entry.openable ? ' data-action="files-view#collapse"' : "";
   const selectedAttribute = entry.path === selectedPath ? ' aria-selected="true"' : "";
   const size = entry.kind === "directory" ? "" : `<span class="files-row-size">${formatBytes(entry.size)}</span>`;
-  return actionItemHtml({
-    kind: "single",
+  return contentRowHtml({
+    kind: "compact",
     primary: Boolean(destination),
     leadingHtml: `<span class="files-row-icon" aria-hidden="true">${icon}</span>`,
     label: { kind: "text", text: entry.name },

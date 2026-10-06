@@ -126,12 +126,12 @@ class CatalogueController extends Controller<HTMLElement> {
     const status = tab.querySelector<HTMLElement>(".tab-strip__status")!;
     demo.querySelector<HTMLInputElement>("[data-tab-busy]")!.checked = !status.querySelector<HTMLElement>(".running")!.hidden;
     demo.querySelector<HTMLInputElement>("[data-tab-attention]")!.checked = !status.querySelector<HTMLElement>(".attention")!.hidden;
-    demo.querySelector("[data-tab-selected-title]")!.textContent = tab.querySelector(".action-item__label-text")!.textContent;
+    demo.querySelector("[data-tab-selected-title]")!.textContent = tab.querySelector(".content-row__label-text")!.textContent;
   }
   tabStatus(event: Event): void {
     // SAFETY: This change action is bound to the specimen's native checkboxes.
     const demo = (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-catalogue-tab-demo]")!;
-    setTabStatus(demo.querySelector<HTMLElement>('.action-item:has([aria-selected="true"])')!, {
+    setTabStatus(demo.querySelector<HTMLElement>('.content-row:has([aria-selected="true"])')!, {
       busy: demo.querySelector<HTMLInputElement>("[data-tab-busy]")!.checked,
       requestingAttention: demo.querySelector<HTMLInputElement>("[data-tab-attention]")!.checked,
     });

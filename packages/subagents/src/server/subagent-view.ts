@@ -1,9 +1,10 @@
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import type { AgentLivePresentationSubscription, AgentRouteHandler } from "@agents-in-the-cloud/builtin-agent/server";
 import { ids } from "@agents-in-the-cloud/agent/server";
 import { listWorkspaceAgents } from "@agents-in-the-cloud/builtin-agent/server";
 import { requestAcceptsJson, type JsonValue } from "@agents-in-the-cloud/core";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
+import type { DisclosureSummary } from "@agents-in-the-cloud/design-system/disclosure";
 import type { WorkspaceModuleWorkViewAdapter, WorkspaceWorkViewPresentation } from "@agents-in-the-cloud/shared";
 import { createLivePresentation, escapeHtml as h } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
@@ -49,15 +50,16 @@ export const handleSubagentRequest: AgentRouteHandler = async (request, url) => 
 };
 
 function childrenId(workspaceId: string, parentId: string): string { return `subagent-children-${workspaceId}-${parentId}`; }
-function summaryHtml(agent: SubagentRecord, agents: SubagentRecord[]): string {
+function branchSummary(agent: SubagentRecord, agents: SubagentRecord[]): DisclosureSummary {
   const tone = agent.status === "running" || agent.status === "pending" ? "running" : agent.status === "failed" ? "danger" : agent.status === "completed" ? "success" : "";
-  return actionItemHtml({ kind: "single", element: { tag: "summary", attributesHtml: `id="subagent-summary-${h(agent.id)}"` }, leadingHtml: Icons.Disclosure, label: { kind: "text", text: viewPath(agents, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` });
+  return { kind: "multiline", attributesHtml: `id="subagent-summary-${h(agent.id)}"`, label: { kind: "text", text: viewPath(agents, agent.id) }, trailingHtml: `<span class="subagent-state"><span class="status-dot ${tone}"></span>${h(agent.status)}</span>` };
 }
 function branchHtml(workspaceId: string, agent: SubagentRecord, agents: SubagentRecord[], open: Set<string>): string {
-  return `<details id="subagent-${h(agent.id)}" class="subagent-branch" data-subagent-id="${h(agent.id)}" data-subagents-target="branch"${open.has(agent.id) ? " open" : ""}>
-    ${summaryHtml(agent, agents)}
-    <div class="subagent-branch-body"><div id="${ids.transcript({ workspaceId, agentId: agent.id })}" class="agent-transcript" data-turbo-permanent></div>${childrenHtml(workspaceId, agent.id, agents, open)}</div>
-  </details>`;
+  return `<div class="subagent-branch">${disclosureHtml({
+    element: { id: `subagent-${agent.id}`, attributesHtml: `data-subagent-id="${h(agent.id)}" data-subagents-target="branch"` },
+    summary: branchSummary(agent, agents), open: open.has(agent.id),
+    bodyHtml: `<div id="${ids.transcript({ workspaceId, agentId: agent.id })}" class="agent-transcript" data-turbo-permanent></div>${childrenHtml(workspaceId, agent.id, agents, open)}`,
+  })}</div>`;
 }
 function childrenHtml(workspaceId: string, parentId: string, agents: SubagentRecord[], open: Set<string>): string {
   return `<div id="${h(childrenId(workspaceId, parentId))}" class="action-list subagent-list">${agents.filter((agent) => agent.parentId === parentId).map((agent) => branchHtml(workspaceId, agent, agents, open)).join("")}</div>`;

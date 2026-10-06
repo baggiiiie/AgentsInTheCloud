@@ -1,34 +1,34 @@
 .tab-strip { display: flex; flex: 1; align-self: stretch; align-items: center; min-width: 0; padding-block: 4px; }
 .tab-strip__tabs { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
 /* Content-sized short tabs; longer tabs shrink to 7rem before scrolling. */
-.tab-strip__tabs > .action-item { --tab-content-width: 20rem; flex: 0 1 min(20rem, var(--tab-content-width)); min-width: min(7rem, var(--tab-content-width)); user-select: none; -webkit-user-select: none; }
-.tab-strip__tabs > .action-item > .action-item__primary { padding-inline-end: 0; }
+.tab-strip__tabs > .content-row { --tab-content-width: 20rem; flex: 0 1 min(20rem, var(--tab-content-width)); min-width: min(7rem, var(--tab-content-width)); user-select: none; -webkit-user-select: none; }
+.tab-strip__tabs > .content-row > .content-row__primary { padding-inline-end: 0; }
 .tab-strip__status { display: inline-flex; }
 .tab-strip__status[hidden], .tab-strip__status [hidden] { display: none; }
-.tab-strip__tabs .action-item__primary:has(> .action-item__metadata > .tab-strip__status:not([hidden])) > .action-item__content { flex: 0 1 auto; }
+.tab-strip__tabs .content-row__primary:has(> .content-row__metadata > .tab-strip__status:not([hidden])) > .content-row__content { flex: 0 1 auto; }
 /* A title without a status marker needs its own trailing breathing room. */
-.tab-strip__tabs > .action-item:not(:has(> .action-item__primary > .action-item__metadata > .tab-strip__status:not([hidden]))) { padding-inline-end: 8px; }
+.tab-strip__tabs > .content-row:not(:has(> .content-row__primary > .content-row__metadata > .tab-strip__status:not([hidden]))) { padding-inline-end: 8px; }
 @media (min-width: 701px) and (hover: hover) and (pointer: fine) {
   /* Close replaces status, never changes intrinsic width, and frees title space. */
-  .tab-strip__tabs > .action-item:has(> .action-item__actions--engaged):is(:hover, :has(:focus-visible), :has(> .action-item__actions--engaged :popover-open)) > .action-item__primary > .action-item__metadata { display: none; }
+  .tab-strip__tabs > .content-row:has(> .content-row__actions--engaged):is(:hover, :has(:focus-visible), :has(> .content-row__actions--engaged :popover-open)) > .content-row__primary > .content-row__metadata { display: none; }
 }
 @media (max-width: 700px), (hover: none), (pointer: coarse) {
   /* Touch reveals close through selection, not hover. Unselected tabs keep status. */
-  .tab-strip__tabs > .action-item { padding-inline-end: 8px; }
-  .tab-strip__tabs > .action-item:has(> .action-item__actions--engaged) > .action-item__primary { flex: 1; }
-  .tab-strip__tabs .action-item__actions--engaged { display: none; position: static; }
-  .tab-strip__tabs > .action-item:has(> .action-item__primary[aria-selected="true"]) > .action-item__actions--engaged { display: flex; opacity: 1; pointer-events: auto; }
-  .tab-strip__tabs > .action-item:has(> .action-item__primary[aria-selected="true"] + .action-item__actions--engaged) > .action-item__primary > .action-item__metadata { display: none; }
+  .tab-strip__tabs > .content-row { padding-inline-end: 8px; }
+  .tab-strip__tabs > .content-row:has(> .content-row__actions--engaged) > .content-row__primary { flex: 1; }
+  .tab-strip__tabs .content-row__actions--engaged { display: none; position: static; }
+  .tab-strip__tabs > .content-row:has(> .content-row__primary[aria-selected="true"]) > .content-row__actions--engaged { display: flex; opacity: 1; pointer-events: auto; }
+  .tab-strip__tabs > .content-row:has(> .content-row__primary[aria-selected="true"] + .content-row__actions--engaged) > .content-row__primary > .content-row__metadata { display: none; }
 }
 /* These masks are independent: strip edges fade clipped tabs; title edges fade text,
    leaving status and close controls crisp. The controller removes fades at the end. */
-.tab-strip__tabs, .tab-strip__tabs .action-item .action-item__label {
+.tab-strip__tabs, .tab-strip__tabs .content-row .content-row__label {
   --tab-fade-left: 0px;
   --tab-fade-right: 0px;
   mask-image: linear-gradient(to right, transparent, black var(--tab-fade-left), black calc(100% - var(--tab-fade-right)), transparent);
 }
 .tab-strip__tabs[data-cut-left] { --tab-fade-left: 20px; }
 .tab-strip__tabs[data-cut-right] { --tab-fade-right: 24px; }
-.tab-strip__tabs .action-item .action-item__label-text { text-overflow: clip; }
-.tab-strip__tabs .action-item[data-title-cut-left] .action-item__label { --tab-fade-left: 12px; }
-.tab-strip__tabs .action-item[data-title-cut-right] .action-item__label { --tab-fade-right: 16px; }
+.tab-strip__tabs .content-row .content-row__label-text { text-overflow: clip; }
+.tab-strip__tabs .content-row[data-title-cut-left] .content-row__label { --tab-fade-left: 12px; }
+.tab-strip__tabs .content-row[data-title-cut-right] .content-row__label { --tab-fade-right: 16px; }

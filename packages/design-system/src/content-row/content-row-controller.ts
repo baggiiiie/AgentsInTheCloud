@@ -2,12 +2,12 @@
 
 import { Controller } from "@hotwired/stimulus";
 
-const actionItemSelector = ".action-item";
-const labelSelector = ".action-item__label";
-const labelTextSelector = ".action-item__label-text";
+const contentRowSelector = ".content-row--compact";
+const labelSelector = ".content-row__label";
+const labelTextSelector = ".content-row__label-text";
 const scrollingClass = "is-label-scrolling";
 
-export class ActionItemController extends Controller<HTMLElement> {
+export class ContentRowController extends Controller<HTMLElement> {
   connect(): void {
     this.element.addEventListener("mouseover", this.startLabelScroll);
     this.element.addEventListener("mouseout", this.stopPointerLabelScroll);
@@ -26,24 +26,24 @@ export class ActionItemController extends Controller<HTMLElement> {
 
   private readonly preserveBrowserState = (event: Event): void => {
     const item = event.target;
-    if (!(item instanceof HTMLElement) || !item.matches(actionItemSelector)) return;
+    if (!(item instanceof HTMLElement) || !item.matches(contentRowSelector)) return;
     // SAFETY: Turbo's before-morph-element event supplies newElement except for removals.
     const { newElement } = (event as CustomEvent<{ newElement?: Element }>).detail;
-    if (!(newElement instanceof HTMLElement) || !newElement.matches(actionItemSelector)) return;
-    const actionsWidth = item.style.getPropertyValue("--action-item-actions-width");
-    if (actionsWidth) newElement.style.setProperty("--action-item-actions-width", actionsWidth);
+    if (!(newElement instanceof HTMLElement) || !newElement.matches(contentRowSelector)) return;
+    const actionsWidth = item.style.getPropertyValue("--content-row-actions-width");
+    if (actionsWidth) newElement.style.setProperty("--content-row-actions-width", actionsWidth);
     if (!item.classList.contains(scrollingClass)) return;
     // Merge only browser-owned animation state into the incoming markup. Keeping
     // the animation applied continuously preserves its progress, while allowing
     // server-owned classes, styles, and contents to morph normally.
     newElement.classList.add(scrollingClass);
-    for (const property of ["--action-item-label-scroll-distance", "--action-item-label-scroll-duration"]) {
+    for (const property of ["--content-row-label-scroll-distance", "--content-row-label-scroll-duration"]) {
       newElement.style.setProperty(property, item.style.getPropertyValue(property));
     }
   };
 
   private transitionedItem(event: MouseEvent | FocusEvent): HTMLElement | null {
-    const item = event.target instanceof Element ? event.target.closest<HTMLElement>(actionItemSelector) : null;
+    const item = event.target instanceof Element ? event.target.closest<HTMLElement>(contentRowSelector) : null;
     return item && !(event.relatedTarget instanceof Node && item.contains(event.relatedTarget)) ? item : null;
   }
 
@@ -55,8 +55,8 @@ export class ActionItemController extends Controller<HTMLElement> {
     if (!viewport || !text) return;
     const distance = text.scrollWidth - viewport.clientWidth;
     if (distance <= 0) return;
-    item.style.setProperty("--action-item-label-scroll-distance", `${distance}px`);
-    item.style.setProperty("--action-item-label-scroll-duration", `${Math.max(2.5, distance / 64 + 0.8)}s`);
+    item.style.setProperty("--content-row-label-scroll-distance", `${distance}px`);
+    item.style.setProperty("--content-row-label-scroll-duration", `${Math.max(2.5, distance / 64 + 0.8)}s`);
     item.classList.add(scrollingClass);
   };
 
@@ -70,7 +70,7 @@ export class ActionItemController extends Controller<HTMLElement> {
   };
 }
 
-/** Updates the plain label of an existing Action item without exposing its anatomy. */
-export function setActionItemLabel(element: HTMLElement, text: string): void {
+/** Updates the plain label of an existing Content row without exposing its anatomy. */
+export function setContentRowLabel(element: HTMLElement, text: string): void {
   element.querySelector<HTMLElement>(labelTextSelector)!.textContent = text;
 }

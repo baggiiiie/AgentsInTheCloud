@@ -52,7 +52,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
         let branch = this.branchTargets.find((branch) => branch.dataset.subagentId === this.reveal);
         while (branch) {
           this.expanded.add(branch.dataset.subagentId!);
-          branch = branch.parentElement!.closest<HTMLDetailsElement>(".subagent-branch") ?? undefined;
+          branch = branch.parentElement!.closest<HTMLDetailsElement>("details[data-subagent-id]") ?? undefined;
         }
       }
       for (const branch of this.branchTargets) branch.open = this.expanded.has(branch.dataset.subagentId!);
@@ -67,7 +67,7 @@ export function createSubagentsController(Controller: WorkspaceClientControllerC
     private syncChildren(): void {
       for (const branch of this.branchTargets) {
         const id = branch.dataset.subagentId!;
-        const visible = this.tree && branch.open && !branch.parentElement!.closest(".subagent-branch:not([open])");
+        const visible = this.tree && branch.open && !branch.parentElement!.closest("details[data-subagent-id]:not([open])");
         const child = this.children.get(id);
         if (!visible) { child?.subscription.unsubscribe(); this.children.delete(id); continue; }
         if (child?.branch === branch) continue;

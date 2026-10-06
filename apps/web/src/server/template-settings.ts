@@ -1,5 +1,6 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { invalidArguments } from "@agents-in-the-cloud/core";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
@@ -46,7 +47,7 @@ function navigation(id: string, section: TemplateSettingsSection, caption: strin
 }
 function record(id: string, section: TemplateSettingsSection, editor: string, label: string, description = "", status = ""): string {
   const noteId = `template_settings_record_note_${section}_${encodeURIComponent(editor)}`;
-  const action = actionItemHtml({ kind: "single", label: { kind: "text", text: label }, trailingHtml: escapeHtml(status), element: { tag: "a", attributesHtml: `href="${templateSettingsUrl(id, section, editor)}" data-turbo-frame="${templateSettingsFrameId}" data-template-settings-record="${escapeHtml(editor || section)}"${description ? ` aria-describedby="${escapeHtml(noteId)}"` : ""}` } });
+  const action = contentRowHtml({ kind: "compact", label: { kind: "text", text: label }, trailingHtml: escapeHtml(status), element: { tag: "a", attributesHtml: `href="${templateSettingsUrl(id, section, editor)}" data-turbo-frame="${templateSettingsFrameId}" data-template-settings-record="${escapeHtml(editor || section)}"${description ? ` aria-describedby="${escapeHtml(noteId)}"` : ""}` } });
   return description ? `<div class="template-settings-record">${action}<p class="template-settings-record-note" id="${escapeHtml(noteId)}">${escapeHtml(description)}</p></div>` : action;
 }
 interface EditorFormOptions {
@@ -82,14 +83,14 @@ function secretEditor(t: WorkspaceTemplateConfiguration, secret?: WorkspaceTempl
     ${field(secret?.configured ? "Replace secret value" : "Secret value", "secretValue", "", `type="password" autocomplete="new-password" data-1p-ignore${isNew ? ' required' : ''}`)}
     ${paragraph(secret?.configured ? "Leave the value blank to keep the stored secret. Stored values are never shown." : isNew ? "Required secrets need a value. Optional secrets can be added without one. Agents only see a placeholder." : "Agents only see a placeholder. Add the real value here when it’s available.")}
     ${selection("Requirement", "optional", String(secret?.optional ?? false), [{ value: "false", label: "Required" }, { value: "true", label: "Optional" }])}
-    <details><summary>Advanced</summary><div class="form-stack">
+    ${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Advanced" } }, bodyHtml: `<div class="form-stack">
       ${field("Placeholder", "placeholder", secret?.placeholder ?? "", 'autocomplete="off"')}
       ${paragraph("Leave blank to use an automatically generated placeholder.")}
       ${textarea("Needed for", "annotation", secret?.annotation ?? "", 2)}
       <div class="form-section"><span>Allow substitution in URL paths</span><input type="hidden" name="allowInPath" value="${permission}"${isNew ? ' data-workspace-template-secret-path-target="permission"' : ""}>
       ${toggleHtml({ variant: "button", label: "Allow substitution in URL paths", name: "allowInPath", value: permission, options: [{ value: "false", label: "Disallow" }, { value: "true", label: "Allow" }], element: { dataAction: `${isNew ? "click->workspace-template-secret-path#choose change->workspace-template-secret-path#choose " : ""}change->template-settings#toggleChanged`, data: isNew ? { "workspace-template-secret-path-target": "toggle" } : undefined } })}</div>
       ${paragraph("Allow only if the service needs this secret in its URL path, rather than headers or the request body.")}
-    </div></details>`;
+    </div>` })}`;
   return `${secret ? paragraph(secret.configured ? "Secret stored" : secretNeedsValue(secret) ? "Required secret — needs a value" : "Optional secret — no value stored") : ""}${form(t.id, `/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`, content, { section: "secrets", saved, editor: secret?.id, caption: isNew ? "Add secret" : "Save changes", attributesHtml: isNew ? 'data-controller="workspace-template-secret-path" data-template-settings-new-secret' : "" })}${secret ? removeForm(t.id, `/secrets/${encodeURIComponent(secret.id)}/delete`, "secrets", "Delete secret", `Delete ${secret.envName} and its stored value. Requests using it will no longer receive this secret.`) : ""}`;
 }
 
@@ -110,7 +111,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
   let backSection: TemplateSettingsSection = "index";
   if (section === "index") {
     content = `<nav class="action-list" aria-label="Template settings sections">${sections.map(([value, label]) => value === "developer" ? `<div hidden data-template-settings-target="developer">${record(id, value, "", label)}</div>` : record(id, value, "", label)).join("")}</nav>`;
-    content += `<details${location.section === "danger" ? " open" : ""}><summary>Delete template</summary>${references.length ? paragraph(`Delete ${references.length === 1 ? `workspace “${references[0]!.title}”` : `${references.length} workspaces`} first. This template is still in use.`) : removeForm(id, "/delete", section, "Delete template", `Permanently delete template “${t.name}”, including its secrets and SSH keys.`)}</details>`;
+    content += disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Delete template" } }, open: location.section === "danger", bodyHtml: references.length ? paragraph(`Delete ${references.length === 1 ? `workspace “${references[0]!.title}”` : `${references.length} workspaces`} first. This template is still in use.`) : removeForm(id, "/delete", section, "Delete template", `Permanently delete template “${t.name}”, including its secrets and SSH keys.`) });
   } else if (section === "developer") {
     content = form(id, "/seed-config", `${selection("Atelier-in-Atelier seeding", "seedConfigEnabled", String(t.seedConfigEnabled ?? false), [{ value: "false", label: "Off" }, { value: "true", label: "On" }])}${paragraph("Allows this repository’s manifest to copy model-provider credentials and saved template configuration into new workspaces. Only enable for repositories and agents you trust.")}${paragraph("Disabling this does not remove credentials already copied into existing workspaces.")}`, { section, saved });
   } else if (section === "general") {
@@ -150,7 +151,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
         content += removeForm(id, `/ssh-keys/${encodeURIComponent(key.id)}/delete`, section, "Remove key", `Remove SSH key “${key.name || key.keyType}”. Connections relying on it may stop working.`);
       }
     } else {
-      content = `${paragraph("Keys and trusted server identities for SSH connections. Changes also apply to existing workspaces.")}<div class="template-settings-toolbar"><span>${keys.length} ${keys.length === 1 ? "key" : "keys"}</span>${navigation(id, section, "Add key", "new")}</div><div class="action-list">${keys.map(k => record(id, section, k.id, k.name || "Unnamed key", "", `${k.keyType} · Stored`)).join("")}</div>${keys.length ? "" : paragraph("No SSH keys yet.")}<details${location.section === "ssh-keys" || saved ? " open" : ""}><summary>Trusted SSH servers${knownHosts.trim() ? " · Configured" : " · None configured"}</summary>${form(id, "/ssh-known-hosts", `${paragraph("Paste known_hosts entries for servers you trust. Changing a server’s key requires trusting its new identity.")}${textarea("Known hosts", "knownHosts", knownHosts, 7, 'spellcheck="false"')}`, { section, saved })}</details>`;
+      content = `${paragraph("Keys and trusted server identities for SSH connections. Changes also apply to existing workspaces.")}<div class="template-settings-toolbar"><span>${keys.length} ${keys.length === 1 ? "key" : "keys"}</span>${navigation(id, section, "Add key", "new")}</div><div class="action-list">${keys.map(k => record(id, section, k.id, k.name || "Unnamed key", "", `${k.keyType} · Stored`)).join("")}</div>${keys.length ? "" : paragraph("No SSH keys yet.")}${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: `Trusted SSH servers${knownHosts.trim() ? " · Configured" : " · None configured"}` } }, open: location.section === "ssh-keys" || saved, bodyHtml: form(id, "/ssh-known-hosts", `${paragraph("Paste known_hosts entries for servers you trust. Changing a server’s key requires trusting its new identity.")}${textarea("Known hosts", "knownHosts", knownHosts, 7, 'spellcheck="false"')}`, { section, saved }) })}`;
     }
   } else {
     content = paragraph("Container changes apply to new workspaces. Existing containers stay unchanged.");

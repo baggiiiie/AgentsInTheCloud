@@ -1,6 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response } from "@agents-in-the-cloud/shared/http";
@@ -62,7 +62,7 @@ export const handleDurableHistoryRequest: AgentRouteHandler = async (request, ur
       const gates = await history.owner.admission();
       for (const record of await history.owner.catalog()) {
         const state = gates?.deleted ? "Deleted workspace" : gates?.closed.includes(record.durableId) ? "Closed conversation" : "Conversation";
-        rows.push(actionItemHtml({ kind: "single", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.agentId)}"` } }));
+        rows.push(contentRowHtml({ kind: "multiline", label: { kind: "text", text: record.title }, description: `${history.workspaceId} · ${record.label} · ${state}`, element: { tag: "a", attributesHtml: `href="${base}/${encodeURIComponent(history.workspaceId)}/${encodeURIComponent(record.agentId)}"` } }));
       }
     }
     return page("Agent history", `<p>Read-only history from this template's session share.</p><div class="action-list">${rows.join("") || "No native history yet."}</div>`);

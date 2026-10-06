@@ -31,8 +31,9 @@ export const designSystemStaticFiles = {
     url: new URL("./design-system.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
-  "/action-item.css": {
-    url: new URL("./action-item/action-item.css", import.meta.url),
+  "/disclosure.css": { url: new URL("./disclosure/disclosure.css", import.meta.url), contentType: "text/css; charset=utf-8" },
+  "/content-row.css": {
+    url: new URL("./content-row/content-row.css", import.meta.url),
     contentType: "text/css; charset=utf-8",
   },
   "/autocomplete.css": {

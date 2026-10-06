@@ -1,5 +1,5 @@
 import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 
@@ -18,8 +18,8 @@ export function parseTreeFilterMode(value: string | null): TreeFilterMode {
 }
 
 function renderAgentTreeContinuationMenu(entryId: string): string {
-  const continueOption = actionItemHtml({
-    kind: "single",
+  const continueOption = contentRowHtml({
+    kind: "multiline",
     label: { kind: "text", text: "Continue on a new branch" },
     description: "Keep earlier branches in history.",
     element: {

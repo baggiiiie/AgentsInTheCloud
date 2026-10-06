@@ -1,7 +1,7 @@
 {
   "composerVisible": false,
   "panels": { "strength": 28, "whiteness": 14, "position": 0, "width": 133, "reach": 180, "glow": 11, "glowReach": 7, "outline": 36 },
-  "actionItems": { "strength": 27, "whiteness": 32, "position": 21, "width": 147, "reach": 21, "glow": 10, "glowReach": 2, "outline": 12 },
+  "contentRows": { "strength": 27, "whiteness": 32, "position": 21, "width": 147, "reach": 21, "glow": 10, "glowReach": 2, "outline": 12 },
   "actionScope": "engaged",
   "buttonLighting": { "strength": 27, "whiteness": 32, "position": 21, "width": 147, "reach": 21, "glow": 4, "glowReach": 2, "outline": 0 },
   "panelFill": { "position": 27, "width": 53, "reach": 300, "light": 3.5, "dark": 1.5 },

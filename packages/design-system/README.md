@@ -28,7 +28,8 @@ Prefer consistency over feature-specific visual preservation.
 | Prominent navigation, optional icon-only comparison ring | `action-link` | [ActionLinkOptions](src/action-link/action-link-html.ts) |
 | Glanceable gauge, not interactive | `comparison-ring` | [ComparisonRingOptions](src/comparison-ring/comparison-ring-html.ts) |
 | Related actions, not selection | `button-group` | [ButtonGroupOptions](src/button-group/button-group-html.ts) |
-| Actionable row / compound row | `action-item` | [ActionItemOptions](src/action-item/action-item-html.ts) |
+| Menu item / navigation / information / action row | `content-row` | [ContentRowOptions](src/content-row/content-row-html.ts) — `kind: compact / multiline` |
+| Inline open/close with a compact or multiline summary and guttered body | `disclosure` | [DisclosureOptions](src/disclosure/disclosure-html.ts) |
 | Leading mark for a row that creates something | `add-badge` | [addBadgeHtml](src/add-badge/add-badge-html.ts) |
 | Running, still cancellable | `activity-button` | [ActivityButtonOptions](src/activity-button/activity-button-html.ts) |
 | Running, cannot invoke again | `progress-button` | [ProgressButtonOptions](src/progress-button/progress-button-html.ts) |
@@ -138,8 +139,12 @@ items retain their shared rounded treatment and reveal truncated labels on engag
 Public renderers have no `className` or `bodyClassName`. Do not replace these with
 feature-specific variants or selectors. Put layout on a **surrounding element**.
 Panel owns its regions (`bodyLayout`, `bodyOverflow`); Dialog owns its surface.
-Action item requires a plain-text label, optionally a plain-text `description`
-and semantic `tone`. Its leading, metadata and engaged-action slots retain
+Content row uses `kind: "compact"` for single-line pills or `kind: "multiline"`
+for wrapping soft rectangles. Both require a plain-text label; multiline accepts
+a plain-text `description`. Native `element` semantics and independent `primary`
+controls are separate from presentation. Disclosure composes either summary
+with native open/close, a chevron and the shared gutter; callers supply content
+and integration attributes, never their own summary element or body styling. Its leading, metadata and engaged-action slots retain
 canonical wrappers; there is no wholesale `contentHtml` replacement. For
 icon-only controls use Button. Toggle options have text labels, not HTML.
 Transient feedback buttons select a Button variant rather than arbitrary classes.
@@ -147,8 +152,8 @@ Transient feedback buttons select a Button variant rather than arbitrary classes
 HTML content slots remain where composition is the purpose of the module:
 Panel/Dialog bodies, popup/autocomplete items, feedback contents, decorative
 icons and metadata. These fill defined regions; they do not replace anatomy.
-For browser-owned label changes use `setActionItemLabel(element, text)` from
-`@agents-in-the-cloud/design-system/action-item/client`; for server updates target the label
+For browser-owned label changes use `setContentRowLabel(element, text)` from
+`@agents-in-the-cloud/design-system/content-row/client`; for server updates target the label
 ID and send escaped text, never replacement label markup.
 
 ## Package map / maintenance

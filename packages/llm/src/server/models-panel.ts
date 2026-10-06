@@ -1,3 +1,4 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { anthropicSubscriptionNotice } from "./subscription.ts";
 import { listAccounts, providerLabel, sortByPopularity, type Account } from "./accounts.ts";
@@ -5,7 +6,7 @@ import { modelUnavailableReason, providerAvailability } from "./provider-availab
 import { providerUsageFrameId, supportedUsageProviders } from "./provider-usage.ts";
 import { getPopularModelRank, getPopularProviderRank, getProviderApiKeyExample, modelDisplayName } from "./hardcoded-provider-knowledge.ts";
 import { modelRefValue as modelKey, parseModelRef, type ModelRef } from "./model-reference.ts";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
@@ -108,20 +109,19 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
     confirmCaption: forgetCaption,
     cancelCaption: "Cancel",
   })}</form>`;
-  const summary = actionItemHtml({
-    kind: "single",
-    element: { tag: "summary" },
-    label: { kind: "text", text: account.label },
+  const summary = {
+    kind: "multiline" as const,
+    label: { kind: "text" as const, text: account.label },
     description: account.connection === "needs_attention" ? "Sign-in needs attention" : account.description,
     leadingHtml: providerIcon(account.provider, account.label),
-    trailingHtml: `${rings}${Icons.Disclosure}`,
-  });
-  return `<details class="model-account"${open || account.connection === "needs_attention" ? " open" : ""}>${summary}<div class="model-account__body">${notice}${usage}<div class="model-account__actions">${reconnect}${forget}</div></div></details>`;
+    trailingHtml: rings,
+  };
+  return `<div class="model-account">${disclosureHtml({ summary, open: open || account.connection === "needs_attention", bodyHtml: `<div class="form-section">${notice}${usage}<div class="model-account__actions">${reconnect}${forget}</div></div>` })}</div>`;
 }
 
 function renderProviderChoice(provider: ProviderChoice, host: ModelsHost): string {
-  return `<form class="model-provider-choice" method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true">${actionItemHtml({
-    kind: "single",
+  return `<form class="model-provider-choice" method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true">${contentRowHtml({
+    kind: "compact",
     element: { tag: "button", attributesHtml: 'type="submit"' },
     label: { kind: "text", text: provider.label },
     leadingHtml: providerIcon(provider.provider, provider.label),
@@ -157,11 +157,9 @@ function renderConnectChoices(host: ModelsHost, runtime: Runtime, accounts: Acco
   return connectFrame(host, `<div class="model-provider-groups">
     <p class="model-connect__hint">Bring your own subscription or API key.</p>
     <div class="model-popular-providers">${popular.map((provider) => renderProviderChoice(provider, host)).join("")}</div>
-    <details>${actionItemHtml({ kind: "single", element: { tag: "summary" }, label: { kind: "text", text: "Other model providers" }, leadingHtml: Icons.Disclosure })}
-      <div class="model-other-providers-body"><form method="get" action="/models/connect/providers" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.otherProviders(host)}">
+    ${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Other model providers" } }, bodyHtml: `<div class="model-other-providers-body"><form method="get" action="/models/connect/providers" data-controller="server-filter" data-action="input->server-filter#submit" data-turbo-frame="${ids.otherProviders(host)}">
         <input type="hidden" name="host" value="${host}"><input class="text-field" type="search" name="q" placeholder="Find a provider…" aria-label="Find a provider" autocomplete="off"><button type="submit" hidden>Search</button>
-      </form>${renderOtherProviders(other, host)}</div>
-    </details>
+      </form>${renderOtherProviders(other, host)}</div>` })}
   </div>${cancel}`);
 }
 
@@ -184,8 +182,8 @@ async function renderEnabledModelsList(runtime: Runtime, host: ModelsHost): Prom
 function catalogueRow(model: CatalogueEntry, host: ModelsHost): string {
   return `<form id="${ids.catalogueRow(host, model)}" method="post" action="/models/enabled-models/enable?${hostQuery(host)}" data-turbo="true">
     <input type="hidden" name="model" value="${escapeHtml(modelKey(model))}">
-    ${actionItemHtml({
-      kind: "single",
+    ${contentRowHtml({
+      kind: "multiline",
       element: { tag: "button", attributesHtml: `type="submit"${model.enabled ? " disabled" : ""} title="${escapeHtml(model.id)}"` },
       label: { kind: "text", text: model.label },
       description: model.providerLabel,
@@ -253,8 +251,7 @@ function renderCustomModelsSettings(view: CustomModelsView): string {
     content: { kind: "caption", caption: "Refresh model catalogue" },
     attributesHtml: 'data-turbo-submits-with="Refreshing…"',
   });
-  return `<details class="custom-models-settings" id="custom_models_settings"${view.open ? " open" : ""}>
-    <summary>Advanced model settings</summary>
+  return `<div class="custom-models-settings">${disclosureHtml({ element: { id: "custom_models_settings" }, open: view.open, summary: { kind: "compact", label: { kind: "text", text: "Advanced model settings" } }, bodyHtml: `
     <form method="post" action="/models/catalogue/refresh" data-turbo="true">${refreshButton}</form>
     <form class="custom-models-form form-stack" method="post" action="/models/custom" data-turbo="true">
       <div><label for="custom_models_json">Custom Pi model configuration</label><p>Paste a Pi <code>models.json</code> object containing <code>providers</code>. Custom models are merged with the official catalogue.</p></div>
@@ -263,7 +260,7 @@ function renderCustomModelsSettings(view: CustomModelsView): string {
       ${view.status ? `<p class="custom-models-status" role="status">${escapeHtml(view.status)}</p>` : ""}
       <div class="custom-models-actions">${saveButton}</div>
     </form>
-  </details>`;
+  ` })}</div>`;
 }
 
 type PanelOptions = {

@@ -1,5 +1,5 @@
 import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { actionItemHtml, type ActionItemLabel, type ActionItemElement } from "../action-item/action-item-html.ts";
+import { contentRowHtml, type ContentRowLabel, type ContentRowElement } from "../content-row/content-row-html.ts";
 import { attributesHtml } from "../html.ts";
 
 export interface TabStatus {
@@ -17,16 +17,16 @@ function tabStatusHtml(status: TabStatus = {}): string {
 
 /** Shared tab anatomy and status; features own selection, close forms and integration attributes. */
 export function tabHtml(options: {
-  label: ActionItemLabel;
+  label: ContentRowLabel;
   iconHtml?: string;
   status?: TabStatus;
   selected: boolean;
-  primary: ActionItemElement;
+  primary: ContentRowElement;
   containerAttributesHtml?: string;
   closeHtml?: string;
 }): string {
-  return actionItemHtml({
-    kind: "compound", label: options.label, leadingHtml: options.iconHtml, trailingHtml: tabStatusHtml(options.status),
+  return contentRowHtml({
+    kind: "compact", label: options.label, leadingHtml: options.iconHtml, trailingHtml: tabStatusHtml(options.status),
     container: { attributesHtml: options.containerAttributesHtml },
     primary: { tag: options.primary.tag, attributesHtml: `role="tab" aria-selected="${options.selected}" tabindex="${options.selected ? 0 : -1}" ${options.primary.attributesHtml ?? ""}` },
     engagedActionsHtml: options.closeHtml,

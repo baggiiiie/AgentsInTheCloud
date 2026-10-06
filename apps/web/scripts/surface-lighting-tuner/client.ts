@@ -33,7 +33,7 @@ class ButtonSurfacesController extends Controller {
       let value: string;
       if (control.dataset.group) {
         // SAFETY: these groups and numeric field names are authored in tuner.html.
-        const group = control.dataset.group as 'panels' | 'actionItems' | 'buttonLighting' | 'panelFill' | 'buttonFill' | 'surfaces';
+        const group = control.dataset.group as 'panels' | 'contentRows' | 'buttonLighting' | 'panelFill' | 'buttonFill' | 'surfaces';
         value = String(Object.entries(startingSettings[group]).find(([name]) => name === control.name)![1]);
       } else {
         // SAFETY: amount targets are the three numeric effect-strength settings.
@@ -78,7 +78,7 @@ class ButtonSurfacesController extends Controller {
   }
   update(): void {
     const panels = this.lighting('panels');
-    const actionItems = this.lighting('actionItems');
+    const contentRows = this.lighting('contentRows');
     const buttons = this.lighting('buttonLighting');
     const panelFill = this.fill('panelFill');
     const buttonFill = this.fill('buttonFill');
@@ -107,9 +107,9 @@ class ButtonSurfacesController extends Controller {
       '--panel-rim-reflection': reflection(panels),
       '--panel-outline': outline(panels),
       '--panel-background-image': fill(this.panelTarget.value,panelFill,panelAmount),
-      '--action-item-rim-reflection': reflection(actionItems),
-      '--action-item-outline': outline(actionItems),
-      '--action-item-inner-glow': glow(actionItems),
+      '--content-row-rim-reflection': reflection(contentRows),
+      '--content-row-outline': outline(contentRows),
+      '--content-row-inner-glow': glow(contentRows),
       '--button-rim-reflection': buttonReflection,
       '--button-inner-glow': glow(buttons,rim),
       '--button-rim-inset': this.effectTarget.value === 'b' ? '0' : '-1px',
@@ -127,7 +127,7 @@ class ButtonSurfacesController extends Controller {
     // Only these two preview-only behavior choices need selectors.
     const css = `:root { ${Object.entries(images).map(([name,value]) => `${name}: ${value};`).join('\n')} }
       ${this.composerTarget.checked ? '' : '.agent-composer-pane > .composer, .agent-composer-pane > .agent-composer-opener { display: none; }'}
-      ${this.actionScopeTarget.value === 'all' ? '.action-item { --action-item-reflection: ""; }' : ''}`;
+      ${this.actionScopeTarget.value === 'all' ? '.content-row { --content-row-reflection: ""; }' : ''}`;
     const documents = [document];
     if (this.frameTarget.contentDocument?.head) documents.push(this.frameTarget.contentDocument);
     for (const doc of documents) {
@@ -141,7 +141,7 @@ class ButtonSurfacesController extends Controller {
     for (const control of this.sliderTargets) query.set(`${control.dataset.group}.${control.name}`,control.value);
     query.set('composerVisible',String(this.composerTarget.checked));
     history.replaceState(null, '', `?${query}`);
-    this.settingsTarget.value = JSON.stringify({composerVisible:this.composerTarget.checked,panels,actionItems,actionScope:this.actionScopeTarget.value,buttonLighting:buttons,panelFill,buttonFill,surfaces,...Object.fromEntries(this.choices.filter(control=>control!==this.actionScopeTarget).map(control=>[control.name,control.value])),...Object.fromEntries(this.amounts.map(control=>[control.name,Number(control.value)]))},null,2);
+    this.settingsTarget.value = JSON.stringify({composerVisible:this.composerTarget.checked,panels,contentRows,actionScope:this.actionScopeTarget.value,buttonLighting:buttons,panelFill,buttonFill,surfaces,...Object.fromEntries(this.choices.filter(control=>control!==this.actionScopeTarget).map(control=>[control.name,control.value])),...Object.fromEntries(this.amounts.map(control=>[control.name,Number(control.value)]))},null,2);
   }
   reset(): void {
     this.composerTarget.checked = startingSettings.composerVisible;

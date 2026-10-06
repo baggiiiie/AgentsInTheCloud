@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { discoverGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { escapeHtml, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
@@ -108,8 +108,8 @@ export function renderGitHubRepositorySearchMenu(repositories: readonly GitHubRe
   return autocompleteHtml({ kind: "results", label: "GitHub repositories", contentHtml: repositories.map((repo, index) => {
     const description = repo.description || repo.htmlUrl;
     const visibility = repo.private ? " — Private repository" : "";
-    return actionItemHtml({
-      kind: "single",
+    return contentRowHtml({
+      kind: "compact",
       label: { kind: "text", text: `${repo.fullName} — ${description}${visibility}` },
       element: {
         tag: "button",

@@ -2,7 +2,7 @@
 
 import { Controller } from "@hotwired/stimulus";
 import { PopupPosition } from "./popup-position.ts";
-import { actionItemElement } from "../action-item/action-item-html.ts";
+import { contentRowElement } from "../content-row/content-row-html.ts";
 import { popupMenuHtml } from "./popup-surface.ts";
 import { buttonElement } from "../button/button-html.ts";
 
@@ -149,8 +149,8 @@ export class PopupSelectController extends Controller<HTMLSelectElement> {
   };
 
   private renderOption(option: HTMLOptionElement): HTMLButtonElement {
-    const item = actionItemElement<HTMLButtonElement>({
-      kind: "single",
+    const item = contentRowElement<HTMLButtonElement>({
+      kind: "compact",
       label: { kind: "text", text: option.textContent ?? option.value },
       element: { tag: "button", attributesHtml: `type="button" role="menuitemradio" aria-checked="${option.selected}"${option.disabled ? " disabled" : ""}` },
     });

@@ -21,7 +21,7 @@ function createTerminalSessionPickerController(Controller: WorkspaceClientContro
     select(event: Event): void {
       if (!(event.currentTarget instanceof HTMLButtonElement)) throw new Error("terminal session selection must come from a button");
       const session = event.currentTarget.dataset.terminalSession;
-      if (!session) throw new Error("terminal session action item is missing its session name");
+      if (!session) throw new Error("terminal session content row is missing its session name");
       this.inputTarget.value = session;
       for (const item of this.itemTargets) item.setAttribute("aria-selected", String(item === event.currentTarget));
     }

@@ -1,4 +1,4 @@
-import { actionItemHtml } from "@agents-in-the-cloud/design-system/action-item";
+import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import type { Skill } from "@earendil-works/pi-coding-agent";
@@ -56,8 +56,8 @@ export function renderSlashCommandCatalog(templates: readonly PromptTemplate[], 
     // Keep existing previews for built-in actions without modelling them as Prompt templates.
     const preview = command.kind === "prompt-template" ? command.prompt : command.kind === "builtin" && command.trigger !== "/tree" ? command.trigger : undefined;
     const hasPreview = preview !== undefined;
-    return actionItemHtml({
-      kind: "single",
+    return contentRowHtml({
+      kind: "compact",
       label: { kind: "text", text: `${command.trigger}${command.argumentHint ? ` ${command.argumentHint}` : ""} — ${command.description}` },
       trailingHtml: preview === undefined ? "" : `<template data-agents-in-the-cloud-fullscreen-target="content"><pre class="agent-slash-command-preview">${escapeHtml(preview)}</pre></template>`,
       element: {
