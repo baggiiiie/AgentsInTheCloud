@@ -84,7 +84,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       const model = JSON.parse(this.modelTarget.textContent!) as { files: FileSummary[]; items: CodeViewItem<CommentAnnotation>[] };
       this.files = model.files;
       for (const item of model.items) if (item.type === "file") this.loaded.add(item.id);
-      if (!this.files.length) return;
+      if (!this.files.length) { this.syncCollapseControl(); return; }
       const abort = this.abort = new AbortController();
       const [{ CodeView }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (abort.signal.aborted) return;
@@ -120,6 +120,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.viewer.setup(this.viewerTarget);
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: this.collapsed })));
       for (const path of this.loaded) this.updateComments(path);
+      this.syncCollapseControl();
     }
 
     commentsModelTargetConnected(script: HTMLScriptElement): void {
@@ -150,6 +151,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.orphanDisclosureTarget.setAttribute("aria-expanded", String(this.orphansOpen));
       this.orphanContentTarget.hidden = !this.orphansOpen;
       if (this.draftInList) this.listEditorTarget.hidden = !this.orphansOpen;
+      if (this.viewer) this.syncCollapseControl();
     }
 
     dismissError(): void { this.errorTarget.hidden = true; }
@@ -173,10 +175,14 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     }
 
     private syncCollapseControl(): void {
-      this.collapsed = (this.hasOrphanDisclosureTarget && !this.orphansOpen) || this.files.some((file) => this.viewer!.getItem(file.path)!.collapsed === true);
+      // Mixed states offer Collapse all; Expand all is only useful once everything is closed.
+      this.collapsed = (this.files.length > 0 || this.hasOrphanDisclosureTarget)
+        && (!this.hasOrphanDisclosureTarget || !this.orphansOpen)
+        && this.files.every((file) => this.viewer!.getItem(file.path)!.collapsed === true);
       if (!this.hasCollapseToggleTarget) return;
-      this.collapseToggleTarget.setAttribute("aria-pressed", String(this.collapsed));
-      const label = this.collapsed ? "Expand all files" : "Collapse all files";
+      this.collapseToggleTarget.disabled = false;
+      this.collapseToggleTarget.dataset.collapsed = String(this.collapsed);
+      const label = this.collapsed ? "Expand all" : "Collapse all";
       this.collapseToggleTarget.setAttribute("aria-label", label);
       this.collapseToggleTarget.title = label;
     }
@@ -439,6 +445,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     }
 
     toggleCollapse(): void {
+      this.syncCollapseControl();
       this.collapsed = !this.collapsed;
       for (const file of this.files) {
         const item = this.viewer?.getItem(file.path);

@@ -8,7 +8,7 @@ type ComparisonModel = { endpoints: DiffEndpoints; label: string; baseLabel: str
 export function createDiffEndpointsController(Controller: WorkspaceClientControllerConstructor) {
   return class DiffEndpointsController extends Controller {
     declare readonly element: HTMLElement;
-    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more", "selectionHint"];
+    static targets = ["diff", "trigger", "refresh", "picker", "loading", "error", "historyModel", "comparisonModel", "graph", "table", "row", "historyScroll", "more"];
     static values = { workspaceId: String, historyId: String, open: Boolean };
     declare readonly workspaceIdValue: string;
     declare readonly historyIdValue: string;
@@ -26,8 +26,9 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     declare readonly historyScrollTarget: HTMLElement;
     declare readonly moreTarget: HTMLButtonElement;
     declare readonly hasMoreTarget: boolean;
-    declare readonly selectionHintTarget: HTMLElement;
     private awaitingEnd = false;
+    private secondCommitDeadline = 0;
+    private secondCommitTimer?: ReturnType<typeof setTimeout>;
     private model?: HistoryModel;
     private graph?: HistoryGraph;
     private endpoints?: DiffEndpoints;
@@ -54,7 +55,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       if (this.openValue) this.openPicker();
       this.measure();
     }
-    disconnect(): void { this.request?.abort(); this.paging?.abort(); this.resize?.disconnect(); }
+    disconnect(): void { this.request?.abort(); this.paging?.abort(); this.resize?.disconnect(); clearTimeout(this.secondCommitTimer); }
 
     historyModelTargetConnected(script: HTMLScriptElement): void {
       // SAFETY: This model is emitted by the Changes history renderer, not an external endpoint.
@@ -100,7 +101,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     closePicker(): void {
       if (!this.isOpen) return;
       this.clearHover();
-      this.awaitingEnd = false;
+      this.endSecondCommitSelection();
       this.isOpen = false;
       this.pickerTarget.hidden = true;
       this.triggerTarget.setAttribute("aria-expanded", "false");
@@ -130,9 +131,21 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.endpoints = candidate.base === undefined ? { target: selected.target } : { target: selected.target, base: selected.base };
       this.paint();
     }
+    private endSecondCommitSelection(): void {
+      clearTimeout(this.secondCommitTimer);
+      this.secondCommitTimer = undefined;
+      this.awaitingEnd = false;
+      this.secondCommitDeadline = 0;
+      if (this.model) this.paint();
+    }
     private selectCommit(id: string): void {
-      const extend = this.awaitingEnd;
-      this.awaitingEnd = !extend;
+      const extend = this.awaitingEnd && performance.now() < this.secondCommitDeadline;
+      this.endSecondCommitSelection();
+      if (!extend) {
+        this.awaitingEnd = true;
+        this.secondCommitDeadline = performance.now() + 5000;
+        this.secondCommitTimer = setTimeout(() => this.endSecondCommitSelection(), 5000);
+      }
       this.choose(id, extend);
       void this.generate("compare");
     }
@@ -172,7 +185,6 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
 
     private paint(): void {
       const model = this.model!, endpoints = this.endpoints!, graph = this.graph!;
-      this.selectionHintTarget.textContent = this.awaitingEnd ? "Select the end snapshot" : "Select the start snapshot";
       const selected = comparisonGraph(graph, endpoints, model.topology);
       for (const rect of this.graphTarget.querySelectorAll<SVGRectElement>(".changes-history-row-background")) {
         rect.dataset.path = String(selected.selectedRows.includes(rect.dataset.commit!));
@@ -197,7 +209,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
       const applied = this.comparison?.endpoints.target === endpoints.target && this.comparison.endpoints.base === endpoints.base;
       const description = applied ? this.comparison!.label : diffEndpointsDescription(model, selected);
-      setContentRowLabel(this.triggerTarget, description);
+      setContentRowLabel(this.triggerTarget, this.awaitingEnd ? "Select a second commit for a custom range" : description);
       this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.targetLabel}` : `${endpointName(model, selected.base ?? undefined)} → ${endpointName(model, selected.target)}`;
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
       this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
@@ -227,7 +239,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     private async generate(operation: "compare" | "refresh"): Promise<void> {
       this.request?.abort();
       if (operation === "refresh") {
-        this.awaitingEnd = false;
+        this.endSecondCommitSelection();
         this.paging?.abort();
       }
       const request = this.request = new AbortController();
