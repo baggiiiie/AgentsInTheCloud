@@ -139,12 +139,12 @@ export function createWorkspaceTemplateRoutes(deps: {
     const workspaceTemplateId = decodeURIComponent(url.pathname.split("/")[2]!);
     const section: TemplateSettingsSection = concern === "seed-config" ? "developer" : concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
     const deleted = url.pathname.endsWith("/delete");
-    const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
+    const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : concern === "ssh-known-hosts" ? "known-hosts" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
     // Save/create remains in the editor, using the persisted record ID and fresh credential fields.
     // Deletion returns to the list because that editor no longer exists.
     const location: TemplateSettingsLocation = { section, editor: deleted ? undefined : record };
     if (!wantsStream(request)) return Response.redirect(new URL(templateSettingsUrl(workspaceTemplateId, section, location.editor), request.url).toString(), 303);
-    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted);
+    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted, url.pathname);
     return turboStreamResponse(replace(templateSettingsFrameId, frame));
   }
 

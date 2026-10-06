@@ -486,17 +486,24 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
 .template-settings-host > turbo-frame { display: flex; width: 100%; max-width: 960px; min-width: 0; min-height: 0; }
 .template-settings-host > turbo-frame > .panel { width: 100%; min-height: 0; }
 .template-settings-content { max-width: 760px; margin-inline: auto; padding: 24px; display: grid; gap: 16px; }
-.template-settings-content .action-list { gap: 8px; }
-.template-settings-record { display: grid; gap: 2px; min-width: 0; }
-.template-settings-record-note { margin: 0; padding-inline: 8px; color: var(--text-muted); overflow-wrap: anywhere; }
 .template-settings-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .template-settings-note { margin: 0; }
 #template_settings_error:empty { display: none; }
-.template-settings-remove { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.template-settings-remove { display: grid; gap: 12px; padding-top: 8px; }
+#template_settings_delete .button.danger.icon-only { --button-foreground: var(--danger); --button-hover-foreground: var(--danger); }
+.template-settings-inline-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.template-settings-inline-disclosures { display: grid; gap: 12px; margin-inline-start: -8px; }
+.template-settings-inline-records { display: grid; gap: 8px; }
+.template-settings-inline-body { display: grid; gap: 16px; padding-inline-start: 8px; }
+.template-settings-inline .form-actions[hidden] { display: none; }
+@media (max-width: 640px) {
+  .template-settings-inline-fields { grid-template-columns: minmax(0, 1fr); }
+}
 .template-settings-content .form-section > .button-toggle { justify-self: start; }
 .template-settings-content textarea[name="dockerfile"], .template-settings-content textarea[name="knownHosts"] { font-family: var(--font-mono); }
 @media (max-width: 700px) {
   .template-settings-content { padding: 16px; }
+  .template-settings-inline-disclosures > .disclosure > summary .content-row__label { white-space: normal; }
   .template-settings-toolbar { gap: 8px; }
 }
 .fixed-shell-app-main:has(.template-settings-host) > .workspace-detail-host { visibility: hidden; }

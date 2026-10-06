@@ -10,7 +10,19 @@ export class WorkspaceTemplateSecretPathController extends Controller<HTMLFormEl
   declare readonly toggleTarget: HTMLElement;
   private chosen = false;
 
-  connect(): void { this.useDefault(); }
+  connect(): void {
+    this.chosen = this.element.hasAttribute("data-secret-path-chosen");
+    this.useDefault();
+    this.element.addEventListener("reset", this.resetChoice);
+  }
+
+  disconnect(): void { this.element.removeEventListener("reset", this.resetChoice); }
+
+  private readonly resetChoice = (): void => {
+    this.chosen = false;
+    this.element.removeAttribute("data-secret-path-chosen");
+    queueMicrotask(() => this.useDefault());
+  };
 
   useDefault(): void {
     if (this.chosen) return;
@@ -24,5 +36,6 @@ export class WorkspaceTemplateSecretPathController extends Controller<HTMLFormEl
     // but a click on the already-selected choice is also an explicit decision.
     if (event.type === "click" && !(event.target instanceof Element && event.target.closest('button[name="allowInPath"]'))) return;
     this.chosen = true;
+    this.element.setAttribute("data-secret-path-chosen", "");
   }
 }
