@@ -268,3 +268,28 @@ test("parked workspaces sort after active workspaces regardless of attention or 
   registry.setParked("a", false);
   expect(registry.list().map(({ id }) => id)).toEqual(["a", "b"]);
 });
+
+test("active workspaces without attention sort idle before busy, then by recent activity", async () => {
+  let clock = 100;
+  const registry = createWorkspaceRegistry({ now: () => clock++ });
+  await registry.seed(["idle-old", "idle-new", "busy-old", "busy-new"].map((id) => ({ id, title: id })));
+  for (const id of ["idle-old", "idle-new", "busy-old", "busy-new"]) registry.touch(id);
+  registry.setAgentBusy("busy-old", "agent:first", true);
+  registry.setAgentBusy("busy-new", "agent:first", true);
+  expect(registry.list().map(({ id }) => id)).toEqual(["idle-new", "idle-old", "busy-new", "busy-old"]);
+
+  registry.setAgentBusy("busy-new", "agent:first", false);
+  expect(registry.list().map(({ id }) => id)).toEqual(["busy-new", "idle-new", "idle-old", "busy-old"]);
+
+  registry.requestAttention("busy-old");
+  expect(registry.list().map(({ id }) => id)).toEqual(["busy-old", "busy-new", "idle-new", "idle-old"]);
+});
+
+test("busy-last ordering does not change the order within parked workspaces", async () => {
+  const { registry } = await setup();
+  registry.setAgentBusy("b", "agent:first", true);
+  registry.touch("b");
+  registry.setParked("a", true);
+  registry.setParked("b", true);
+  expect(registry.list().map(({ id }) => id)).toEqual(["b", "a"]);
+});
