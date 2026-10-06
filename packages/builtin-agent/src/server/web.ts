@@ -12,6 +12,8 @@ import { handleAgentRequest } from "./routes.ts";
 import { refreshWorkspaceCompletionCatalogs, closeWorkspaceAgent, getWorkspaceAgentController, getWorkspaceAgentPresentation, restoreWorkspaceAgentRuntime } from "./runtime.ts";
 import { removeClosedWorkspaceAgent, createNextWorkspaceAgent, listWorkspaceAgents, untitledAgentTitle, type WorkspaceAgentInfo } from "./agent-store.ts";
 
+const toolAbortRequestSchema = { type: "object", properties: { note: { type: "string", description: "Optional user note returned in the tool result" } } };
+
 let agentEvents: AgentsInTheCloudEventBus | undefined;
 
 export function createWorkspaceAgentTabProvider(dependencies: {
@@ -138,6 +140,10 @@ export const builtinAgentWorkspaceModule: WorkspaceModule = {
     } },
     "/workspaces/{id}/agents/{agentId}/tools/{callId}/abort": { post: {
       summary: "Abort one live tool call and its owned work without stopping the agent turn",
+      requestBody: { required: false, content: {
+        "application/json": { schema: toolAbortRequestSchema },
+        "application/x-www-form-urlencoded": { schema: toolAbortRequestSchema },
+      } },
       parameters: ["id", "agentId", "callId"].map(name => ({ name, in: "path", required: true, schema: { type: "string" } })),
       responses: { "200": { description: "Cancellation requested; aborted is false if the call is no longer active. HTML clients receive a Turbo Stream.", content: { "application/json": { schema: { type: "object", properties: { tool: { type: "object", required: ["callId", "aborted"], properties: { callId: { type: "string" }, aborted: { type: "boolean" } } } } } } } } },
     } },

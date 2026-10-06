@@ -1,3 +1,4 @@
+import { createAgentToolAbortController } from "./tool-abort-controller.ts";
 import { createAgentFooterController } from "./footer-controller.ts";
 import { createUsageControllers } from "./usage-controllers.ts";
 import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
@@ -28,6 +29,7 @@ export const agentClientModule: WorkspaceClientModule = {
     application.register("agent-tail-frame", createAgentTailFrameController(Controller));
     application.register("agent-lazy-detail", createAgentLazyDetailController(Controller));
     application.register("agent-mermaid", createAgentMermaidController(Controller));
+    application.register("agent-tool-abort", createAgentToolAbortController(Controller));
     application.register("agent-notice", createAgentNoticeController(Controller));
     application.register("agent-completions", createAgentCompletionsController(Controller, hooks));
 

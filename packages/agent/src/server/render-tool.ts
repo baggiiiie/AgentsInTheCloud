@@ -2,7 +2,9 @@ import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { agentToolPresentations } from "./tool-presentations.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
-import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
+import { buttonGroupHtml } from "@agents-in-the-cloud/design-system/button-group";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
+import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { isJsonObject, type JsonObject } from "@agents-in-the-cloud/core";
@@ -96,12 +98,7 @@ export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolV
   const labelOptions = {
     leadingHtml: `<span id="${ids.itemSummaryStatus(ctx, key)}" class="agent-tool-status">${statusHtml(tool.status, ctx.readOnly)}</span>`,
     labelId: ids.itemSummaryContent(ctx, key),
-    trailingHtml: tool.canAbort && !ctx.readOnly ? `<form method="post" action="${escapeHtml(agentPath(ctx, `/tools/${encodeURIComponent(tool.callId)}/abort`))}">${destructiveConfirmationHtml({
-      id: domId(ids.item(ctx, key), "abort"),
-      trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Stop, label: "Stop this tool only; the agent will continue" } },
-      confirmCaption: "Stop tool only",
-      cancelCaption: "Keep running",
-    })}</form>` : undefined,
+    trailingHtml: tool.canAbort && !ctx.readOnly ? toolAbortHtml(ctx, key, tool) : undefined,
   };
   const active = tool.status === "streaming" || tool.status === "running";
   const content = transcriptRowContent(label, { ...labelOptions, kind: isBashTool(tool.name) ? "compact" : "multiline" });
@@ -115,6 +112,34 @@ export function renderToolCard(ctx: AgentRenderContext, key: string, tool: ToolV
     summary: content, open,
     bodyHtml: lazy ? lazyTranscriptItemFrame(ctx, key) : `<turbo-frame ${tailFrameAttributes(ctx, key)} class="agent-tool-detail-host">${renderToolDetail(ctx, key, tool, 100)}</turbo-frame>`,
   })}</div>`;
+}
+
+function toolAbortHtml(ctx: AgentRenderContext, key: string, tool: ToolView): string {
+  const id = domId(ids.item(ctx, key), "abort");
+  const noteId = `${id}_note`;
+  const actions = buttonGroupHtml({
+    orientation: "horizontal", semantics: "layout",
+    itemsHtml: buttonHtml({
+      type: "button", variant: "secondary", content: { kind: "caption", caption: "Keep running" },
+      attributesHtml: 'data-action="dialog#close"',
+    }) + buttonHtml({
+      type: "submit", variant: "danger", content: { kind: "caption", caption: "Stop tool only" },
+    }),
+  });
+  return buttonHtml({
+    type: "button", variant: "danger",
+    content: { kind: "icon-only", iconHtml: Icons.Stop, label: "Stop this tool only; the agent will continue" },
+    attributesHtml: `commandfor="${escapeHtml(id)}" command="show-modal"`,
+  }) + dialogHtml({
+    element: { id, attributesHtml: 'data-turbo-permanent data-controller="dialog" data-action="turbo:submit-end->dialog#submitted"' },
+    iconHtml: Icons.Stop, titleCaption: "Stop this tool?", closeLabel: "Keep running",
+    bodyHtml: `<p>The agent will continue. Add a note to tell it why you stopped this tool.</p>
+      <form method="post" data-controller="agent-tool-abort" data-action="keydown->agent-tool-abort#keydown" action="${escapeHtml(agentPath(ctx, `/tools/${encodeURIComponent(tool.callId)}/abort`))}">
+        <label for="${escapeHtml(noteId)}">Note (optional)</label>
+        <textarea class="textarea" id="${escapeHtml(noteId)}" name="note" rows="3"></textarea>
+        <div class="agent-tool-abort-actions">${actions}</div>
+      </form>`,
+  });
 }
 
 function sourceRegionHtml(title: string, body: string, className = "agent-source-region"): string {

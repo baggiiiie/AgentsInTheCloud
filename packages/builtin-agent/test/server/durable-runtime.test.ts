@@ -978,7 +978,7 @@ test("unknown model selection rejects with invalid_arguments and leaves settings
   expect((await agent.settings()).model?.modelId).toBe("large");
 });
 
-test("aborting one tool preserves the turn and other tool calls", async () => {
+test.each([undefined, "   ", "  Try a narrower search instead.  "])("aborting one tool preserves the turn and other tool calls (note: %p)", async note => {
   const { runtime, faux, registry } = await setup();
   const started = Promise.withResolvers<void>();
   const survivor = Promise.withResolvers<void>();
@@ -1005,8 +1005,16 @@ test("aborting one tool preserves the turn and other tool calls", async () => {
   faux.setResponses([
     fauxAssistantMessage([stopping, continuing], { stopReason: "toolUse" }),
     request => {
-      expect(JSON.stringify(request)).toContain("was aborted");
-      expect(JSON.stringify(request)).toContain("Other tool completed");
+      const results = request.messages.filter(message => message.role === "toolResult");
+      const stopped = results.find(message => message.toolCallId === stopping.id)!;
+      if (note?.trim()) {
+        expect(stopped.content).toEqual([{ type: "text", text: "<harnass>\nThe user manually cancelled this tool with the following note:\nTry a narrower search instead.\n</harnass>" }]);
+        expect(stopped.details).toEqual({ aborted: true });
+      } else {
+        expect(stopped.content).toEqual([{ type: "text", text: "<harness>\n[error] Tool block was aborted\n</harness>" }]);
+      }
+      expect(stopped.isError).toBe(true);
+      expect(results.find(message => message.toolCallId === continuing.id)?.content).toEqual([{ type: "text", text: "Other tool completed" }]);
       return fauxAssistantMessage("Continued after stopping just one tool");
     },
   ]);
@@ -1014,7 +1022,7 @@ test("aborting one tool preserves the turn and other tool calls", async () => {
   const submission = await agent.submit({ requestId: "abort-one", text: "Begin" });
   await started.promise;
   expect(await agent.abortTool("unknown-call")).toBe(false);
-  expect(await agent.abortTool(stopping.id)).toBe(true);
+  expect(await agent.abortTool(stopping.id, note)).toBe(true);
   expect(cancelled).toBe(true);
   survivor.resolve();
   expect((await submission.wait(context)).status).toBe("done");
