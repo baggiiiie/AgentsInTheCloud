@@ -2,9 +2,7 @@ import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { renderTranscript } from "@agents-in-the-cloud/agent/server/render-transcript";
 import { ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderAgentPane, renderAgentPaneComposerFooter, renderPromptActions, type AgentStatsView } from "@agents-in-the-cloud/builtin-agent/server/render-composer";
-import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import type { LiveRegion } from "@agents-in-the-cloud/shared";
-import { codexSlashCommands } from "./commands.ts";
 import { projectCodexTurns } from "./transcript.ts";
 import type { CodexRuntime } from "./runtime.ts";
 
@@ -29,9 +27,11 @@ export function liveRegions(runtime: CodexRuntime): LiveRegion[] {
     { target: ids.transcript(ctx), html: transcriptHtml(runtime) },
     { target: ids.actions(ctx), html: renderPromptActions(ctx, runtime.isBusy) },
     { target: ids.stats(ctx), html: renderAgentPaneComposerFooter(ctx, stats(runtime)), morph: false },
+    { target: ids.completionCatalog(ctx), html: runtime.completionCatalog },
   ];
 }
 export async function paneHtml(runtime: CodexRuntime) {
+  await runtime.refreshCompletionCatalog();
   const ctx = renderContext(runtime);
-  return renderAgentPane(ctx, { agentId: runtime.agentId }, { transcriptHtml: transcriptHtml(runtime), busy: runtime.isBusy, stats: stats(runtime) }, await renderWorkspaceCompletionCatalog(runtime.workspaceId, "cli", codexSlashCommands), { moduleChannel: channelName, notifications: false, initialPromptDraft: false });
+  return renderAgentPane(ctx, { agentId: runtime.agentId }, { transcriptHtml: transcriptHtml(runtime), busy: runtime.isBusy, stats: stats(runtime) }, runtime.completionCatalog, { moduleChannel: channelName, notifications: false, initialPromptDraft: false });
 }

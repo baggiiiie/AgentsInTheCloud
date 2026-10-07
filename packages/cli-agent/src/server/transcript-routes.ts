@@ -1,10 +1,11 @@
 import { agentKey, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderReadOnlyTranscript, renderReadOnlyTranscriptDetail } from "@agents-in-the-cloud/agent/server/read-only-transcript";
 import { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { renderFollowLatestButton } from "@agents-in-the-cloud/prompt/server";
-import { escapeHtml, turboStream, type CableChannelAdapter } from "@agents-in-the-cloud/shared";
+import { domId, escapeHtml, turboStream, type CableChannelAdapter } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { response } from "@agents-in-the-cloud/shared/http";
@@ -31,9 +32,12 @@ export function cliTranscriptAttributes(adapter: CliAgentAdapter, agentId: strin
   return `data-cli-terminal-agent-id-value="${escapeHtml(agentId)}" data-cli-terminal-transcript-channel-value="${escapeHtml(cliTranscriptChannelName(adapter))}"`;
 }
 
+/** The composer's slash command catalog; turns can add prompt templates, so each finished turn refreshes it. */
+export function cliCompletionCatalogId(workspaceId: string, agentId: string): string { return domId("cli_catalog", workspaceId, agentId); }
+
 function cliTranscriptChannelName(adapter: CliAgentAdapter): string { return `${adapter.id}-transcript`; }
 
-/** Publishes whether the transcript is available whenever the CLI starts or finishes a turn, with the transcript itself for panes showing it. */
+/** Publishes whether the transcript is available whenever the CLI starts or finishes a turn, with the transcript itself for panes showing it, and the refreshed completion catalog between turns. */
 export function cliTranscriptChannel(adapter: CliAgentAdapter, agents: Pick<CliAgents, "ready">): CableChannelAdapter {
   // Agent keys identify Agents, which are unique across workspaces.
   const busy = new Set<string>();
@@ -44,10 +48,12 @@ export function cliTranscriptChannel(adapter: CliAgentAdapter, agents: Pick<CliA
   });
   async function render(workspaceId: string, agentId: string, includeTranscript: boolean): Promise<string> {
     // The transcript is only shown between turns, so every turn in it has finished.
-    const records = busy.has(agentKey(agentId)) ? undefined : await adapter.loadTranscript!(workspaceId, agentId);
+    const idle = !busy.has(agentKey(agentId));
+    const [records, catalog] = idle ? await Promise.all([adapter.loadTranscript!(workspaceId, agentId), renderWorkspaceCompletionCatalog(workspaceId, "cli")]) : [];
     const available = records?.some((record) => record.kind === "user") ?? false;
     const ctx = context(workspaceId, agentId, adapter.id);
-    return turboStream("replace", ids.transcript(ctx), renderTranscriptContent(ctx, available, includeTranscript && available ? renderReadOnlyTranscript(ctx, records!) : ""));
+    const transcript = turboStream("replace", ids.transcript(ctx), renderTranscriptContent(ctx, available, includeTranscript && available ? renderReadOnlyTranscript(ctx, records!) : ""));
+    return catalog === undefined ? transcript : `${transcript}${turboStream("update", cliCompletionCatalogId(workspaceId, agentId), catalog)}`;
   }
   return {
     name: cliTranscriptChannelName(adapter),

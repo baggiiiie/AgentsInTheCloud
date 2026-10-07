@@ -9,7 +9,7 @@ import type { CliAgentAdapter } from "./adapter.ts";
 import { createCliAgents } from "./agents.ts";
 import { cliSocketHandler } from "./sockets.ts";
 import { cliComposerRoutes } from "./composer-routes.ts";
-import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
+import { cliCompletionCatalogId, cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
 export type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
 export type { CliAgentSession } from "./adapter.ts";
@@ -75,7 +75,7 @@ export function createCliAgentModule(adapter: CliAgentAdapter): WorkspaceModule 
                 })}
               </form>
               <div class="agent-completion-menu-host" data-agent-completions-target="menu" hidden></div>
-              <div data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
+              <div id="${cliCompletionCatalogId(workspaceId, agentId)}" data-agent-completions-target="catalog" hidden>${await renderWorkspaceCompletionCatalog(workspaceId, "cli")}</div>
             </div>
           </div>` : "";
           return `<section id="${domId("cli_agent", workspaceId, agentId)}" data-turbo-permanent class="cli-agent-body agent-composer-pane" data-controller="cli-terminal agent-composer composer-focus${composer ? " agent-attachments" : ""}" data-cli-terminal-url-value="${escapeHtml(url)}" data-cli-terminal-workspace-id-value="${escapeHtml(workspaceId)}" ${cliTranscriptAttributes(adapter, agentId)} ${composerAttachmentAttributes(draftId, rowId, `agents-in-the-cloud:workspace-pane-visible@window->cli-terminal#refresh agents-in-the-cloud:workspace-agent-focus->cli-terminal#focus agents-in-the-cloud:theme-change@document->cli-terminal#theme ${agentComposerActions}`)}>

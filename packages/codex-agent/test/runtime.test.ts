@@ -311,6 +311,25 @@ test("review operation IDs never become phantom turns and pending starts stay bu
 `));
 
 
+test("a finished turn reloads prompt templates it added for the composer", () => scenario(`
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const { workspaceWorkHostPath } = await import("@agents-in-the-cloud/workspace");
+  const id = await agents.create("workspace");
+  const runtime = await agents.ready("workspace", id);
+  await runtime.send(input, "first");
+  expect(runtime.completionCatalog).not.toContain('data-command-trigger="/ship"');
+  const prompts = workspaceWorkHostPath("workspace") + "/.agents-in-the-cloud/prompts";
+  await mkdir(prompts, { recursive: true });
+  await writeFile(prompts + "/ship.md", "---\\ncomposer-button: true\\n---\\nShip it");
+  connections[0].notification({ method: "turn/started", params: { threadId: "thread-1", turn: turn("turn-0", "inProgress") } });
+  connections[0].notification({ method: "turn/completed", params: { threadId: "thread-1", turn: turn("turn-0") } });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(runtime.isBusy).toBe(false);
+  expect(runtime.completionCatalog).toContain('data-command-trigger="/ship"');
+  await agents.disposeAll();
+`));
+
+
 test("native new starts a Codex thread without submitting an inference prompt", () => scenario(`
   const id = await agents.create("workspace");
   const runtime = await agents.ready("workspace", id);

@@ -1,11 +1,14 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, spyOn, test } from "bun:test";
+import { workspaceWorkHostPath } from "@agents-in-the-cloud/workspace";
 import { createAgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
 import { publishWorkspaceAgentBusy } from "../../agent/src/server/workspace-agent-busy.ts";
 import type { CliAgentAdapter } from "../src/server/adapter.ts";
 import type { CliAgents } from "../src/server/agents.ts";
-import { cliTranscriptChannel } from "../src/server/transcript-routes.ts";
+import { cliCompletionCatalogId, cliTranscriptChannel } from "../src/server/transcript-routes.ts";
 
-function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>) {
+function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>, workspaceId = "workspace") {
   const agentId = crypto.randomUUID();
   const adapter: CliAgentAdapter = {
     id: "review", label: "Review", iconHtml: "",
@@ -21,9 +24,9 @@ function fixture(loadTranscript: NonNullable<CliAgentAdapter["loadTranscript"]>)
   return {
     agentId,
     channel: cliTranscriptChannel(adapter, agents),
-    identifier: { channel: "module" as const, name: "review-transcript", workspaceId: "workspace", params: { agentId } },
+    identifier: { channel: "module" as const, name: "review-transcript", workspaceId, params: { agentId } },
     finishTurn() {
-      publishWorkspaceAgentBusy({ workspaceId: "workspace", agentKey: `agent:${agentId}`, busy: false });
+      publishWorkspaceAgentBusy({ workspaceId, agentKey: `agent:${agentId}`, busy: false });
     },
   };
 }
@@ -67,4 +70,27 @@ test("an initial history read failure still rejects channel subscription", async
   f.finishTurn();
   await Promise.resolve();
   expect(reads).toBe(1);
+});
+
+test("a finished turn refreshes the composer catalog with prompt templates it added", async () => {
+  const workspaceId = `catalog-${crypto.randomUUID()}`;
+  const f = fixture(async () => undefined, workspaceId);
+  const published: string[] = [];
+  const refreshed = Promise.withResolvers<void>();
+  const subscription = await f.channel.subscribe(f.identifier, (html) => {
+    published.push(html);
+    if (published.length === 2) refreshed.resolve();
+  }, createAgentsInTheCloudEventBus());
+  try {
+    expect(published[0]).not.toContain("/ship");
+    const prompts = join(workspaceWorkHostPath(workspaceId), ".agents-in-the-cloud/prompts");
+    await mkdir(prompts, { recursive: true });
+    await writeFile(join(prompts, "ship.md"), "---\ncomposer-button: true\nshortcut: s\n---\nShip it");
+    f.finishTurn();
+    await refreshed.promise;
+    expect(published[1]).toContain(`target="${cliCompletionCatalogId(workspaceId, f.agentId)}"`);
+    expect(published[1]).toContain('data-command-trigger="/ship"');
+  } finally {
+    subscription.unsubscribe();
+  }
 });

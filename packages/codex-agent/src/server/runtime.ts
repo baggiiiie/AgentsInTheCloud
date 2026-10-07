@@ -5,6 +5,7 @@ import { createLivePresentation, type WorkspaceAgentInput } from "@agents-in-the
 import { parseModelRef, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
 import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { revokeAgentMcp } from "@agents-in-the-cloud/agent/server";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import type {
   UserInput,
   TurnStartParams,
@@ -19,7 +20,7 @@ import type {
   ListMcpServerStatusResponse,
 } from "../protocol.ts";
 import type { Requests, CodexNotification } from "./protocol.ts";
-import { codexCommandMutates, type CodexCommand, type CodexCommandResult } from "./commands.ts";
+import { codexCommandMutates, codexSlashCommands, type CodexCommand, type CodexCommandResult } from "./commands.ts";
 import { CodexRpcError, type CodexRpc } from "./rpc.ts";
 import { CodexState } from "./state.ts";
 import { openCodexTransport } from "./transport.ts";
@@ -31,6 +32,8 @@ export class CodexRuntime {
   readonly state = new CodexState();
   instructions = "";
   private catalog: Model[] = [];
+  /** Slash commands and prompt templates; turns can add templates, so each finished turn reloads them. */
+  completionCatalog = "";
   failure?: Error;
   private transport!: Awaited<ReturnType<typeof openCodexTransport>>;
   private disposed = false;
@@ -49,8 +52,15 @@ export class CodexRuntime {
     if (busy !== this.busy) {
       this.busy = busy;
       publishWorkspaceAgentBusy({ workspaceId: this.workspaceId, agentKey: `agent:${this.agentId}`, busy });
-      if (!busy) void this.events.emit("workspace_agent_turn_finished", { workspaceId: this.workspaceId, agentId: this.agentId }).catch(error => console.error("Could not publish Codex turn completion", error));
+      if (!busy) {
+        void this.events.emit("workspace_agent_turn_finished", { workspaceId: this.workspaceId, agentId: this.agentId }).catch(error => console.error("Could not publish Codex turn completion", error));
+        void this.refreshCompletionCatalog().catch(error => console.error("Could not refresh Codex completions", error));
+      }
     }
+    this.presentation.invalidate();
+  }
+  async refreshCompletionCatalog() {
+    this.completionCatalog = await renderWorkspaceCompletionCatalog(this.workspaceId, "cli", codexSlashCommands);
     this.presentation.invalidate();
   }
   static async open(workspaceId: string, record: CodexAgentRecord, save: () => void, events: AgentsInTheCloudEventBus) {
