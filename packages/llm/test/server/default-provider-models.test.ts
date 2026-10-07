@@ -67,9 +67,9 @@ describe("provider setup defaults", () => {
   test("uses the price rule when curated IDs are absent from the account catalogue", () => {
     expect(defaultProviderModels("anthropic", [model("claude-opus-4-8", 10), model("claude-haiku-4-5", 1)])[0]!.id).toBe("claude-opus-4-8");
   });
-  test("highlights OpenAI, which supersedes the Codex provider", () => {
-    expect(getPopularProviderRank("openai")).toBe(0);
-    expect(getPopularProviderRank("openai-codex")).toBeUndefined();
+  test("highlights Codex and leaves OpenAI in the other providers list", () => {
+    expect(getPopularProviderRank("openai-codex")).toBe(0);
+    expect(getPopularProviderRank("openai")).toBeUndefined();
     expect(getPopularProviderRank("google")).toBeUndefined();
   });
   test("drops the Claude brand prefix from model names", () => {

@@ -84,7 +84,9 @@ function providerIcon(provider: string, label: string): string {
 
 /** What the card says in place of usage limits; undefined when it can show them. */
 function usageNote(account: Account): string | undefined {
-  if (account.connection === "needs_attention") return "Sign in again to use this provider and see its usage.";
+  if (account.connection === "needs_attention") return supportedUsageProviders.some((supported) => supported.id === account.provider)
+    ? "Sign in again to use this provider and see its usage."
+    : "Sign in again to use this provider.";
   if (account.method !== "subscription") return "API keys don’t have usage limits to show.";
   if (account.provider === "openai") return "Check your subscription usage on ChatGPT.";
   if (!supportedUsageProviders.some((supported) => supported.id === account.provider)) return `AgentsInTheCloud can’t read ${account.label} usage limits yet.`;
@@ -100,17 +102,16 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
     ? actionLinkHtml({ href: "https://chatgpt.com/settings/usage", variant: "secondary", content: { kind: "caption", caption: "View usage on ChatGPT" }, attributesHtml: 'target="_blank" rel="noreferrer"' })
     : "";
   const usage = note
-    ? `<p class="usage-caption">${escapeHtml(note)}</p>${usageLink}`
+    ? `<p class="usage-caption">${escapeHtml(note)}</p>${usageLink ? `<div class="model-account__actions">${usageLink}</div>` : ""}`
     : `<turbo-frame class="model-provider-usage" id="${providerUsageFrameId("limits", account.id, host)}" src="${usagePath}/limits?scope=${host}" loading="lazy"><p class="usage-caption" role="status"><span class="status-spinner" aria-hidden="true"></span> Checking usage…</p></turbo-frame>`;
   const notice = account.provider === "anthropic" && account.method === "subscription" ? warningBannerHtml(anthropicSubscriptionNotice) : "";
-  const reconnect = account.method === "subscription"
-    ? `<form method="post" action="/models/providers/${encodeURIComponent(account.provider)}/connect?${hostQuery(host)}&method=oauth" data-turbo="true">${buttonHtml({ type: "submit", variant: account.connection === "needs_attention" ? "primary" : "secondary", content: { kind: "caption", caption: "Sign in again" } })}</form>`
+  const reconnect = account.method === "subscription" && account.connection === "needs_attention"
+    ? `<form method="post" action="/models/providers/${encodeURIComponent(account.provider)}/connect?${hostQuery(host)}&method=oauth" data-turbo="true">${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Sign in again" } })}</form>`
     : "";
-  const forgetCaption = `Forget ${account.label}`;
-  const forget = `<form method="post" action="/models/providers/${encodeURIComponent(account.provider)}/forget?${hostQuery(host)}" data-turbo="true">${destructiveConfirmationHtml({
+  const disconnect = `<form method="post" action="/models/providers/${encodeURIComponent(account.provider)}/forget?${hostQuery(host)}" data-turbo="true">${destructiveConfirmationHtml({
     id: domId("forget_provider", host, account.id),
-    trigger: { type: "button", variant: "secondary", content: { kind: "caption", caption: forgetCaption } },
-    confirmCaption: forgetCaption,
+    trigger: { type: "button", variant: "danger", content: { kind: "caption", caption: "Disconnect" } },
+    confirmCaption: "Disconnect",
     cancelCaption: "Cancel",
   })}</form>`;
   const summary = {
@@ -121,7 +122,7 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
     leadingHtml: providerIcon(account.provider, account.label),
     trailingHtml: rings,
   };
-  return `<div class="model-account">${disclosureHtml({ summary, open: open || account.connection === "needs_attention", bodyHtml: `<div class="form-section">${notice}${usage}<div class="model-account__actions">${reconnect}${forget}</div></div>` })}</div>`;
+  return `<div class="model-account">${disclosureHtml({ summary, open: open || account.connection === "needs_attention", bodyHtml: `<div class="form-section">${notice}${usage}<div class="model-account__actions">${reconnect}${disconnect}</div></div>` })}</div>`;
 }
 
 function renderProviderChoice(provider: ProviderChoice, host: ModelsHost, width: "fit" | "fill" = "fit"): string {
@@ -334,9 +335,16 @@ function renderConnectionStep(provider: Pick<ProviderChoice, "provider" | "label
     <div class="model-setup-actions">${options.actionsHtml ?? backToChoices(host)}</div>
   </div>`);
 }
+function openAISignInNotice(provider: string): string {
+  return provider === "openai" ? warningBannerHtml({
+    title: "We recommend ChatGPT / Codex instead",
+    message: "For a ChatGPT subscription, use the ChatGPT / Codex login flow. It works with both the builtin agent and Pi.",
+  }) : "";
+}
+
 function renderConnectionMethods(provider: ProviderChoice, host: ModelsHost): string {
   return renderConnectionStep(provider, host, {
-    bodyHtml: `<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}&method=${method}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>`,
+    bodyHtml: `${openAISignInNotice(provider.provider)}<div class="model-setup-choices">${provider.methods.map((method) => `<form method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}&method=${method}" data-turbo="true">${buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: method === "oauth" ? "Use subscription" : "Use API key" } })}</form>`).join("")}</div>`,
   });
 }
 function renderApiKeyConnectionStep(provider: ProviderChoice, host: ModelsHost, error = ""): string {
@@ -462,7 +470,7 @@ function oauthStatus(kind: "pending" | "done", title: string, detail: string): s
 }
 
 function oauthAuthenticationAction(flow: PendingOAuthFlow, url: string, hidden = false, caption?: string): string {
-  const authenticationName = flow.provider === "openai-codex" ? "OpenAI" : flow.label;
+  const authenticationName = flow.provider === "openai-codex" || flow.provider === "openai" ? "OpenAI" : flow.label;
   return actionLinkHtml({
     href: url,
     variant: "primary",
@@ -558,7 +566,7 @@ function renderOAuthConnectionStep(flow: PendingOAuthFlow): string {
       ? `<form method="post" action="${oauthFlowPath(flow, "cancel")}" data-turbo="true">${backButton}</form>${flow.prompt ? submitUrlButton : ""}`
       : `<form method="post" action="${oauthFlowPath(flow, "finish")}" data-turbo="true">${backButton}</form>`;
   return renderConnectionStep(flow, flow.host, {
-    bodyHtml: body,
+    bodyHtml: `${flow.status !== "complete" ? openAISignInNotice(flow.provider) : ""}${body}`,
     actionsHtml: action,
     attributesHtml: `data-controller="oauth-flow" data-oauth-flow-status-url-value="${oauthFlowPath(flow, "status")}?revision=${flow.revision}" data-oauth-flow-active-value="${flow.status === "pending" && !(flow.prompt && !flow.authUrl && !flow.verificationUri)}" data-oauth-flow-poll-ms-value="${pollMs}"`,
   });

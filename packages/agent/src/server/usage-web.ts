@@ -69,7 +69,7 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
       <span>${reset}</span>
       </div>
       <div class="usage-metrics-row">
-      <span>Estimated time to hit limit ${estimatedTimeToHitLimit} ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>
+      <span>Estimated time to hit limit: ${estimatedTimeToHitLimit} ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>
       <span>Pace ${pace} ${helpTipHtml({ label: "What is pace?", text: "How your usage compares to spreading it evenly over the window. Ahead means you're using it faster than that, behind means you have room to spare." })}</span>
       </div>
     </div>
