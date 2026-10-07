@@ -508,5 +508,22 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
 
 export const agentsInTheCloudClientModule: WorkspaceClientModule = {
   id: "changes",
-  install({ application, Controller }) { application.register("deletion-review", createDeletionReviewController(Controller)); application.register("changes", createChangesController(Controller)); application.register("changes-edit", createChangesEditController(Controller)); application.register("review-copy", createReviewCopyController(Controller)); application.register("changes-diff-endpoints", createDiffEndpointsController(Controller)); },
+  install({ application, Controller, hooks }) {
+    application.register("deletion-review", createDeletionReviewController(Controller));
+    application.register("changes", createChangesController(Controller));
+    application.register("changes-edit", createChangesEditController(Controller));
+    application.register("review-copy", createReviewCopyController(Controller));
+    application.register("changes-diff-endpoints", createDiffEndpointsController(Controller));
+    hooks.onBecomeVisible(({ pane }) => {
+      // Let Stimulus connect newly inserted views before requesting the refresh.
+      requestAnimationFrame(() => {
+        if (pane.dataset.workspaceSurfaceVisible !== "true") return;
+        const element = pane.querySelector("[data-controller~='changes-diff-endpoints']");
+        if (!element) return;
+        // SAFETY: This element belongs to the controller registered above.
+        const controller = application.getControllerForElementAndIdentifier(element, "changes-diff-endpoints") as InstanceType<ReturnType<typeof createDiffEndpointsController>>;
+        controller.refresh();
+      });
+    });
+  },
 };
