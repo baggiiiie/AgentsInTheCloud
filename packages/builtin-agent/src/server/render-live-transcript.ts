@@ -1,6 +1,6 @@
 import { escapeHtml, liveCollection, type LiveRegion } from "@agents-in-the-cloud/shared";
 import { commentaryContext, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
-import { renderModelContextEntries, renderTranscriptItem, workingCommentaryItems, type AgentModelContextView } from "@agents-in-the-cloud/agent/server/render-transcript";
+import { renderModelContextEntries, renderTranscriptItem, renderWorkingSection, workingCommentaryItems, type AgentModelContextView } from "@agents-in-the-cloud/agent/server/render-transcript";
 import type { TranscriptItem, WorkingTranscriptItem } from "@agents-in-the-cloud/agent/server/transcript";
 
 export class LiveTranscriptRenderer {
@@ -10,18 +10,20 @@ export class LiveTranscriptRenderer {
   private rows(ctx: AgentRenderContext, items: readonly TranscriptItem[], initial = false) {
     return items.map(item => {
       const children: LiveRegion[] = [];
-      let view = item;
+      let commentaryIslands: string | undefined;
       if (item.type === "working" && !initial) {
-        view = { ...item, items: item.items.filter(child => child.type !== "text") };
         const commentary = commentaryContext(ctx);
-        children.push(liveCollection(ids.workingItems(commentary, item.key), this.rows(commentary, workingCommentaryItems(item))));
+        const collection = liveCollection(ids.workingItems(commentary, item.key), this.rows(commentary, workingCommentaryItems(item)));
+        commentaryIslands = collection.html;
+        children.push(collection);
       }
       const rendering = !initial && item.type === "text" && item.live ? ctx.streamingText!(item.key, item.text) : undefined;
       const key = ids.item(ctx, item.key);
       const fingerprint = initial || item.type === "working" || item.type === "extension" ? undefined : JSON.stringify(rendering ? { ...item, text: "" } : item);
       const cached = this.cache.get(key);
       const html = fingerprint !== undefined && cached?.fingerprint === fingerprint ? cached.html
-        : renderTranscriptItem(rendering ? { ...ctx, streamingText: () => ({ stableHtml: "", tailHtml: "" }) } : ctx, view);
+        : item.type === "working" && commentaryIslands !== undefined ? renderWorkingSection(ctx, item, commentaryIslands)
+        : renderTranscriptItem(rendering ? { ...ctx, streamingText: () => ({ stableHtml: "", tailHtml: "" }) } : ctx, item);
       if (fingerprint !== undefined) this.cache.set(key, { fingerprint, html });
       if (rendering) children.push(
         { target: ids.itemTextStable(ctx, item.key), html: rendering.stableHtml, appendOnly: true },

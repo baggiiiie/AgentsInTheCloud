@@ -55,7 +55,9 @@ function renderUserMessage(ctx: AgentRenderContext, user: Extract<TranscriptItem
 
 function renderStreamingTextBody(ctx: AgentRenderContext, key: string, text: string, className: string): string {
   const snapshot = ctx.streamingText?.(key, text) ?? renderStreamingMarkdownSnapshot(ctx.workspaceId, text);
-  return `<div class="${className} agent-stream-markdown" data-controller="agent-streaming-text" id="${ids.itemText(ctx, key)}"><div id="${ids.itemTextStable(ctx, key)}">${snapshot.stableHtml}</div><div id="${ids.itemTextTail(ctx, key)}">${snapshot.tailHtml}</div></div>`;
+  // Live streaming text is owned by its own regions; morphing the row must not blank it.
+  const island = ctx.streamingText ? " data-turbo-permanent" : "";
+  return `<div class="${className} agent-stream-markdown" data-controller="agent-streaming-text" id="${ids.itemText(ctx, key)}"><div id="${ids.itemTextStable(ctx, key)}"${island}>${snapshot.stableHtml}</div><div id="${ids.itemTextTail(ctx, key)}"${island}>${snapshot.tailHtml}</div></div>`;
 }
 
 export function renderTranscriptItem(ctx: AgentRenderContext, item: TranscriptItem, options: { live?: boolean; open?: boolean } = {}): string {
@@ -99,11 +101,12 @@ export function workingCommentaryItems(section: WorkingTranscriptItem): Transcri
   return section.items.filter((item) => item.type === "text");
 }
 
-function renderWorkingSection(ctx: AgentRenderContext, section: WorkingTranscriptItem): string {
+/** Live renderers pass the commentary collection's islands so morphing the turn keeps its rows mounted. */
+export function renderWorkingSection(ctx: AgentRenderContext, section: WorkingTranscriptItem, commentaryHtml?: string): string {
   if (section.completedAt !== undefined && section.items.length === 0 && !section.timing) return "";
   const summary = workingSummary(ctx, section);
   const commentary = commentaryContext(ctx);
-  const commentaryHtml = workingCommentaryItems(section).map((item) => renderTranscriptItem(commentary, item)).join("");
+  commentaryHtml ??= workingCommentaryItems(section).map((item) => renderTranscriptItem(commentary, item)).join("");
   const revealing = Boolean(ctx.revealTarget && section.items.some((item) => item.anchor === ctx.revealTarget || item.key === ctx.revealTarget));
   const attributes = ctx.readOnly ? "" : ctx.inlineWorkingItems ? `data-agent-turn-turn-id-value="${escapeHtml(section.key)}"` : `data-controller="agent-turn" data-agent-turn-workspace-id-value="${escapeHtml(ctx.workspaceId)}" data-agent-turn-agent-id-value="${escapeHtml(ctx.agentId)}" data-agent-turn-turn-id-value="${escapeHtml(section.key)}" data-agent-turn-branch-id-value="${escapeHtml(ctx.branchId ?? "")}"${revealing ? ` data-agent-turn-reveal-value="${escapeHtml(ctx.revealTarget!)}"` : ""} data-action="toggle->agent-turn#toggle"`;
   const items = ctx.readOnly || ctx.inlineWorkingItems ? renderWorkingContent(ctx, section) : "";
