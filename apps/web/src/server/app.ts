@@ -307,17 +307,17 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     })}</turbo-frame>`;
   }
 
-  async function renderEmptyLaunchComposerFrame(): Promise<string> {
+  async function renderEmptyLaunchComposerFrame(autoSelect = false): Promise<string> {
     return await renderLaunchComposerFrame({
       titleCaption: "Create empty workspace, and then…",
-      action: "/agent-workspaces",
+      action: `/agent-workspaces${autoSelect ? "?autoSelect=true" : ""}`,
     });
   }
 
-  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary): Promise<string> {
+  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary, autoSelect = false): Promise<string> {
     return await renderLaunchComposerFrame({
       titleCaption: `Create workspace from ${workspaceTemplate.name}, and then…`,
-      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}`,
+      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}${autoSelect ? "?autoSelect=true" : ""}`,
       workspaceTemplateId: workspaceTemplate.id,
     });
   }
@@ -803,7 +803,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       launchComposerSubmissions.set(submissionId, launch);
     }
     const { id, isFirstWorkspace } = await launch;
-    return turboStreamResponse(`${update(launchComposerFrameId, "")}${isFirstWorkspace ? selectWorkspaceTurboStream(id) : ""}`);
+    return turboStreamResponse(`${update(launchComposerFrameId, "")}${isFirstWorkspace || new URL(request.url).searchParams.get("autoSelect") === "true" ? selectWorkspaceTurboStream(id) : ""}`);
   }
 
   async function createEmptyAgentWorkspaceEndpoint(request: Request): Promise<Response> {
@@ -1178,9 +1178,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(agentsInTheCloudOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
     if (url.pathname === "/launch-composer" && request.method === "GET") {
       const workspaceTemplateReference = url.searchParams.get("workspaceTemplate");
+      const autoSelect = url.searchParams.get("autoSelect") === "true";
       return response(workspaceTemplateReference
-        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference))
-        : await renderEmptyLaunchComposerFrame());
+        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference), autoSelect)
+        : await renderEmptyLaunchComposerFrame(autoSelect));
     }
     if (url.pathname === "/launch-composer/agent-type" && request.method === "GET") return response(await renderLaunchAgentType(getAgentType(url.searchParams.get("agentTypeId") ?? "builtin"), await orderedAgentTypes(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await getAgentType(url.searchParams.get("agentTypeId") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));

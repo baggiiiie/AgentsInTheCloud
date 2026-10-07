@@ -207,6 +207,7 @@ function renderWorkspaceTemplatePicker(presentation: WorkspacePanePresentation, 
     : "";
   return `<form class="workspace-template-picker" method="get" action="/launch-composer" data-turbo-frame="launch_composer" data-turbo="true" data-action="submit->workspace-pane#submitted keydown.esc->workspace-pane#back">
     <input type="hidden" name="workspaceTemplate" value="" data-workspace-pane-target="value">
+    <input type="hidden" name="autoSelect" value="true">
     <div class="workspace-template-picker-scroll">${renderWorkspaceTemplateOptions(presentation)}</div>
   </form>${tip}`;
 }
