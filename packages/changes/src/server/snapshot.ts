@@ -12,7 +12,6 @@ export interface ChangesHistory extends HistoryModel {
   indexTree: string;
   emptyTree: string;
   upstreamId?: string;
-  branch?: string;
   hasStaged: boolean;
   aheadIds: Set<string>;
   hasMore: boolean;
