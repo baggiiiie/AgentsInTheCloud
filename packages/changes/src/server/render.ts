@@ -1,5 +1,6 @@
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { canEditFile, type EditModel } from "../editing.ts";
+import { canRevertFile } from "../reverting.ts";
 import { renderEditFeedback, renderFileEditActions } from "./editing-render.ts";
 import { workingTree } from "./snapshot.ts";
 import { placeReviewComments, reviewComments } from "./comments.ts";
@@ -104,7 +105,10 @@ function renderImageFile(workspaceId: string, snapshot: ChangesSnapshot, file: C
 
 export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, collapsed: boolean): string {
   const comments = placeReviewComments(reviewComments.list(workspaceId), snapshot);
-  const files = snapshot.stats.map(file => ({ ...file, image: !!snapshot.files.get(file.path)!.images, editable: snapshot.endpoints.target === workingTree && canEditFile(snapshot.files.get(file.path)!) }));
+  const files = snapshot.stats.map(file => {
+    const captured = snapshot.files.get(file.path)!, working = snapshot.endpoints.target === workingTree;
+    return { ...file, image: !!captured.images, editable: working && canEditFile(captured), revertible: working && canRevertFile(captured) };
+  });
   const items: CodeViewItem<undefined>[] = files.filter(file => !file.image).map((file) => {
     const captured = snapshot.files.get(file.path)!;
     if (!captured.diff) return fileItem(captured, snapshot.id, 0, file.editable);
@@ -129,7 +133,8 @@ export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, colla
     trailingHtml: `${renderRename(file)}<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}</span>`,
     element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="${!collapsed}"` },
   })}${file.editable ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Edit" }, attributesHtml: `data-action="changes-edit#begin" data-path="${escapeHtml(file.path)}" aria-label="Edit ${escapeHtml(file.path)}"${collapsed ? " hidden" : ""}` }) + renderFileEditActions() : ""}</div></template>`).join("");
-  const commentTemplates = `<template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
+  const commentTemplates = `<template data-changes-target="revertBlock"><div class="changes-revert-block">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Revert hunk" }, attributesHtml: 'data-action="changes-edit#revertBlock"' })}</div></template>
+    <template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
     <template data-changes-target="commentEditor"><form class="changes-comment changes-comment-editor" data-action="submit->changes#saveComment keydown.meta+enter->changes#commentShortcut keydown.ctrl+enter->changes#commentShortcut keydown.esc->changes#cancelComment"><textarea class="textarea" rows="3" required maxlength="10000" aria-label="Comment" placeholder="Leave a comment" data-action="input->changes#commentInput"></textarea><footer><span class="changes-comment-footer-space"></span>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Discard" }, attributesHtml: 'data-action="changes#cancelComment"' })}${buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Comment" } })}</footer></form></template>
     <template data-changes-target="commentCard"><article class="changes-comment changes-comment-card">${contentRowHtml({ width: "fill", kind: "multiline", label: { kind: "text", text: "Comment", textAttributesHtml: "data-comment-body" }, element: { tag: "button", attributesHtml: 'type="button" aria-label="Edit comment" data-action="changes#editComment"' } })}<div class="changes-comment-tools">${renderCopyCommentButton()}${iconButton("Delete comment", "deleteComment", Icons.Trash)}</div></article></template>`;
   const empty = snapshot.index.phase === "not-git" ? "This workspace isn’t a Git repository." : snapshot.endpoints.target === workingTree && snapshot.base === (snapshot.history.head ?? snapshot.history.emptyTree) ? "No uncommitted changes." : snapshot.label === "Unstaged changes" ? "No unstaged changes." : snapshot.label === "Staged changes" ? "No staged changes." : "No changed files in this comparison.";

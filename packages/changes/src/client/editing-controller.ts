@@ -1,13 +1,13 @@
 // @ts-expect-error Turbo ships no TypeScript declarations.
 import { visit } from "@hotwired/turbo";
-import type { CodeView, CodeViewOptions } from "@pierre/diffs";
-import type { EditorChangeEvent } from "@pierre/diffs/edit";
+import type { CodeView, CodeViewOptions, DiffLineAnnotation, FileDiffMetadata } from "@pierre/diffs";
+import type { Editor, EditorChangeEvent } from "@pierre/diffs/edit";
 import { copyTextToClipboard, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
-import type { CommentAnnotation } from "../comments.ts";
+import { changeBlocks, revertAnchor, revertBlockEdit, type ChangesAnnotation } from "../reverting.ts";
 import { diskContents, editorContents, type EditModel, type EditedCommentRange } from "../editing.ts";
 import { moveCommentRanges } from "../editing-ranges.ts";
 
-type Viewer = CodeView<CommentAnnotation, undefined>;
+type Viewer = CodeView<ChangesAnnotation, undefined>;
 type Stream = { targetElements: HTMLElement[] };
 
 /** Both fresh Pierre headers and session updates use the same file-row state. */
@@ -36,7 +36,7 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
     declare readonly dialogErrorTarget: HTMLElement;
     private connection!: AbortController;
     private viewer?: Viewer;
-    private configure?: (options: CodeViewOptions<CommentAnnotation, undefined>) => void;
+    private configure?: (options: CodeViewOptions<ChangesAnnotation, undefined>) => void;
     private model?: EditModel;
     private text = "";
     private ranges: EditedCommentRange[] = [];
@@ -46,6 +46,9 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
     private starting = false;
     private accepted = false;
     private continuation?: () => void;
+    private editor?: Editor<"file" | "file-diff", ChangesAnnotation, undefined>;
+    /** Reverting rewrites the draft, so its hunks follow the base and the current draft. */
+    private reverting?: { base: string; comments: DiffLineAnnotation<ChangesAnnotation>[]; diff: FileDiffMetadata; signature: string; parse: typeof import("@pierre/diffs").parseDiffFromFile };
 
     connect(): void {
       this.connection = new AbortController();
@@ -98,30 +101,36 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
       try {
         const data = new FormData(); data.set("snapshot", this.snapshotIdValue); data.set("path", path);
         // Load first so a failed editor import cannot abandon an acquired lease.
-        const [{ Editor }, { editorThemeCSS }] = await Promise.all([import("@pierre/diffs/edit"), import("@agents-in-the-cloud/syntax/pierre")]);
+        const [{ Editor }, { editorThemeCSS }, { parseDiffFromFile }] = await Promise.all([import("@pierre/diffs/edit"), import("@agents-in-the-cloud/syntax/pierre"), import("@pierre/diffs")]);
         const tokenCSS = await editorThemeCSS();
         const html = await this.request("begin", data);
         const document = new DOMParser().parseFromString(html, "text/html");
         // SAFETY: The begin endpoint emits our typed edit lease in an HTML data island.
         const model = JSON.parse(document.querySelector("script[data-changes-edit-model]")!.textContent!) as EditModel;
         if (this.connection.signal.aborted) { await this.release(model.token); return; }
-        this.element.dispatchEvent(new CustomEvent("changes-edit:viewer", { detail: { receive: (viewer: Viewer, configure: (options: CodeViewOptions<CommentAnnotation, undefined>) => void) => { this.viewer = viewer; this.configure = configure; } } }));
+        this.element.dispatchEvent(new CustomEvent("changes-edit:viewer", { detail: { receive: (viewer: Viewer, configure: (options: CodeViewOptions<ChangesAnnotation, undefined>) => void) => { this.viewer = viewer; this.configure = configure; } } }));
         this.model = model;
         const original = this.viewer!.getItem(path)!;
         this.text = editorContents(model.contents);
         this.accepted = false;
-        this.ranges = (original.annotations ?? []).filter(annotation => annotation.metadata.side === "additions" && annotation.metadata.kind === "comment").map(({ metadata }) => ({ id: metadata.id, revision: metadata.revision!, start: metadata.start, end: metadata.end }));
+        this.ranges = (original.annotations ?? []).flatMap(({ metadata }) => metadata.kind === "comment" && metadata.side === "additions" ? [{ id: metadata.id, revision: metadata.revision!, start: metadata.start, end: metadata.end }] : []);
         this.history.set(0, structuredClone(this.ranges));
         let focused = false;
         this.configure!({
           unsafeCSS: tokenCSS,
           createEditor: (type, options, key) => new Editor(type, { ...options, onAttach: editor => {
+            this.editor = editor;
             if (!focused) { focused = true; requestAnimationFrame(() => editor.focus({ lineNumber: model.contents ? "first-visible" : 1, preventScroll: true })); }
           } }, key),
           onItemEditChange: event => this.changed(event),
           onItemEditComplete: () => this.accepted ? "accept" : "reject",
         });
-        this.viewer!.updateItem({ ...original, edit: true, collapsed: false, version: (original.version ?? 0) + 1 });
+        if (original.type === "diff" && this.revertible(path)) {
+          const base = editorContents(original.fileDiff.deletionLines.join(""));
+          this.reverting = { base, comments: original.annotations ?? [], diff: original.fileDiff, signature: "", parse: parseDiffFromFile };
+          this.diffDraft(path);
+          this.viewer!.updateItem({ ...original, annotations: this.annotations(path), edit: true, collapsed: false, version: (original.version ?? 0) + 1 });
+        } else this.viewer!.updateItem({ ...original, edit: true, collapsed: false, version: (original.version ?? 0) + 1 });
         this.viewer!.scrollTo({ type: "item", id: path, align: "start" });
 
       } catch (error) {
@@ -136,7 +145,7 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
         this.renderAvailability();
       }
     }
-    private changed(event: EditorChangeEvent<"file" | "file-diff", CommentAnnotation, undefined>): void {
+    private changed(event: EditorChangeEvent<"file" | "file-diff", ChangesAnnotation, undefined>): void {
       if (!this.model) return;
       this.text = event.file.contents;
       const document = event.editor.getEditState()!.document;
@@ -149,6 +158,15 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
       if (last) this.historyEntries.add(last);
       const versions = new Set([document.version, ...[...undoStack, ...redoStack].flatMap(entry => [entry.versionBefore, entry.versionAfter])]);
       for (const version of this.history.keys()) if (!versions.has(version)) this.history.delete(version);
+      if (this.reverting && this.diffDraft(this.model.path)) {
+        const path = this.model.path;
+        // Pierre is still applying this change; replace the session's annotations once it has finished.
+        queueMicrotask(() => {
+          if (this.model?.path !== path) return;
+          const item = this.viewer!.getItem(path)!;
+          if (item.type === "diff") this.viewer!.updateItem({ ...item, annotations: this.annotations(path), version: (item.version ?? 0) + 1 });
+        });
+      }
       this.renderAvailability();
     }
     private renderAvailability(): void {
@@ -161,7 +179,10 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
     private finish(accept: boolean): void {
       this.accepted = accept;
       const item = this.viewer!.getItem(this.model!.path)!;
-      this.viewer!.updateItem({ ...item, edit: false, version: (item.version ?? 0) + 1 });
+      if (item.type === "diff" && this.reverting) this.viewer!.updateItem({ ...item, annotations: this.reverting.comments, edit: false, version: (item.version ?? 0) + 1 });
+      else this.viewer!.updateItem({ ...item, edit: false, version: (item.version ?? 0) + 1 });
+      this.reverting = undefined;
+      this.editor = undefined;
       delete this.element.dataset.codeEditing;
       this.model = undefined;
       this.history.clear();
@@ -202,6 +223,39 @@ export function createChangesEditController(Controller: WorkspaceClientControlle
         console.error(error);
         return false;
       } finally { this.busy = false; if (this.element.isConnected) this.renderAvailability(); }
+    }
+    private revertible(path: string): boolean {
+      // SAFETY: The viewer model is the server-rendered list of files and their revert availability.
+      const files = (JSON.parse(this.element.querySelector('script[data-changes-target="model"]')!.textContent!) as { files: { path: string; revertible: boolean }[] }).files;
+      return files.some(file => file.path === path && file.revertible);
+    }
+    /** Re-diffs the draft against the base; reports whether the revert buttons moved. */
+    private diffDraft(path: string): boolean {
+      const reverting = this.reverting!;
+      reverting.diff = reverting.parse({ name: path, contents: reverting.base }, { name: path, contents: this.text }, { context: 3 });
+      const signature = JSON.stringify(changeBlocks(reverting.diff).map(revertAnchor));
+      if (signature === reverting.signature) return false;
+      reverting.signature = signature;
+      return true;
+    }
+    /** Comments keep their tracked positions; every hunk gets a revert button above it. */
+    private annotations(path: string): DiffLineAnnotation<ChangesAnnotation>[] {
+      const { comments, diff } = this.reverting!;
+      const positions = new Map(this.ranges.map(range => [range.id, range]));
+      const moved = comments.map(annotation => {
+        const range = annotation.metadata.kind === "comment" && annotation.metadata.side === "additions" ? positions.get(annotation.metadata.id) : undefined;
+        return range && annotation.metadata.kind === "comment" ? { ...annotation, lineNumber: range.end, metadata: { ...annotation.metadata, start: range.start, end: range.end } } : annotation;
+      });
+      return [...moved, ...changeBlocks(diff).map(block => ({ ...revertAnchor(block), metadata: { kind: "revert" as const, path, block: block.index } }))];
+    }
+    revertBlock(event: Event): void {
+      if (!this.reverting || this.busy) return;
+      // SAFETY: Revert buttons are cloned into annotations carrying their hunk index.
+      const index = Number((event.currentTarget as HTMLElement).closest<HTMLElement>("[data-block]")!.dataset.block);
+      const { diff } = this.reverting;
+      this.editor!.applyEdits([revertBlockEdit(diff, changeBlocks(diff)[index]!)]);
+      // The clicked button is replaced with the new hunks; keep typing and undo in the editor.
+      this.editor!.focus({ preventScroll: true });
     }
     async copy(): Promise<void> {
       try { await copyTextToClipboard(this.text); this.statusTarget.textContent = "Copied edits"; }

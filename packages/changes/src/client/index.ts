@@ -2,6 +2,7 @@ import { createChangesEditController, syncFileEditButtons } from "./editing-cont
 import { showButtonConfirmation } from "@agents-in-the-cloud/design-system/button-confirmation/client";
 import { createReviewCopyController } from "./review-copy-controller.ts";
 import { exportReviewComments, type CommentAnnotation, type CommentPlacement } from "../comments.ts";
+import type { ChangesAnnotation, RevertAnnotation } from "../reverting.ts";
 import { createDeletionReviewController } from "./deletion-controller.ts";
 import type { CodeView, CodeViewItem, CodeViewOptions, CodeViewDiffItem, VirtualizedFileDiff, SelectedLineRange } from "@pierre/diffs";
 import { copyTextToClipboard, type WorkspaceClientModule, type WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
@@ -18,8 +19,9 @@ type FileSummary = { path: string };
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
     declare readonly element: HTMLElement;
-    static targets = ["imageFile", "imageHost", "viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
+    static targets = ["revertBlock", "imageFile", "imageHost", "viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
     static values = { workspaceId: String, snapshotId: String, collapsed: Boolean };
+    declare readonly revertBlockTarget: HTMLTemplateElement;
     declare readonly imageFileTargets: HTMLDetailsElement[];
     declare readonly imageHostTarget: HTMLElement;
     declare readonly viewerTarget: HTMLElement;
@@ -39,7 +41,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     declare readonly workspaceIdValue: string;
     declare readonly snapshotIdValue: string;
     declare readonly collapsedValue: boolean;
-    private viewer?: CodeView<CommentAnnotation, undefined>;
+    private viewer?: CodeView<ChangesAnnotation, undefined>;
     private comments = new Map<string, CommentAnnotation>();
     private draft?: CommentAnnotation;
     private draftInList = false;
@@ -54,7 +56,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     private loaded = new Set<string>();
     private pending = new Set<string>();
     private abort?: AbortController;
-    private options: CodeViewOptions<CommentAnnotation, undefined> = {};
+    private options: CodeViewOptions<ChangesAnnotation, undefined> = {};
     private layout: "unified" | "split" = "unified";
     private wrap = true;
     private collapsed = false;
@@ -90,7 +92,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       for (const radio of this.element.querySelectorAll<HTMLElement>("[data-layout]")) radio.setAttribute("aria-checked", String(radio.dataset.layout === this.layout));
       this.element.querySelector('[data-action="changes#toggleWrap"]')!.setAttribute("aria-checked", String(this.wrap));
       // SAFETY: renderChanges emits this private model with type-matched loading items.
-      const model = JSON.parse(this.modelTarget.textContent!) as { items: CodeViewItem<CommentAnnotation>[]; files: (FileSummary & { image: boolean })[] };
+      const model = JSON.parse(this.modelTarget.textContent!) as { items: CodeViewItem<ChangesAnnotation>[]; files: (FileSummary & { image: boolean })[] };
       this.files = model.files.filter(file => !file.image);
       // SAFETY: The edit controller transfers only file disclosure booleans in this presentation model.
       const disclosure = new Map(Object.entries(JSON.parse(shell.dataset.changesFileCollapse ?? "{}") as Record<string, boolean>));
@@ -113,7 +115,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
           this.gutters.set(button, { path: context.item.id, hovered });
           return button;
         },
-        renderAnnotation: (annotation) => this.renderComment(annotation.metadata),
+        renderAnnotation: ({ metadata }) => metadata.kind === "revert" ? this.renderRevert(metadata) : this.renderComment(metadata),
         renderCodeViewHeader: () => this.imageHostTarget,
         renderCodeViewFooter: () => this.orphanHostTarget,
         diffStyle: this.layout,
@@ -129,7 +131,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         },
         renderCustomHeader: (_file, context) => this.header(context.item.id, context.item.collapsed === true),
       };
-      this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
+      this.viewer = new CodeView<ChangesAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: disclosure.get(item.id) ?? this.collapsed })));
       const scroll = Number(shell.dataset.changesScroll ?? 0);
@@ -171,7 +173,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       if (this.viewer) this.syncCollapseControl();
     }
 
-    shareViewer(event: CustomEvent<{ receive(viewer: CodeView<CommentAnnotation, undefined>, configure: (options: CodeViewOptions<CommentAnnotation, undefined>) => void): void }>): void {
+    shareViewer(event: CustomEvent<{ receive(viewer: CodeView<ChangesAnnotation, undefined>, configure: (options: CodeViewOptions<ChangesAnnotation, undefined>) => void): void }>): void {
       event.detail.receive(this.viewer!, options => {
         if (options.unsafeCSS !== undefined) options = { ...options, unsafeCSS: `${viewerCSS} ${options.unsafeCSS}` };
         this.options = { ...this.options, ...options };
@@ -227,7 +229,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         if (!result.ok) throw new Error(await result.text());
         const document = new DOMParser().parseFromString(await result.text(), "text/html");
         // SAFETY: The Changes file endpoint serializes a CodeViewItem captured by this snapshot.
-        const item = JSON.parse(document.querySelector("script[data-changes-file]")!.textContent!) as CodeViewItem<CommentAnnotation>;
+        const item = JSON.parse(document.querySelector("script[data-changes-file]")!.textContent!) as CodeViewItem<ChangesAnnotation>;
         if (signal.aborted) return;
         this.loaded.add(path);
         const previous = this.viewer!.getItem(path)!;
@@ -286,9 +288,9 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.viewer!.updateItem({ ...item, annotations: comments.map(metadata => ({ lineNumber: metadata.end, side: metadata.side, metadata })), version: (item.version ?? 0) + 1 });
     }
 
-    private revealCommentLines(item: CodeViewDiffItem<CommentAnnotation>, instance: VirtualizedFileDiff<CommentAnnotation, undefined>): void {
+    private revealCommentLines(item: CodeViewDiffItem<ChangesAnnotation>, instance: VirtualizedFileDiff<ChangesAnnotation, undefined>): void {
       // Pierre keeps annotations in collapsed context hidden. Reveal their exact line ranges.
-      for (const annotation of item.annotations ?? []) for (const line of [annotation.metadata.start, annotation.metadata.end]) {
+      for (const annotation of item.annotations ?? []) if (annotation.metadata.kind !== "revert") for (const line of [annotation.metadata.start, annotation.metadata.end]) {
         const key = `${item.id}:${annotation.side}:${line}`;
         if (this.revealedLines.has(key)) continue;
         this.revealedLines.add(key);
@@ -300,6 +302,13 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
         if (following !== -1) instance.expandHunk(following, "up", start(following) - line);
         else instance.expandHunk(hunks.length - 1, "down", line - end(hunks.length - 1));
       }
+    }
+
+    private renderRevert(annotation: RevertAnnotation): HTMLElement {
+      // SAFETY: The revert template contains one server-rendered element wrapping its Button.
+      const element = this.revertBlockTarget.content.firstElementChild!.cloneNode(true) as HTMLElement;
+      element.dataset.block = String(annotation.block);
+      return element;
     }
 
     private renderComment(comment: CommentAnnotation): HTMLElement {
