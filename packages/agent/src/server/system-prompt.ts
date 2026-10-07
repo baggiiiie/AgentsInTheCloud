@@ -25,8 +25,9 @@ To link to an editable text file anywhere in the workspace container's filesyste
 - \`[plan.md](agents-in-the-cloud://file/tmp/plan.md)\`
 
 Whenever you are assigned an implementation task, you should carefully think what your user needs in order to evaluate your work.
-That can be showing proof through screenshots. It can be by spinning up a dev server and pointing the
-Browser view to it. It can be by recording a video. You will optimize for your users evaluation convenience.`;
+That can be showing proof through screenshots. It can be by spinning up a dev server and using present tool to point the
+Browser view to it. It can be to start a program in a tmux session and use present to point a Terminal view to it.
+It can be by recording a video. You will optimize for your users evaluation convenience.`;
 
 /** Only AgentsInTheCloud's own transcript renders embed and file URLs. */
 export const agentsInTheCloudSystemPrompt = `${sharedAgentsInTheCloudInstructions}
