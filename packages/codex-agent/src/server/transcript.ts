@@ -10,6 +10,29 @@ function status(value: string): ToolView["status"] {
   return "ok";
 }
 
+/** Codex reports its shell invocation as a quoted command, not an argv array. */
+function bashStatement(command: string): string {
+  const wrapper = /^(?:\/bin\/|\/usr\/bin\/)?(?:bash|sh)\s+-[il]*c\s+(['"])([\s\S]*)\1$/.exec(command);
+  if (!wrapper) return command;
+  const quote = wrapper[1]!;
+  const script = wrapper[2]!;
+  let statement = "";
+  for (let index = 0; index < script.length; index++) {
+    const character = script[index]!;
+    if (character === quote) return command; // Not a single quoted script argument.
+    if (quote === '"' && character === "\\" && index + 1 < script.length) {
+      const next = script[index + 1]!;
+      if ('"\\$`\n'.includes(next)) {
+        if (next !== "\n") statement += next;
+        index++;
+        continue;
+      }
+    }
+    statement += character;
+  }
+  return statement;
+}
+
 /** Codex items retain their own IDs and semantics; no Pi messages or journal entries. */
 function projectCodexItem(item: ThreadItem, live: boolean): TranscriptItem {
   const key = item.id;
@@ -18,7 +41,7 @@ function projectCodexItem(item: ThreadItem, live: boolean): TranscriptItem {
     case "agentMessage": return { type: "text", key, text: item.text, final: item.phase === "final_answer", live };
     case "reasoning": return { type: "thinking", key, text: (item.summary.length ? item.summary : item.content).join("\n\n"), live };
     case "plan": return { type: "text", key, text: item.text, final: false, live };
-    case "commandExecution": return { type: "tool", key, tool: { callId: key, name: "Codex command", args: { command: item.command }, status: status(item.status), resultText: item.aggregatedOutput ?? "", durationMs: item.durationMs ?? undefined, details: item.exitCode === null ? undefined : { exitCode: item.exitCode } } };
+    case "commandExecution": return { type: "tool", key, tool: { callId: key, name: "bash", args: { command: bashStatement(item.command) }, status: status(item.status), resultText: item.aggregatedOutput ?? "", durationMs: item.durationMs ?? undefined, details: item.exitCode === null ? undefined : { exitCode: item.exitCode } } };
     case "fileChange": return { type: "tool", key, tool: { callId: key, name: "Codex file changes", args: { paths: item.changes.map(change => change.path) }, status: status(item.status), resultText: item.changes.map(change => `${change.path}\n${change.diff}`).join("\n\n") } };
     case "mcpToolCall": return { type: "tool", key, tool: { callId: key, name: item.tool, args: item.arguments, status: status(item.status), resultText: item.error?.message ?? (item.result ? JSON.stringify(item.result.content, null, 2) : ""), durationMs: item.durationMs ?? undefined } };
     case "dynamicToolCall": return { type: "tool", key, tool: { callId: key, name: item.tool, args: item.arguments, status: item.success === false ? "error" : status(item.status), resultText: item.contentItems ? JSON.stringify(item.contentItems, null, 2) : "" } };
