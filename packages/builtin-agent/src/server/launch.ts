@@ -3,7 +3,7 @@ import { reconcileAgentModelPreferences } from "@agents-in-the-cloud/agent/serve
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { invalidArguments, type JsonObject } from "@agents-in-the-cloud/core";
-import { renderModelsDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
+import { renderReadOnlyLaunchModelSettings, renderModelsDialog, parseModelRef, modelRefValue, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
 import { turboStream, turboStreamResponse, type AgentWorkspaceParameters, type WorkspaceAgentLaunch } from "@agents-in-the-cloud/shared";
 import { listStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { resolveNewWorkspaceAgentModel } from "@agents-in-the-cloud/agent/server/model-state";
@@ -44,6 +44,7 @@ export async function prepareAgentLaunch(parameters: JsonObject = {}): Promise<{
 
 export const nativeAgentLaunch: WorkspaceAgentLaunch = {
   renderFooter({ query, ...context }) {
+    if (context.readOnly) return renderReadOnlyLaunchModelSettings(query.get("model") ?? undefined, query.get("thinkingLevel") ?? undefined);
     return renderLaunchComposerSettings({ ...context, selectedModel: query.get("model") ?? undefined, selectedThinkingLevel: query.get("thinkingLevel") ?? undefined });
   },
   prepare: prepareAgentLaunch,

@@ -207,7 +207,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   });
   const hostTrustPanels = new Map<string, Awaited<ReturnType<typeof scanSshHost>>>();
   deps.events?.on("workspace_deleted", ({ workspaceId }) => { cancelWorkspaceSshTrust(workspaceId); hostTrustPanels.delete(workspaceId); });
-  const provisioningPrompts = new Map<string, string>();
+  const provisioningLaunchPanels = new Map<string, string>();
   const provisioning = createWorkspaceProvisioning({ events: deps.events, onChange: (workspaceId) => {
     invalidatePresentation();
     const entry = registry.get(workspaceId);
@@ -260,7 +260,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   registry.setCallbacks({
     rowChanged(entry) {
-      if (entry.phase.kind === "runningPhase") provisioningPrompts.delete(entry.id);
+      if (entry.phase.kind === "runningPhase") provisioningLaunchPanels.delete(entry.id);
       invalidatePresentation();
     },
     listChanged() {
@@ -273,7 +273,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     },
     removed(id) {
       workPresentationIntents.delete(id);
-      provisioningPrompts.delete(id);
+      provisioningLaunchPanels.delete(id);
       provisioning.delete(id);
       for (const [key, surface] of surfaces) if (surface.workspaceId === id) { surface.resource.dispose(); surfaces.delete(key); }
       invalidatePresentation();
@@ -534,7 +534,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const inner = `${renderWorkspaceProvisioning(entry.id, snapshot, { failed, error: entry.phase.error, recovery })}${sourceFailure ? "" : recoveryActions}${deleteAction}`;
     const trustPanel = hostTrustPanels.get(entry.id);
     const overlay = trustPanel ? sshTrustPanel(entry.id, trustPanel.records, trustPanel.host, trustPanel.port, changedHost, `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust`) : "";
-    return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${renderWorkspaceLaunchPrompt(provisioningPrompts.get(entry.id))}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
+    return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${provisioningLaunchPanels.get(entry.id) ?? ""}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
   }
 
   function emptyWorkspaceArtworkHtml(pane: WorkspacePanePresentation): string {
@@ -735,7 +735,16 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const prepared = await agentType.launch.prepare(command.agent);
       context = { ...prepared, agent: { ...prepared?.agent, initialPrompt, attachmentDraft, agentTypeId: agentType.id } };
     }
-    if (context?.agent?.initialPrompt) provisioningPrompts.set(id, context.agent.initialPrompt);
+    if (context?.agent?.initialPrompt) {
+      const agent = context.agent;
+      const query = new URLSearchParams();
+      if (agent.model) query.set("model", agent.model);
+      if (agent.thinkingLevel) query.set("thinkingLevel", agent.thinkingLevel);
+      const settingsHtml = await renderLaunchAgentType(getAgentType(agent.agentTypeId ?? "builtin"), [], {
+        ...launchComposerFooterContext(query), readOnly: true,
+      });
+      provisioningLaunchPanels.set(id, renderWorkspaceLaunchPrompt(agent.initialPrompt, settingsHtml));
+    }
     registry.add(id, title || null, init);
     const options: Parameters<typeof startWorkspaceProvisioning>[1] = {};
     if (init !== undefined) options.init = init;

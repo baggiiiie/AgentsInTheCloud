@@ -506,6 +506,8 @@ export function selectedWorkspaceAgent(element: Element): string | undefined {
 export const workspaceAgentSelectionEvent = "agents-in-the-cloud:workspace-agent-selected";
 
 export interface AgentLaunchFooterContext {
+  /** Show the submitted settings without editing or resolving current preferences. */
+  readOnly?: boolean;
   frameId: string;
   formId: string;
   url: string;

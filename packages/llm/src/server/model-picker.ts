@@ -4,6 +4,7 @@ import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { escapeHtml, providerBrandIconHtml } from "@agents-in-the-cloud/shared";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { createPiModelRuntime } from "./pi-config-models.ts";
+import { parseModelRef } from "./model-reference.ts";
 import type { ModelRef } from "./model-reference.ts";
 
 export interface ComposerModelOption {
@@ -16,6 +17,7 @@ export interface ComposerModelOption {
 }
 
 interface SharedComposerSelectionsOptions {
+  readOnly?: boolean;
   modelFormId: string;
   thinkingLevelFormId: string;
   models: ComposerModelOption[];
@@ -25,8 +27,10 @@ interface SharedComposerSelectionsOptions {
   connectedProvider?: boolean;
 }
 
-function renderModelSelection(formId: string, models: ComposerModelOption[], connectedProvider = false): string {
+function renderModelSelection(formId: string, models: ComposerModelOption[], connectedProvider = false, readOnly = false): string {
   const selected = models.find((model) => model.selected) ?? models[0];
+  if (readOnly) return buttonHtml({ type: "button", variant: "secondary", disabled: true,
+    content: { kind: "caption", caption: selected?.name ?? "Model", iconHtml: selected ? providerBrandIconHtml(selected.provider) : undefined } });
   const hasAvailableModel = models.some((model) => model.available !== false);
   const menuId = `${formId}_popup`;
   const setupAction = 'data-controller="agent-model-setup" data-action="click->agent-model-setup#open"';
@@ -48,15 +52,18 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
 }
 
 export function renderSharedComposerSelections(options: SharedComposerSelectionsOptions): string {
-  const autosubmit = options.autosubmitThinking
+  const autosubmit = options.autosubmitThinking && !options.readOnly
     ? ` data-controller="composer-selection-autosubmit" data-composer-selection-autosubmit-form-id-value="${escapeHtml(options.thinkingLevelFormId)}" data-action="change->composer-selection-autosubmit#submit"`
     : "";
-  const thinkingSelection = options.thinkingLevels.length > 0
+  const thinkingSelection = options.readOnly
+    ? (options.selectedThinkingLevel ? buttonHtml({ type: "button", variant: "secondary", disabled: true,
+      content: { kind: "caption", caption: options.selectedThinkingLevel } }) : "")
+    : options.thinkingLevels.length > 0
     ? `<span class="composer-selection-field"${autosubmit}><select class="composer-selection popup-select" data-controller="popup-select" data-popup-placement="above" name="thinkingLevel" form="${escapeHtml(options.thinkingLevelFormId)}" title="Thinking level">${options.thinkingLevels.map((level) => `<option value="${escapeHtml(level)}"${level === options.selectedThinkingLevel ? " selected" : ""}>${escapeHtml(level)}</option>`).join("")}</select></span>`
     : "";
   const ready = options.models.some((model) => model.selected && model.available !== false);
   return `<span class="composer-selections" data-model-ready="${ready}">
-${renderModelSelection(options.modelFormId, options.models, options.connectedProvider)}
+${renderModelSelection(options.modelFormId, options.models, options.connectedProvider, options.readOnly)}
 ${ready ? thinkingSelection : ""}
 </span>`;
 }
@@ -76,4 +83,15 @@ ${renderSharedComposerSelections({ ...options, modelFormId, thinkingLevelFormId:
 export async function modelThinkingLevels(ref: ModelRef) {
   const model = (await createPiModelRuntime()).getModel(ref.provider, ref.id);
   return model ? getSupportedThinkingLevels(model) : [];
+}
+
+/** Render the actual launch values, independent of enabled models and remembered preferences. */
+export async function renderReadOnlyLaunchModelSettings(modelValue: string | undefined, thinkingLevel: string | undefined): Promise<string> {
+  const ref = modelValue ? parseModelRef(modelValue) : undefined;
+  const model = ref ? (await createPiModelRuntime()).getModel(ref.provider, ref.id) : undefined;
+  return renderSharedComposerSelections({
+    readOnly: true, modelFormId: "", thinkingLevelFormId: "",
+    models: ref ? [{ ...ref, name: model?.name ?? ref.id, selected: true }] : [],
+    thinkingLevels: thinkingLevel ? [thinkingLevel] : [], selectedThinkingLevel: thinkingLevel ?? "",
+  });
 }

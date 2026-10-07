@@ -1,4 +1,5 @@
 import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
+import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
@@ -15,6 +16,8 @@ export interface AgentLaunchPresentation {
 const launchAgentTypeFrameId = "launch_composer_agent_type";
 
 export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agentTypes: readonly WorkspaceAgentType[], context: AgentLaunchFooterContext): Promise<string> {
+  if (context.readOnly) return `${buttonHtml({ type: "button", variant: "secondary", disabled: true,
+    content: { kind: "caption", caption: agentType.label, iconHtml: agentType.iconHtml } })}${await agentType.launch.renderFooter(context)}`;
   const selectionFormId = `${launchAgentTypeFrameId}_selection`;
   const picker = popupHtml({
     id: `${launchAgentTypeFrameId}_menu`, label: "Agent type", placement: "above",

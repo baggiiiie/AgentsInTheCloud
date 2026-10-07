@@ -8,7 +8,7 @@ export { recordSubscriptionInference, providersInLastInferenceWindow, selectSubs
 export { connectedUsageProviders, getProviderUsageOverview, providerUsageFrameId, supportedUsageProviders, type ProviderUsageOverview } from "./provider-usage.ts";
 
 export { installSubscriptionCli } from "./subscription-cli.ts";
-export { renderSharedComposerSelections, renderLaunchModelSettings, modelThinkingLevels, type ComposerModelOption } from "./model-picker.ts";
+export { renderSharedComposerSelections, renderLaunchModelSettings, renderReadOnlyLaunchModelSettings, modelThinkingLevels, type ComposerModelOption } from "./model-picker.ts";
 export { modelUnavailableReason, providerAvailability } from "./provider-availability.ts";
 export { anthropicSubscriptionUnavailableReason, requireProviderSubscription, usesProviderSubscription } from "./subscription.ts";
 
