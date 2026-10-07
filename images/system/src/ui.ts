@@ -73,7 +73,6 @@ export function supervisorFragment(view: SupervisorView): string {
     : "Installation computer only — Tailscale is off.";
   const accessActions = `
     ${!remote || (!view.authUrl && view.connectionState !== "Running") ? `<form method="post" action="/connect">${button(remote ? "Retry Tailscale connection" : "Use devices on your Tailscale network")}</form>` : ""}
-    ${remote && view.connectionState === "Running" ? "<p>Switching to installation computer only will disconnect devices using Tailscale.</p>" : ""}
     ${remote ? `<form method="post" action="/local">${button("Use installation computer only")}</form>` : ""}`;
 
   return `<section aria-label="AgentsInTheCloud System"><h1>${title}</h1>
