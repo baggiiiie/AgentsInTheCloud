@@ -5,7 +5,7 @@ export const turnStartEntryType = "agents-in-the-cloud.turn-start";
 export const turnStartSchema = Type.Object({ turnEntryId: Type.String(), startedAt: Type.Number() });
 
 export const turnTimingEntryType = "agents-in-the-cloud.turn-timing";
-export const turnTimingSchema = Type.Object({
+const turnTimingSchema = Type.Object({
   elapsedMs: Type.Number({ minimum: 0 }),
   toolMs: Type.Number({ minimum: 0 }),
   inferenceMs: Type.Number({ minimum: 0 }),

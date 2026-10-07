@@ -91,14 +91,14 @@ async function scenario(name: string, description: string, body: (recorder: Scen
 }
 
 /** Runs an action while tracing, and applies the one-step pass criteria to it. */
-async function transition(recorder: ScenarioRecorder, label: string, action: () => Promise<void>, options: { waitMs?: number; expectChange?: boolean } = {}): Promise<{ before: Frame; after: Frame }> {
+async function transition(recorder: ScenarioRecorder, label: string, action: () => Promise<void>, options: { waitMs?: number; expectChange?: boolean; endAtContentChange?: boolean } = {}): Promise<{ before: Frame; after: Frame }> {
   await page.startTrace();
   await Bun.sleep(80); // Capture the pre-action arrangement before an immediate CDP edit.
   const t = await page.mark(label);
   await action();
   await Bun.sleep(options.waitMs ?? 700);
   const trace = await page.takeTrace();
-  const analysis = analyseTransition(trace, t);
+  const analysis = analyseTransition(trace, t, Number.POSITIVE_INFINITY, { endAtContentChange: options.endAtContentChange });
   await recorder.trace(trace, label);
   recorder.add(...oneStepChecks(analysis, { expectChange: options.expectChange }).map((result) => ({ ...result, name: `${label} — ${result.name}` })));
   return { before: analysis.window[0]!, after: settled(analysis) };
@@ -376,7 +376,9 @@ await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcri
     check("D18: terminal showing after send", after.transcript === null && after.terminal !== null, `transcript ${JSON.stringify(after.transcript)}, terminal ${JSON.stringify(after.terminal)}`),
     check("D2: composer closed after send", after.composer === null, JSON.stringify(after.composer)),
     check("D17: terminal not focused after send", !after.focus.includes("gespenst__input"), `focus: ${after.focus || "body"}`),
-    check("D18: no view switch while the agent works", !await page.visible(sel.viewTranscript) && !await page.visible(sel.showTerminal), "view switch hidden"),
+    // Use the same recorded working frame as the layout checks above. A short
+    // reply can finish before transition() returns and legitimately restore the switch.
+    check("D18: no view switch while the agent works", !after.floating["View transcript"] && !after.floating["Back to terminal"], JSON.stringify(after.floating)),
   );
   await page.waitFor(sel.cliTranscript, 120_000);
   recorder.add(check("D18: transcript returns when the turn finishes", await page.visible(sel.showTerminal), "Back to terminal shown"));
@@ -461,10 +463,11 @@ await scenario("desktop-D1-selection", "D1: on desktop the composer is open and 
   await page.navigate(`${setup.atelier}/`, "body");
   await page.navigate(builtinUrl, sel.input);
   const { after } = await transition(recorder, "after selection", async () => {}, { waitMs: 200, expectChange: false });
+  const buttonColumn = await page.evaluate<NonNullable<Box>[]>(`[...document.querySelectorAll(".agent-composer-pane .composer-button")].filter((slot) => slot.checkVisibility() && [...slot.querySelectorAll("button")].some((button) => button.checkVisibility())).map((slot) => { const r = slot.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; })`);
   recorder.add(
     check("D1: composer open", after.composer !== null, JSON.stringify(after.composer)),
     check("D1: text field focused", after.focus.includes("composer-input"), `focus: ${after.focus || "body"}`),
-    check("D4: one button column (close, attach, transcribe, send)", after.buttons.join() === "close,attach,transcribe,send", after.buttons.join(", ")),
+    check("D4: four buttons in one vertical column (close, attach, dictation, send)", buttonColumn.length === 4 && buttonColumn.every((box, index) => close(box[0] + box[2] / 2, buttonColumn[0]![0] + buttonColumn[0]![2] / 2) && (index === 0 || box[1] >= bottom(buttonColumn[index - 1]!))), JSON.stringify(buttonColumn)),
   );
 });
 
@@ -527,7 +530,12 @@ for (const layout of ["mobile", "desktop"] as const) {
     recorder.add(check("Intentional initial focus", focused === (layout === "desktop"), `textarea focused: ${focused}`));
     recorder.add(check("Dictation available before typing", await page.visible(".launch-composer .composer-dictation button"), "dictation control visible"));
     await page.tap(".launch-composer .composer-input");
-    await transition(recorder, "large launch prompt", () => page.insertText(Array.from({ length: 80 }, (_, i) => `Launch line ${i}`).join("\n")));
+    // Launch drafts survive navigation, including the preceding mobile scenario.
+    // Start empty so this action actually exercises growth on both layouts.
+    await page.evaluate<boolean>(`(() => { const input = document.querySelector(".launch-composer .composer-input"); input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    await Bun.sleep(400);
+    // Transcript updates behind the dialog are unrelated to launch-editor growth.
+    await transition(recorder, "large launch prompt", () => page.insertText(Array.from({ length: 80 }, (_, i) => `Launch line ${i}`).join("\n")), { endAtContentChange: false });
     const geometry = await page.evaluate<{ fits: boolean; scrolls: boolean; caret: boolean }>(`(() => {
       const dialog = document.querySelector("dialog[open]").getBoundingClientRect();
       const input = document.querySelector(".launch-composer .composer-input");

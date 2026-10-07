@@ -1,7 +1,5 @@
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { invalidArguments } from "@agents-in-the-cloud/core";
-import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
-import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { dialogHtml } from "@agents-in-the-cloud/design-system/dialog";
@@ -13,16 +11,18 @@ import { buttonConfirmationHtml } from "@agents-in-the-cloud/design-system/butto
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts, listWorkspaceTemplateSshKeys, secretNeedsValue, workspaceTemplateSecretAllowsPath, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSecretSummary } from "@agents-in-the-cloud/workspace-templates";
 
+import { workspaceTemplateSwatchColor } from "./workspace-presentation.ts";
+
 export const templateSettingsHostId = "template_settings_host";
 export const templateSettingsFrameId = "template_settings_detail";
-export type TemplateSettingsSection = "index" | typeof sections[number][0];
+export type TemplateSettingsSection = "index" | typeof sections[number];
 export interface TemplateSettingsLocation { section?: string; editor?: string }
 export interface TemplateSettingsReference { workspaceId: string; title: string }
 
 function sectionFor(value?: string): TemplateSettingsSection | undefined {
   if (value === undefined) return undefined;
   if (value === "index") return value;
-  const section = sections.find(([section]) => section === value)?.[0];
+  const section = sections.find(section => section === value);
   if (section) return section;
   switch (value) {
     case "repository": return "general";
@@ -32,9 +32,7 @@ function sectionFor(value?: string): TemplateSettingsSection | undefined {
     default: throw invalidArguments("Unknown template settings section");
   }
 }
-const sections = [
-  ["general", "General"], ["secrets", "Secrets"], ["ssh", "SSH access"], ["environment", "Environment Variables"], ["container", "Container"], ["developer", "Developer Settings"],
-] as const;
+const sections = ["general", "secrets", "ssh", "environment", "container", "developer"] as const;
 const captionButton = (caption: string, attributesHtml: string, variant: "secondary" | "primary" = "secondary") => buttonHtml({ type: "button", variant, content: { kind: "caption", caption }, attributesHtml });
 const paragraph = (text: string) => `<p class="template-settings-note">${escapeHtml(text)}</p>`;
 const field = (caption: string, name: string, value: string, attributes = "") => `<label class="form-section"><span>${escapeHtml(caption)}</span><input class="text-field" name="${name}" value="${escapeHtml(value)}" ${attributes}></label>`;
@@ -42,31 +40,28 @@ const textarea = (caption: string, name: string, value: string, rows: number, at
 export function templateSettingsUrl(id: string, section: TemplateSettingsSection, editor?: string): string {
   return `/workspace-templates/${encodeURIComponent(id)}/settings?section=${section}${editor ? `&editor=${encodeURIComponent(editor)}` : ""}`;
 }
-function navigation(id: string, section: TemplateSettingsSection, caption: string, editor?: string, focus?: string): string {
-  return actionLinkHtml({ href: templateSettingsUrl(id, section, editor), variant: "secondary", content: { kind: "caption", caption }, attributesHtml: `data-turbo-frame="${templateSettingsFrameId}"${caption === "Cancel" ? " data-template-settings-cancel" : ""}${focus ? ` data-template-settings-focus="${escapeHtml(focus)}"` : ""}` });
-}
-function record(id: string, section: TemplateSettingsSection, editor: string, label: string, description = "", status = ""): string {
-  const noteId = `template_settings_record_note_${section}_${encodeURIComponent(editor)}`;
-  const action = contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: label }, trailingHtml: escapeHtml(status), element: { tag: "a", attributesHtml: `href="${templateSettingsUrl(id, section, editor)}" data-turbo-frame="${templateSettingsFrameId}" data-template-settings-record="${escapeHtml(editor || section)}"${description ? ` aria-describedby="${escapeHtml(noteId)}"` : ""}` } });
-  return description ? `<div class="template-settings-record">${action}<p class="template-settings-record-note" id="${escapeHtml(noteId)}">${escapeHtml(description)}</p></div>` : action;
-}
 interface EditorFormOptions {
   section: TemplateSettingsSection;
   saved: boolean;
   editor?: string;
   caption?: string;
   attributesHtml?: string;
+  autosave?: boolean;
+  available?: boolean;
 }
-function form(id: string, path: string, contents: string, { section, saved, editor, caption = "Save changes", attributesHtml = "" }: EditorFormOptions): string {
-  return `<form class="form-stack" method="post" action="/workspace-templates/${encodeURIComponent(id)}${path}" data-template-settings-target="form" data-action="input->template-settings#changed change->template-settings#changed turbo:submit-start->template-settings#submitting turbo:submit-end->template-settings#submitted" ${attributesHtml}>
+const editorKey = (section: TemplateSettingsSection, editor?: string) => `${section}:${editor ?? ""}`;
+function form(id: string, path: string, contents: string, { section, saved, editor, caption = "Save changes", attributesHtml = "", autosave = false, available = true }: EditorFormOptions): string {
+  return `<form class="form-stack" method="post" action="/workspace-templates/${encodeURIComponent(id)}${path}" data-template-settings-target="form" data-template-settings-form-key="${escapeHtml(editorKey(section, editor))}"${autosave ? ' data-template-settings-autosave' : ""} data-template-settings-available="${available}"${saved ? ' data-template-settings-saved-form' : ""} data-action="input->template-settings#changed change->template-settings#changed turbo:submit-start->template-settings#submitting turbo:submit-end->template-settings#submitted" ${attributesHtml}>
     ${contents}
-    <div class="form-actions" tabindex="-1" data-template-settings-save-actions>${navigation(id, section === "general" ? "index" : section, "Cancel", undefined, editor)}${buttonConfirmationHtml({
+    <div class="form-actions" tabindex="-1" data-template-settings-save-actions${autosave ? " hidden" : ""}>${captionButton("Cancel", 'data-action="template-settings#reset"')}${buttonConfirmationHtml({
       type: "submit", variant: "primary", disabled: true,
-      content: { kind: "caption", caption },
-      confirmationLabel: "Changes saved", confirmed: saved,
+      content: { kind: "caption", caption }, confirmationLabel: "Changes saved", confirmed: saved,
       attributesHtml: "data-template-settings-save",
     })}</div>
   </form>`;
+}
+function inlineDisclosure(section: TemplateSettingsSection, editor: string | undefined, label: string, contents: string, open = false, attributesHtml = ""): string {
+  return disclosureHtml({ element: { attributesHtml: `data-template-settings-disclosure="${escapeHtml(editorKey(section, editor))}"${attributesHtml ? ` ${attributesHtml}` : ""}` }, summary: { kind: "compact", width: "fit", label: { kind: "text", text: label }, attributesHtml: `data-template-settings-record="${escapeHtml(editorKey(section, editor))}"` }, bodyHtml: `<div class="template-settings-inline-body">${contents}</div>`, open });
 }
 function removeForm(id: string, path: string, section: TemplateSettingsSection, label: string, consequence: string): string {
   return `<div class="template-settings-remove">${paragraph(consequence)}<form method="post" action="/workspace-templates/${encodeURIComponent(id)}${path}" data-action="turbo:submit-start->template-settings#submitting turbo:submit-end->template-settings#submitted">${destructiveConfirmationHtml({ id: `template_remove_${section}_${path.replace(/[^a-zA-Z0-9]/g, "_")}`, trigger: { type: "button", variant: "danger", content: { kind: "caption", caption: label } }, confirmCaption: label, cancelCaption: "Cancel" })}</form></div>`;
@@ -78,7 +73,7 @@ function secretEditor(t: WorkspaceTemplateConfiguration, secret?: WorkspaceTempl
   const isNew = !secret;
   const permission = String(secret ? workspaceTemplateSecretAllowsPath(secret) : false);
   const hostAttributes = isNew ? 'data-workspace-template-secret-path-target="host" data-action="input->workspace-template-secret-path#useDefault"' : "";
-  const content = `${field("Environment variable", "envName", secret?.envName ?? "", 'required autocomplete="off" autofocus')}
+  const content = `${field("Environment variable", "envName", secret?.envName ?? "", 'required autocomplete="off"')}
     ${field("Allowed host", "hostPattern", secret?.hostPattern ?? "", `required autocomplete="off" placeholder="api.example.com" ${hostAttributes}`)}
     ${field(secret?.configured ? "Replace secret value" : "Secret value", "secretValue", "", `type="password" autocomplete="new-password" data-1p-ignore${isNew ? ' required' : ''}`)}
     ${paragraph(secret?.configured ? "Leave the value blank to keep the stored secret. Stored values are never shown." : isNew ? "Required secrets need a value. Optional secrets can be added without one. Agents only see a placeholder." : "Agents only see a placeholder. Add the real value here when it’s available.")}
@@ -91,7 +86,7 @@ function secretEditor(t: WorkspaceTemplateConfiguration, secret?: WorkspaceTempl
       ${toggleHtml({ variant: "button", label: "Allow substitution in URL paths", name: "allowInPath", value: permission, options: [{ value: "false", label: "Disallow" }, { value: "true", label: "Allow" }], element: { dataAction: `${isNew ? "click->workspace-template-secret-path#choose change->workspace-template-secret-path#choose " : ""}change->template-settings#toggleChanged`, data: isNew ? { "workspace-template-secret-path-target": "toggle" } : undefined } })}</div>
       ${paragraph("Allow only if the service needs this secret in its URL path, rather than headers or the request body.")}
     </div>` })}`;
-  return `${secret ? paragraph(secret.configured ? "Secret stored" : secretNeedsValue(secret) ? "Required secret — needs a value" : "Optional secret — no value stored") : ""}${form(t.id, `/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`, content, { section: "secrets", saved, editor: secret?.id, caption: isNew ? "Add secret" : "Save changes", attributesHtml: isNew ? 'data-controller="workspace-template-secret-path" data-template-settings-new-secret' : "" })}${secret ? removeForm(t.id, `/secrets/${encodeURIComponent(secret.id)}/delete`, "secrets", "Delete secret", `Delete ${secret.envName} and its stored value. Requests using it will no longer receive this secret.`) : ""}`;
+  return `${secret ? paragraph(secret.configured ? "Secret stored" : secretNeedsValue(secret) ? "Required secret — needs a value" : "Optional secret — no value stored") : ""}${form(t.id, `/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`, content, { section: "secrets", saved, editor: secret?.id ?? "new", caption: isNew ? "Add secret" : "Save changes", attributesHtml: isNew ? 'data-controller="workspace-template-secret-path" data-template-settings-new-secret' : "" })}${secret ? removeForm(t.id, `/secrets/${encodeURIComponent(secret.id)}/delete`, "secrets", "Delete secret", `Delete ${secret.envName} and its stored value. Requests using it will no longer receive this secret.`) : ""}`;
 }
 
 export function templateSettingsErrorHtml(message: string): string {
@@ -101,86 +96,41 @@ export function templateSettingsErrorHtml(message: string): string {
   });
 }
 
-export async function renderTemplateSettingsFrame(id: string, location: TemplateSettingsLocation, references: TemplateSettingsReference[], saved = false): Promise<string> {
-  const t = await getWorkspaceTemplateConfiguration(id);
+export async function renderTemplateSettingsFrame(id: string, location: TemplateSettingsLocation, references: TemplateSettingsReference[], saved = false, submittedPath?: string): Promise<string> {
+  const [t, keys, knownHosts] = await Promise.all([getWorkspaceTemplateConfiguration(id), listWorkspaceTemplateSshKeys(id), getWorkspaceTemplateSshKnownHosts(id)]);
   const section = sectionFor(location.section) ?? (t.secrets.some(secretNeedsValue) ? "secrets" : "index");
   const editor = location.editor ?? (location.section === "privileged" ? "docker" : location.section === "preload-images" ? "images" : location.section === "dockerfile" ? "dockerfile" : undefined);
   if (editor && !["secrets", "ssh", "environment", "container"].includes(section)) throw invalidArguments("This settings section has no record editor");
-  let title: string = sections.find(([value]) => value === section)?.[1] ?? "";
-  let content = "";
-  let backSection: TemplateSettingsSection = "index";
-  if (section === "index") {
-    content = `<nav class="action-list" aria-label="Template settings sections">${sections.map(([value, label]) => value === "developer" ? `<div hidden data-template-settings-target="developer">${record(id, value, "", label)}</div>` : record(id, value, "", label)).join("")}</nav>`;
-    content += disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Delete template" } }, open: location.section === "danger", bodyHtml: references.length ? paragraph(`Delete ${references.length === 1 ? `workspace “${references[0]!.title}”` : `${references.length} workspaces`} first. This template is still in use.`) : removeForm(id, "/delete", section, "Delete template", `Permanently delete template “${t.name}”, including its secrets and SSH keys.`) });
-  } else if (section === "developer") {
-    content = form(id, "/seed-config", `${selection("Atelier-in-Atelier seeding", "seedConfigEnabled", String(t.seedConfigEnabled ?? false), [{ value: "false", label: "Off" }, { value: "true", label: "On" }])}${paragraph("Allows this repository’s manifest to copy model-provider credentials and saved template configuration into new workspaces. Only enable for repositories and agents you trust.")}${paragraph("Disabling this does not remove credentials already copied into existing workspaces.")}`, { section, saved });
-  } else if (section === "general") {
-    content = form(id, "", `${field("Display name", "name", t.name, 'required autofocus autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), 'required')}${paragraph("Repository changes apply to new workspaces. Existing workspaces stay unchanged.")}`, { section, saved });
-  } else if (section === "secrets") {
-    if (editor) {
-      const secret = editor === "new" ? undefined : t.secrets.find(s => s.id === editor);
-      if (editor !== "new" && !secret) throw invalidArguments("Secret not found");
-      title = secret ? "Edit secret" : "Add secret";
-      backSection = section;
-      content = secretEditor(t, secret, saved);
-    } else {
-      content = `${paragraph("Agents use placeholders. Real values are substituted in requests to the hosts you allow. Secret changes also apply to existing workspaces.")}<div class="template-settings-toolbar"><span>${t.secrets.length} ${t.secrets.length === 1 ? "secret" : "secrets"}</span>${navigation(id, section, "Add secret", "new")}</div><div class="action-list">${t.secrets.toSorted((a, b) => Number(secretNeedsValue(b)) - Number(secretNeedsValue(a))).map(s => record(id, section, s.id, s.envName, `${s.hostPattern} · ${s.optional ? "Optional" : "Required"}`, s.configured ? "Stored" : secretNeedsValue(s) ? "Needs a value" : "No value")).join("")}</div>${t.secrets.length ? "" : paragraph("No secrets yet. Add one to connect your agents to a service.")}`;
-    }
-  } else if (section === "environment") {
-    if (editor) {
-      const variable = editor === "new" ? undefined : t.environment.find(v => v.id === editor);
-      if (editor !== "new" && !variable) throw invalidArguments("Environment variable not found");
-      title = variable ? "Edit variable" : "Add variable";
-      backSection = section;
-      content = form(id, `/environment${variable ? `/${encodeURIComponent(variable.id)}` : ""}`, `${field("Name", "name", variable?.name ?? "", 'required autocomplete="off" autofocus')}${field("Value", "value", variable?.value ?? "", 'autocomplete="off"')}${paragraph("Added to new workspace containers. Use Secrets for passwords and API keys.")}`, { section, saved, editor: variable?.id, caption: variable ? "Save changes" : "Add variable" });
-      if (variable) content += removeForm(id, `/environment/${encodeURIComponent(variable.id)}/delete`, section, "Remove variable", `Remove ${variable.name} from new workspaces. Existing containers stay unchanged.`);
-    } else {
-      content = `${paragraph("Added to new workspace containers. Use Secrets for passwords and API keys.")}<div class="template-settings-toolbar"><span>${t.environment.length} ${t.environment.length === 1 ? "variable" : "variables"}</span>${navigation(id, section, "Add variable", "new")}</div><div class="action-list">${t.environment.map(v => record(id, section, v.id, v.name, v.value || "Empty value")).join("")}</div>${t.environment.length ? "" : paragraph("No environment variables yet.")}`;
-    }
-  } else if (section === "ssh") {
-    const [keys, knownHosts] = await Promise.all([listWorkspaceTemplateSshKeys(id), getWorkspaceTemplateSshKnownHosts(id)]);
-    if (editor) {
-      const key = editor === "new" ? undefined : keys.find(k => k.id === editor);
-      if (editor !== "new" && !key) throw invalidArguments("SSH key not found");
-      title = key ? "Edit SSH key" : "Add SSH key";
-      backSection = section;
-      content = form(id, `/ssh-keys${key ? `/${encodeURIComponent(key.id)}` : ""}`, `${field("Name", "name", key?.name ?? "", 'autocomplete="off" autofocus')}${key ? "" : textarea("Private key", "privateKey", "", 7, 'required autocomplete="off" spellcheck="false"')}${paragraph("Private keys are encrypted outside workspaces. SSH key changes also apply to existing workspaces.")}`, { section, saved, editor: key?.id, caption: key ? "Save changes" : "Add key" });
-      if (key) {
-        const copy = buttonConfirmationHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Copy public key", iconHtml: Icons.Copy }, confirmationLabel: "Copied to clipboard", attributesHtml: 'data-action="ssh-public-key-copy#copy"' });
-        content += `<div class="template-settings-toolbar" data-controller="ssh-public-key-copy" data-ssh-public-key-copy-url-value="/workspace-templates/${encodeURIComponent(id)}/ssh-keys/${encodeURIComponent(key.id)}/public-key"><span>${escapeHtml(key.keyType)} · Public key</span>${copy}<span data-ssh-public-key-copy-target="error" role="status" hidden>Could not copy key</span></div>`;
-        content += removeForm(id, `/ssh-keys/${encodeURIComponent(key.id)}/delete`, section, "Remove key", `Remove SSH key “${key.name || key.keyType}”. Connections relying on it may stop working.`);
-      }
-    } else {
-      content = `${paragraph("Keys and trusted server identities for SSH connections. Changes also apply to existing workspaces.")}<div class="template-settings-toolbar"><span>${keys.length} ${keys.length === 1 ? "key" : "keys"}</span>${navigation(id, section, "Add key", "new")}</div><div class="action-list">${keys.map(k => record(id, section, k.id, k.name || "Unnamed key", "", `${k.keyType} · Stored`)).join("")}</div>${keys.length ? "" : paragraph("No SSH keys yet.")}${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: `Trusted SSH servers${knownHosts.trim() ? " · Configured" : " · None configured"}` } }, open: location.section === "ssh-keys" || saved, bodyHtml: form(id, "/ssh-known-hosts", `${paragraph("Paste known_hosts entries for servers you trust. Changing a server’s key requires trusting its new identity.")}${textarea("Known hosts", "knownHosts", knownHosts, 7, 'spellcheck="false"')}`, { section, saved }) })}`;
-    }
-  } else {
-    content = paragraph("Container changes apply to new workspaces. Existing containers stay unchanged.");
-    if (editor) {
-      backSection = section;
-      if (editor === "docker") {
-        title = "Docker support";
-        content += form(id, "/privileged", `${selection("Docker support", "privileged", String(t.privileged ?? false), [{ value: "false", label: "Off — stronger isolation" }, { value: "true", label: "On — privileged" }])}${paragraph("Privileged workspaces can access host devices and may read or modify host data. Enable only for Workspace templates and Agents you trust.")}`, { section, saved, editor });
-      } else if (editor === "images") {
-        title = "Preloaded images";
-        content += t.privileged ? form(id, "/preload-images", `${paragraph("Loaded into new workspaces when Docker support is on.")}${textarea("Image references, one per line", "preloadImages", (t.preloadImages ?? []).join("\n"), 6, 'spellcheck="false" autofocus')}`, { section, saved, editor }) : `${paragraph("Turn on and save Docker support to edit preloaded images. Saved image references are kept while Docker is off.")}${textarea("Saved image references", "savedImages", (t.preloadImages ?? []).join("\n"), 4, "disabled")}${navigation(id, section, "Configure Docker support", "docker")}`;
-      } else if (editor === "dockerfile") {
-        title = "Custom Dockerfile";
-        content += form(id, "/dockerfile", `${paragraph("An override takes precedence over .agents-in-the-cloud/Dockerfile in the repository. Leave blank to use the repository file, or the default image if there isn’t one.")}${textarea("Dockerfile override", "dockerfile", t.dockerfile ?? "", 14, 'spellcheck="false" placeholder="FROM agents-in-the-cloud-workspace" autofocus')}${paragraph("The first line must be FROM agents-in-the-cloud-workspace.")}`, { section, saved, editor });
-      } else throw invalidArguments("Unknown container editor");
-    } else {
-      content += `<div class="action-list">${record(id, section, "docker", "Docker support", "Isolation and Docker inside workspaces", t.privileged ? "On — privileged" : "Off")}${record(id, section, "images", "Preloaded images", t.privileged ? "Loaded into new workspaces" : "Requires Docker support · Saved references are retained", `${(t.preloadImages ?? []).length} configured`)}${record(id, section, "dockerfile", "Custom Dockerfile", "Repository file or template override", t.dockerfile?.trim() ? "Override configured" : "No override")}</div>`;
-      if (t.privileged) content += paragraph("Docker support is on. Privileged workspaces can access host devices and may read or modify host data.");
-    }
-  }
-  const back = section === "index" ? "" : actionLinkHtml({
-    href: templateSettingsUrl(id, backSection),
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: Icons.Back, label: backSection === "index" ? "Back to template settings" : `Back to ${sections.find(([value]) => value === backSection)![1]}` },
-    attributesHtml: `data-turbo-frame="${templateSettingsFrameId}"${editor ? ` data-template-settings-focus="${escapeHtml(editor)}"` : ""}`,
-  });
-  const header = `${back}<h1 class="panel__title" id="template_settings_title"${section === "index" ? "" : ' tabindex="-1" data-template-settings-heading'}>${section === "index" ? `${Icons.Settings}<span>Template settings · ${escapeHtml(t.name)}</span>` : escapeHtml(title)}</h1>${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Close template settings" }, attributesHtml: 'data-action="template-settings#close"' })}`;
-  const body = `<div class="template-settings-content" data-template-settings-target="content" data-template-settings-location="${escapeHtml(templateSettingsUrl(id, section, editor))}" data-template-settings-depth="${section === "index" ? 0 : editor ? 2 : 1}"${saved ? ' data-template-settings-saved="true"' : ""}>
-    <div id="template_settings_error"></div><div id="template_settings_request_error" hidden>${templateSettingsErrorHtml("Please try again. Your unsaved changes are still here.")}</div>${content}
+  if (section === "container" && editor && !["docker", "images", "dockerfile"].includes(editor)) throw invalidArguments("Settings record not found");
+  if (editor && editor !== "new" && (section === "secrets" && !t.secrets.some(secret => secret.id === editor) || section === "environment" && !t.environment.some(variable => variable.id === editor) || section === "ssh" && editor !== "known-hosts" && !keys.some(key => key.id === editor))) throw invalidArguments("Settings record not found");
+  const savedFor = (value: TemplateSettingsSection, record?: string) => saved && section === value && editor === record;
+  const opened = (value: TemplateSettingsSection, record?: string) => section === value && (record === undefined || editor === record);
+  const general = form(id, "", `<div class="template-settings-inline-fields">${field("Display name", "name", t.name, 'required autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), "required")}</div><label class="template-settings-color"><span>Swatch color</span><input type="hidden" name="swatchColor" value="${escapeHtml(t.swatchColor ?? "")}"><span class="template-settings-color-control"><span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(t.swatchColor ?? workspaceTemplateSwatchColor(t.id))}" aria-hidden="true"></span><input type="color" name="swatchColorPicker" aria-label="Swatch color" data-template-settings-target="colorPicker" data-default-color="${workspaceTemplateSwatchColor(t.id)}" data-action="input->template-settings#colorChanged change->template-settings#colorChanged"></span></label>`, { section: "general", saved: savedFor("general"), autosave: true });
+  const secrets = inlineDisclosure("secrets", undefined, "Secrets your agent may use but not see", `${paragraph("Agents use placeholders. Real values are substituted in requests to allowed hosts. Changes also apply to existing workspaces.")}<div class="template-settings-inline-records">${t.secrets.toSorted((a, b) => Number(secretNeedsValue(b)) - Number(secretNeedsValue(a))).map(secret => inlineDisclosure("secrets", secret.id, secret.envName, secretEditor(t, secret, savedFor("secrets", secret.id)), opened("secrets", secret.id))).join("")}${inlineDisclosure("secrets", "new", "Add secret", secretEditor(t), opened("secrets", "new"))}</div>`, opened("secrets"));
+  const environmentEditor = (variable?: WorkspaceTemplateConfiguration["environment"][number]) => {
+    const record = variable?.id ?? "new";
+    return `${form(id, `/environment${variable ? `/${encodeURIComponent(variable.id)}` : ""}`, `<div class="template-settings-inline-fields">${field("Name", "name", variable?.name ?? "", 'required autocomplete="off"')}${field("Value", "value", variable?.value ?? "", 'autocomplete="off"')}</div>`, { section: "environment", editor: record, saved: savedFor("environment", record), caption: variable ? "Save changes" : "Add variable" })}${variable ? removeForm(id, `/environment/${encodeURIComponent(variable.id)}/delete`, "environment", "Remove variable", `Remove ${variable.name} from new workspaces. Existing containers stay unchanged.`) : ""}`;
+  };
+  const environment = inlineDisclosure("environment", undefined, "Environment variables", `${paragraph("Added to new containers. Use Secrets for passwords and API keys.")}<div class="template-settings-inline-records">${t.environment.map(variable => inlineDisclosure("environment", variable.id, variable.name, environmentEditor(variable), opened("environment", variable.id))).join("")}${inlineDisclosure("environment", "new", "Add variable", environmentEditor(), opened("environment", "new"))}</div>`, opened("environment"));
+  const keyEditor = (key?: typeof keys[number]) => {
+    const record = key?.id ?? "new";
+    const fields = form(id, `/ssh-keys${key ? `/${encodeURIComponent(key.id)}` : ""}`, `${field("Name", "name", key?.name ?? "", 'autocomplete="off"')}${key ? "" : textarea("Private key", "privateKey", "", 7, 'required autocomplete="off" spellcheck="false"')}`, { section: "ssh", editor: record, saved: savedFor("ssh", record), caption: key ? "Save changes" : "Add key" });
+    if (!key) return fields;
+    const copy = buttonConfirmationHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Copy public key", iconHtml: Icons.Copy }, confirmationLabel: "Copied to clipboard", attributesHtml: 'data-action="ssh-public-key-copy#copy"' });
+    return `${fields}<div class="template-settings-toolbar" data-controller="ssh-public-key-copy" data-ssh-public-key-copy-url-value="/workspace-templates/${encodeURIComponent(id)}/ssh-keys/${encodeURIComponent(key.id)}/public-key"><span>${escapeHtml(key.keyType)}</span>${copy}<span data-ssh-public-key-copy-target="error" role="status" hidden>Could not copy key</span></div>${removeForm(id, `/ssh-keys/${encodeURIComponent(key.id)}/delete`, "ssh", "Remove key", `Remove SSH key “${key.name || key.keyType}”. Connections relying on it may stop working.`)}`;
+  };
+  const ssh = inlineDisclosure("ssh", undefined, "SSH private keys your agent may use but not see", `${paragraph("Private keys are encrypted outside workspaces. Changes also apply to existing workspaces.")}<div class="template-settings-inline-records">${keys.map(key => inlineDisclosure("ssh", key.id, key.name || "Unnamed key", keyEditor(key), opened("ssh", key.id))).join("")}${inlineDisclosure("ssh", "new", "Add key", keyEditor(), opened("ssh", "new"))}${inlineDisclosure("ssh", "known-hosts", "Trusted SSH servers", form(id, "/ssh-known-hosts", `${paragraph("GitHub is trusted by default. Only add identities you have verified with the server’s administrator.")}${textarea("Known hosts", "knownHosts", knownHosts, 7, 'spellcheck="false"')}`, { section: "ssh", editor: "known-hosts", saved: savedFor("ssh", "known-hosts") }), opened("ssh", "known-hosts"))}</div>`, opened("ssh"));
+  const dockerSupport = form(id, "/privileged", `${selection("Docker support", "privileged", String(t.privileged ?? false), [{ value: "false", label: "Off" }, { value: "true", label: "On" }])}${paragraph("Privileged workspaces can access host devices and data. Enable only for templates and agents you trust.")}`, { section: "container", editor: "docker", saved: savedFor("container", "docker"), autosave: true });
+  const images = inlineDisclosure("container", "images", "Preloaded images", form(id, "/preload-images", `${t.privileged ? "" : paragraph("Turn on Docker support to edit preloaded images. Saved references are kept while Docker is off.")}${textarea("Image references, one per line", "preloadImages", (t.preloadImages ?? []).join("\n"), 6, `spellcheck="false"${t.privileged ? "" : " readonly"}`)}`, { section: "container", editor: "images", saved: savedFor("container", "images"), available: Boolean(t.privileged) }), opened("container", "images"));
+  const dockerfile = inlineDisclosure("container", "dockerfile", "Custom Dockerfile", form(id, "/dockerfile", `${textarea("Dockerfile override", "dockerfile", t.dockerfile ?? "", 14, 'spellcheck="false" placeholder="FROM agents-in-the-cloud-workspace"')}${paragraph("Leave blank to use the repository Dockerfile or default image. An override must start with FROM agents-in-the-cloud-workspace.")}`, { section: "container", editor: "dockerfile", saved: savedFor("container", "dockerfile") }), opened("container", "dockerfile"));
+  const docker = inlineDisclosure("container", undefined, "Docker", `${paragraph("Docker changes apply to new workspaces. Existing containers stay unchanged.")}${dockerSupport}<div class="template-settings-inline-records">${images}${dockerfile}</div>`, opened("container"));
+  const developer = inlineDisclosure("developer", undefined, "Developer settings", form(id, "/seed-config", `${selection("Atelier-in-Atelier seeding", "seedConfigEnabled", String(t.seedConfigEnabled ?? false), [{ value: "false", label: "Off" }, { value: "true", label: "On" }])}${paragraph("Allows the repository manifest to copy provider credentials and template configuration into new workspaces. Enable only for repositories and agents you trust.")}${paragraph("Disabling this does not remove credentials already copied into existing workspaces.")}`, { section: "developer", saved: savedFor("developer") }), opened("developer"), 'hidden data-template-settings-target="developer"');
+  const deleteLabel = references.length ? `Delete template — delete ${references.length === 1 ? `workspace “${references[0]!.title}”` : `${references.length} workspaces`} first. This template is still in use.` : "Delete template";
+  const deletion = `<form method="post" action="/workspace-templates/${encodeURIComponent(id)}/delete" data-action="turbo:submit-start->template-settings#submitting turbo:submit-end->template-settings#submitted">${destructiveConfirmationHtml({ id: "template_settings_delete", trigger: { type: "button", variant: "danger", content: { kind: "icon-only", iconHtml: Icons.Trash, label: deleteLabel }, disabled: references.length > 0, attributesHtml: 'data-template-settings-record="index:delete"' }, confirmCaption: "Delete template", cancelCaption: "Cancel" })}</form>`;
+  const header = `<h1 class="panel__title" id="template_settings_title">${Icons.Settings}<span>Template settings · ${escapeHtml(t.name)}</span></h1>${deletion}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Close, label: "Close template settings" }, attributesHtml: 'data-action="template-settings#close"' })}`;
+  const body = `<div class="template-settings-content template-settings-inline" data-template-settings-target="content" data-template-settings-location="${escapeHtml(templateSettingsUrl(id, section, editor))}"${section !== "index" || location.section === "danger" ? ` data-template-settings-focus="${escapeHtml(editorKey(section, location.section === "danger" ? "delete" : editor))}"` : ""}${submittedPath ? ` data-template-settings-submitted-path="${escapeHtml(submittedPath)}"` : ""}>
+    <div id="template_settings_error"></div><div id="template_settings_request_error" hidden>${templateSettingsErrorHtml("Please try again. Your unsaved changes are still here.")}</div>
+    ${general}<div class="template-settings-inline-disclosures">${secrets}${ssh}${environment}${docker}${developer}</div>
   </div>`;
   return `<turbo-frame id="${templateSettingsFrameId}" data-template-settings-target="frame">${panelHtml({ element: { tag: "section", attributesHtml: 'aria-label="Template settings"' }, headerHtml: header, bodyHtml: body, bodyLayout: "full-bleed", bodyOverflow: "scroll" })}</turbo-frame>`;
 }

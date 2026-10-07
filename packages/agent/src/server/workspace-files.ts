@@ -1,6 +1,6 @@
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { workspaceContainerName } from "@agents-in-the-cloud/workspace";
-import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/prompt/server";
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 
 interface WorkspaceFileMimeRegistry {
   [extension: string]: string;

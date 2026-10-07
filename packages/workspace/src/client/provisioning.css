@@ -2,7 +2,7 @@
 
 .provision-list { margin-top: 0; }
 .provision-step { align-items: flex-start; }
-.provision-step > .status-list__marker { flex: 0 0 auto; }
+.provision-step > .status-list__marker { margin-top: 1px; }
 .provision-step-content { min-width: 0; flex: 1; }
 .provision-step-label { display: block; line-height: 20px; }
 .provision-step-detail { display: block; margin-top: 2px; }
@@ -14,16 +14,16 @@
 .provision-actions { margin: 12px 0 0; }
 .provision-actions > .button-group { flex-wrap: wrap; }
 
-.provision-step[data-status="warning"] > .status-list__marker { border-color: var(--warning); color: var(--warning); }
 
 .provision-launch-prompt { width: min(720px, 100%); align-self: center; flex: 0 0 auto; display: flex; max-height: 35%; }
 .provision-launch-prompt > .panel { width: 100%; }
+.provision-launch-settings { width: 100%; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .provision-launch-prompt .panel__body > p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 700px), (pointer: coarse) {
   .provision-terminal.observable-terminal-host, .provision-terminal-progress { height: min(160px, 25dvh); }
   .provision-output-log { max-height: min(160px, 25dvh); }
-  .provision-launch-prompt { max-height: min(120px, 22dvh); }
+  .provision-launch-prompt { max-height: min(220px, 35dvh); }
   .provision-terminal.observable-terminal-host, .provision-terminal-progress { margin-top: 6px; }
   .provision-recovery-description, .provision-actions { margin-top: 8px; }
 }

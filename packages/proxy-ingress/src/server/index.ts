@@ -1,2 +1,2 @@
-export * from "../ingress/index.ts";
+export { createWorkspaceIngress, publicWorkspaceAppOrigin, agentsInTheCloudUrl, handleCanonicalWorkspaceRequest, StoppedWorkspaceError, type WorkspaceAppHost, createFileOriginIdentityStore, detectParentOriginPublisher, createWorkspaceIngressSockets, defaultPublicOriginPortRange } from "../ingress/index.ts";
 export { managementOriginRejection } from "./management-origin.ts";

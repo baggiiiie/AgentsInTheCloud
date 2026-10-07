@@ -339,7 +339,7 @@ export const entries: CatalogueEntry[] = [
     title: "Foundations & composition",
     when: "Role tokens and shared layout primitives, not a second set of component sizes.",
     contract:
-      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Content rows, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
+      "Use --bg, --panel, --elev, --text, --text-bright, --text-muted, --accent, --success, --warning and --danger by semantic role. Theme is data-theme on the root. surface-lighting.css owns the shared rim, inner-glow and background-image roles for panels, Content rows, buttons and domain surfaces. Typography uses --font-sans / --font-mono, --text-body / --text-title / --text-code. title supplies visual heading style, not heading semantics. Action lists use a single bounded grid column so long row contents cannot widen the collection. form-stack, form-section, form-actions, action-list, work-view-toolbar and empty-state own composition spacing. viewport-overlay bounds browser-owned overlays.",
     sources: ["design-system.css", "surface-lighting.css"],
     examples: [
       {
@@ -618,17 +618,21 @@ export const entries: CatalogueEntry[] = [
   {
     id: "disclosure", title: "Disclosure",
     when: "Open and close related prose, forms, tool output or nested records in place. Either Content row presentation can be the summary.",
-    contract: "Native details/summary. summary.kind is compact or multiline; summary.width defaults to fit and can be fill independently of body size. Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
+    contract: "Native details/summary. summary.kind is compact or multiline; summary.width defaults to fit and can be fill independently of body size. Disclosure supplies the leading chevron and owns one shared guttered body. Summary content is structured Content row content, not arbitrary HTML. bodyHtml is trusted server HTML. The body always has flush block edges (no top/bottom margin or padding), while preserving the inline gutter. open sets initial state. element supplies details id/attributes; summary.attributesHtml and bodyAttributesHtml supply integration hooks, never classes/styles. Lazy frames and independently subscribed Turbo regions remain feature-owned. For commentary outside a disclosure, disclosure-content is the same native CSS gutter anatomy. No separate sizing, body paint, or gutter variants.",
     imports: { disclosure: "disclosureHtml", button: "buttonHtml" },
     sources: ["disclosure/disclosure.css"],
     examples: [
       {
-        title: "Compact summary · multiline body · native keyboard disclosure",
-        render: () => disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Compaction summary" } }, bodyHtml: '<div class="markdown"><p>The row presentation and disclosure state are independent.</p><ul><li>A compact summary stays a pill.</li><li>Its revealed content uses the same gutter, however many lines it contains.</li></ul></div>', open: true }),
+        title: "Compact summary · workspace handoff in a transcript",
+        render: () => '<div class="markdown"><p>I’ve finished reviewing the workspace settings. Here’s the handoff for the next session.</p></div>' + disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Compaction summary" } }, bodyHtml: '<div class="markdown"><p>The workspace settings now separate repository access from commit identity. GitHub connects once for all workspaces; each workspace template chooses its own repository.</p><ul><li><strong>Done:</strong> moved the GitHub connection into app settings and updated the repository picker.</li><li><strong>Checked:</strong> existing templates still open with their saved repository and branch.</li><li><strong>Next:</strong> review the empty state when no repositories are available, then verify the layout on a narrow screen.</li></ul><p>Keep the current commit author name and email. No credentials or repository contents were changed.</p></div>', open: true }) + '<div class="markdown"><p>Next I’ll check the repository picker on mobile.</p></div>',
       },
       {
         title: "Multiline summary · wrapping provider description · account action",
         render: () => disclosureHtml({ summary: { kind: "multiline", width: "fill", label: { kind: "text", text: "OpenAI" }, description: "Connected with your subscription. Usage is shared across the models you use with this account.", trailingHtml: comparisonRingHtml({ caption: "5h", referencePercent: 60, valuePercent: 32, label: "5-hour limit: 60% of the period elapsed, 32% used" }) }, bodyHtml: '<div class="form-section"><p>5-hour limit: 32% used. Resets in 2h.</p><div>' + buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Account settings" } }) + '</div></div>', open: true }),
+      },
+      {
+        title: "Compact collection · flush body edges",
+        render: () => disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "Subagents" } }, open: true, bodyHtml: disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/review" } }, bodyHtml: "Review transcript" }) + disclosureHtml({ summary: { kind: "compact", width: "fill", label: { kind: "text", text: "/root/research" } }, bodyHtml: "Research transcript" }) }),
       },
       {
         title: "Nested disclosures · shared gutter keeps the hierarchy visible",
@@ -827,7 +831,7 @@ export const entries: CatalogueEntry[] = [
     contract: "Place right after the text it explains. label names the question for screen readers; text is plain. Click or tap toggles; outside click or Escape closes.",
     imports: { "help-tip": "helpTipHtml" },
     sources: ["help-tip/help-tip-controller.ts", "help-tip/help-tip.css", "popup/popup-position.ts"],
-    examples: [{ title: "Inline with a metric", render: () => `<span>Estimated time to hit limit 2h 10m ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>` }],
+    examples: [{ title: "Inline with a metric", render: () => `<span>Estimated time to hit limit: 2h 10m ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>` }],
   },
   {
     id: "qr-code", title: "QR code", when: "Let people open a URL on their phone.",
@@ -1164,7 +1168,7 @@ export const entries: CatalogueEntry[] = [
     title: "Status & progress lists",
     when: "Compact status markers and multi-step summaries. Pair color with visible text.",
     contract:
-      "status-dot with success, warning, danger or running; add static to running for a non-animated snapshot marker. Decorative dots use aria-hidden. status-list has __item and __marker; use status-list--compact for dense progress histories. aria-busy for running, data-status=failed for failure, aria-checked=true only with checkbox role. Reduced motion disables spinning.",
+      "status-dot with success, warning, danger or running; add static to running for a non-animated snapshot marker. Decorative dots use aria-hidden. status-list has __item and __marker; use status-list--compact for dense progress histories. aria-busy for running, data-status=failed for failure, aria-checked=true only with checkbox role. Use Icons.Check, Icons.Close and Icons.Exclamation inside markers, not text glyphs. Reduced motion disables spinning.",
     sources: ["status/status.css"],
     examples: [
       {
@@ -1178,7 +1182,7 @@ export const entries: CatalogueEntry[] = [
             )
             .join("") +
           '<span><span class="status-dot running static" aria-hidden="true"></span> In progress at snapshot</span>' +
-          '<ul class="status-list"><li class="status-list__item" role="checkbox" aria-checked="true"><span class="status-list__marker">✓</span>Complete</li><li class="status-list__item" aria-busy="true"><span class="status-list__marker"></span>Running</li><li class="status-list__item" data-status="failed"><span class="status-list__marker">!</span>Failed</li></ul></div>',
+          `<ul class="status-list"><li class="status-list__item" role="checkbox" aria-checked="true"><span class="status-list__marker">${Icons.Check}</span>Complete</li><li class="status-list__item" aria-busy="true"><span class="status-list__marker"></span>Running</li><li class="status-list__item" data-status="failed"><span class="status-list__marker">${Icons.Close}</span>Failed</li></ul></div>`,
       },
     ],
   },

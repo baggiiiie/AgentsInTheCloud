@@ -1,7 +1,6 @@
 import { fetchSubscriptionUsageJson, subscriptionUsageMessages, SubscriptionUsageError, type Fetcher, type SubscriptionUsage } from "./subscription-usage.ts";
 import { codexTokenClaims } from "./codex-token.ts";
 import { Type, type Static } from "typebox";
-import { Value } from "typebox/value";
 
 const claimsSchema = Type.Object({ "https://api.openai.com/auth": Type.Optional(Type.Object({ chatgpt_account_id: Type.Optional(Type.String({ minLength: 1 })) })) });
 const windowSchema = Type.Object({

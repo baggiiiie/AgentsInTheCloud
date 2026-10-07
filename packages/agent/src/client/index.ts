@@ -1,5 +1,4 @@
 export {
-  agentClientModule,
   agentClientModule as agentsInTheCloudClientModule,
   createHtmlAutocompleteController,
   PromptHistoryNavigator,

@@ -41,6 +41,7 @@ export interface WorkspacePaneEntry {
 export interface WorkspacePaneWorkspaceTemplate {
   id: string;
   title: string;
+  swatchColor?: string;
   lastUsedAt?: number;
 }
 
@@ -103,9 +104,9 @@ export function workspaceTemplateSwatchColor(workspaceTemplateId: string): strin
   return `oklch(${[0.62, 0.7, 0.78][Math.floor(hash / 360) % 3]} 0.15 ${hash % 360})`;
 }
 
-function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id">): string {
+function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id" | "swatchColor">): string {
   return workspaceTemplate
-    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${workspaceTemplateSwatchColor(workspaceTemplate.id)}" aria-hidden="true"></span>`
+    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(workspaceTemplate.swatchColor ?? workspaceTemplateSwatchColor(workspaceTemplate.id))}" aria-hidden="true"></span>`
     : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
 }
 
@@ -206,6 +207,7 @@ function renderWorkspaceTemplatePicker(presentation: WorkspacePanePresentation, 
     : "";
   return `<form class="workspace-template-picker" method="get" action="/launch-composer" data-turbo-frame="launch_composer" data-turbo="true" data-action="submit->workspace-pane#submitted keydown.esc->workspace-pane#back">
     <input type="hidden" name="workspaceTemplate" value="" data-workspace-pane-target="value">
+    <input type="hidden" name="autoSelect" value="true">
     <div class="workspace-template-picker-scroll">${renderWorkspaceTemplateOptions(presentation)}</div>
   </form>${tip}`;
 }
@@ -447,13 +449,13 @@ export function renderWorkspaceDeletionPresentation(workspaceId: string, deletio
   });
   let content: string;
   if (deletion.status === "checking") {
-    content = '<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>Checking if it’s safe to delete…</h1><p>AgentsInTheCloud is checking for uncommitted changes and unpushed commits.</p></div>';
+    content = '<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>Checking if it’s safe to delete…</h1><p>AgentsInTheCloud is checking for local Git work and saved review comments.</p></div>';
   } else if (deletion.status === "deleting") {
     const title = deletion.forced ? "Force deleting workspace…" : "Deleting workspace…";
     const detail = deletion.forced ? "Local changes may be discarded." : "The safety check passed. AgentsInTheCloud is removing the workspace.";
     content = `<div class="workspace-deletion-heading"><span class="status-spinner" aria-hidden="true"></span><h1>${title}</h1><p>${detail}</p></div>`;
   } else if (deletion.status === "blocked") {
-    content = `<div class="workspace-deletion-evidence" aria-label="Git work that may be lost">${evidenceHtml}</div><footer class="workspace-deletion-actions"><form method="post" action="/workspaces/${id}/delete/cancel" data-turbo="true">${deletionButton("Cancel deletion")}</form><form method="post" action="/workspaces/${id}/delete/confirm" data-turbo="true" data-controller="submit-shortcut" data-action="keydown@window->submit-shortcut#windowKeydown submit->submit-shortcut#submit turbo:submit-end->submit-shortcut#submitted"><input type="hidden" name="fingerprint" value="${escapeHtml(deletion.fingerprint)}">${deletionButton("Delete anyway", "danger")}</form></footer>`;
+    content = `<div class="workspace-deletion-evidence" aria-label="Work that may be lost">${evidenceHtml}</div><footer class="workspace-deletion-actions"><form method="post" action="/workspaces/${id}/delete/cancel" data-turbo="true">${deletionButton("Cancel deletion")}</form><form method="post" action="/workspaces/${id}/delete/confirm" data-turbo="true" data-controller="submit-shortcut" data-action="keydown@window->submit-shortcut#windowKeydown submit->submit-shortcut#submit turbo:submit-end->submit-shortcut#submitted"><input type="hidden" name="fingerprint" value="${escapeHtml(deletion.fingerprint)}">${deletionButton("Delete anyway", "danger")}</form></footer>`;
   } else {
     const bypass = deletion.operation === "checking" ? `<form method="post" action="/workspaces/${id}/delete?force=1" data-turbo="true">${deletionButton("Delete without review", "danger")}</form>` : "";
     content = `<div class="workspace-deletion-heading"><h1>${deletion.operation === "checking" ? "Deletion review failed" : "Workspace deletion failed"}</h1><p class="workspace-deletion-error">${escapeHtml(deletion.error)}</p></div><footer class="workspace-deletion-actions"><form method="post" action="/workspaces/${id}/delete/cancel" data-turbo="true">${deletionButton("Cancel deletion")}</form><form method="post" action="/workspaces/${id}/delete/retry" data-turbo="true">${deletionButton("Retry review")}</form>${bypass}</footer>`;

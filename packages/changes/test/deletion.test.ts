@@ -204,3 +204,31 @@ describe("Workspace deletion review", () => {
     expect((await deletionReviewFileResponse(workspaceId, url)).status).toBe(409);
   });
 });
+
+describe("Review comments in workspace deletion safety", () => {
+  test("warns about saved comments even in a clean repository, and copying keeps the confirmation valid", async () => {
+    const { createReviewCommentStore } = await import("../src/server/comments.ts");
+    const { captureChanges } = await import("../src/server/snapshot.ts");
+    const root = await workspaceRepository();
+    const comments = createReviewCommentStore({ dataDir });
+    const review = createDeletionReview((id, path) => localRepository(join(dataDir, "workspaces", id, "work", path)), comments);
+    await writeFile(join(root, "tracked.txt"), "review this\n");
+    const snapshot = await captureChanges(localRepository(root));
+    const comment = comments.save(workspaceId, { id: "review", revision: 0, body: "Needs work", path: "tracked.txt", side: "additions", start: 1, end: 1 }, snapshot);
+    await writeFile(join(root, "tracked.txt"), "initial\n");
+    const uncopied = await review.changesDeletionReview.inspect(workspaceId);
+    expect(uncopied).toMatchObject({ status: "blocked", details: { repositories: [], comments: [{ revision: 1, copiedRevision: 0 }] } });
+    comments.markCopied(workspaceId, [{ id: comment.id, revision: 1 }]);
+    const copied = await review.changesDeletionReview.inspect(workspaceId);
+    expect(copied).toMatchObject({ status: "blocked", details: { comments: [{ copiedRevision: 1 }] } });
+    if (uncopied.status !== "blocked" || copied.status !== "blocked") throw new Error("Expected review comments to block deletion");
+    expect(copied.fingerprint).toBe(uncopied.fingerprint);
+    comments.save(workspaceId, { id: comment.id, revision: 1, body: "Changed review" }, snapshot);
+    const changed = await review.changesDeletionReview.inspect(workspaceId);
+    if (changed.status !== "blocked") throw new Error("Expected edited comment to block deletion");
+    expect(changed.fingerprint).not.toBe(copied.fingerprint);
+    expect(changed).toMatchObject({ details: { comments: [{ revision: 2, copiedRevision: 1 }] } });
+    comments.remove(workspaceId, comment.id, 2);
+    expect(await review.changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
+  });
+});

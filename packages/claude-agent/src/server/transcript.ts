@@ -1,7 +1,7 @@
 import { nativeJsonlRows, nativeImageTypes, nativeImageResponse, nativeTimestamp } from "@agents-in-the-cloud/cli-agent/server";
 import { join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext, readTextIfExists } from "@agents-in-the-cloud/core";
-import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server/transcript";
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";

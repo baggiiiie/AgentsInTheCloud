@@ -1,4 +1,6 @@
-import { agentKey, ids, renderReadOnlyTranscript, renderReadOnlyTranscriptDetail, subscribeWorkspaceAgentBusy, type AgentRenderContext } from "@agents-in-the-cloud/agent/server";
+import { agentKey, ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
+import { renderReadOnlyTranscript, renderReadOnlyTranscriptDetail } from "@agents-in-the-cloud/agent/server/read-only-transcript";
+import { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { renderFollowLatestButton } from "@agents-in-the-cloud/prompt/server";

@@ -1,3 +1,4 @@
+import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
@@ -20,7 +21,7 @@ function stepStatusAttributes(status: WorkspaceProvisionStepStatus): string {
 
 function renderStatusMarker(status: WorkspaceProvisionStepStatus): string {
   const statusAttributes = status === "failed" || status === "warning" ? ` role="img" aria-label="${status === "warning" ? "Warning" : "Failed"}"` : "";
-  const marker = status === "done" ? "✓" : status === "failed" ? "✕" : status === "warning" ? "!" : "";
+  const marker = status === "done" ? Icons.Check : status === "failed" ? Icons.Close : status === "warning" ? Icons.Exclamation : "";
   return `<span class="status-list__marker"${statusAttributes}>${marker}</span>`;
 }
 
@@ -57,13 +58,14 @@ function renderProvisionStep(workspaceId: string, step: WorkspaceProvisionStep, 
   return `<li class="status-list__item provision-step"${stepStatusAttributes(step.status)}>${renderStatusMarker(step.status)}<div class="provision-step-content"><span class="provision-step-label">${escapeHtml(step.label)}</span>${detail}${activity}${output}${description}${actions}</div></li>`;
 }
 
-export function renderWorkspaceLaunchPrompt(launchPrompt: string | undefined): string {
+export function renderWorkspaceLaunchPrompt(launchPrompt: string | undefined, settingsHtml?: string): string {
   const prompt = launchPrompt?.trim();
   if (!prompt) return "";
   return `<div class="provision-launch-prompt">${panelHtml({
     element: { tag: "section", attributesHtml: 'aria-label="Launch prompt"' },
     headerHtml: `<h2 class="panel__title">Launch prompt</h2>${copyButtonHtml({ label: "Copy launch prompt", copyText: prompt })}`,
     bodyHtml: `<p>${escapeHtml(prompt)}</p>`,
+    footerHtml: settingsHtml ? `<div class="provision-launch-settings">${settingsHtml}</div>` : undefined,
     bodyLayout: "padded",
     bodyOverflow: "scroll",
   })}</div>`;

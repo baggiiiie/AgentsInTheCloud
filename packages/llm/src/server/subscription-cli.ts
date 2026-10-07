@@ -34,7 +34,7 @@ export function registerSubscriptionCli(getRuntime: () => Promise<ModelRuntime>)
     const inference = (url.hostname === "chatgpt.com" && /^\/(?:backend-api|api)\/codex\/responses(?:\/|$)/.test(url.pathname))
       || (url.hostname === "api.openai.com" && url.pathname === "/v1/responses");
     if (!inference || request.method !== "POST" || !response.ok) return response;
-    if (await usesConnectedSubscription(request, "openai-codex")) recordSubscriptionInference("openai");
+    if (await usesConnectedSubscription(request, "openai-codex")) recordSubscriptionInference("openai-codex");
     return response;
   });
   // Claude Code responses carry the subscription's limits; keeping them spares the

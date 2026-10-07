@@ -41,7 +41,15 @@ export async function withManagedDockerCommand<T>(args: string[], execute: (args
 export async function requireDocker(args: string[], options: CommandOptions = {}): Promise<CommandResult> {
   const result = await runDocker(args, options);
   if (result.exitCode !== 0) {
-    throw new AgentsInTheCloudCoreError("docker_unavailable", result.stderr.trim() || `docker ${args[0] ?? ""} failed`);
+    const message = result.stderr.trim() || `docker ${args[0] ?? ""} failed`;
+    if (message.includes("all predefined address pools have been fully subnetted")) {
+      throw new AgentsInTheCloudCoreError(
+        "docker_network_capacity_exhausted",
+        "Docker has run out of network address space. Delete workspaces you no longer need, then try again. Parking a workspace won’t free its network. To keep more workspaces, configure larger default-address-pools in Docker’s daemon settings (Docker Desktop: Settings → Docker Engine). Changing pools requires a Docker restart and applies only to new networks.",
+        { stderr: result.stderr, command: args },
+      );
+    }
+    throw new AgentsInTheCloudCoreError("docker_unavailable", message);
   }
   return result;
 }

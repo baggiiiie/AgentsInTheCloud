@@ -1,4 +1,4 @@
-import { chromium, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { copyFile, mkdir, rename, rm, stat } from "node:fs/promises";
 import { dirname, extname, isAbsolute, join, resolve } from "node:path";

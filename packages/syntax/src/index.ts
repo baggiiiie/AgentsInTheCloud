@@ -1,1 +1,1 @@
-export { highlightCodeHtml, highlightCodeHtmlForPath, languageFromPath, type HighlightRequest, type HighlightedCode } from "./highlight.ts";
+export { highlightCodeHtml, highlightCodeHtmlForPath, languageFromPath } from "./highlight.ts";

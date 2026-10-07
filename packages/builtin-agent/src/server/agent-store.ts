@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createKeyedOperationQueue, getAgentsInTheCloudRuntimeContext, isJsonObject, readTextIfExists, writeJsonAtomic } from "@agents-in-the-cloud/core";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server";
+import { sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server/session-share";
 
 export interface WorkspaceAgentInfo {
   workspaceId: string;
@@ -17,9 +17,8 @@ export interface WorkspaceAgentInfo {
 
 export const untitledAgentTitle = "Untitled";
 const serializeAgentOperation = createKeyedOperationQueue();
-export { publishSessionSnapshot, projectlessSessionShareKey, sessionShareMountPath, sessionShareKeySlug, sessionShareKeyForInit, sessionShareDir, workspaceSessionShareKey } from "@agents-in-the-cloud/agent/server";
 
-export interface AgentRecord { agentId: string; label: string; title: string; storage: "durable" }
+interface AgentRecord { agentId: string; label: string; title: string; storage: "durable" }
 const agentsSchema = Type.Object({ version: Type.Literal(2), agents: Type.Array(Type.Object({ agentId: Type.String(), label: Type.String(), title: Type.String(), storage: Type.Literal("durable") })) });
 const previousAgentsSchema = Type.Object({ version: Type.Literal(1), conversations: Type.Array(Type.Object({ conversationId: Type.String(), label: Type.String(), title: Type.String(), storage: Type.Literal("durable") })) });
 function agentMetadataPath(workspaceId: string): string {

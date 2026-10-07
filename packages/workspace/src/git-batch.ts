@@ -1,12 +1,21 @@
-import type { GitResult } from "./git-repository.ts";
+import type { WorkingFileRevision, WorkingFileWriteResult, GitResult } from "./git-repository.ts";
 
-export type RepositoryRequest = { kind: "git"; args: string[] } | { kind: "working-file"; path: string } | { kind: "index-tree" };
+export type RepositoryRequest = { kind: "git"; args: string[] } | { kind: "working-file"; path: string; editable?: true } | { kind: "index-tree" } | { kind: "write-working-file"; path: string; expected: WorkingFileRevision; contents: string };
+
+export function decodeWorkingFileWrite(result: GitResult): WorkingFileWriteResult {
+  if (result.exitCode === 73) return "changed";
+  if (result.exitCode === 45) return "unsupported";
+  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Couldn’t save workspace file");
+  return "saved";
+}
 
 /** Fixed trusted source, not loaded from the repository. Requests travel on stdin, never in shell source or argv. */
 export const repositoryBatchRunner = String.raw`
-const { lstat, readFile, readlink, mkdtemp, copyFile, rm } = require('node:fs/promises');
+const { lstat, readFile, readlink, mkdtemp, copyFile, rm, open, rename } = require('node:fs/promises');
 const { resolve, join, relative, sep } = require('node:path');
 const { tmpdir } = require('node:os');
+const { constants } = require('node:fs');
+const { createHash, randomUUID } = require('node:crypto');
 const requests = JSON.parse(await Bun.stdin.text());
 async function execute(args, env) {
   const child = Bun.spawn(args, { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env });
@@ -15,11 +24,74 @@ async function execute(args, env) {
 }
 async function run(request) {
   if (request.kind === 'git') return execute(request.args);
+  if (request.kind === 'write-working-file') {
+    const result = exitCode => ({ stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode });
+    if (!request.path || request.path.startsWith('/') || request.path.includes('\0') || request.path.split('/').some(part => part === '..' || part === '.git')) return result(45);
+    const path = resolve(request.path), within = relative(process.cwd(), path);
+    if (!within || within === '..' || within.startsWith('..' + sep)) return result(45);
+    // Hold directory descriptors and use their proc paths. A renamed or swapped
+    // ancestor cannot redirect the write through a symlink between checks.
+    const directories = [];
+    async function parentDirectory() {
+      let directory = await open(process.cwd(), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+      directories.push(directory);
+      for (const part of within.split(sep).slice(0, -1)) {
+        directory = await open('/proc/self/fd/' + directory.fd + '/' + part, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+        directories.push(directory);
+      }
+      return '/proc/self/fd/' + directory.fd;
+    }
+    let handle, temporary;
+    try {
+      const directory = await parentDirectory();
+      const target = directory + '/' + within.split(sep).at(-1);
+      const entry = await lstat(target);
+      if (!entry.isFile()) return result(45);
+      handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const info = await handle.stat();
+      const original = await handle.readFile();
+      const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+      const mode = info.mode & 0o111 ? '100755' : '100644';
+      if (hash(original) !== request.expected.hash || mode !== request.expected.mode) return result(73);
+      if (original.equals(Buffer.from(request.contents, 'utf8'))) return result(0);
+      // Honor the workspace user's file permissions even when directory replacement is allowed.
+      const writable = await open(target, constants.O_WRONLY | constants.O_NOFOLLOW);
+      await writable.close();
+      temporary = directory + '/.agents-in-the-cloud-edit-' + randomUUID();
+      const output = await open(temporary, 'wx', 0o600);
+      try {
+        await output.writeFile(request.contents, 'utf8');
+        await output.chmod(info.mode & 0o777);
+        await output.sync();
+      } finally { await output.close(); }
+      const latest = await lstat(target);
+      if (!latest.isFile() || latest.ino !== info.ino || latest.dev !== info.dev || latest.mode !== info.mode || hash(await readFile(target)) !== request.expected.hash) return result(73);
+      await rename(temporary, target);
+      return result(0);
+    } catch (error) {
+      if (error.code === 'ENOENT') return result(73);
+      if (error.code === 'ELOOP' || error.code === 'ENOTDIR') return result(45);
+      throw error;
+    } finally {
+      if (handle) await handle.close();
+      if (temporary) await rm(temporary, { force: true });
+      for (const directory of directories.reverse()) await directory.close();
+    }
+  }
   if (request.kind === 'working-file') {
     const path = resolve(request.path), within = relative(process.cwd(), path);
     if (within === '..' || within.startsWith('..' + sep)) throw new Error('File path escapes repository');
     try {
+      if (request.editable) {
+        if (!request.path || request.path.split('/').some(part => part === '..' || part === '.git')) return { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: 44 };
+        let parent = process.cwd();
+        for (const part of within.split(sep).slice(0, -1)) {
+          parent = join(parent, part);
+          if (!(await lstat(parent)).isDirectory()) return { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: 44 };
+        }
+      }
       const info = await lstat(path);
+      if (request.editable && !info.isFile()) return { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: 44 };
       if (!info.isFile() && !info.isSymbolicLink()) return { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), exitCode: 44 };
       const mode = info.isSymbolicLink() ? '120000' : info.mode & 0o111 ? '100755' : '100644';
       const contents = info.isSymbolicLink() ? Buffer.from(await readlink(path)) : await readFile(path);

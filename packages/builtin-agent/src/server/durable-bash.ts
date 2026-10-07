@@ -20,11 +20,11 @@ export const bashOperationReceiptSchema = Type.Union([
     aborted: Type.Boolean(), timedOut: Type.Boolean(), output: Type.String(), displayAnsi: Type.String(), fullOutputPath: Type.String(),
   }),
 ]);
-export type BashOperationReceipt = Static<typeof bashOperationReceiptSchema>;
-export type BashOperationAction = "ensure" | "status" | "stop";
+type BashOperationReceipt = Static<typeof bashOperationReceiptSchema>;
+type BashOperationAction = "ensure" | "status" | "stop";
 export type BashOperations = (action: BashOperationAction, request: BashOperationRequest, create?: boolean) => Promise<BashOperationReceipt>;
 
-export function workspaceBashOperations(workspaceId: string): BashOperations {
+function workspaceBashOperations(workspaceId: string): BashOperations {
   return async (action, request, create = false) => {
     const command = ["/opt/agents-in-the-cloud/bin/agents-in-the-cloud-agent-bash", action, JSON.stringify(request)];
     if (create) command.push("--create");

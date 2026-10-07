@@ -59,8 +59,9 @@ export function getPopularModelRank(provider: string, id: string): number | unde
 }
 
 export function getPopularProviderRank(provider: string): number | undefined {
-  // Sign in with ChatGPT on OpenAI supersedes the Codex provider, which keeps its curated defaults.
-  if (provider === "openai-codex") return undefined;
+  // Prefer Codex sign-in; OpenAI keeps its model defaults in the other providers list.
+  if (provider === "openai") return undefined;
+  if (provider === "openai-codex") return 0;
   const rank = hardcodedPopularModels.findIndex((model) => model.provider === provider);
   return rank < 0 ? undefined : rank;
 }

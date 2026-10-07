@@ -2,7 +2,9 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, commitIdentitySettingsFile, hasCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateEnvironmentVariables, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { setWorkspaceTemplateSeedConfigEnabled, addWorkspaceTemplate, createWorkspaceTemplateEnvironmentVariable, createWorkspaceTemplateSecret, deleteWorkspaceTemplate, deleteWorkspaceTemplateEnvironmentVariable, getCommitIdentity, getStoredCommitIdentity, createWorkspaceTemplateSshKey, deriveWorkspaceTemplateSshPublicKey, listWorkspaceTemplateSecrets, listWorkspaceTemplateSshKeys, listWorkspaceTemplates, parseWorkspaceTemplateSpec, revealWorkspaceTemplateSecrets, revealWorkspaceTemplateSshKeys, renameWorkspaceTemplateSshKey, setCommitIdentity, updateWorkspaceTemplate, updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret } from "@agents-in-the-cloud/workspace-templates";
+import { commitIdentitySettingsFile, hasCommitIdentity } from "../src/commit-identity.ts";
+import { listWorkspaceTemplateEnvironmentVariables } from "../src/environment.ts";
 
 describe("Workspace templates", () => {
   test("parseWorkspaceTemplateSpec supports an optional #branch suffix", () => {
@@ -60,6 +62,20 @@ describe("Workspace templates", () => {
     const result = await updateWorkspaceTemplate(workspaceTemplate.id, { name: "Renamed", spec: "https://github.com/org/renamed.git#main" }, file);
 
     expect(result.workspaceTemplate).toMatchObject({ id: workspaceTemplate.id, name: "Renamed", gitUrl: "https://github.com/org/renamed.git", branch: "main", sessionShareKey: "Renamed" });
+  });
+
+  test("custom swatch colors persist, survive unrelated updates, and can be cleared", async () => {
+    const file = join(await mkdtemp(join(tmpdir(), "template-colors-")), "projects.json");
+    const template = (await addWorkspaceTemplate("https://github.com/org/colors.git", file)).workspaceTemplate;
+    const values = { name: template.name, spec: template.gitUrl };
+    expect(template.swatchColor).toBeUndefined();
+    await updateWorkspaceTemplate(template.id, { ...values, swatchColor: "#Ab12Cd" }, file);
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBe("#ab12cd");
+    expect((await updateWorkspaceTemplate(template.id, values, file)).workspaceTemplate.swatchColor).toBe("#ab12cd");
+    await expect(updateWorkspaceTemplate(template.id, { ...values, swatchColor: "red" }, file)).rejects.toThrow("six-digit hex color");
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBe("#ab12cd");
+    await updateWorkspaceTemplate(template.id, { ...values, swatchColor: "" }, file);
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBeUndefined();
   });
 
   test("Workspace template secrets are encrypted at rest and decryptable by the host", async () => {

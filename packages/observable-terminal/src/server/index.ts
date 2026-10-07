@@ -1,8 +1,6 @@
 export { observableTerminalStaticFiles } from "./static.ts";
 export {
   observableTerminalCols,
-  observableTerminalEnvironment,
-  observableTerminalHistoryLimit,
   observableTerminalRows,
 } from "./constants.ts";
 export {
@@ -12,26 +10,16 @@ export {
   tailTerminalText,
 } from "./text.ts";
 export {
-  buildCapturePaneCommand,
   buildKillSessionCommand,
   buildListSessionsCommand,
   buildObservableSessionCommand,
-  buildSetRemainOnExitCommand,
-  type ObservableTerminalSessionOptions,
 } from "./tmux.ts";
 export {
   attachHostObservableTerminal,
-  attachObservableTerminal,
-  buildAttachArgs,
-  type HostObservableTerminalAttachOptions,
-  type ObservableTerminalAttachOptions,
   type ObservableTerminalConnection,
-  type ObservableTerminalEvents,
 } from "./attach.ts";
 export {
   runHostObservableCommand,
-  type HostObservableCommandOptions,
-  type HostObservableCommandResult,
 } from "./host-command.ts";
 export { createObservableTerminalSocket, terminalSocketDimensions } from "./socket.ts";
 export { renderTerminalConnectionStatus } from "./status.ts";

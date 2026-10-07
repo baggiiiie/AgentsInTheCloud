@@ -1,13 +1,18 @@
 import { join, relative, sep } from "node:path";
-import { decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "./git-batch.ts";
+import { decodeWorkingFileWrite, decodeRepositoryBatch, repositoryBatchRunner, type RepositoryRequest } from "./git-batch.ts";
 import { workspaceRoot, type WorkspaceCommandOptions } from "./index.ts";
 
 export interface GitResult { stdout: Buffer; stderr: string; exitCode: number }
 export interface WorkingFile { contents: Buffer; mode: string }
+export interface WorkingFileRevision { hash: string; mode: string }
+export type WorkingFileWriteResult = "saved" | "changed" | "unsupported";
+const writes = new Map<string, Promise<void>>();
+
 export interface Repository {
   gitResult(args: string[]): Promise<GitResult>;
-  workingFile(path: string): Promise<WorkingFile | undefined>;
+  workingFile(path: string, editable?: true): Promise<WorkingFile | undefined>;
   captureIndexTree(): Promise<Buffer>;
+  writeWorkingFile(path: string, expected: WorkingFileRevision, contents: string): Promise<WorkingFileWriteResult>;
 }
 
 export function safeGitArguments(args: string[]): string[] {
@@ -58,16 +63,25 @@ export function createWorkspaceRepository(
   }
   return {
     gitResult: args => enqueue({ kind: "git", args }),
-    async workingFile(path) {
+    async workingFile(path, editable) {
       if (path.startsWith("/")) throw new Error("File path must be repository-relative");
       const within = relative(workdir, join(workdir, path));
       if (within === ".." || within.startsWith(`..${sep}`)) throw new Error("File path escapes repository");
-      const result = await enqueue({ kind: "working-file", path });
+      const result = await enqueue({ kind: "working-file", path, editable });
       if (result.exitCode === 44) return undefined;
       if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Couldn’t read workspace file");
       const separator = result.stdout.indexOf(10);
       if (separator !== 6) throw new Error("Invalid workspace file response");
       return { mode: result.stdout.subarray(0, separator).toString(), contents: result.stdout.subarray(separator + 1) };
+    },
+    async writeWorkingFile(path, expected, contents) {
+      if (!path || path.startsWith("/") || path.split("/").some(part => part === ".." || part === ".git") || path.includes("\0")) throw new Error("Invalid editable repository path");
+      const key = `${workspaceId}:${workdir}`;
+      const previous = writes.get(key) ?? Promise.resolve();
+      const write = previous.then(async () => decodeWorkingFileWrite(await enqueue({ kind: "write-working-file", path, expected, contents })));
+      const tail = write.then(() => undefined, () => undefined);
+      writes.set(key, tail);
+      try { return await write; } finally { if (writes.get(key) === tail) writes.delete(key); }
     },
     async captureIndexTree() {
       const result = await enqueue({ kind: "index-tree" });

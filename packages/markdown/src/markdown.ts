@@ -91,7 +91,8 @@ markdown.renderer.rules.link_open = (tokens, index, options, environment: Markdo
 
   const workspaceLocalHref = workspaceLocalPreviewHref(environment.workspaceId, href);
   if (workspaceLocalHref) token.attrSet("href", workspaceLocalHref);
-  if (href.startsWith("http://") || href.startsWith("https://")) {
+  if (/^https?:\/\//i.test(href)) {
+    token.attrSet("data-turbo", "false");
     token.attrSet("target", "_blank");
     token.attrSet("rel", "noopener noreferrer");
   }

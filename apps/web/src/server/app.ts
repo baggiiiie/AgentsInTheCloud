@@ -60,7 +60,7 @@ import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/ro
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
 import { createPageLayout } from "./page-layout.ts";
 import { createWorkspaceTemplateRoutes, type WorkspaceTemplateEditorOptions } from "./workspace-template-routes.ts";
-import { renderDeveloperToolsDialog, renderSettingsDialog } from "./settings/page.ts";
+import { appSettingsFrameId, renderDeveloperToolsSettings, renderAppSettings } from "./settings/page.ts";
 import { handleSettingsRequest } from "./settings/routes.ts";
 import { themeRegionHtml, themeRegionId } from "./settings/theme.ts";
 import { parseCloseWorkViewRequest, parseReorderWorkViewRequest } from "./work-view-api.ts";
@@ -207,7 +207,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   });
   const hostTrustPanels = new Map<string, Awaited<ReturnType<typeof scanSshHost>>>();
   deps.events?.on("workspace_deleted", ({ workspaceId }) => { cancelWorkspaceSshTrust(workspaceId); hostTrustPanels.delete(workspaceId); });
-  const provisioningPrompts = new Map<string, string>();
+  const provisioningLaunchPanels = new Map<string, string>();
   const provisioning = createWorkspaceProvisioning({ events: deps.events, onChange: (workspaceId) => {
     invalidatePresentation();
     const entry = registry.get(workspaceId);
@@ -260,7 +260,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   registry.setCallbacks({
     rowChanged(entry) {
-      if (entry.phase.kind === "runningPhase") provisioningPrompts.delete(entry.id);
+      if (entry.phase.kind === "runningPhase") provisioningLaunchPanels.delete(entry.id);
       invalidatePresentation();
     },
     listChanged() {
@@ -273,7 +273,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     },
     removed(id) {
       workPresentationIntents.delete(id);
-      provisioningPrompts.delete(id);
+      provisioningLaunchPanels.delete(id);
       provisioning.delete(id);
       for (const [key, surface] of surfaces) if (surface.workspaceId === id) { surface.resource.dispose(); surfaces.delete(key); }
       invalidatePresentation();
@@ -294,7 +294,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
   async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; workspaceTemplateId?: string }): Promise<string> {
     const draftId = crypto.randomUUID();
     const agentTypes = await orderedAgentTypes();
-    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: options.workspaceTemplateId });
+    const initialPrompt = registry.list().length === 0
+      ? "Hi, I think I'm about to make my first workspace in AgentsInTheCloud. Yay!\n\nIs it true that you have access to your own documentation and I can just ask you if I have a question about it?"
+      : "";
+    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: options.workspaceTemplateId, initialPrompt });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
         attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut composer-focus" data-action="mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:software-keyboard@document->launch-composer-dialog#layout resize@window->launch-composer-dialog#layout" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
@@ -307,17 +310,17 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     })}</turbo-frame>`;
   }
 
-  async function renderEmptyLaunchComposerFrame(): Promise<string> {
+  async function renderEmptyLaunchComposerFrame(autoSelect = false): Promise<string> {
     return await renderLaunchComposerFrame({
       titleCaption: "Create empty workspace, and then…",
-      action: "/agent-workspaces",
+      action: `/agent-workspaces${autoSelect ? "?autoSelect=true" : ""}`,
     });
   }
 
-  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary): Promise<string> {
+  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary, autoSelect = false): Promise<string> {
     return await renderLaunchComposerFrame({
       titleCaption: `Create workspace from ${workspaceTemplate.name}, and then…`,
-      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}`,
+      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}${autoSelect ? "?autoSelect=true" : ""}`,
       workspaceTemplateId: workspaceTemplate.id,
     });
   }
@@ -356,7 +359,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function workspacePaneCollections(activeWorkspaceId: string): Promise<WorkspacePanePresentation> {
     const { workspaceTemplates: savedWorkspaceTemplates } = await listWorkspaceTemplates();
-    const workspaceTemplates: WorkspacePaneWorkspaceTemplate[] = savedWorkspaceTemplates.map(({ id, name, lastUsedAt }) => ({ id, title: name, lastUsedAt }));
+    const workspaceTemplates: WorkspacePaneWorkspaceTemplate[] = savedWorkspaceTemplates.map(({ id, name, lastUsedAt, swatchColor }) => ({ id, title: name, lastUsedAt, swatchColor }));
     const workspaceTemplatesById = new Map(workspaceTemplates.map((workspaceTemplate) => [workspaceTemplate.id, workspaceTemplate]));
     const workspaces = registry.list().map((entry) => {
       let workspaceTemplate: WorkspacePaneWorkspaceTemplate | undefined;
@@ -534,7 +537,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const inner = `${renderWorkspaceProvisioning(entry.id, snapshot, { failed, error: entry.phase.error, recovery })}${sourceFailure ? "" : recoveryActions}${deleteAction}`;
     const trustPanel = hostTrustPanels.get(entry.id);
     const overlay = trustPanel ? sshTrustPanel(entry.id, trustPanel.records, trustPanel.host, trustPanel.port, changedHost, `/workspaces/${encodeURIComponent(entry.id)}/ssh-trust`) : "";
-    return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${renderWorkspaceLaunchPrompt(provisioningPrompts.get(entry.id))}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
+    return `<div class="workspace-boot"><div class="main"${trustPanel ? " inert" : ""}><div class="body"><div class="workspace-boot-progress"><div class="workspace-boot-content">${inner}</div></div>${provisioningLaunchPanels.get(entry.id) ?? ""}</div></div>${renderMobileWorkspaceBar("", "", !!trustPanel)}${overlay}</div>`;
   }
 
   function emptyWorkspaceArtworkHtml(pane: WorkspacePanePresentation): string {
@@ -579,7 +582,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const pane = await workspacePaneCollections(selectedId ?? "");
     const workspaceTemplateEditor = surface?.kind === "workspace-template-editor" ? surface.dialogHtml : '<div id="workspace-template-editor-modal"></div>';
     const settings = surface?.kind === "settings"
-      ? surface.developerTools ? await renderDeveloperToolsDialog() : await renderSettingsDialog(surface.request, surface.section)
+      ? surface.developerTools ? await renderDeveloperToolsSettings(surface.request) : await renderAppSettings(surface.request, surface.section)
       : surface?.kind === "models" ? await renderModelsDialog({ focus: surface.focus })
       : "";
     const launchComposer = surface?.kind === "new-workspace"
@@ -587,12 +590,12 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
     return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""), launchComposerCommand.binding)}
-    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}${surface?.kind === "template-settings" ? surface.html : `<div id="${templateSettingsHostId}"></div>`}</main>
+    <main class="fixed-shell-app-main">${await workspaceDetailHostHtml(pane, selectedId, initialSelection)}${surface?.kind === "template-settings" ? surface.html : `<div id="${templateSettingsHostId}"></div>`}<div id="app_settings_host">${surface?.kind === "settings" ? settings : ""}</div></main>
     ${renderAgentsInTheCloudBar()}
   </div>
   ${workspaceTemplateEditor}
   <div id="update_modal_host"></div>
-  <div id="settings_modal_host">${settings}</div>
+  <div id="settings_modal_host">${surface?.kind === "models" ? settings : ""}</div>
   <turbo-frame id="${workspaceModuleModalFrameId}">${surface?.kind === "module-modal" ? surface.dialogHtml : ""}</turbo-frame>
   <div id="onboarding_modal_host">${await renderOnboardingDialog()}</div>
   <div id="${workspaceCommandModalHostId}"></div>
@@ -735,7 +738,16 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       const prepared = await agentType.launch.prepare(command.agent);
       context = { ...prepared, agent: { ...prepared?.agent, initialPrompt, attachmentDraft, agentTypeId: agentType.id } };
     }
-    if (context?.agent?.initialPrompt) provisioningPrompts.set(id, context.agent.initialPrompt);
+    if (context?.agent?.initialPrompt) {
+      const agent = context.agent;
+      const query = new URLSearchParams();
+      if (agent.model) query.set("model", agent.model);
+      if (agent.thinkingLevel) query.set("thinkingLevel", agent.thinkingLevel);
+      const settingsHtml = await renderLaunchAgentType(getAgentType(agent.agentTypeId ?? "builtin"), [], {
+        ...launchComposerFooterContext(query), readOnly: true,
+      });
+      provisioningLaunchPanels.set(id, renderWorkspaceLaunchPrompt(agent.initialPrompt, settingsHtml));
+    }
     registry.add(id, title || null, init);
     const options: Parameters<typeof startWorkspaceProvisioning>[1] = {};
     if (init !== undefined) options.init = init;
@@ -794,7 +806,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       launchComposerSubmissions.set(submissionId, launch);
     }
     const { id, isFirstWorkspace } = await launch;
-    return turboStreamResponse(`${update(launchComposerFrameId, "")}${isFirstWorkspace ? selectWorkspaceTurboStream(id) : ""}`);
+    return turboStreamResponse(`${update(launchComposerFrameId, "")}${isFirstWorkspace || new URL(request.url).searchParams.get("autoSelect") === "true" ? selectWorkspaceTurboStream(id) : ""}`);
   }
 
   async function createEmptyAgentWorkspaceEndpoint(request: Request): Promise<Response> {
@@ -1169,9 +1181,10 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/openapi.json" && request.method === "GET") return jsonResponse(agentsInTheCloudOpenApi(workspaceModuleCommands(), Object.assign({}, ...workspaceModules.map((module) => module.openApiPaths ?? {}))));
     if (url.pathname === "/launch-composer" && request.method === "GET") {
       const workspaceTemplateReference = url.searchParams.get("workspaceTemplate");
+      const autoSelect = url.searchParams.get("autoSelect") === "true";
       return response(workspaceTemplateReference
-        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference))
-        : await renderEmptyLaunchComposerFrame());
+        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference), autoSelect)
+        : await renderEmptyLaunchComposerFrame(autoSelect));
     }
     if (url.pathname === "/launch-composer/agent-type" && request.method === "GET") return response(await renderLaunchAgentType(getAgentType(url.searchParams.get("agentTypeId") ?? "builtin"), await orderedAgentTypes(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await getAgentType(url.searchParams.get("agentTypeId") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));
@@ -1187,7 +1200,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/workspace-templates/new" && request.method === "GET") {
       return workspaceTemplateEditorResponse(request, { kind: "new" });
     }
-    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
+    if (url.pathname === "/settings" && request.method === "GET" && !wantsStream(request) && request.headers.get("turbo-frame") !== appSettingsFrameId) return await surfacePage({ kind: "settings", request, section: url.searchParams.get("section") ?? undefined });
     if (url.pathname === "/models" && request.method === "GET" && !wantsStream(request) && !url.searchParams.has("host")) return await surfacePage({ kind: "models", focus: url.searchParams.get("focus") ?? undefined });
     if ((url.pathname === "/settings/developer-tools" || url.pathname === "/settings/development") && request.method === "GET" && !wantsStream(request)) return await surfacePage({ kind: "settings", request, section: undefined, developerTools: true });
     if (url.pathname === "/workspaces" && request.method === "GET") return workspaceListEndpoint(request, url);

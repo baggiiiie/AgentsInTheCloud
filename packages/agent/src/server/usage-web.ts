@@ -69,7 +69,7 @@ function renderUsageWindow(paced: PacedUsageWindow): string {
       <span>${reset}</span>
       </div>
       <div class="usage-metrics-row">
-      <span>Estimated time to hit limit ${estimatedTimeToHitLimit} ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>
+      <span>Estimated time to hit limit: ${estimatedTimeToHitLimit} ${helpTipHtml({ label: "What is estimated time to hit limit?", text: "An estimate based on your average usage rate so far. It does not project beyond the next reset." })}</span>
       <span>Pace ${pace} ${helpTipHtml({ label: "What is pace?", text: "How your usage compares to spreading it evenly over the window. Ahead means you're using it faster than that, behind means you have room to spare." })}</span>
       </div>
     </div>
@@ -123,9 +123,9 @@ function renderUsageRings({ provider, reported, error, windows }: ProviderUsageO
   return `<turbo-frame class="usage-rings" id="${providerUsageFrameId("rings", provider.id, scope)}">${rings || balance || `<span class="usage-caption"${error ? ` title="${escapeHtml(error)}"` : ""}>Usage unavailable</span>`}</turbo-frame>`;
 }
 
-/** Limits alone, for the provider card that already names the provider. Showing fresh limits also refreshes the Usage button. */
+/** Refresh the card's rings from the same snapshot as its expanded limits. */
 function renderUsageProviderLimits(overview: ProviderUsageOverview, scope: string): string {
-  return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section" data-controller="usage-snapshot">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section></turbo-frame>`;
+  return `<turbo-frame id="${providerUsageFrameId("limits", overview.provider.id, scope)}"><section class="usage-section" data-controller="usage-snapshot">${renderUsageLimits(overview)}${renderUsageAccount(overview)}</section>${turboStream("replace", providerUsageFrameId("rings", overview.provider.id, scope), renderUsageRings(overview, scope))}</turbo-frame>`;
 }
 
 /** Opens the Models dialog, with the provider whose limit the ring shows already open. */

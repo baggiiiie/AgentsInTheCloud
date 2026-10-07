@@ -1,15 +1,10 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, test } from "bun:test";
-import {
-  createMemoryOriginIdentityStore,
-  createWorkspaceIngress,
-  ensureTailscaleServePortConfig,
-  normalizeDecodedFetchResponse,
-  StoppedWorkspaceError,
-  pruneTailscaleServePortConfig,
-  type ParentOriginPublisher,
-  type TailscaleServeConfig,
-} from "@agents-in-the-cloud/proxy-ingress/server";
+import { createWorkspaceIngress, StoppedWorkspaceError } from "@agents-in-the-cloud/proxy-ingress/server";
+import { createMemoryOriginIdentityStore } from "../src/ingress/origin-identity.ts";
+import { ensureTailscaleServePortConfig, pruneTailscaleServePortConfig, type TailscaleServeConfig } from "../src/ingress/tailscale-serve.ts";
+import { normalizeDecodedFetchResponse } from "../src/ingress/index.ts";
+import { type ParentOriginPublisher } from "../src/ingress/parent.ts";
 import { closeWebSocket } from "../src/ingress/websocket.ts";
 
 async function freePort(): Promise<number> {
@@ -54,7 +49,6 @@ describe("workspace ingress", () => {
     });
     await ingress.initialize();
 
-    const canonical = new Request("http://127.0.0.1:3000/workspaces/ws/apps/demo/path?x=1");
     const first = await ingress.openCanonical({ workspaceId: "ws", appKey: "demo" }, "/path?x=1");
     const second = await ingress.openCanonical({ workspaceId: "ws", appKey: "demo" }, "/other");
 
@@ -80,7 +74,6 @@ describe("workspace ingress", () => {
       resolveApp: () => ({ kind: "fetch", fetch: () => new Response("ok") }),
     });
     await ingress.initialize();
-    const request = new Request("http://127.0.0.1:3000/");
     const first = await ingress.openCanonical({ workspaceId: "ws", appKey: "first" }, "/");
     const firstPort = Number(new URL(first.headers.get("location")!).port);
     await ingress.stopWorkspace("ws");
@@ -130,7 +123,7 @@ describe("workspace ingress", () => {
     upstream.stop(true);
   });
 
-  test("preserves forms, redirects, cookies, validators, downloads, custom headers, and byte ranges", async () => {
+  test("preserves forms, redirects, cookies, downloads, custom headers, and byte ranges while bypassing read validators", async () => {
     let uploaded = "";
     const upstream = Bun.serve({
       hostname: "127.0.0.1",
@@ -177,8 +170,10 @@ describe("workspace ingress", () => {
     expect(cookie.headers.get("x-frame-options")).toBeNull();
     expect(cookie.headers.get("content-security-policy")).toBe("default-src 'self'");
     const conditional = await fetch(`${origin}/conditional`, { headers: { "if-none-match": `"v1"` } });
-    expect(conditional.status).toBe(304);
-    expect(conditional.headers.get("x-app-validator")).toBe("matched");
+    expect(conditional.status).toBe(200);
+    expect(await conditional.text()).toBe("fresh");
+    expect(conditional.headers.get("etag")).toBe('"v1"');
+    expect(conditional.headers.get("cache-control")).toBe("no-store");
     const range = await fetch(`${origin}/range`, { headers: { range: "bytes=2-5" } });
     expect(range.status).toBe(206);
     expect(range.headers.get("content-range")).toBe("bytes 2-5/10");
@@ -350,7 +345,6 @@ describe("workspace ingress", () => {
     expect(await exhausted.text()).toContain("capacity exhausted");
     await capacity.stopAll();
   });
-
 
 });
 

@@ -15,28 +15,13 @@ import { applySeedConfigManifest } from "./seed-config.ts";
 import type { WorkspaceCreationContext, WorkspaceDockerMount, WorkspaceDockerPlan, WorkspaceInitInstruction } from "./types.ts";
 export type { WorkspaceCreationContext, WorkspaceDockerMount, WorkspaceDockerPlan, WorkspaceInitInstruction, WorkspaceInitInstructionMap } from "./types.ts";
 
-export type {
-  WorkspaceAgentTurnFinishedEvent,
-  WorkspaceAgentViewInvalidatedEvent,
-  WorkspaceCreatedEvent,
-  WorkspaceDeletedEvent,
-  WorkspaceDeleteInspectEvent,
-  WorkspacePlanPrepareEvent,
-  WorkspaceSourcePrepareEvent,
-  WorkspaceTitleChangedEvent,
-  WorkspaceUserActivityEvent,
-} from "./events.ts";
-
 export { createWorkspaceMetadataState, type WorkspaceMetadataState } from "./metadata-state.ts";
 export { ensureHostInotifyLimit } from "./host-inotify.ts";
-export { createWorkspaceProvisioning, type WorkspaceProvisioning, type WorkspaceProvisionRun, type WorkspaceProvisionStep } from "./provisioning.ts";
+export { createWorkspaceProvisioning, type WorkspaceProvisioning, type WorkspaceProvisionRun } from "./provisioning.ts";
 import type { WorkspaceProvisionRun, WorkspaceProvisionProgress } from "./provisioning.ts";
 
 export {
   createWorkspacePresentationStore,
-  type WorkspacePresentationStore,
-  type WorkspacePresentationStoreOptions,
-  type WorkspaceWorkViewContribution,
   type WorkspaceWorkViewReference,
   type WorkspaceWorkViewState,
 } from "./presentation.ts";
@@ -60,18 +45,18 @@ export const workspaceRoot = "/work";
 // Reserved for VS Code. The adapter still verifies ownership before using it.
 export const workspaceVSCodePort = 24800;
 
-export interface WorkspaceListResult { workspaces: Array<{ id: string; title: string | null; parked?: boolean; init?: WorkspaceInitInstruction; imageOutdated?: boolean }> }
+interface WorkspaceListResult { workspaces: Array<{ id: string; title: string | null; parked?: boolean; init?: WorkspaceInitInstruction; imageOutdated?: boolean }> }
 export interface WorkspaceExecResult { exitCode: number; stdout: string; stderr: string; durationMs: number }
-export type WorkspaceExecBufferResult = Omit<WorkspaceExecResult, "stdout"> & { stdout: Buffer }
+type WorkspaceExecBufferResult = Omit<WorkspaceExecResult, "stdout"> & { stdout: Buffer }
 export interface WorkspaceCommandOptions { workdir?: string; user?: "agents-in-the-cloud" | "root"; stdin?: CommandInput }
-export interface DeleteWorkspaceOptions { force?: boolean; events?: AgentsInTheCloudEventBus }
+interface DeleteWorkspaceOptions { force?: boolean; events?: AgentsInTheCloudEventBus }
 
 function namespace(): string { return process.env.ATELIER_NAMESPACE || "host"; }
 export function generateWorkspaceId(): string { return crypto.randomUUID().replaceAll("-", "").slice(0, 8); }
 export function workspaceContainerName(id: string): string { return `agents-in-the-cloud-${id}`; }
 
-export function workspaceNetworkName(id: string): string { return `agents-in-the-cloud-workspace-${id}`; }
-export function workspaceBridgeName(id: string): string { return `atw-${createHash("sha256").update(id).digest("hex").slice(0, 11)}`; }
+function workspaceNetworkName(id: string): string { return `agents-in-the-cloud-workspace-${id}`; }
+function workspaceBridgeName(id: string): string { return `atw-${createHash("sha256").update(id).digest("hex").slice(0, 11)}`; }
 function formatDeleteBlockedMessage(id: string, issues: JsonObject[]): string { return `workspace ${id} has delete blockers:\n${issues.map((issue) => `- ${JSON.stringify(issue)}`).join("\n")}\nuse --force to delete anyway`; }
 
 async function createWorkspaceWorkDir(id: string): Promise<{ worktreePath: string; dockerHostWorktreePath: string }> {
@@ -624,7 +609,7 @@ async function updateWorkspaceContainerRunning(id: string, running: boolean): Pr
 }
 
 /** Give the gateway 15 seconds to boot before reporting a recoverable startup failure. */
-export async function checkWorkspaceGateway(id: string): Promise<void> {
+async function checkWorkspaceGateway(id: string): Promise<void> {
   await workspaceGateway(id);
   const result = await runDocker(["exec", "--user", "root", workspaceContainerName(id), "sh", "-lc", `deadline=$(( $(date +%s) + 15 )); while [ "$(date +%s)" -lt "$deadline" ]; do if test "$(curl --noproxy '*' --silent --max-time 1 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:${workspaceGatewayPort}/)" = 401; then exit 0; fi; sleep 0.05; done; exit 1`]);
   if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_gateway_unavailable", `Workspace gateway did not become ready within 15 seconds.${result.stderr.trim() ? `\n${result.stderr.trim()}` : ""}`);

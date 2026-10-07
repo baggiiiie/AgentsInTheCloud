@@ -1,3 +1,6 @@
+import { reviewComments, type ReviewCommentStore } from "./comments.ts";
+import { renderDeletionComments } from "./comment-render.ts";
+import type { ReviewComment } from "../comments.ts";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { createHash } from "node:crypto";
 import { collectUnpushedCommits, type UnpushedCommit } from "@agents-in-the-cloud/core";
@@ -15,10 +18,10 @@ type DeletionRepository = {
 type DeletionAssessment = {
   status: "blocked";
   fingerprint: string;
-  details: { repositories: DeletionRepository[] };
+  details: { repositories: DeletionRepository[]; comments?: ReviewComment[] };
 };
 
-export function createDeletionReview(repositoryFor: (workspaceId: string, path: string) => Repository) {
+export function createDeletionReview(repositoryFor: (workspaceId: string, path: string) => Repository, comments?: ReviewCommentStore) {
   const assessments = new Map<string, DeletionAssessment>();
 
   async function inspect(workspaceId: string): Promise<WorkspaceDeletionAssessment> {
@@ -40,12 +43,14 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
         fingerprintMaterial.push(`${file.path}:${(await git(root, ["hash-object", "--no-filters", "--", file.path])).toString("utf8").trim()}`);
       }
     }
-    if (!repositories.length) {
+    const savedComments = comments?.list(workspaceId) ?? [];
+    if (!repositories.length && !savedComments.length) {
       assessments.delete(workspaceId);
       return { status: "clear" };
     }
-    const details = { repositories };
-    const fingerprint = createHash("sha256").update(JSON.stringify(details)).update(fingerprintMaterial.join("\0")).digest("hex");
+    const details: DeletionAssessment["details"] = { repositories };
+    if (savedComments.length) details.comments = savedComments;
+    const fingerprint = createHash("sha256").update(JSON.stringify({ repositories, comments: savedComments.map(({ copiedRevision: _copied, ...comment }) => comment) })).update(fingerprintMaterial.join("\0")).digest("hex");
     const assessment: DeletionAssessment = {
       status: "blocked",
       fingerprint,
@@ -96,7 +101,7 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
   function renderEvidence(workspaceId: string): string {
     const assessment = assessments.get(workspaceId);
     if (!assessment) throw new Error("Deletion review assessment is no longer current");
-    return `<div data-controller="deletion-review"><p>You might lose:</p>${assessment.details.repositories.map((repository) => {
+    return `${renderDeletionComments(workspaceId, comments?.list(workspaceId) ?? [])}<div data-controller="deletion-review">${assessment.details.repositories.length ? "<p>You might lose:</p>" : ""}${assessment.details.repositories.map((repository) => {
       const { fingerprint } = assessment;
       const working = repository.uncommitted.length ? disclosureHtml({ open: true, summary: { kind: "compact", label: { kind: "text", text: "Uncommitted changes" }, attributesHtml: 'data-linear-navigation-target="item"' }, bodyHtml: fileList(workspaceId, fingerprint, repository.relativePath, repository.uncommitted) }) : "";
       const commits = repository.unpushedCommits.length ? `<div class="action-list">${repository.unpushedCommits.map((commit) => commitSummary(workspaceId, fingerprint, repository.relativePath, commit)).join("")}</div>` : "";
@@ -149,4 +154,4 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
   return { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview };
 }
 
-export const { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } = createDeletionReview(workspaceRepository);
+export const { changesDeletionReview, deletionReviewCommitResponse, deletionReviewFileResponse, clearDeletionReview } = createDeletionReview(workspaceRepository, reviewComments);

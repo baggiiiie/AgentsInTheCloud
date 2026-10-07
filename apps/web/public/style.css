@@ -42,7 +42,7 @@ a { color: inherit; text-decoration: none; }
 .status-spinner.sm { width: 10px; height: 10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .agents-in-the-cloud-url { display: flex; align-items: center; gap: 8px; }
-.agents-in-the-cloud-url a { min-width: 0; margin-right: auto; overflow-wrap: anywhere; }
+.agents-in-the-cloud-url a { min-width: 0; overflow-wrap: anywhere; }
 .agents-in-the-cloud-url .button { flex-shrink: 0; }
 
 turbo-frame { display: contents; }
@@ -346,7 +346,7 @@ button { border: 0; background: none; cursor: pointer; }
 .settings-commit-identity .settings-field { border-top: 0; }
 .settings-field-label { white-space: nowrap; }
 .settings-field p { margin: 2px 0 0; color: var(--text); }
-.settings-select { padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: var(--bg); color: var(--text-bright); font: inherit; }
+.settings-select { max-width: 100%; }
 .settings-developer-tools-link-row { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 16px; padding: 16px 24px 24px; text-align: left; }
 .settings-build-identity { white-space: nowrap; }
 .developer-tools-link, .settings-build-identity { color: var(--text-muted); font-size: var(--text-body); text-decoration: none; }
@@ -486,21 +486,60 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
 .template-settings-host > turbo-frame { display: flex; width: 100%; max-width: 960px; min-width: 0; min-height: 0; }
 .template-settings-host > turbo-frame > .panel { width: 100%; min-height: 0; }
 .template-settings-content { max-width: 760px; margin-inline: auto; padding: 24px; display: grid; gap: 16px; }
-.template-settings-content .action-list { gap: 8px; }
-.template-settings-record { display: grid; gap: 2px; min-width: 0; }
-.template-settings-record-note { margin: 0; padding-inline: 8px; color: var(--text-muted); overflow-wrap: anywhere; }
 .template-settings-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .template-settings-note { margin: 0; }
 #template_settings_error:empty { display: none; }
-.template-settings-remove { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.template-settings-remove { display: grid; gap: 12px; padding-top: 8px; }
+#template_settings_delete .button.danger.icon-only { --button-foreground: var(--danger); --button-hover-foreground: var(--danger); }
+.template-settings-inline-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.template-settings-inline-disclosures { display: grid; gap: 12px; margin-inline-start: -8px; }
+.template-settings-inline-records { display: grid; gap: 8px; }
+.template-settings-inline-body { display: grid; gap: 16px; padding-inline-start: 8px; }
+.template-settings-inline .form-actions[hidden] { display: none; }
+@media (max-width: 640px) {
+  .template-settings-inline-fields { grid-template-columns: minmax(0, 1fr); }
+}
 .template-settings-content .form-section > .button-toggle { justify-self: start; }
 .template-settings-content textarea[name="dockerfile"], .template-settings-content textarea[name="knownHosts"] { font-family: var(--font-mono); }
 @media (max-width: 700px) {
   .template-settings-content { padding: 16px; }
+  .template-settings-inline-disclosures > .disclosure > summary .content-row__label { white-space: normal; }
   .template-settings-toolbar { gap: 8px; }
 }
-.fixed-shell-app-main:has(> .template-settings-host) > .workspace-detail-host { visibility: hidden; }
+.fixed-shell-app-main:has(.template-settings-host) > .workspace-detail-host { visibility: hidden; }
 @media (max-width: 700px), (hover: none) and (pointer: coarse) {
   .fixed-shell-app:has(.template-settings-host) > .fixed-shell-workspace-pane { opacity: 0; visibility: hidden; pointer-events: none; }
   .fixed-shell-app:has(.template-settings-host) > .fixed-shell-agents-in-the-cloud-bar { display: none; }
 }
+
+/* App settings uses the same panel composition as template settings. */
+#app_settings_host { display: contents; }
+.app-settings-content .settings-sec { min-width: 0; padding: 0; border-bottom: 0; }
+.app-settings-overview { display: grid; min-width: 0; gap: 24px; }
+.app-settings-content .settings-sec h2 { margin: 0; font-weight: var(--weight-medium); }
+.app-settings-content .settings-commit-identity { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.app-settings-content .settings-commit-identity .settings-field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0; }
+.app-settings-content .settings-commit-identity .settings-error { grid-column: 1 / -1; }
+.app-settings-content .settings-sec-dictation > form { flex: 0 1 300px; min-width: 0; }
+.app-settings-content .settings-sec-theme > form { display: flex; justify-content: flex-end; }
+.app-settings-content .settings-sec-url { display: grid; gap: 12px; }
+.app-settings-content .settings-sec-url > .agents-in-the-cloud-url { margin-top: 0; }
+.app-settings-content .update-actions { flex-basis: auto; }
+.app-settings-content .update-settings-summary { flex-basis: 180px; }
+/* Align disclosure carets with the page's labels, accounting for row padding. */
+.app-settings-disclosures { display: grid; gap: 8px; min-width: 0; margin-inline-start: -8px; }
+.app-settings-expanded { display: grid; gap: 16px; }
+.app-settings-content .developer-tools-action + .developer-tools-action { border-top: 0; }
+@media (max-width: 700px) {
+  .app-settings-content .settings-commit-identity { grid-template-columns: minmax(0, 1fr); }
+  .app-settings-content .settings-sec-dictation > form { flex-basis: auto; }
+}
+
+.app-settings-section-frame { display: block; min-width: 0; }
+.app-settings-overview > .app-settings-section-frame:empty { display: none; }
+
+.template-settings-color { display: flex; align-items: center; gap: 8px; width: fit-content; cursor: pointer; }
+.template-settings-color-control { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-control); }
+.template-settings-color-control:hover { background: var(--accent-soft); }
+.template-settings-color-control:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.template-settings-color-control input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }

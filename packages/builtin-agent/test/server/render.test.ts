@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { renderAgentPane, renderAgentPaneComposerFooter, renderPromptActions } from "../../src/server/render-composer.ts";
+import { renderAgentPane, renderPromptActions } from "../../src/server/render-composer.ts";
 import { renderTranscript, renderTranscriptItem, renderTranscriptItemDetailFrame } from "@agents-in-the-cloud/agent/server/render-transcript";
 import type { AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import type { ToolView, TranscriptItem } from "@agents-in-the-cloud/agent/server/transcript";
@@ -9,7 +9,6 @@ const agent = { workspaceId: "ws", agentId: "00000000-0000-4000-8000-00000000000
 const ctxPrefix = `ag_ws_${agent.agentId}`;
 const tool = (overrides: Partial<ToolView>): ToolView => ({ callId: "call", name: "read", args: {}, status: "ok", ...overrides });
 const renderBash = (command: string, overrides: Partial<ToolView> = {}): string => renderTranscriptItemDetailFrame(ctx, { type: "tool", key: "bash", tool: tool({ name: "bash", args: { command }, ...overrides }) });
-const renderedText = (html: string): string => html.replace(/<script[^>]*>[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, "");
 const firstEditModel = (html: string): Array<{ name: string; hunks: Array<{ collapsedBefore?: number; additionLines: number; deletionLines: number; hunkContent: Array<{ type: string; lines?: number }> }> }> => {
   const source = html.match(/<script type="application\/json"[^>]*>([\s\S]*?)<\/script>/)![1]!;
   return JSON.parse(source);

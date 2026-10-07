@@ -4,7 +4,7 @@ import { createAgentPaneController, registerAgentPaneVisibilityHooks } from "./a
 import { createAgentTurnController } from "./turn-controller.ts";
 import { createAgentTermController } from "./terminal-controller.ts";
 
-export const builtinAgentClientModule: WorkspaceClientModule = {
+const builtinAgentClientModule: WorkspaceClientModule = {
   id: "builtin-agent",
   install({ application, Controller, hooks }) {
     application.register("agent-notifications", createAgentNotificationsController(Controller));
@@ -15,5 +15,3 @@ export const builtinAgentClientModule: WorkspaceClientModule = {
   },
 };
 export { builtinAgentClientModule as agentsInTheCloudClientModule };
-export { agentConnectionShouldRun } from "./agent-pane.ts";
-export { forwardAgentTerminalWheel, terminalOutputHasPrintableText } from "./terminal-controller.ts";

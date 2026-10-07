@@ -9,7 +9,7 @@ export function agentComposerPrimaryAction(busy: boolean, text: string, attachme
   return busy ? "steer" : "send";
 }
 
-export type PromptHistoryState = { prompts: string[]; draft: string; index: number };
+type PromptHistoryState = { prompts: string[]; draft: string; index: number };
 
 export function navigatePromptHistory(state: PromptHistoryState | undefined, direction: "up" | "down", draft: string, prompts: string[]): { state: PromptHistoryState | undefined; value: string } | undefined {
   if (!state) {

@@ -1,6 +1,6 @@
 import { isJsonObject } from "@agents-in-the-cloud/core";
 
-export interface ObservableTerminalResizeMessage {
+interface ObservableTerminalResizeMessage {
   type: "resize";
   cols: number;
   rows: number;
@@ -12,7 +12,7 @@ export interface ObservableTerminalProgressMessage {
   value?: number;
 }
 
-export type ObservableTerminalControlMessage = ObservableTerminalResizeMessage | ObservableTerminalProgressMessage;
+type ObservableTerminalControlMessage = ObservableTerminalResizeMessage | ObservableTerminalProgressMessage;
 
 export function encodeObservableTerminalMessage(message: ObservableTerminalControlMessage): string {
   return JSON.stringify(message);

@@ -1,9 +1,7 @@
 import { isUtf8 } from "node:buffer";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
 import { git, parseGitStatus, parseGitNumstat, type GitStatusEntry, type GitNumstat, type Repository } from "@agents-in-the-cloud/workspace/git";
-
-const maxRenderedBytes = 1_000_000;
-const maxRenderedLines = 5_000;
+import { maxChangesTextBytes, maxChangesTextLines } from "../editing.ts";
 
 type ChangesFileKind = "text" | "binary" | "large" | "mode";
 type ChangesFileChange = "added" | "modified" | "removed";
@@ -17,6 +15,7 @@ export interface ChangesFile {
   newContents?: string;
   diff?: FileDiffMetadata;
   detail?: string;
+  newMode?: string;
 }
 
 export type ChangesFileSummary = {
@@ -71,19 +70,19 @@ function changesFileFromContents(
 ): ChangesFile | undefined {
   const oldPath = entry.previousPath ?? entry.path;
   const change: ChangesFileChange = oldBuffer === undefined ? "added" : newBuffer === undefined ? "removed" : "modified";
-  const base: Pick<ChangesFile, "path" | "previousPath" | "change"> = { path: entry.path, change };
+  const base: Pick<ChangesFile, "path" | "previousPath" | "change" | "newMode"> = { path: entry.path, change, newMode: modes.newMode };
   if (entry.previousPath) base.previousPath = entry.previousPath;
   if (oldBuffer === undefined && newBuffer === undefined) return undefined;
   const oldText = decodeText(oldBuffer);
   const newText = decodeText(newBuffer);
   if ((oldBuffer && oldText === undefined) || (newBuffer && newText === undefined)) return { ...base, kind: "binary", detail: "Binary file changed" };
-  if ((oldBuffer?.byteLength ?? 0) > maxRenderedBytes || (newBuffer?.byteLength ?? 0) > maxRenderedBytes || lineCount(oldText) > maxRenderedLines || lineCount(newText) > maxRenderedLines) return { ...base, kind: "large", detail: "File is too large to render safely" };
+  if ((oldBuffer?.byteLength ?? 0) > maxChangesTextBytes || (newBuffer?.byteLength ?? 0) > maxChangesTextBytes || lineCount(oldText) > maxChangesTextLines || lineCount(newText) > maxChangesTextLines) return { ...base, kind: "large", detail: "File is too large to render safely" };
   const oldFile: FileContents | null = oldBuffer === undefined ? null : { name: oldPath, contents: oldText ?? "" };
   const newFile: FileContents | null = newBuffer === undefined ? null : { name: entry.path, contents: newText ?? "" };
   const diff = parseDiffFromFile(oldFile, newFile, { context: 3 });
   return diff.hunks.length
     ? { ...base, kind: "text", oldContents: oldText, newContents: newText, diff }
-    : { ...base, kind: "mode", detail: entry.previousPath ? "File renamed"
+    : { ...base, oldContents: oldText, newContents: newText, kind: "mode", detail: entry.previousPath ? "File renamed"
       : oldBuffer === undefined ? "Empty file added"
       : newBuffer === undefined ? "Empty file deleted"
       : modes.oldMode !== modes.newMode ? "File mode changed" : "No textual changes" };

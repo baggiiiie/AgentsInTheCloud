@@ -3,7 +3,7 @@ import { createKeyedOperationQueue, invalidArguments, type AgentsInTheCloudEvent
 import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { createLivePresentation, type WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 import { parseModelRef, setAgentModelPreference } from "@agents-in-the-cloud/llm/server";
-import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { revokeAgentMcp } from "@agents-in-the-cloud/agent/server";
 import type {
   UserInput,

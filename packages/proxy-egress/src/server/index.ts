@@ -18,11 +18,8 @@ export {
   clearGitHubToken,
   createWorkspaceSecretContext,
   discoverGitHubToken,
-  forgetWorkspaceSecretContext,
-  getWorkspaceSecretContext,
   hasGitHubToken,
   setGitHubToken,
-  type WorkspaceSecretContext,
 } from "../secrets/workspace-secrets.ts";
 export { HttpRequestBlockedError } from "../secrets/errors.ts";
 

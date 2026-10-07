@@ -1,11 +1,15 @@
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import { stopDurableWorkspaceAgent } from "./runtime.ts";
 import { existingDurableController } from "./runtime.ts";
-import { AgentsInTheCloudCoreError, requestAcceptsJson } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, readJsonObject, requestAcceptsJson } from "@agents-in-the-cloud/core";
 import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { matchRoute, response } from "@agents-in-the-cloud/shared/http";
 import { invalidateAgentView, requireAgentPresentation, requireAgentController, type AgentRouteHandler } from "./route-support.ts";
 import { resolveAgent } from "./delegation.ts";
 import { handleAgentTreeRequest } from "./session-tree.ts";
+
+const abortInputSchema = Type.Object({ note: Type.Optional(Type.String()) });
 
 export const handleSessionRequest: AgentRouteHandler = async (request, url, options) => {
   let params: string[] | undefined;
@@ -41,7 +45,13 @@ export const handleSessionRequest: AgentRouteHandler = async (request, url, opti
   if ((params = matchRoute(url, /^\/workspaces\/([^/]+)\/agents\/([^/]+)\/tools\/([^/]+)\/abort$/)) && request.method === "POST") {
     const [workspaceId, agentId, callId] = params;
     const controller = await requireAgentController(workspaceId, agentId, options);
-    const aborted = await controller.abortTool(callId);
+    const body = request.body === null ? {} : request.headers.get("content-type")?.includes("application/json")
+      ? await readJsonObject(request)
+      : Object.fromEntries(await request.formData());
+    if (!Value.Check(abortInputSchema, body)) {
+      throw new AgentsInTheCloudCoreError("invalid_arguments", "The note must be text.");
+    }
+    const aborted = await controller.abortTool(callId, body.note);
     await invalidateAgentView(options, workspaceId, agentId);
     return requestAcceptsJson(request) ? Response.json({ tool: { callId, aborted } }) : turboStreamResponse("");
   }

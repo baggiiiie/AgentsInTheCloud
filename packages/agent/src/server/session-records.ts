@@ -43,21 +43,62 @@ const sessionImagePartSchema = Type.Object({
 const sessionImageStringSchema = Type.String();
 const sessionTextSignatureSchema = Type.String();
 
+// Persisted Pi entries are external input. Validate the fields this projection
+// reads without requiring unrelated SDK metadata or rejecting older sessions.
+const textPartSchema = Type.Object({ type: Type.Literal("text"), text: Type.Optional(Type.String()), textSignature: Type.Optional(Type.Unknown()) });
+const assistantPartSchema = Type.Union([
+  textPartSchema,
+  Type.Object({ type: Type.Literal("thinking"), thinking: Type.Optional(Type.String()) }),
+  Type.Object({ type: Type.Literal("toolCall"), id: Type.String(), name: Type.String(), arguments: Type.Unknown() }),
+]);
+const contentSchema = Type.Union([Type.String(), Type.Array(Type.Unknown())]);
+const messageSchema = Type.Union([
+  Type.Object({ role: Type.Literal("user"), content: contentSchema }),
+  Type.Object({ role: Type.Literal("assistant"), content: Type.Optional(Type.Array(Type.Unknown())),
+    stopReason: Type.Optional(Type.Union([Type.Literal("pending"), Type.Literal("stop"), Type.Literal("length"), Type.Literal("toolUse"), Type.Literal("error"), Type.Literal("aborted"), Type.Literal("deferred")])),
+    errorMessage: Type.Optional(Type.String()),
+  }),
+  Type.Object({ role: Type.Literal("toolResult"), toolCallId: Type.String(), content: contentSchema, details: Type.Optional(Type.Unknown()), isError: Type.Optional(Type.Boolean()) }),
+  Type.Object({ role: Type.Literal("bashExecution"), command: Type.String(), output: Type.Optional(Type.String()) }),
+  Type.Object({ role: Type.Literal("custom"), content: contentSchema, display: Type.Boolean() }),
+  Type.Object({ role: Type.Literal("branchSummary"), summary: Type.Optional(Type.String()) }),
+]);
+const entryFields = { id: Type.String(), timestamp: Type.Optional(Type.String()) };
+const sessionEntrySchema = Type.Union([
+  Type.Object({ ...entryFields, type: Type.Literal("message"), parentId: Type.Optional(Type.Union([Type.String(), Type.Null()])), message: messageSchema }),
+  Type.Object({ timestamp: entryFields.timestamp, type: Type.Literal("custom"), customType: Type.String(), data: Type.Optional(Type.Unknown()) }),
+  Type.Object({ ...entryFields, type: Type.Literal("branch_summary"), summary: Type.Optional(Type.String()) }),
+  Type.Object({ ...entryFields, type: Type.Literal("usage"), kind: Type.String(), note: Type.Optional(Type.String()),
+    usage: Type.Object({ input: Type.Number(), cacheRead: Type.Number(), cacheWrite: Type.Number(), cost: Type.Object({ total: Type.Number() }) }),
+  }),
+  Type.Object({ ...entryFields, type: Type.Literal("compaction") }),
+  Type.Object({ ...entryFields, type: Type.Literal("custom_message"), content: contentSchema, display: Type.Boolean() }),
+  Type.Object({ ...entryFields, type: Type.Literal("model_change"), provider: Type.String(), modelId: Type.String() }),
+  Type.Object({ ...entryFields, type: Type.Literal("thinking_level_change"), thinkingLevel: Type.String() }),
+]);
+
+type CacheWarmUsage = Extract<SessionEntry, { type: "usage" }>["usage"];
+function sessionContentText(content: string | readonly unknown[]): string {
+  if (Value.Check(sessionImageStringSchema, content)) return content;
+  return contentText(content.filter(part => Value.Check(textPartSchema, part)).map(part => ({ type: "text", text: part.text ?? "" })));
+}
+
+
 interface SessionAssistantTextPart {
   type: "text";
   text: string;
   textSignature?: string;
 }
 
-export function sessionContentImages(entry: { id: string; message?: { content?: unknown } }): SessionImageRef[] {
-  if (!Array.isArray(entry.message?.content)) return [];
+function sessionContentImages(entryId: string, content: string | readonly unknown[]): SessionImageRef[] {
+  if (Value.Check(sessionImageStringSchema, content)) return [];
   const images: SessionImageRef[] = [];
-  entry.message.content.forEach((part, contentIndex) => {
+  content.forEach((part, contentIndex) => {
     if (!Value.Check(sessionImagePartSchema, part)) return;
     const mimeType = Value.Check(sessionImageStringSchema, part.mimeType) ? part.mimeType : undefined;
     const data = Value.Check(sessionImageStringSchema, part.data) ? part.data : undefined;
     const dimensions = data && mimeType ? imageDimensions(Buffer.from(data.slice(0, 87_384), "base64"), mimeType) : undefined;
-    images.push({ entryId: entry.id, contentIndex, mimeType, ...dimensions });
+    images.push({ entryId, contentIndex, mimeType, ...dimensions });
   });
   return images;
 }
@@ -67,17 +108,18 @@ function entryTimestamp(entry: { timestamp?: string }): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function cacheWarmingNotice(entry: Extract<SessionEntry, { type: "usage" }>): string {
+function cacheWarmingNotice(entry: { usage: Pick<CacheWarmUsage, "input" | "cacheRead" | "cacheWrite"> & { cost: Pick<CacheWarmUsage["cost"], "total"> }; note?: string }): string {
   const tokens = entry.usage.input + entry.usage.cacheRead + entry.usage.cacheWrite;
   const cost = entry.usage.cost.total.toFixed(6).replace(/(\.\d{3}\d*?)0+$/, "$1");
   const note = entry.note ? ` (${entry.note})` : "";
   return `Cache warmed${note} · ${tokens.toLocaleString("en-US")} tokens · $${cost}`;
 }
 
-export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
+export function recordsFromSessionEntries(entries: readonly unknown[]): TranscriptRecord[] {
   const records: TranscriptRecord[] = [];
   let lastSettingChange: { type: "model_change" | "thinking_level_change"; record: TranscriptRecord } | undefined;
   for (const entry of entries) {
+    if (!Value.Check(sessionEntrySchema, entry)) continue;
     if (entry.type === "custom" && entry.customType === turnStartEntryType && Value.Check(turnStartSchema, entry.data)) {
       records.push({ kind: "runStart", ...entry.data, timestamp: entryTimestamp(entry) });
       continue;
@@ -89,12 +131,12 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
     }
     if (entry.type === "message") {
       const message = entry.message;
-      if (!message) continue;
       if (message.role === "user") {
-        records.push({ kind: "user", id: entry.id, text: contentText(message.content), images: sessionContentImages(entry), timestamp: entryTimestamp(entry), rewindable: entry.parentId !== null && entry.parentId !== undefined });
+        records.push({ kind: "user", id: entry.id, text: sessionContentText(message.content), images: sessionContentImages(entry.id, message.content), timestamp: entryTimestamp(entry), rewindable: entry.parentId !== null && entry.parentId !== undefined });
       } else if (message.role === "assistant") {
-        const parts: any[] = [];
+        const parts: Extract<TranscriptRecord, { kind: "assistant" }>["parts"] = [];
         for (const part of message.content ?? []) {
+          if (!Value.Check(assistantPartSchema, part)) continue;
           if (part.type === "thinking") parts.push({ type: "thinking", text: part.thinking ?? "" });
           else if (part.type === "text") {
             const textPart: SessionAssistantTextPart = { type: "text", text: part.text ?? "" };
@@ -113,11 +155,11 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
         });
       } else if (message.role === "toolResult") {
         const details = isToolViewDetails(message.details) ? message.details : undefined;
-        records.push({ kind: "toolResult", callId: message.toolCallId, text: contentText(message.content), images: sessionContentImages(entry), isError: Boolean(message.isError), timestamp: entryTimestamp(entry), details });
+        records.push({ kind: "toolResult", callId: message.toolCallId, text: sessionContentText(message.content), images: sessionContentImages(entry.id, message.content), isError: Boolean(message.isError), timestamp: entryTimestamp(entry), details });
       } else if (message.role === "bashExecution") {
         records.push({ kind: "note", id: entry.id, text: `\`$ ${message.command}\`\n\n\`\`\`\n${message.output ?? ""}\n\`\`\``, tone: "system", timestamp: entryTimestamp(entry) });
       } else if (message.role === "custom" && message.display) {
-        records.push({ kind: "note", id: entry.id, text: contentText(message.content), tone: "summary", timestamp: entryTimestamp(entry) });
+        records.push({ kind: "note", id: entry.id, text: sessionContentText(message.content), tone: "summary", timestamp: entryTimestamp(entry) });
       } else if (message.role === "branchSummary") {
         records.push({ kind: "note", id: entry.id, text: `**Rewound** — summary of the abandoned branch:\n\n${message.summary ?? ""}`, tone: "summary", timestamp: entryTimestamp(entry) });
       }
@@ -136,7 +178,7 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
       continue;
     }
     if (entry.type === "custom_message" && entry.display) {
-      records.push({ kind: "note", id: entry.id, text: contentText(entry.content), tone: "summary", timestamp: entryTimestamp(entry) });
+      records.push({ kind: "note", id: entry.id, text: sessionContentText(entry.content), tone: "summary", timestamp: entryTimestamp(entry) });
       continue;
     }
     if (entry.type === "model_change" || entry.type === "thinking_level_change") {
@@ -151,4 +193,3 @@ export function recordsFromSessionEntries(entries: any[]): TranscriptRecord[] {
   }
   return records;
 }
-

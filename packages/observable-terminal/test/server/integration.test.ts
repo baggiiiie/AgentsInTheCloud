@@ -4,16 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { shellQuote, withCommandSignal } from "@agents-in-the-cloud/core";
-import {
-  attachHostObservableTerminal,
-  buildCapturePaneCommand,
-  buildKillSessionCommand,
-  buildObservableSessionCommand,
-  normalizeCarriageReturns,
-  observableTerminalCols,
-  observableTerminalRows,
-  runHostObservableCommand,
-} from "../../src/server/index.ts";
+import { attachHostObservableTerminal, buildKillSessionCommand, buildObservableSessionCommand, normalizeCarriageReturns, observableTerminalCols, observableTerminalRows, runHostObservableCommand } from "../../src/server/index.ts";
+import { buildCapturePaneCommand } from "../../src/server/tmux.ts";
 
 const sessions: string[] = [];
 

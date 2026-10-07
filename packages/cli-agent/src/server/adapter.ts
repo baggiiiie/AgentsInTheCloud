@@ -1,5 +1,6 @@
 import type { JsonObject } from "@agents-in-the-cloud/core";
-import type { CliAgentConnection, TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
+import type { TranscriptRecord } from "@agents-in-the-cloud/agent/server/transcript";
 import type { AgentLaunchFooterContext, AgentWorkspaceParameters, WorkspaceAgentInput } from "@agents-in-the-cloud/shared";
 
 /** Identity of the session being launched, so adapters can address their session-local files. */

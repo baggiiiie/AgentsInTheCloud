@@ -1,3 +1,4 @@
+import { Icons } from "../../../packages/design-system/src/icons/icons-html.ts";
 import { actionLinkHtml } from "../../../packages/design-system/src/action-link/action-link-html.ts";
 import { buttonHtml } from "../../../packages/design-system/src/button/button-html.ts";
 import { disclosureHtml } from "../../../packages/design-system/src/disclosure/disclosure-html.ts";
@@ -56,7 +57,7 @@ export function supervisorFragment(view: SupervisorView): string {
     const done = (view.healthy || index < view.phase) && !(index === 4 && view.connectionAction);
     const failed = !done && index === view.phase && !!view.failure;
     const running = !done && !failed && index === view.phase;
-    return `<li class="status-list__item"${done ? ' role="checkbox" aria-checked="true"' : failed ? ' data-status="failed"' : running ? ' aria-busy="true"' : ''}><span class="status-list__marker"${failed ? ' role="img" aria-label="Failed"' : ''}>${done ? "✓" : failed ? "✕" : ""}</span><div>${label}${failed ? `<span class="system-detail system-error">${escapeHtml(view.failure!)}</span>` : ""}</div></li>`;
+    return `<li class="status-list__item"${done ? ' role="checkbox" aria-checked="true"' : failed ? ' data-status="failed"' : running ? ' aria-busy="true"' : ''}><span class="status-list__marker"${failed ? ' role="img" aria-label="Failed"' : ''}>${done ? Icons.Check : failed ? Icons.Close : ""}</span><div>${label}${failed ? `<span class="system-detail system-error">${escapeHtml(view.failure!)}</span>` : ""}</div></li>`;
   }).join("");
 
   const failureActions = view.failure && !view.stopping ? `
@@ -72,7 +73,6 @@ export function supervisorFragment(view: SupervisorView): string {
     : "Installation computer only — Tailscale is off.";
   const accessActions = `
     ${!remote || (!view.authUrl && view.connectionState !== "Running") ? `<form method="post" action="/connect">${button(remote ? "Retry Tailscale connection" : "Use devices on your Tailscale network")}</form>` : ""}
-    ${remote && view.connectionState === "Running" ? "<p>Switching to installation computer only will disconnect devices using Tailscale.</p>" : ""}
     ${remote ? `<form method="post" action="/local">${button("Use installation computer only")}</form>` : ""}`;
 
   return `<section aria-label="AgentsInTheCloud System"><h1>${title}</h1>

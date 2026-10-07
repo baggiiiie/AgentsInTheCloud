@@ -5,7 +5,7 @@ import { claudeLaunchScript } from "./launch-command.ts";
 import { prepareClaudeSession } from "./session.ts";
 import { loadClaudeTranscript, loadClaudeTranscriptImage, hasClaudeSession, hasClaudeTurnSettled, claudeHistoryFiles } from "./transcript.ts";
 
-export const claudeModelSettings = createCliModelSettings({
+const claudeModelSettings = createCliModelSettings({
   agentTypeId: "claude", provider: "anthropic", label: "Claude",
   mapThinkingLevel: (level, mapped) => mapped !== null && ["low", "medium", "high", "xhigh", "max"].includes(mapped ?? level) ? mapped ?? level : undefined,
 });

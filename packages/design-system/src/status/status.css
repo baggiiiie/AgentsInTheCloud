@@ -43,8 +43,10 @@
 .status-list__item { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: var(--text-body); }
 .status-list__item[aria-checked="true"],
 .status-list__item[data-status="failed"] { color: var(--text-bright); }
-.status-list__marker { width: 20px; height: 20px; box-sizing: border-box; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: var(--radius-round); background: transparent; color: var(--text-muted); font-weight: var(--weight-bold); }
-.status-list__item[aria-checked="true"] .status-list__marker { border-color: var(--accent); color: var(--accent); }
+.status-list__marker { width: 20px; height: 20px; box-sizing: border-box; flex: 0 0 auto; display: grid; place-items: center; line-height: 1; border: 1px solid var(--line-strong); border-radius: var(--radius-round); background: transparent; color: var(--text-muted); font-weight: var(--weight-bold); }
+.status-list__item[aria-checked="true"] .status-list__marker { border-color: transparent; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.status-list__marker > svg { display: block; width: 12px; height: 12px; stroke-width: 2.5; }
+.status-list__item[data-status="warning"] .status-list__marker { border-color: var(--warning); color: var(--warning); }
 .status-list__item[data-status="failed"] .status-list__marker { border-color: var(--danger); color: var(--danger); }
 .status-list__item[aria-busy="true"] .status-list__marker { border-color: var(--line-strong); border-top-color: var(--accent); color: transparent; animation: status-list-marker-spin 750ms linear infinite; }
 /* Dense progress histories retain the same semantic markers and states. */

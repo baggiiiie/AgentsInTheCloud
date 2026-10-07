@@ -1,4 +1,4 @@
-import { finalAssistantTextIndexes, finalAssistantText, isFinalAssistantMessage } from "@agents-in-the-cloud/agent/server";
+import { finalAssistantTextIndexes, finalAssistantText, isFinalAssistantMessage } from "@agents-in-the-cloud/agent/server/transcript";
 import { defineDoc, defineEntry, type ConversationId, type EntryRecord, type Tx } from "@earendil-works/pi-durable";
 import { type Message, type TextContent } from "@earendil-works/pi-ai";
 import { Type } from "typebox";

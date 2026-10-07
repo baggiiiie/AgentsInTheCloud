@@ -9,7 +9,7 @@ describe("Files view integration", () => {
     const request = new Request("http://test.local/workspaces/workspace-progressive/files-view/open?path=%2Fwork%2Fnew.ts");
     let opened: WorkspaceWorkViewReference | undefined;
     // SAFETY: The test fixture supplies the route context fields exercised by this endpoint.
-    const response = await agentsInTheCloudServerModule.routes![0]!.handle(request, new URL(request.url), {
+    await agentsInTheCloudServerModule.routes![0]!.handle(request, new URL(request.url), {
       openWorkView: async (_workspaceId: string, reference: WorkspaceWorkViewReference) => {
         opened = reference;
         return new Response("<turbo-stream></turbo-stream>");

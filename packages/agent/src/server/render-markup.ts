@@ -12,9 +12,9 @@ export function transcriptRow(html: string): string {
   return `<div class="agent-row">${html}</div>`;
 }
 
-export function transcriptRowContent(label: ContentRowLabel, options: { kind?: "compact" | "multiline"; leadingHtml?: string; trailingHtml?: string; labelId?: string }): ContentRowContent {
+export function transcriptRowContent(label: ContentRowLabel, options: { leadingHtml?: string; trailingHtml?: string; labelId?: string } = {}): ContentRowContent {
   return {
-    kind: options.kind ?? "compact",
+    kind: "compact",
     leadingHtml: options.leadingHtml,
     trailingHtml: options.trailingHtml,
     label: { ...label, textAttributesHtml: [label.textAttributesHtml, options.labelId ? `id="${escapeHtml(options.labelId)}"` : ""].filter(Boolean).join(" ") },

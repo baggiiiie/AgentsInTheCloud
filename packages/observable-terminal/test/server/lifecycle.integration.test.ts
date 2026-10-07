@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
-import { attachHostObservableTerminal, attachObservableTerminal, buildObservableSessionCommand, type ObservableTerminalConnection } from "../../src/server/index.ts";
+import { attachHostObservableTerminal, buildObservableSessionCommand, type ObservableTerminalConnection } from "../../src/server/index.ts";
+import { attachObservableTerminal } from "../../src/server/attach.ts";
 
 for (const remote of [false, true]) {
   describe.skip(`${remote ? "Docker" : "host"} terminal lifecycle`, () => {

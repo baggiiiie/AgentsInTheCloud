@@ -1,3 +1,4 @@
+import { createAgentToolAbortController } from "./tool-abort-controller.ts";
 import { createAgentFooterController } from "./footer-controller.ts";
 import { createUsageControllers } from "./usage-controllers.ts";
 import type { WorkspaceClientModule } from "@agents-in-the-cloud/shared";
@@ -11,8 +12,8 @@ import { createAgentThinkingController } from "./thinking-controller.ts";
 import { createAgentStreamingTextController } from "./streaming-text-controller.ts";
 import { createAgentLazyDetailController, createAgentTailFrameController } from "./transcript-detail-controllers.ts";
 
-export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator, type PromptHistoryState } from "./composer-state.ts";
-export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput, type AgentCompletionRequest } from "./completion-input.ts";
+export { agentComposerPrimaryAction, agentComposerTextStorageKey, navigatePromptHistory, PromptHistoryNavigator } from "./composer-state.ts";
+export { agentCompletionRequest, fileCompletionPrefix, insertSlashCommand, type AgentCompletionInput } from "./completion-input.ts";
 export { promptTemplateShortcutConflict } from "./completions-controller.ts";
 export { createHtmlAutocompleteController } from "./html-autocomplete-controller.ts";
 
@@ -28,6 +29,7 @@ export const agentClientModule: WorkspaceClientModule = {
     application.register("agent-tail-frame", createAgentTailFrameController(Controller));
     application.register("agent-lazy-detail", createAgentLazyDetailController(Controller));
     application.register("agent-mermaid", createAgentMermaidController(Controller));
+    application.register("agent-tool-abort", createAgentToolAbortController(Controller));
     application.register("agent-notice", createAgentNoticeController(Controller));
     application.register("agent-completions", createAgentCompletionsController(Controller, hooks));
 

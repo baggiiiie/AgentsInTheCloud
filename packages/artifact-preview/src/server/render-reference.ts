@@ -1,9 +1,10 @@
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 /** Render standalone artifacts and URL previews referenced in Markdown. */
 
-const imageExtensions = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "bmp"]);
+const imageExtensions = new Set(Object.keys(imageMimeByExtension));
 const videoExtensions = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 
 function workspaceProxyController(workspaceId: string, appKey: string, path: string): string {
@@ -13,10 +14,6 @@ function workspaceProxyController(workspaceId: string, appKey: string, path: str
     `data-artifact-preview-proxy-app-key-value="${escapeHtml(appKey)}"`,
     `data-artifact-preview-proxy-path-value="${escapeHtml(path)}"`,
   ].join(" ");
-}
-
-function extensionOf(path: string): string {
-  return path.split(/[?#]/)[0]!.split(".").at(-1)!.toLowerCase();
 }
 
 function isLoopbackHost(hostname: string): boolean {
@@ -35,7 +32,7 @@ function embedLiteral(target: string): string {
 function renderFileEmbed(workspaceId: string, path: string): string {
   if (path.includes("\0")) return embedLiteral(path);
 
-  const ext = extensionOf(path);
+  const ext = extensionOf(path.split(/[?#]/)[0]!);
   const name = path.split("/").pop() || path;
   const proxy = workspaceProxyController(workspaceId, "file", path);
 

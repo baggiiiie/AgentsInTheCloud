@@ -14,9 +14,9 @@ import { requestSupervisorUpdate } from "./supervisor.ts";
 const updateSidebarContributionId = "agents-in-the-cloud-update";
 const pollIntervalMs = 5 * 60 * 1000;
 
-export type UpdateState = "idle" | "checking" | "available" | "pulling" | "ready_to_restart" | "failed" | "restarting";
+type UpdateState = "idle" | "checking" | "available" | "pulling" | "ready_to_restart" | "failed" | "restarting";
 
-export interface StateSnapshot {
+interface StateSnapshot {
   state: UpdateState;
   percent?: number;
   error?: string;

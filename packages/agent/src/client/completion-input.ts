@@ -39,7 +39,7 @@ function rawFileCompletionQuery(prefix: string): string {
   return prefix;
 }
 
-export interface AgentCompletionRequest {
+interface AgentCompletionRequest {
   kind: "slash-command" | "file";
   query: string;
   mode?: "direct" | "fuzzy";

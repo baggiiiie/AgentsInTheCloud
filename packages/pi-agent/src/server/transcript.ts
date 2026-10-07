@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { getAgentsInTheCloudRuntimeContext } from "@agents-in-the-cloud/core";
-import { recordsFromSessionEntries, type TranscriptRecord } from "@agents-in-the-cloud/agent/server";
+import { recordsFromSessionEntries } from "@agents-in-the-cloud/agent/server/session-records";
+import { type TranscriptRecord } from "@agents-in-the-cloud/agent/server/transcript";
 import { latestNativeSessionFile, loadNativeTranscriptFiles, loadNativeTranscriptImage, nativeImageTypes, nativeJsonlRows, nativeSessionFiles } from "@agents-in-the-cloud/cli-agent/server";
 import { Type } from "typebox";
 import { Value } from "typebox/value";

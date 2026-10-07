@@ -13,7 +13,7 @@ export const treeFilterOptions = [
 
 export type TreeFilterMode = typeof treeFilterOptions[number][0];
 
-export function parseTreeFilterMode(value: string | null): TreeFilterMode {
+function parseTreeFilterMode(value: string | null): TreeFilterMode {
   return treeFilterOptions.find(([mode]) => mode === value)?.[0] ?? "default";
 }
 

@@ -1,10 +1,10 @@
 import { enabledModelOptionViews } from "@agents-in-the-cloud/agent/server/model-state";
 import { getAgentModelThinkingLevel } from "@agents-in-the-cloud/llm/server";
-import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+import { publishWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 import { startNotificationTurn, finishNotificationTurn } from "./turn-notifications.ts";
 import { sendTurnNotification } from "./web-push.ts";
 import { durableTimingEntry } from "./durable-timing.ts";
-import { AgentsInTheCloudCoreError } from "@agents-in-the-cloud/core";
+import { AgentsInTheCloudCoreError, isJsonObject } from "@agents-in-the-cloud/core";
 import { checkWorkspaceReadiness } from "@agents-in-the-cloud/workspace";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { contentText, getSupportedThinkingLevels } from "@earendil-works/pi-ai";
@@ -18,7 +18,7 @@ import { expandWorkspaceSkillCommand } from "@agents-in-the-cloud/agent/server/s
 import type { WorkspaceAgentToolOptions } from "@agents-in-the-cloud/agent/server/tools";
 
 const context = BACKGROUND_CONTEXT;
-export const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
+const DurableHistoryLabels = defineDoc<{ labels: Record<string, string[]> }>({
   kind: "agents-in-the-cloud.history-labels", version: 1, scope: "session", initial: () => ({ labels: {} }),
 });
 type AgentIdentity = Omit<DurableAgentRecord, "durableId">;
@@ -418,12 +418,26 @@ export async function openDurableAgentRuntime(
         });
       },
       /** Cancel one live tool and its owned work, without withdrawing the turn or queued input. */
-      abortTool(callId: string) {
+      abortTool(callId: string, note?: string) {
         return command(async () => {
           const live = await harness.snapshot(LiveDoc, conversation.id, context);
           const slot = live?.tools?.find(tool => tool.callId === callId);
           if (!slot?.taskId || slot.status === "done") return false;
           await readyForExecution();
+          const message = note?.trim();
+          if (message) {
+            await harness.commit(async tx => {
+              const current = (await tx.doc(LiveDoc, conversation.id)).tools?.find(tool => tool.callId === callId);
+              if (current && current.status !== "done") {
+                const cancellation = `<harnass>\nThe user manually cancelled this tool with the following note:\n${message}\n</harnass>`;
+                current.abortResult = {
+                  content: [{ type: "text", text: current.output ? `${current.output}\n\n${cancellation}` : cancellation }],
+                  isError: true,
+                  details: isJsonObject(current.details) ? { ...current.details, aborted: true } : { aborted: true },
+                };
+              }
+            }, context);
+          }
           await harness.abortTask(slot.taskId, context);
           return true;
         });

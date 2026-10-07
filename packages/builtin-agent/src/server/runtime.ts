@@ -10,7 +10,7 @@ import type { WorkspaceAgentOptions } from "./runtime-types.ts";
 import type { WorkspaceAgentInfo } from "./agent-store.ts";
 
 export type { AgentLivePresentationSubscription } from "./runtime-types.ts";
-export { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server/workspace-agent-busy";
+export { subscribeWorkspaceAgentBusy } from "@agents-in-the-cloud/agent/server";
 
 const presentations = new Map<string, Promise<AgentPresentation>>();
 // First attachment can prepare a root before it exists in the catalog. Lifecycle

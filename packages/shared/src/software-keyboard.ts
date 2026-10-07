@@ -24,7 +24,13 @@ export function softwareKeyboardVisible(
   return focusOpensSoftwareKeyboard && textEntryFocused && baselineHeight - viewportHeight >= minimumOcclusion;
 }
 
+function deepActiveElement(element: Element | null): Element | null {
+  while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+  return element;
+}
+
 export function isTextEntry(element: Element | null): boolean {
+  element = deepActiveElement(element);
   if (element instanceof HTMLTextAreaElement) return !element.readOnly && !element.disabled;
   if (element instanceof HTMLInputElement) return !element.readOnly && !element.disabled && !["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"].includes(element.type);
   return element instanceof HTMLElement && element.isContentEditable;
@@ -102,7 +108,8 @@ export function installSoftwareKeyboardTracking(): void {
 
   const measure = (): void => {
     const height = layoutHeight();
-    const focused = isTextEntry(document.activeElement);
+    const field = deepActiveElement(document.activeElement);
+    const focused = isTextEntry(field);
     const visible = softwareKeyboardVisible(height, viewport.height, focused, focusLikelyOpensSoftwareKeyboard());
     if (visible) {
       detected = true;
@@ -120,12 +127,13 @@ export function installSoftwareKeyboardTracking(): void {
     detected = false;
     // Some keyboards hide without blurring (Android back, a dismiss key).
     // Dismissing the keyboard ends text entry, so the field loses focus too.
-    if (focused && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (focused && field instanceof HTMLElement) field.blur();
     else arrange(false, 0, 0, false);
   };
 
   document.addEventListener("focusin", (event) => {
-    if (!focusLikelyOpensSoftwareKeyboard() || !isTextEntry(event.target instanceof Element ? event.target : null)) return;
+    const field = deepActiveElement(event.target instanceof Element ? event.target : null);
+    if (!focusLikelyOpensSoftwareKeyboard() || !isTextEntry(field)) return;
     if (arranged) {
       // Focus moved between text fields: the keyboard stays up. Rearrange
       // once for the new focus (for example, the composer collapsing for a terminal).
@@ -135,7 +143,7 @@ export function installSoftwareKeyboardTracking(): void {
     // Like WebKit, only expect a keyboard for focus that comes from a user gesture.
     // Focus while a finger is still down (a terminal focuses on pointerdown)
     // raises the keyboard when the tap completes, so predict then.
-    if (touch && !navigator.userActivation.isActive) touchFocus = event.target;
+    if (touch && !navigator.userActivation.isActive) touchFocus = field;
     else if (navigator.userActivation.isActive) predict();
   });
 
@@ -174,10 +182,11 @@ export function installSoftwareKeyboardTracking(): void {
     touch = undefined;
     const focusedDuringTouch = touchFocus;
     touchFocus = undefined;
-    if (focusedDuringTouch && focusedDuringTouch === document.activeElement && !arranged) predict();
+    if (focusedDuringTouch && focusedDuringTouch === deepActiveElement(document.activeElement) && !arranged) predict();
     const point = event.changedTouches.length === 1 && event.touches.length === 0 ? event.changedTouches[0]! : undefined;
-    const field = event.target instanceof Element ? event.target.closest("textarea, input, [contenteditable]") : null;
-    if (!start || !point || !event.cancelable || !(field instanceof HTMLElement) || !isTextEntry(field) || document.activeElement === field || field.inert) return;
+    const target = event.composedPath()[0];
+    const field = target instanceof Element ? target.closest("textarea, input, [contenteditable]") : null;
+    if (!start || !point || !event.cancelable || !(field instanceof HTMLElement) || !isTextEntry(field) || deepActiveElement(document.activeElement) === field || field.inert) return;
     if (event.timeStamp - start.time > 500 || Math.hypot(point.screenX - start.x, point.screenY - start.y) > 10) return;
     event.preventDefault();
     field.focus({ preventScroll: true });

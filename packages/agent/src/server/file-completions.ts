@@ -4,9 +4,9 @@ import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplet
 import { execWorkspaceCommand, workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 
-export type FileCompletionMode = "direct" | "fuzzy";
+type FileCompletionMode = "direct" | "fuzzy";
 
-export interface FileCompletion {
+interface FileCompletion {
   path: string;
   directory: boolean;
 }

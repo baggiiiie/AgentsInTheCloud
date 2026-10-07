@@ -19,7 +19,7 @@ export interface Account {
 }
 
 export function providerLabel(provider: { id: string; name?: string }): string {
-  return provider.id === "openai-codex" ? "ChatGPT / Codex" : provider.id === "openai" ? "OpenAI" : provider.name ?? provider.id;
+  return provider.id === "openai-codex" ? "ChatGPT / Codex" : provider.id === "openai" ? "OpenAI - Sign in with ChatGPT" : provider.name ?? provider.id;
 }
 
 /** Popular providers first, then by name. */

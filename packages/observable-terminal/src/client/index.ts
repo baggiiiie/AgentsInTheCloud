@@ -118,10 +118,10 @@ export interface ObservableTerminalViewer {
   setTheme(theme: ObservableTerminalTheme): void;
 }
 
-export type TerminalConnectionState = "connecting" | "connected" | "reconnecting" | "unavailable" | "ended";
+type TerminalConnectionState = "connecting" | "connected" | "reconnecting" | "unavailable" | "ended";
 
 /** Update the server-rendered status for any interactive terminal pane. */
-export function setTerminalConnectionStatus(status: HTMLElement, state: TerminalConnectionState): void {
+function setTerminalConnectionStatus(status: HTMLElement, state: TerminalConnectionState): void {
   status.hidden = state === "connected";
   status.dataset.state = state;
   for (const message of status.querySelectorAll<HTMLElement>("[data-terminal-connection-state]")) {
@@ -129,7 +129,7 @@ export function setTerminalConnectionStatus(status: HTMLElement, state: Terminal
   }
 }
 
-export interface ObservableTerminalViewerOptions {
+interface ObservableTerminalViewerOptions {
   host: HTMLElement;
   websocketUrl: string;
   mode: "interactive" | "fixed-readonly";
@@ -632,6 +632,6 @@ function lastCursorVisibility(data: string | Uint8Array): boolean | undefined {
 }
 
 export { createTerminalKeyBarController } from "./key-bar.ts";
-export { TerminalFrame, type TerminalFrameOptions } from "./terminal-frame.ts";
+export { TerminalFrame } from "./terminal-frame.ts";
 
 export { createNativeTerminalTextInputController } from "./native-text-input.ts";

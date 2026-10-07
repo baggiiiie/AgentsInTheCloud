@@ -1,4 +1,4 @@
-import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server";
+import { registerWorkspacePresenter } from "@agents-in-the-cloud/agent/server/tools";
 import { invalidArguments, readJsonObject, requestAcceptsJson, type JsonObject, type JsonValue } from "@agents-in-the-cloud/core";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { textResponse } from "@agents-in-the-cloud/shared/http";

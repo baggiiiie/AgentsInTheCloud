@@ -1,4 +1,3 @@
-import { Icons } from "@agents-in-the-cloud/design-system/icons";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
@@ -9,13 +8,14 @@ import { nativeDelegationTranscript } from "./native-transcript.ts";
 import { attributedEntry } from "./native-state.ts";
 import { nativeToolPresentations } from "./native-tool-presentation.ts";
 import { nativeSnapshot } from "./native-view-state.ts";
-import { subagentsWorkView, subagentsWorkViewAdapter, handleSubagentRequest, subscribeSubagentTree } from "./subagent-view.ts";
+import { renderSubagentsControl, handleSubagentRequest, subscribeSubagentTree } from "./subagent-view.ts";
 import { subagentsOpenApiPaths } from "./openapi.ts";
 
 export const agentsInTheCloudServerModule: WorkspaceModule = {
   id: "subagents",
   initialize() {
     configureAgentDelegation({
+      renderControl: renderSubagentsControl,
       create(models, harness) { return { extension: createNativeDelegationExtension(harness), models: delegationModels(models, harness) }; },
       transcript: nativeDelegationTranscript,
       attributed: attributedEntry,
@@ -27,9 +27,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     });
   },
   staticFiles: { "/subagents.css": { url: new URL("../client/subagents.css", import.meta.url), contentType: "text/css; charset=utf-8" } },
-  workViews: [subagentsWorkViewAdapter],
   openApiPaths: subagentsOpenApiPaths,
-  commands: [{ id: "subagents.open", execute: () => ({ createdWorkView: { type: "subagents" } }) }],
   cableChannels: [{
     name: "subagents",
     subscribe(identifier, listener) {
@@ -38,9 +36,6 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       return subscribeSubagentTree(identifier.workspaceId, params.agentId, listener);
     },
   }],
-  attachToWorkspace() {
-    return { workViews: [subagentsWorkView], commands: [{ id: "subagents.open", label: "Subagents", scope: "workspace", surfaces: { ui: { placement: "work-launcher", iconHtml: Icons.Subagents, label: "Subagents" } } }] };
-  },
   routes: [{
     async handle(request, url, context) {
       const reveal = url.pathname.match(/^\/workspaces\/([^/]+)\/subagents\/reveal$/);
@@ -58,8 +53,7 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
           const query = new URLSearchParams({ agent: target, agentTarget: message.id });
           return new Response(null, { status: 303, headers: { location: `/workspaces/${encodeURIComponent(workspaceId)}?${query}` } });
         }
-        await context.openWorkView(workspaceId, { type: "subagents" });
-        const query = new URLSearchParams({ agent: child.rootId, workView: "subagents:workspace", subagent: child.id, message: message.id });
+        const query = new URLSearchParams({ agent: child.rootId, subagent: child.id, message: message.id });
         return new Response(null, { status: 303, headers: { location: `/workspaces/${encodeURIComponent(workspaceId)}?${query}` } });
       }
       return handleSubagentRequest(request, url, { events: context.events });

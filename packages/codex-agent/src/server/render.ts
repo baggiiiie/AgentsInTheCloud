@@ -2,7 +2,7 @@ import { parseModelRef } from "@agents-in-the-cloud/llm/server";
 import { renderTranscript } from "@agents-in-the-cloud/agent/server/render-transcript";
 import { ids, type AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { renderAgentPane, renderAgentPaneComposerFooter, renderPromptActions, type AgentStatsView } from "@agents-in-the-cloud/builtin-agent/server/render-composer";
-import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import type { LiveRegion } from "@agents-in-the-cloud/shared";
 import { codexSlashCommands } from "./commands.ts";
 import { projectCodexTurns } from "./transcript.ts";

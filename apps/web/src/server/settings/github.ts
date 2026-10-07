@@ -5,7 +5,7 @@ import { getStoredCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud
 import { validateGitHubToken } from "../github-auth.ts";
 import { renderOnboardingDialog } from "../onboarding/routes.ts";
 import { replace, stream, update } from "@agents-in-the-cloud/shared/http";
-import { renderSettingsDialog } from "./page.ts";
+import { renderCommitIdentityForm } from "./page.ts";
 import { domId, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
 import { registerSettingsContribution } from "./registry.ts";
 
@@ -70,14 +70,14 @@ export async function handleGitHubSettingsRequest(request: Request, url: URL): P
     if (!await getStoredCommitIdentity()) await setCommitIdentity({ name: validation.name, email: validation.email });
     return surface === "onboarding"
       ? stream(update("onboarding_modal_host", await renderOnboardingDialog({ resumeAfter: "github" })))
-      : stream(`${replace("settings_dialog", await renderSettingsDialog(request))}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
+      : stream(`${replace("settings-sec-github", await renderGitHubSettings())}${replace("settings_commit_identity", await renderCommitIdentityForm())}${update("onboarding_modal_host", await renderOnboardingDialog())}`);
   }
   if (url.pathname === "/settings/github/disconnect" && request.method === "POST") {
     const surface = url.searchParams.get("surface") === "onboarding" ? "onboarding" : "settings";
     clearGitHubToken();
     return surface === "onboarding"
       ? stream(update("onboarding_modal_host", await renderOnboardingDialog()))
-      : stream(replace("settings_dialog", await renderSettingsDialog(request)));
+      : stream(replace("settings-sec-github", await renderGitHubSettings()));
   }
   return undefined;
 }

@@ -1,7 +1,7 @@
 import { setContentRowLabel } from "@agents-in-the-cloud/design-system/content-row/client";
 import type { WorkspaceClientControllerConstructor } from "@agents-in-the-cloud/shared";
 import { resolveDiffEndpoints } from "../diff-endpoints.ts";
-import { endpointName, workingTree, historyGraph, diffEndpointsDescription, comparisonGraph, rowHeight, type DiffEndpoints, type HistoryGraph, type HistoryModel } from "../history.ts";
+import { workingTree, historyGraph, diffEndpointsDescription, comparisonGraph, rowHeight, type DiffEndpoints, type HistoryGraph, type HistoryModel } from "../history.ts";
 
 type ComparisonModel = { endpoints: DiffEndpoints; label: string; baseLabel: string; targetLabel: string };
 
@@ -26,13 +26,15 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     declare readonly historyScrollTarget: HTMLElement;
     declare readonly moreTarget: HTMLButtonElement;
     declare readonly hasMoreTarget: boolean;
+    private awaitingEnd = false;
+    private secondCommitDeadline = 0;
+    private secondCommitTimer?: ReturnType<typeof setTimeout>;
     private model?: HistoryModel;
     private graph?: HistoryGraph;
     private endpoints?: DiffEndpoints;
     private comparison?: ComparisonModel;
     private anchor?: string;
     private hoveredCommit?: string;
-    private gesture?: { pointer: number; last: string; deferred: boolean; extend: boolean };
     private isOpen = false;
     private busy = false;
     private failed = false;
@@ -53,7 +55,7 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       if (this.openValue) this.openPicker();
       this.measure();
     }
-    disconnect(): void { this.request?.abort(); this.paging?.abort(); this.resize?.disconnect(); }
+    disconnect(): void { this.request?.abort(); this.paging?.abort(); this.resize?.disconnect(); clearTimeout(this.secondCommitTimer); }
 
     historyModelTargetConnected(script: HTMLScriptElement): void {
       // SAFETY: This model is emitted by the Changes history renderer, not an external endpoint.
@@ -98,9 +100,8 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
     }
     closePicker(): void {
       if (!this.isOpen) return;
-      // Closing during a drag commits its final preview, just like releasing the pointer.
-      if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); }
       this.clearHover();
+      this.endSecondCommitSelection();
       this.isOpen = false;
       this.pickerTarget.hidden = true;
       this.triggerTarget.setAttribute("aria-expanded", "false");
@@ -115,7 +116,6 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.closePicker();
     }
 
-    private modified(event: MouseEvent | KeyboardEvent): boolean { return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey; }
     private commitAt(element: Element, clientY: number): string | undefined {
       const dot = element.closest<SVGCircleElement>("[data-dot]");
       if (dot) return dot.dataset.dot;
@@ -131,57 +131,50 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       this.endpoints = candidate.base === undefined ? { target: selected.target } : { target: selected.target, base: selected.base };
       this.paint();
     }
-    beginSelection(event: PointerEvent): void {
+    private endSecondCommitSelection(): void {
+      clearTimeout(this.secondCommitTimer);
+      this.secondCommitTimer = undefined;
+      this.awaitingEnd = false;
+      this.secondCommitDeadline = 0;
+      if (this.model) this.paint();
+    }
+    private withEditGuard(resume: () => void): void {
+      const editor = this.element.querySelector<HTMLElement>('[data-controller~="changes-edit"]');
+      if (!editor || editor.dispatchEvent(new CustomEvent("changes-edit:guard", { cancelable: true, detail: { resume } }))) resume();
+    }
+    private selectCommit(id: string): void {
+      this.withEditGuard(() => {
+        const extend = this.awaitingEnd && performance.now() < this.secondCommitDeadline;
+        this.endSecondCommitSelection();
+        if (!extend) {
+          this.awaitingEnd = true;
+          this.secondCommitDeadline = performance.now() + 5000;
+          this.secondCommitTimer = setTimeout(() => this.endSecondCommitSelection(), 5000);
+        }
+        this.choose(id, extend);
+        void this.generate("compare");
+      });
+
+    }
+    selectSnapshot(event: MouseEvent): void {
       if (event.button !== 0) return;
       // SAFETY: This action is attached to the native history table.
-      const element = event.target as Element;
-      const id = this.commitAt(element, event.clientY);
-      if (!id) return;
-      event.preventDefault();
-      const extend = this.modified(event);
-      // Touching metadata/the graph can scroll. Apply a tap only on release, not on pan cancellation.
-      const deferred = event.pointerType === "touch" && !element.closest(".changes-description");
-      if (!deferred) this.choose(id, extend);
-      this.gesture = { pointer: event.pointerId, last: id, deferred, extend };
-      this.tableTarget.setPointerCapture(event.pointerId);
+      const id = this.commitAt(event.target as Element, event.clientY);
+      if (id) this.selectCommit(id);
     }
-    moveSelection(event: PointerEvent): void {
-      if (!this.gesture || this.gesture.pointer !== event.pointerId || this.gesture.deferred) return;
-      const element = document.elementFromPoint(event.clientX, event.clientY);
-      if (!element || !this.tableTarget.contains(element)) return;
-      const id = this.commitAt(element, event.clientY);
-      if (!id || id === this.gesture.last) return;
-      event.preventDefault();
-      this.gesture.last = id;
-      this.choose(id, true);
-      const rect = this.historyScrollTarget.getBoundingClientRect();
-      if (event.clientY < rect.top + 28) this.historyScrollTarget.scrollTop -= rowHeight;
-      if (event.clientY > rect.bottom - 28) this.historyScrollTarget.scrollTop += rowHeight;
-    }
-    finishSelection(event: PointerEvent): void {
-      if (!this.gesture || this.gesture.pointer !== event.pointerId) return;
-      if (this.gesture.deferred) this.choose(this.gesture.last, this.gesture.extend);
-      else this.moveSelection(event);
-      this.gesture = undefined;
-      this.tableTarget.releasePointerCapture(event.pointerId);
-      void this.generate("compare");
-    }
-    cancelGesture(): void { if (this.gesture) { const apply = !this.gesture.deferred; this.gesture = undefined; if (apply) void this.generate("compare"); } }
 
     navigate(event: KeyboardEvent): void {
       // SAFETY: Only history rows bind this action.
       const row = event.currentTarget as HTMLTableRowElement;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        this.choose(row.dataset.commit!, this.modified(event));
-        void this.generate("compare");
+        this.selectCommit(row.dataset.commit!);
       } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const index = this.rowTargets.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1);
         const next = this.rowTargets[index];
         if (!next) return;
         next.focus();
-        if (this.modified(event)) { this.choose(next.dataset.commit!, true); void this.generate("compare"); }
       }
     }
     hoverRow(event: PointerEvent): void {
@@ -223,10 +216,9 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       for (const path of this.graphTarget.querySelectorAll<SVGPathElement>("[data-selected-backbone],[data-selected-beads]")) path.setAttribute("d", selected.route);
       const applied = this.comparison?.endpoints.target === endpoints.target && this.comparison.endpoints.base === endpoints.base;
       const description = applied ? this.comparison!.label : diffEndpointsDescription(model, selected);
-      setContentRowLabel(this.triggerTarget, description);
-      this.triggerTarget.title = applied ? `${this.comparison!.baseLabel} → ${this.comparison!.targetLabel}` : `${endpointName(model, selected.base ?? undefined)} → ${endpointName(model, selected.target)}`;
+      setContentRowLabel(this.triggerTarget, this.awaitingEnd ? "Select a second commit for a custom range" : description);
       this.element.style.setProperty("--changes-history-rows", String(model.commits.length));
-      this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "64px" : "0px");
+      this.element.style.setProperty("--changes-history-chrome", this.hasMoreTarget ? "var(--changes-history-more-height)" : "0px");
     }
     private measure(): void {
       const toolbar = this.diffTarget.querySelector<HTMLElement>(".changes-toolbar")!;
@@ -247,17 +239,18 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
       for (const element of this.diffTarget.querySelectorAll<HTMLElement>(".changes-controls")) element.inert = this.busy;
     }
 
-    refresh(): void { void this.generate("refresh"); }
-    retry(): void { if (this.lastOperation === "history") void this.loadMore(); else void this.generate(this.lastOperation); }
+    refresh(): void { this.withEditGuard(() => { void this.generate("refresh"); }); }
+    retry(): void {
+      const operation = this.lastOperation;
+      if (operation === "history") void this.loadMore();
+      else this.withEditGuard(() => { void this.generate(operation); });
+    }
     dismissError(): void { this.errorTarget.hidden = true; }
     private async generate(operation: "compare" | "refresh"): Promise<void> {
       this.request?.abort();
       if (operation === "refresh") {
+        this.endSecondCommitSelection();
         this.paging?.abort();
-        if (this.gesture) {
-          this.tableTarget.releasePointerCapture(this.gesture.pointer);
-          this.gesture = undefined;
-        }
       }
       const request = this.request = new AbortController();
       this.lastOperation = operation;

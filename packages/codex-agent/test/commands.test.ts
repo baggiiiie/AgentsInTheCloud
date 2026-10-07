@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { codexSlashCommands, parseCodexCommand } from "../src/server/commands.ts";
-import { slashCommands } from "@agents-in-the-cloud/agent/server/slash-commands";
+import { slashCommands } from "../../agent/src/server/slash-commands.ts";
 
 test("every advertised native command is handled without turning it into a prompt", () => {
   for (const command of codexSlashCommands) expect(parseCodexCommand(command.trigger)?.kind).toBe(command.name);

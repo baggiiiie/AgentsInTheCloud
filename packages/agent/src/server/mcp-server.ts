@@ -6,7 +6,7 @@ import { errorMessage } from "@agents-in-the-cloud/shared";
 import type { WorkspaceTool } from "./workspace-tool.ts";
 import { authenticateAgentRequest, type AgentMcpIdentity } from "./mcp-credentials.ts";
 
-export interface AgentMcpServerOptions {
+interface AgentMcpServerOptions {
   authenticate(token: string): AgentMcpIdentity | undefined;
   tools(identity: AgentMcpIdentity): WorkspaceTool<any, any>[];
   instructions(identity: AgentMcpIdentity): string | Promise<string>;

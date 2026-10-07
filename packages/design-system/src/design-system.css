@@ -323,7 +323,7 @@
 }
 
 /* Composition modules own the space between independently rendered items. */
-.action-list { display: grid; gap: 2px; }
+.action-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .button,
   .text-field,

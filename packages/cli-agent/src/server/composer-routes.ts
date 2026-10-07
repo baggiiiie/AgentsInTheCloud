@@ -1,4 +1,6 @@
-import { expandSlashCommand, listFileCompletions, renderFileCompletionMenu, runAgentNameCommand } from "@agents-in-the-cloud/agent/server";
+import { expandSlashCommand } from "@agents-in-the-cloud/agent/server/slash-command-input";
+import { listFileCompletions, renderFileCompletionMenu } from "@agents-in-the-cloud/agent/server/file-completions";
+import { runAgentNameCommand } from "@agents-in-the-cloud/agent/server/agent-name-command";
 import { agentAttachmentDraftId, copyAttachmentIntoWorkspace, findStagedAttachment, removeStagedAttachments } from "@agents-in-the-cloud/prompt/server";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
 import type { CliAgents } from "./agents.ts";

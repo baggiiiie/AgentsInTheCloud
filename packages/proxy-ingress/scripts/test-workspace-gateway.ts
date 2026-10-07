@@ -147,10 +147,10 @@ async function exerciseIngress(gatewayUrl: string, token: string) {
     for (const method of ["POST", "OPTIONS"]) {
       const response = await request(`${origin}/origin-check`, { method, headers: { origin, "access-control-request-method": "POST", "access-control-request-headers": "X-App" }, body: method === "POST" ? "form body" : undefined });
       assert.equal(response.status, 200);
-      assert.equal(response.headers.get("access-control-allow-origin"), origin);
-      assert.equal(response.headers.get("timing-allow-origin"), origin);
-      assert.equal(response.headers.get("access-control-allow-credentials"), "true");
-      assert.equal(response.headers.get("vary"), "Origin");
+      // Ingress strips cross-origin grants even from successful same-origin replies.
+      for (const name of ["access-control-allow-origin", "timing-allow-origin", "access-control-allow-credentials", "access-control-allow-methods", "access-control-allow-headers"]) {
+        assert.equal(response.headers.get(name), null);
+      }
       assert.equal(await response.text(), method === "POST" ? "form body" : "");
     }
     for (const foreign of ["https://attacker.example", "null"]) {
@@ -160,7 +160,7 @@ async function exerciseIngress(gatewayUrl: string, token: string) {
       assert.equal(await response.text(), "foreign origin");
       assert.equal(appRequests, before + 1, "origin rejection must not be retried");
     }
-    console.log("PASS: same-origin POST/preflight and WebSocket translation, CORS/timing reversal, foreign/opaque Origin rejection, spoofed forwarding isolation");
+    console.log("PASS: same-origin POST/preflight and WebSocket translation, CORS/timing grant isolation, foreign/opaque Origin rejection, spoofed forwarding isolation");
 
     const unused = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response() });
     targetPort = unused.port!;

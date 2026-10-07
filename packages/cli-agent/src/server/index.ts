@@ -1,4 +1,5 @@
-import { registerAgentTurnSettler, renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server";
+import { registerAgentTurnSettler } from "@agents-in-the-cloud/agent/server";
+import { renderWorkspaceCompletionCatalog } from "@agents-in-the-cloud/agent/server/completion-catalog";
 import { agentAttachmentDraftId, listStagedAttachments, renderComposerBody, renderFloatingStack, renderOpenComposerButton, agentComposerActions, composerAttachmentAttributes } from "@agents-in-the-cloud/prompt/server";
 import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { observableTerminalStaticFiles, renderTerminalKeyBar, renderTerminalConnectionStatus } from "@agents-in-the-cloud/observable-terminal/server";
@@ -11,7 +12,7 @@ import { cliComposerRoutes } from "./composer-routes.ts";
 import { cliTranscriptAttributes, cliTranscriptChannel, cliTranscriptRoutes, renderCliTranscriptControls, renderCliTranscriptView } from "./transcript-routes.ts";
 
 export type { CliAgentConnection } from "@agents-in-the-cloud/agent/server";
-export type { CliAgentAdapter, CliAgentSession } from "./adapter.ts";
+export type { CliAgentSession } from "./adapter.ts";
 
 function terminalStatus(terminal: { ended: boolean; exitCode?: number }): string {
   return terminal.ended ? `Session ended${terminal.exitCode ? ` (exit ${terminal.exitCode}). See terminal output for details.` : ""}` : "";

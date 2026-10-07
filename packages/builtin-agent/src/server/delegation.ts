@@ -8,6 +8,7 @@ import { configureAgentToolPresentations, type AgentToolPresentation } from "@ag
 export type { AgentToolPresentation } from "@agents-in-the-cloud/agent/server";
 
 export interface AgentDelegation {
+  renderControl(workspaceId: string, agentId: string): Promise<string>;
   create(models: Models, harness: () => Harness): { extension: Extension; models: Models };
   transcript(view: ConversationView): AgentTranscriptSnapshot;
   attributed(entry: EntryRecord): "task" | "message" | undefined;

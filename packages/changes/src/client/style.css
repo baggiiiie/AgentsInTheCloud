@@ -2,11 +2,13 @@
 .changes-toolbar { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); flex: none; }
 .changes-summary { margin-inline-end: 8px; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .changes-summary span { margin-inline-start: 8px; }
-.changes-controls { display: flex; align-items: center; gap: 4px; width: 100%; }
+.changes-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; }
 .changes-controls > .changes-summary { margin-inline-end: auto; }
+.changes-controls > [data-changes-target="collapseToggle"] { margin-inline-end: 8px; }
+.changes-collapse-icon, .changes-expand-icon { display: inline-flex; align-items: center; justify-content: center; }
 .changes-expand-icon { display: none; }
-[aria-pressed="true"] .changes-collapse-icon { display: none; }
-[aria-pressed="true"] .changes-expand-icon { display: inline-flex; }
+[data-collapsed="true"] .changes-collapse-icon { display: none; }
+[data-collapsed="true"] .changes-expand-icon { display: inline-flex; }
 .changes-menu-check { opacity: 0; display: inline-flex; }
 [aria-checked="true"] .changes-menu-check { opacity: 1; }
 .changes-additions { color: var(--success); }
@@ -15,7 +17,7 @@
 .changes-viewer { flex: 1; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; --diffs-font-size: 12px; --diffs-line-height: 20px; }
 /* Keep Pierre's item metric aligned with the Content row's responsive sizing. */
 .changes-viewer diffs-container { --diffs-font-size: 12px; --diffs-line-height: 20px; }
-.changes-file-header { height: var(--changes-file-header-height); box-sizing: border-box; padding: 4px 8px; background: var(--bg); font: var(--text-body)/var(--leading-standard) var(--font-sans); }
+.changes-file-header { display: flex; align-items: center; gap: 8px; height: var(--changes-file-header-height); box-sizing: border-box; padding: 4px 8px; background: var(--bg); font: var(--text-body)/var(--leading-standard) var(--font-sans); }
 .changes-file-header .disclosure-icon { transform: none; }
 @media (max-width: 700px), (pointer: coarse) {
   .changes-diff { --changes-file-header-height: 58px; }
@@ -32,6 +34,7 @@
 }
 
 .changes-body {
+  --changes-history-more-height: 34px;
   position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
   container: changes-view / size;
   /* Ordinary graph colors stay at least 90° away from the selected path hue. */
@@ -51,8 +54,8 @@
 .changes-diff-endpoints-header > strong { flex: 1; }
 .changes-diff-endpoints-header [aria-expanded="false"] .disclosure-icon { transform: rotate(-90deg); }
 .changes-picker-host {
-  flex: none; display: flex; min-height: 0; border-bottom: 1px solid var(--line);
-  height: min(60%, calc(min(var(--changes-history-rows, 1), 10) * 36px + var(--changes-history-chrome, 64px)));
+  flex: none; display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--line);
+  height: min(60%, calc(min(var(--changes-history-rows, 1), 10) * 36px + var(--changes-history-chrome, var(--changes-history-more-height))));
 }
 .changes-history-scroll { height: 100%; min-height: 0; min-width: 0; overflow: auto; flex: 1; overscroll-behavior: contain; user-select: none; -webkit-user-select: none; }
 .changes-history-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: var(--text-code); }
@@ -75,8 +78,22 @@
 .changes-history-table tbody tr:focus-visible td:not(.changes-graph-cell) { outline: 1px solid var(--accent); outline-offset: -1px; }
 .changes-history-edges path { opacity: .35; }
 .changes-history-table tbody { touch-action: pan-y; }
-.changes-description { touch-action: none; }
-.changes-history-more { display: flex; align-items: center; justify-content: center; height: 64px; padding: 8px; }
+.changes-history-content:has(.changes-history-more) .changes-history-table { margin-bottom: var(--changes-history-more-height); }
+.changes-history-more {
+  position: sticky; bottom: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; height: var(--changes-history-more-height); padding: 4px 8px;
+  margin-top: calc(-1 * var(--changes-history-more-height));
+  isolation: isolate; pointer-events: none;
+}
+.changes-history-more::before {
+  content: ""; position: absolute; inset: -36px 0 0; z-index: -1;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+}
+.changes-history-more > .button { pointer-events: auto; background: var(--panel); }
+@media (max-width: 700px), (pointer: coarse) {
+  .changes-body { --changes-history-more-height: 52px; }
+}
 .changes-loading { position: absolute; inset: var(--changes-comparison-top, 49px) 0 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); background: var(--bg); }
 .changes-spinner { width: 18px; height: 18px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: changes-spin 800ms linear infinite; }
 @keyframes changes-spin { to { transform: rotate(360deg); } }
@@ -94,12 +111,40 @@
 @media (prefers-reduced-motion: reduce) { .changes-spinner { animation: none; } }
 
 .changes-comment { margin: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--panel); color: var(--text); font: var(--text-body)/var(--leading-standard) var(--font-sans); overflow: hidden; }
-.changes-comment header { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--line); }
-.changes-comment header > span { flex: 1; color: var(--text-muted); font-size: var(--text-code); }
+.changes-comment-card { display: flex; align-items: flex-start; }
+.changes-comment-card > [data-action="changes#editComment"] { flex: 1; min-width: 0; }
+.changes-comment-tools { display: flex; flex-shrink: 0; gap: 4px; margin: 4px; }
 .changes-comment [data-comment-body] { white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; }
 .changes-comment-editor textarea { display: block; width: calc(100% - 16px); margin: 8px; }
 .changes-comment-editor footer { display: flex; align-items: center; gap: 8px; padding: 0 8px 8px; }
-.changes-comment-editor small { flex: 1; color: var(--text-muted); font-size: var(--text-code); }
 .changes-viewer [slot="gutter-utility-slot"] .button { width: 20px; height: 20px; min-width: 20px; min-height: 20px; margin-right: calc((20px - 1ch) * -1); padding: 0; z-index: 4; }
 
 .changes-node-stats { display: inline-flex; flex: none; gap: 8px; margin-inline-start: auto; color: var(--text-muted); font-size: var(--text-code); }
+
+.changes-toolbar { flex-wrap: wrap; }
+.changes-review-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.changes-copy-error { color: var(--danger); font-size: var(--text-code); }
+.changes-copy-error[hidden] { display: none; }
+.changes-comment-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid var(--line); }
+.changes-comment-actions:empty { display: none; }
+.changes-orphan-file:empty { display: none; }
+.changes-orphan-file:not(:empty) { border-top: 1px solid var(--line); }
+.changes-orphan-count { color: var(--text-muted); }
+.changes-review-entry .content-row__label-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.changes-orphan-editor[hidden], [data-changes-target="orphanContent"][hidden] { display: none; }
+.changes-viewer > .changes-empty { min-height: 120px; }
+.changes-comment-footer-space { flex: 1; }
+.changes-deletion-comments { margin-block-end: 20px; }
+
+
+.changes-file-header > .content-row { flex: 1; min-width: 0; }
+.changes-file-edit-actions:not([hidden]) { display: inline-flex; flex: none; gap: 4px; }
+.changes-edit-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.changes-edit-stale:not([hidden]) { padding: 8px 12px; border-bottom: 1px solid var(--line); color: var(--text-muted); font-size: var(--text-code); }
+.changes-edit-dialog-error { color: var(--danger); }
+.changes-code-editing [data-action="changes#editComment"] { pointer-events: none; }
+/* Keep native text entry at 16px so iOS doesn't zoom away from the save controls. */
+@media (pointer: coarse) {
+  .changes-code-editing .changes-viewer diffs-container { --diffs-font-size: 16px; }
+}
+.changes-file-header [hidden] { display: none; }

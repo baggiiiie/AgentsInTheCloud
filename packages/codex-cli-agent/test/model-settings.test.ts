@@ -18,10 +18,12 @@ async function scenario(script: string) {
       ];
       mock.module("@agents-in-the-cloud/llm/server", () => ({ ...llm,
         getEnabledModels: async () => enabledModels,
+        requireProviderSubscription: async () => {},
         createPiModelRuntime: async () => ({ getAvailable: async () => enabledModels.slice(0, 3), checkAuth: async () => true, getProviderAuthStatus: () => ({ configured: true }), getModel: () => ({ thinkingLevelMap: { minimal: "low", off: "none" } }) }),
         modelThinkingLevels: async () => ["off", "minimal", "low", "medium", "high"],
       }));
-      const { codexCliModelSettings: { prepare } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
+      const { agentsInTheCloudServerModule: { agentType: { launch } } } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/index.ts"))});
+      const prepare = async (parameters) => (await launch.prepare(parameters)).agent;
       ${script}
     `], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ATELIER_DATA_DIR: directory }, stdout: "pipe", stderr: "pipe" });
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);

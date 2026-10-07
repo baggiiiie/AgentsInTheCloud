@@ -1,4 +1,4 @@
-import type { AgentRenderContext } from "@agents-in-the-cloud/agent/server";
+import type { AgentRenderContext } from "@agents-in-the-cloud/agent/server/render-context";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 
 /** Communication details share the standard tool card, with labelled data rows. */

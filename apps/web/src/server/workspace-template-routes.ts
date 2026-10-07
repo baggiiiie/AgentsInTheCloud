@@ -17,7 +17,7 @@ import {
   updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret,
   type WorkspaceTemplateEnvironmentVariable, type WorkspaceTemplateSecretInput, type WorkspaceTemplateSecretSummary, type WorkspaceTemplateSshKeySummary, type WorkspaceTemplateSummary,
 } from "@agents-in-the-cloud/workspace-templates";
-import { escapeHtml, turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
@@ -115,16 +115,19 @@ export function createWorkspaceTemplateRoutes(deps: {
     const json = requestAcceptsJson(request);
     let name: string;
     let spec: string;
+    let swatchColor: string | undefined;
     if (json) {
       const body = await readJsonObject(request);
       name = requiredJsonString(body, "name");
       spec = requiredJsonString(body, "gitUrl");
+      swatchColor = optionalJsonString(body, "swatchColor");
     } else {
       const formData = await request.formData();
       name = String(formData.get("name") ?? "");
       spec = String(formData.get("gitUrl") ?? "");
+      if (formData.has("swatchColor")) swatchColor = String(formData.get("swatchColor"));
     }
-    const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec });
+    const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec, swatchColor });
     return workspaceTemplateSettingsResponse(request, { workspaceTemplate });
   }
 
@@ -139,12 +142,12 @@ export function createWorkspaceTemplateRoutes(deps: {
     const workspaceTemplateId = decodeURIComponent(url.pathname.split("/")[2]!);
     const section: TemplateSettingsSection = concern === "seed-config" ? "developer" : concern === "secrets" ? "secrets" : concern === "environment" ? "environment" : concern === "ssh-keys" || concern === "ssh-known-hosts" ? "ssh" : concern === "privileged" || concern === "dockerfile" || concern === "preload-images" ? "container" : "general";
     const deleted = url.pathname.endsWith("/delete");
-    const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
+    const record = concern === "privileged" ? "docker" : concern === "preload-images" ? "images" : concern === "dockerfile" ? "dockerfile" : concern === "ssh-known-hosts" ? "known-hosts" : "secret" in result ? result.secret.id : "environmentVariable" in result ? result.environmentVariable.id : "key" in result ? result.key.id : undefined;
     // Save/create remains in the editor, using the persisted record ID and fresh credential fields.
     // Deletion returns to the list because that editor no longer exists.
     const location: TemplateSettingsLocation = { section, editor: deleted ? undefined : record };
     if (!wantsStream(request)) return Response.redirect(new URL(templateSettingsUrl(workspaceTemplateId, section, location.editor), request.url).toString(), 303);
-    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted);
+    const frame = await renderTemplateSettingsFrame(workspaceTemplateId, location, deps.referencingWorkspaces(workspaceTemplateId), !deleted, url.pathname);
     return turboStreamResponse(replace(templateSettingsFrameId, frame));
   }
 

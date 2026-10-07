@@ -44,6 +44,7 @@
   },
   "patchedDependencies": {
     "@earendil-works/pi-ai@1.0.0": "patches/@earendil-works%2Fpi-ai@1.0.0.patch",
-    "@gespenst/core@0.1.1": "patches/@gespenst%2Fcore@0.1.1.patch"
+    "@gespenst/core@0.1.1": "patches/@gespenst%2Fcore@0.1.1.patch",
+    "@earendil-works/pi-durable@1.0.0": "patches/@earendil-works%2Fpi-durable@1.0.0.patch"
   }
 }

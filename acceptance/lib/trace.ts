@@ -80,7 +80,9 @@ export const samplerSource = String.raw`(() => {
   const state = window.__acceptance = { frames: [], marks: [] };
   state.mark = (label) => { state.marks.push({ t: Math.round(performance.now() * 10) / 10, label }); return true; };
   state.take = () => { const result = { frames: state.frames, marks: state.marks }; state.frames = []; state.marks = []; return JSON.stringify(result); };
-  const loop = (t) => { state.frames.push(sample(t)); if (state.frames.length > 4000) state.frames.shift(); requestAnimationFrame(loop); };
+  // RAF's timestamp is the frame's start, not the time this callback samples
+  // the DOM. An input dispatched mid-frame can otherwise appear before its mark.
+  const loop = () => { state.frames.push(sample(performance.now())); if (state.frames.length > 4000) state.frames.shift(); requestAnimationFrame(loop); };
   requestAnimationFrame(loop);
   return "installed";
 })()`;

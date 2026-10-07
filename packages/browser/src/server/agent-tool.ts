@@ -1,4 +1,4 @@
-import type { WorkspacePresenterDefinition } from "@agents-in-the-cloud/agent/server";
+import type { WorkspacePresenterDefinition } from "@agents-in-the-cloud/agent/server/tools";
 import { Type } from "typebox";
 import { createWorkspaceBrowserView, listWorkspaceBrowserViews, setWorkspaceBrowserTarget, type WorkspaceBrowserView } from "./state.ts";
 

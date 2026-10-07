@@ -81,9 +81,9 @@ async function scenario(script: string) {
       }));
       const rendering = await import(${JSON.stringify(join(import.meta.dir, "../src/server/render.ts"))});
       mock.module(${JSON.stringify(join(import.meta.dir, "../src/server/render.ts"))}, () => ({ ...rendering, liveRegions: runtime => [{ target: "state", html: JSON.stringify(runtime.state.turns) }] }));
-      const busy = await import("@agents-in-the-cloud/agent/server/workspace-agent-busy");
+      const busy = await import("@agents-in-the-cloud/agent/server");
       const busyEvents = [];
-      mock.module("@agents-in-the-cloud/agent/server/workspace-agent-busy", () => ({ ...busy, publishWorkspaceAgentBusy(event) { busyEvents.push(event); } }));
+      mock.module("@agents-in-the-cloud/agent/server", () => ({ ...busy, publishWorkspaceAgentBusy(event) { busyEvents.push(event); } }));
       const handlers = new Map();
       const events = { on(name, handler) { handlers.set(name, [...(handlers.get(name) ?? []), handler]); }, async emit(name, payload) { for (const handler of handlers.get(name) ?? []) await handler(payload); } };
       const { createCodexAgents } = await import(${JSON.stringify(join(import.meta.dir, "../src/server/runtime.ts"))});
