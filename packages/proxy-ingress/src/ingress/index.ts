@@ -226,6 +226,13 @@ export function createWorkspaceIngress(options: WorkspaceIngressOptions): Worksp
   async function dispatchRequest(lease: OriginLease, request: Request): Promise<Response> {
     lease.activeConnections += 1;
     try {
+      // Preview reads need fresh bytes, not a 304 that reuses a browser's old
+      // document or asset. Keep write preconditions and range validators intact.
+      if (request.method === "GET" || request.method === "HEAD") {
+        request.headers.delete("if-none-match");
+        request.headers.delete("if-modified-since");
+        request.headers.set("cache-control", "no-cache");
+      }
       const backend = await resolveBackend(lease.app, new URL(request.url), lease.protocol);
       if (backend.kind === "fetch") {
         const response = adaptWorkspaceResponse(await backend.fetch(request));
@@ -539,14 +546,15 @@ function closeAppSocket(ws: ServerWebSocket<AppSocketData>, code: number, reason
 
 function adaptWorkspaceResponse(response: Response): Response {
   const headers = new Headers(response.headers);
-  let changed = false;
+  // Previews are live working surfaces. This covers documents and subresources,
+  // including assets that the app marks as immutable or long-lived.
+  headers.set("cache-control", "no-store");
   // Workspace content may be embedded or navigated to, but must never grant
   // another origin (especially the management app) permission to read its bytes.
   // Apply after all backend adapters, including redirects and preflight replies.
   for (const name of response.headers.keys()) {
     if (name === "x-frame-options" || name.startsWith("access-control-") || name.startsWith("cross-origin-") || name === "timing-allow-origin") {
       headers.delete(name);
-      changed = true;
     }
   }
   for (const name of ["content-security-policy", "content-security-policy-report-only"]) {
@@ -555,9 +563,8 @@ function adaptWorkspaceResponse(response: Response): Response {
     const directives = policy.split(";").map((directive) => directive.trim()).filter((directive) => directive && !directive.toLowerCase().startsWith("frame-ancestors"));
     if (directives.length) headers.set(name, directives.join("; "));
     else headers.delete(name);
-    changed = true;
   }
-  return changed ? new Response(response.body, { status: response.status, statusText: response.statusText, headers }) : response;
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 export function normalizeDecodedFetchResponse(response: Response): Response {
