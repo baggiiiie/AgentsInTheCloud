@@ -1,6 +1,6 @@
 import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
-import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
+import { renderAgentTypePicker } from "./agent-type-picker.ts";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
 import { dictationComposerController } from "@agents-in-the-cloud/dictation/server";
 import { domId, escapeHtml, type AgentLaunchFooterContext, type WorkspaceAgentType } from "@agents-in-the-cloud/shared";
@@ -22,11 +22,10 @@ export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agent
   const picker = popupHtml({
     id: `${launchAgentTypeFrameId}_menu`, label: "Agent type", placement: "above",
     trigger: { variant: "secondary", content: { kind: "caption", caption: agentType.label, iconHtml: agentType.iconHtml } },
-    contentHtml: agentTypes.map((item) => contentRowHtml({
-      width: "fill",
-      kind: "compact", label: { kind: "text", text: item.label }, leadingHtml: item.iconHtml,
-      element: { tag: "button", attributesHtml: `type="submit" name="agentTypeId" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === agentType.id}"` },
-    })).join(""),
+    width: "content",
+    contentHtml: renderAgentTypePicker(agentTypes, {
+      attributes: item => `type="submit" name="agentTypeId" value="${escapeHtml(item.id)}" form="${selectionFormId}" role="menuitemradio" aria-checked="${item.id === agentType.id}"`,
+    }),
   });
   return `<turbo-frame id="${launchAgentTypeFrameId}">
     <form id="${selectionFormId}" method="get" action="/launch-composer/agent-type" data-turbo-frame="${launchAgentTypeFrameId}" hidden></form>

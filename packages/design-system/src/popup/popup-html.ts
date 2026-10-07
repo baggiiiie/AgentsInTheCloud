@@ -9,6 +9,8 @@ export interface PopupOptions {
   contentHtml: string;
   menuAttributesHtml?: string;
   placement?: "below" | "above";
+  /** Content-width menus can grow beyond the compact 340px limit, within the viewport. */
+  width?: "compact" | "content";
 }
 
 /** Preferred menu interface: owns the anchor, trigger, ARIA linkage and behavior. */
@@ -17,5 +19,5 @@ export function popupHtml(options: PopupOptions): string {
     type: "button",
     ...options.trigger,
     attributesHtml: `data-popup-menu-trigger aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeHtml(options.id)}" popovertarget="${escapeHtml(options.id)}" ${options.trigger.attributesHtml ?? ""}`,
-  })}${popupMenuHtml({ id: options.id, label: options.label, contentHtml: options.contentHtml, placement: options.placement ?? "below", attributesHtml: options.menuAttributesHtml })}</span>`;
+  })}${popupMenuHtml({ id: options.id, label: options.label, contentHtml: options.contentHtml, placement: options.placement ?? "below", attributesHtml: `${options.width === "content" ? 'data-popup-menu-width="content" ' : ""}${options.menuAttributesHtml ?? ""}` })}</span>`;
 }

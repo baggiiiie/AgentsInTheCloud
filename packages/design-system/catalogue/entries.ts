@@ -947,9 +947,20 @@ export const entries: CatalogueEntry[] = [
     title: "Popup",
     when: "Compact choices anchored to a disclosure. Prefer popupHtml: one call owns trigger, anchor, ARIA and native popover behavior.",
     contract:
-      "Unique id per instance. Items need menuitem or menuitemradio roles and native actions. Escape closes; arrows move through enabled items. Placement flips at viewport edges. Trigger captions stay on one line and truncate in constrained containers; menus expose the full choices. The package owns trigger linkage and positioning; trigger.attributesHtml and menuAttributesHtml connect application behavior without supplying class or style. Try the REAL viewport corners in the edge laboratory.",
+      "Unique id per instance. Items need menuitem or menuitemradio roles and native actions. Escape closes; arrows move through enabled items. Placement flips at viewport edges. Use width: \"content\" for wider comparisons; content remains bounded by the viewport. Trigger captions stay on one line and truncate in constrained containers; menus expose the full choices. The package owns trigger linkage and positioning; trigger.attributesHtml and menuAttributesHtml connect application behavior without supplying class or style. Try the REAL viewport corners in the edge laboratory.",
     imports: { popup: "popupHtml", "content-row": "contentRowHtml" },
     examples: [
+      {
+        title: "Content-width comparison · viewport bounded",
+        render: (idSuffix = "") => popupHtml({
+          id: `catalogue-popup-content${idSuffix}`, label: "Agent comparison", width: "content",
+          trigger: { variant: "secondary", content: { kind: "caption", caption: "Compare agents" } },
+          contentHtml: contentRowHtml({ kind: "multiline", width: "fill", label: { kind: "text", text: "Builtin" },
+            trailingHtml: '<span style="width: 420px; max-width: 60vw; white-space: normal">Pi Durable + rich inline rendering · All models</span>',
+            element: { tag: "button", attributesHtml: 'type="button" role="menuitem"' },
+          }),
+        }),
+      },
       {
         title: "Constrained trigger · single-line caption",
         render: (idSuffix = "") => `<div style="width: 180px; max-width: 100%">${popupHtml({

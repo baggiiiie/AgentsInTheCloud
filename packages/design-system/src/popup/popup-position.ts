@@ -68,7 +68,7 @@ export class PopupPosition {
       return;
     }
     const viewport: Bounds = { left: offsetLeft + gap, right: offsetLeft + width - gap, top: offsetTop + gap, bottom: offsetTop + height - gap };
-    this.menu.style.maxWidth = `${Math.min(340, width - gap * 2)}px`;
+    this.menu.style.maxWidth = `${Math.min(this.menu.dataset.popupMenuWidth === "content" ? Infinity : 340, width - gap * 2)}px`;
     this.menu.style.minWidth = `${this.placement === "adjacent" ? 0 : Math.min(anchor.width, width - gap * 2)}px`;
     const rtl = getComputedStyle(this.trigger).direction === "rtl";
     const position = (this.placement === "adjacent" ? this.adjacent(anchor, viewport, rtl) : undefined)
