@@ -8,6 +8,9 @@ import { copyTextToClipboard, type WorkspaceClientModule, type WorkspaceClientCo
 import { createDiffEndpointsController } from "./diff-endpoints-controller.ts";
 import { changesDiffOptions, wordDiffCSS } from "@agents-in-the-cloud/syntax/diff-options";
 
+const layoutStorageKey = "agents-in-the-cloud:changes-layout";
+const wrapStorageKey = "agents-in-the-cloud:changes-wrap";
+
 const viewerCSS = `${wordDiffCSS} [data-diffs-header] { background: var(--bg); }`;
 
 type FileSummary = { path: string };
@@ -51,7 +54,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     private abort?: AbortController;
     private options: CodeViewOptions<CommentAnnotation, undefined> = {};
     private layout: "unified" | "split" = "unified";
-    private wrap = false;
+    private wrap = true;
     private collapsed = false;
     private readonly headerMedia = window.matchMedia("(max-width: 700px), (pointer: coarse)");
     private get headerHeight(): number { return this.headerMedia.matches ? 58 : 36; }
@@ -80,8 +83,8 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     private async mount(): Promise<void> {
       this.collapsed = this.collapsedValue;
       const shell = this.element.closest<HTMLElement>(".changes-body")!;
-      this.layout = shell.dataset.changesLayout === "split" ? "split" : "unified";
-      this.wrap = shell.dataset.changesWrap === "true";
+      this.layout = localStorage.getItem(layoutStorageKey) === "split" ? "split" : "unified";
+      this.wrap = localStorage.getItem(wrapStorageKey) !== "false";
       for (const radio of this.element.querySelectorAll<HTMLElement>("[data-layout]")) radio.setAttribute("aria-checked", String(radio.dataset.layout === this.layout));
       this.element.querySelector('[data-action="changes#toggleWrap"]')!.setAttribute("aria-checked", String(this.wrap));
       // SAFETY: renderChanges emits this private model with type-matched loading items.
@@ -459,14 +462,15 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       const value = (event.currentTarget as HTMLButtonElement).dataset.layout;
       if (value !== "unified" && value !== "split") throw new Error("Unknown diff layout");
       this.layout = value;
-      this.element.closest<HTMLElement>(".changes-body")!.dataset.changesLayout = value;
+      localStorage.setItem(layoutStorageKey, value);
+      for (const radio of this.element.querySelectorAll<HTMLElement>("[data-layout]")) radio.setAttribute("aria-checked", String(radio.dataset.layout === value));
       this.options = { ...this.options, diffStyle: value };
       this.viewer?.setOptions(this.options);
     }
 
     toggleWrap(event: Event): void {
       this.wrap = !this.wrap;
-      this.element.closest<HTMLElement>(".changes-body")!.dataset.changesWrap = String(this.wrap);
+      localStorage.setItem(wrapStorageKey, String(this.wrap));
       // SAFETY: The wrap action is attached to the server-rendered checkbox menu item.
       (event.currentTarget as HTMLButtonElement).setAttribute("aria-checked", String(this.wrap));
       this.options = { ...this.options, overflow: this.wrap ? "wrap" : "scroll" };

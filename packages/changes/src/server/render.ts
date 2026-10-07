@@ -90,7 +90,7 @@ export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, colla
   const displayMenu = popupHtml({
     id: domId("changes", workspaceId, snapshot.id, "display"), label: "Display options",
     trigger: { variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Settings, label: "Display options" } },
-    contentHtml: `${layoutItem("unified", "Unified diff")}${layoutItem("split", "Side-by-side diff")}<hr class="popup-menu__separator">${contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: "Wrap long lines" }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: 'type="button" role="menuitemcheckbox" aria-checked="false" data-action="changes#toggleWrap"' } })}`,
+    contentHtml: `${layoutItem("unified", "Unified diff")}${layoutItem("split", "Side-by-side diff")}<hr class="popup-menu__separator">${contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: "Wrap long lines" }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: 'type="button" role="menuitemcheckbox" aria-checked="true" data-action="changes#toggleWrap"' } })}`,
   });
   const collapseIcons = `<span class="changes-collapse-icon">${Icons.CollapseAll}</span><span class="changes-expand-icon">${Icons.ExpandAll}</span>`;
   const headers = files.map((file) => `<template data-changes-header="${escapeHtml(file.path)}"><div class="changes-file-header" data-changes-edit-target="fileHeader">${contentRowHtml({
