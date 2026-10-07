@@ -17,7 +17,7 @@ export function restoreTemplateSettingsDestination(): boolean {
 
 /** Browser-owned draft, focus and navigation behavior; all settings markup comes from the server. */
 export class TemplateSettingsController extends Controller<HTMLElement> {
-  static targets = ["form", "discard", "frame", "content", "developer"];
+  static targets = ["form", "discard", "frame", "content", "developer", "colorPicker"];
   declare readonly developerTargets: HTMLElement[];
   private altPressed = false;
   declare readonly formTargets: HTMLFormElement[];
@@ -115,6 +115,26 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     // New edits restore the action immediately; the shared feedback timer never owns disabled state.
     if (!unchanged && !this.submissions) resetButtonConfirmation(button);
   }
+  colorPickerTargetConnected(picker: HTMLInputElement): void {
+    const color = picker.closest("form")!.querySelector<HTMLInputElement>('input[name="swatchColor"]')!.value;
+    // Canvas converts the existing OKLCH swatch to the native picker's sRGB hex format.
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = color || picker.dataset.defaultColor!;
+    picker.parentElement!.querySelector<HTMLElement>(".workspace-template-icon")!.style.setProperty("--workspace-template-swatch", color || picker.dataset.defaultColor!);
+    context.fillRect(0, 0, 1, 1);
+    picker.value = "#" + [...context.getImageData(0, 0, 1, 1).data].slice(0, 3).map(channel => channel.toString(16).padStart(2, "0")).join("");
+  }
+  colorChanged(event: Event): void {
+    // Wait for the native picker to commit so autosave does not interrupt color browsing.
+    if (event.type === "input") { event.stopPropagation(); return; }
+    // SAFETY: This change action is bound only to the native color input.
+    const picker = event.target as HTMLInputElement;
+    picker.closest("form")!.querySelector<HTMLInputElement>('input[name="swatchColor"]')!.value = picker.value;
+    picker.parentElement!.querySelector<HTMLElement>(".workspace-template-icon")!.style.setProperty("--workspace-template-swatch", picker.value);
+    this.changed(event);
+  }
   changed(event: Event): void {
     // SAFETY: These actions are bound only to inputs/toggles inside server-rendered forms.
     const form = (event.target as HTMLElement).closest("form")!;
@@ -143,6 +163,7 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     // SAFETY: Reset actions are bound to buttons inside editor forms.
     const form = (event.target as HTMLElement).closest("form")!;
     form.reset();
+    for (const picker of form.querySelectorAll<HTMLInputElement>('input[type="color"]')) this.colorPickerTargetConnected(picker);
     for (const toggle of form.querySelectorAll<HTMLElement>('[data-controller~="toggle"]')) {
       const name = toggle.querySelector<HTMLButtonElement>("button[name]")!.name;
       setToggleValue(toggle, form.querySelector<HTMLInputElement>(`input[type="hidden"][name="${CSS.escape(name)}"]`)!.value);

@@ -537,3 +537,9 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
 
 .app-settings-section-frame { display: block; min-width: 0; }
 .app-settings-overview > .app-settings-section-frame:empty { display: none; }
+
+.template-settings-color { display: flex; align-items: center; gap: 8px; width: fit-content; cursor: pointer; }
+.template-settings-color-control { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-control); }
+.template-settings-color-control:hover { background: var(--accent-soft); }
+.template-settings-color-control:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.template-settings-color-control input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }

@@ -41,6 +41,7 @@ export interface WorkspacePaneEntry {
 export interface WorkspacePaneWorkspaceTemplate {
   id: string;
   title: string;
+  swatchColor?: string;
   lastUsedAt?: number;
 }
 
@@ -103,9 +104,9 @@ export function workspaceTemplateSwatchColor(workspaceTemplateId: string): strin
   return `oklch(${[0.62, 0.7, 0.78][Math.floor(hash / 360) % 3]} 0.15 ${hash % 360})`;
 }
 
-function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id">): string {
+function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id" | "swatchColor">): string {
   return workspaceTemplate
-    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${workspaceTemplateSwatchColor(workspaceTemplate.id)}" aria-hidden="true"></span>`
+    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(workspaceTemplate.swatchColor ?? workspaceTemplateSwatchColor(workspaceTemplate.id))}" aria-hidden="true"></span>`
     : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
 }
 

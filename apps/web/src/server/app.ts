@@ -356,7 +356,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
 
   async function workspacePaneCollections(activeWorkspaceId: string): Promise<WorkspacePanePresentation> {
     const { workspaceTemplates: savedWorkspaceTemplates } = await listWorkspaceTemplates();
-    const workspaceTemplates: WorkspacePaneWorkspaceTemplate[] = savedWorkspaceTemplates.map(({ id, name, lastUsedAt }) => ({ id, title: name, lastUsedAt }));
+    const workspaceTemplates: WorkspacePaneWorkspaceTemplate[] = savedWorkspaceTemplates.map(({ id, name, lastUsedAt, swatchColor }) => ({ id, title: name, lastUsedAt, swatchColor }));
     const workspaceTemplatesById = new Map(workspaceTemplates.map((workspaceTemplate) => [workspaceTemplate.id, workspaceTemplate]));
     const workspaces = registry.list().map((entry) => {
       let workspaceTemplate: WorkspacePaneWorkspaceTemplate | undefined;

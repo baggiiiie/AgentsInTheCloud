@@ -78,6 +78,7 @@ const workspaceTemplateRecordSchema = Type.Object({
   /** Absent on templates added before this was recorded. */
   createdAt: Type.Optional(Type.Number()),
   lastWorkspaceCreatedAt: Type.Optional(Type.Number()),
+  swatchColor: Type.Optional(Type.String({ pattern: "^#[0-9a-fA-F]{6}$" })),
   secrets: Type.Optional(Type.Array(storedWorkspaceTemplateSecretSchema)),
   sshKeys: Type.Optional(Type.Array(storedWorkspaceTemplateSshKeySchema)),
   sshKnownHosts: Type.Optional(Type.String()),
@@ -209,6 +210,7 @@ function workspaceTemplateSummary(workspaceTemplate: WorkspaceTemplateRecord): W
     gitUrl: workspaceTemplate.gitUrl,
     branch: workspaceTemplate.branch,
     sessionShareKey: workspaceTemplate.sessionShareKey,
+    swatchColor: workspaceTemplate.swatchColor,
     createdAt: workspaceTemplate.createdAt,
     lastWorkspaceCreatedAt: workspaceTemplate.lastWorkspaceCreatedAt,
     lastUsedAt: Math.max(workspaceTemplate.createdAt ?? 0, workspaceTemplate.lastWorkspaceCreatedAt ?? 0) || undefined,
@@ -275,7 +277,7 @@ export async function recordWorkspaceCreation(workspaceTemplateId: string, creat
   });
 }
 
-export async function updateWorkspaceTemplate(id: string, values: { name: string; spec: string }, file = workspaceTemplatesFile()): Promise<UpdateWorkspaceTemplateResult> {
+export async function updateWorkspaceTemplate(id: string, values: { name: string; spec: string; swatchColor?: string }, file = workspaceTemplatesFile()): Promise<UpdateWorkspaceTemplateResult> {
   return await updateWorkspaceTemplateStore(file, (store) => {
     const workspaceTemplate = findWorkspaceTemplateRecord(store, id);
     const name = values.name.trim();
@@ -283,6 +285,11 @@ export async function updateWorkspaceTemplate(id: string, values: { name: string
     const { gitUrl, branch } = parseWorkspaceTemplateSpec(values.spec);
     if (store.workspaceTemplates.some((candidate) => candidate.id !== id && candidate.gitUrl === gitUrl && candidate.branch === branch)) {
       throw new AgentsInTheCloudCoreError("workspace_template_exists", `template already exists: ${formatWorkspaceTemplateSpec({ gitUrl, branch })}`);
+    }
+    if (values.swatchColor !== undefined) {
+      if (values.swatchColor !== "" && !/^#[0-9a-fA-F]{6}$/.test(values.swatchColor)) throw new AgentsInTheCloudCoreError("invalid_arguments", "Swatch color must be a six-digit hex color");
+      if (values.swatchColor === "") delete workspaceTemplate.swatchColor;
+      else workspaceTemplate.swatchColor = values.swatchColor.toLowerCase();
     }
     workspaceTemplate.name = name;
     workspaceTemplate.gitUrl = gitUrl;

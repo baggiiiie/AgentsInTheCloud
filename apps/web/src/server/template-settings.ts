@@ -11,6 +11,8 @@ import { buttonConfirmationHtml } from "@agents-in-the-cloud/design-system/butto
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts, listWorkspaceTemplateSshKeys, secretNeedsValue, workspaceTemplateSecretAllowsPath, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSecretSummary } from "@agents-in-the-cloud/workspace-templates";
 
+import { workspaceTemplateSwatchColor } from "./workspace-presentation.ts";
+
 export const templateSettingsHostId = "template_settings_host";
 export const templateSettingsFrameId = "template_settings_detail";
 export type TemplateSettingsSection = "index" | typeof sections[number];
@@ -103,7 +105,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
   if (editor && editor !== "new" && (section === "secrets" && !t.secrets.some(secret => secret.id === editor) || section === "environment" && !t.environment.some(variable => variable.id === editor) || section === "ssh" && editor !== "known-hosts" && !keys.some(key => key.id === editor))) throw invalidArguments("Settings record not found");
   const savedFor = (value: TemplateSettingsSection, record?: string) => saved && section === value && editor === record;
   const opened = (value: TemplateSettingsSection, record?: string) => section === value && (record === undefined || editor === record);
-  const general = form(id, "", `<div class="template-settings-inline-fields">${field("Display name", "name", t.name, 'required autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), "required")}</div>`, { section: "general", saved: savedFor("general"), autosave: true });
+  const general = form(id, "", `<div class="template-settings-inline-fields">${field("Display name", "name", t.name, 'required autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), "required")}</div><label class="template-settings-color"><span>Swatch color</span><input type="hidden" name="swatchColor" value="${escapeHtml(t.swatchColor ?? "")}"><span class="template-settings-color-control"><span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(t.swatchColor ?? workspaceTemplateSwatchColor(t.id))}" aria-hidden="true"></span><input type="color" name="swatchColorPicker" aria-label="Swatch color" data-template-settings-target="colorPicker" data-default-color="${workspaceTemplateSwatchColor(t.id)}" data-action="input->template-settings#colorChanged change->template-settings#colorChanged"></span></label>`, { section: "general", saved: savedFor("general"), autosave: true });
   const secrets = inlineDisclosure("secrets", undefined, "Secrets your agent may use but not see", `${paragraph("Agents use placeholders. Real values are substituted in requests to allowed hosts. Changes also apply to existing workspaces.")}<div class="template-settings-inline-records">${t.secrets.toSorted((a, b) => Number(secretNeedsValue(b)) - Number(secretNeedsValue(a))).map(secret => inlineDisclosure("secrets", secret.id, secret.envName, secretEditor(t, secret, savedFor("secrets", secret.id)), opened("secrets", secret.id))).join("")}${inlineDisclosure("secrets", "new", "Add secret", secretEditor(t), opened("secrets", "new"))}</div>`, opened("secrets"));
   const environmentEditor = (variable?: WorkspaceTemplateConfiguration["environment"][number]) => {
     const record = variable?.id ?? "new";

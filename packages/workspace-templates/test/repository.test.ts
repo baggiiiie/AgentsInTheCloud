@@ -64,6 +64,20 @@ describe("Workspace templates", () => {
     expect(result.workspaceTemplate).toMatchObject({ id: workspaceTemplate.id, name: "Renamed", gitUrl: "https://github.com/org/renamed.git", branch: "main", sessionShareKey: "Renamed" });
   });
 
+  test("custom swatch colors persist, survive unrelated updates, and can be cleared", async () => {
+    const file = join(await mkdtemp(join(tmpdir(), "template-colors-")), "projects.json");
+    const template = (await addWorkspaceTemplate("https://github.com/org/colors.git", file)).workspaceTemplate;
+    const values = { name: template.name, spec: template.gitUrl };
+    expect(template.swatchColor).toBeUndefined();
+    await updateWorkspaceTemplate(template.id, { ...values, swatchColor: "#Ab12Cd" }, file);
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBe("#ab12cd");
+    expect((await updateWorkspaceTemplate(template.id, values, file)).workspaceTemplate.swatchColor).toBe("#ab12cd");
+    await expect(updateWorkspaceTemplate(template.id, { ...values, swatchColor: "red" }, file)).rejects.toThrow("six-digit hex color");
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBe("#ab12cd");
+    await updateWorkspaceTemplate(template.id, { ...values, swatchColor: "" }, file);
+    expect((await listWorkspaceTemplates(file)).workspaceTemplates[0]!.swatchColor).toBeUndefined();
+  });
+
   test("Workspace template secrets are encrypted at rest and decryptable by the host", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-workspace-template-secrets-"));
     const file = join(dir, "projects.json");

@@ -115,16 +115,19 @@ export function createWorkspaceTemplateRoutes(deps: {
     const json = requestAcceptsJson(request);
     let name: string;
     let spec: string;
+    let swatchColor: string | undefined;
     if (json) {
       const body = await readJsonObject(request);
       name = requiredJsonString(body, "name");
       spec = requiredJsonString(body, "gitUrl");
+      swatchColor = optionalJsonString(body, "swatchColor");
     } else {
       const formData = await request.formData();
       name = String(formData.get("name") ?? "");
       spec = String(formData.get("gitUrl") ?? "");
+      if (formData.has("swatchColor")) swatchColor = String(formData.get("swatchColor"));
     }
-    const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec });
+    const { workspaceTemplate } = await updateWorkspaceTemplate(workspaceTemplateId, { name, spec, swatchColor });
     return workspaceTemplateSettingsResponse(request, { workspaceTemplate });
   }
 
