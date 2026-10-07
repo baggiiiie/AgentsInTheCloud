@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
 import { discoverGitHubToken } from "@agents-in-the-cloud/proxy-egress";
-import { escapeHtml, looksLikeWorkspaceTemplateSpec } from "@agents-in-the-cloud/shared";
+import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 
@@ -12,12 +12,10 @@ const githubRepositorySearchResponseSchema = Type.Object({
     description: Type.Union([Type.String(), Type.Null()]),
     private: Type.Boolean(),
     clone_url: Type.String(),
-    html_url: Type.String(),
-    default_branch: Type.String(),
   })),
 });
 
-const searchCache = new Map<string, { expiresAt: number; results: GitHubRepositorySearchResult[] }>();
+const searchCache = new Map<string, { expiresAt: number; results: GitHubRepositorySearchResults }>();
 const searchCacheMs = 60_000;
 
 export class GitHubRepositorySearchRateLimitError extends Error {
@@ -32,18 +30,45 @@ export interface GitHubRepositorySearchResult {
   description: string | null;
   private: boolean;
   cloneUrl: string;
-  htmlUrl: string;
-  defaultBranch: string;
+  personal: boolean;
 }
 
-export function shouldSearchGitHubRepositories(query: string): boolean {
-  const trimmed = query.trim();
-  return trimmed.length >= 2 && !looksLikeWorkspaceTemplateSpec(trimmed);
+export interface GitHubRepositorySearchResults {
+  repositories: GitHubRepositorySearchResult[];
+  personalSearchNotice?: string;
 }
 
-async function searchGitHubRepositoryPage(query: string, token: string | undefined): Promise<GitHubRepositorySearchResult[]> {
+class GitHubApiError extends Error {}
+
+function credentialKey(token: string | undefined): string {
+  return token ? createHash("sha256").update(token).digest("hex") : "public";
+}
+
+const ownerCache = new Map<string, { expiresAt: number; owners: string[] }>();
+
+async function repositoryOwners(token: string): Promise<string[]> {
+  const key = credentialKey(token);
+  const cached = ownerCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.owners;
+  const userSchema = Type.Object({ login: Type.String() });
+  const user = Value.Parse(userSchema, await (await fetchGitHub(new URL("https://api.github.com/user"), token)).json());
+  const owners = [user.login];
+  for (let page = 1; ; page++) {
+    const url = new URL("https://api.github.com/user/orgs");
+    url.searchParams.set("per_page", "100");
+    url.searchParams.set("page", String(page));
+    const orgs = Value.Parse(Type.Array(userSchema), await (await fetchGitHub(url, token)).json());
+    owners.push(...orgs.map((org) => org.login));
+    if (orgs.length < 100) break;
+  }
+  for (const [cacheKey, entry] of ownerCache) if (entry.expiresAt <= Date.now()) ownerCache.delete(cacheKey);
+  ownerCache.set(key, { expiresAt: Date.now() + searchCacheMs, owners });
+  return owners;
+}
+
+async function searchGitHubRepositoryPage(query: string, token: string | undefined, personal = false): Promise<GitHubRepositorySearchResult[]> {
   const url = new URL("https://api.github.com/search/repositories");
-  url.searchParams.set("q", `${query.trim()} in:name`);
+  url.searchParams.set("q", query);
   url.searchParams.set("per_page", "25");
 
   const response = await fetchGitHub(url, token);
@@ -53,8 +78,7 @@ async function searchGitHubRepositoryPage(query: string, token: string | undefin
     description: repo.description,
     private: repo.private,
     cloneUrl: repo.clone_url,
-    htmlUrl: repo.html_url,
-    defaultBranch: repo.default_branch,
+    personal,
   }));
 }
 
@@ -68,14 +92,27 @@ async function fetchGitHub(url: URL, token: string | undefined): Promise<Respons
   const response = await fetch(url, { headers });
   if (!response.ok) {
     const message = await response.text();
-    if (response.status === 403 || response.status === 429) throw new GitHubRepositorySearchRateLimitError(`GitHub repository search failed: ${response.status} ${message}`, Number(response.headers.get("retry-after") ?? undefined) || undefined);
-    throw new Error(`GitHub repository search failed: ${response.status} ${message}`);
+    if (response.status === 429 || (response.status === 403 && (response.headers.get("x-ratelimit-remaining") === "0" || /rate limit/i.test(message)))) throw new GitHubRepositorySearchRateLimitError(`GitHub repository search failed: ${response.status} ${message}`, Number(response.headers.get("retry-after") ?? undefined) || undefined);
+    throw new GitHubApiError(`GitHub repository search failed: ${response.status} ${message}`);
   }
 
   return response;
 }
 
-export async function searchGitHubRepositories(query: string): Promise<GitHubRepositorySearchResult[]> {
+async function searchPersonalRepositories(query: string, token: string | undefined): Promise<GitHubRepositorySearchResults> {
+  if (!token) return { repositories: [], personalSearchNotice: "Connect GitHub to search your personal and organization repositories." };
+  try {
+    const owners = await repositoryOwners(token);
+    const repositories = await searchGitHubRepositoryPage(`${query} ${owners.map((owner) => `user:${owner}`).join(" ")}`, token, true);
+    return { repositories };
+  } catch (error) {
+    if (error instanceof GitHubRepositorySearchRateLimitError) return { repositories: [], personalSearchNotice: "Your repositories could not be searched: GitHub is rate limited. Try again shortly." };
+    if (error instanceof GitHubApiError) return { repositories: [], personalSearchNotice: "Your repositories could not be searched. Check your GitHub connection and organization access." };
+    throw error;
+  }
+}
+
+export async function searchGitHubRepositories(query: string): Promise<GitHubRepositorySearchResults> {
   const now = Date.now();
   for (const [key, entry] of searchCache) {
     if (entry.expiresAt <= now) searchCache.delete(key);
@@ -83,16 +120,22 @@ export async function searchGitHubRepositories(query: string): Promise<GitHubRep
 
   const token = discoverGitHubToken();
   const normalized = query.trim().toLowerCase();
-  const credentialKey = token ? createHash("sha256").update(token).digest("hex").slice(0, 16) : "public";
-  const cacheKey = `${credentialKey}:${normalized}`;
+  const cacheKey = `${credentialKey(token)}:${normalized}`;
   const cached = searchCache.get(cacheKey);
   if (cached) return cached.results;
 
-  const nameQuery = normalized.replace(/[^a-z0-9]+/g, " ").trim();
-  const results = (await searchGitHubRepositoryPage(query, token))
-    .filter((repo) => nameQuery && repo.fullName.toLowerCase().replace(/[^a-z0-9]+/g, " ").includes(nameQuery))
-    .sort((a, b) => Number(b.private) - Number(a.private))
-    .slice(0, 12);
+  const [publicRepositories, personal] = await Promise.all([
+    searchGitHubRepositoryPage(`${query.trim()} is:public`, token),
+    searchPersonalRepositories(query.trim(), token),
+  ]);
+  const seen = new Set<string>();
+  const repositories = [...personal.repositories, ...publicRepositories].filter((repo) => {
+    const key = repo.fullName.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const results: GitHubRepositorySearchResults = { repositories, personalSearchNotice: personal.personalSearchNotice };
   searchCache.set(cacheKey, { expiresAt: Date.now() + searchCacheMs, results });
   return results;
 }
@@ -102,21 +145,27 @@ export function renderGitHubRepositorySearchRateLimitMenu(error: GitHubRepositor
   return autocompleteHtml({ kind: "message", content: { kind: "text", text: `GitHub search is rate limited.${wait}` } });
 }
 
-export function renderGitHubRepositorySearchMenu(repositories: readonly GitHubRepositorySearchResult[], query: string): string {
-  if (!shouldSearchGitHubRepositories(query)) return "";
-  if (repositories.length === 0) return autocompleteHtml({ kind: "message", content: { kind: "text", text: "No GitHub repositories" } });
-  return autocompleteHtml({ kind: "results", label: "GitHub repositories", contentHtml: repositories.map((repo, index) => {
-    const description = repo.description || repo.htmlUrl;
-    const visibility = repo.private ? " — Private repository" : "";
-    return contentRowHtml({
-      width: "fill",
-      kind: "compact",
-      label: { kind: "text", text: `${repo.fullName} — ${description}${visibility}` },
-      element: {
-        tag: "button",
-
-        attributesHtml: `type="button" role="option" aria-selected="${index === 0 ? "true" : "false"}" data-git-url="${escapeHtml(repo.cloneUrl)}" title="${escapeHtml(repo.htmlUrl)}"`,
-      },
-    });
-  }).join("") });
+export function renderGitHubRepositorySearchMenu(results: GitHubRepositorySearchResults): string {
+  const notice = results.personalSearchNotice ? autocompleteHtml({ kind: "message", role: "status", content: { kind: "text", text: results.personalSearchNotice } }) : "";
+  if (results.repositories.length === 0) return notice + autocompleteHtml({ kind: "message", content: { kind: "text", text: "No GitHub repositories" } });
+  const groups = [
+    { label: "Your repositories", repositories: results.repositories.filter((repo) => repo.personal) },
+    { label: "Public repositories", repositories: results.repositories.filter((repo) => !repo.personal) },
+  ];
+  return notice + groups.filter((group) => group.repositories.length > 0).map((group) => {
+    const heading = `<div class="workspace-template-github-heading">${escapeHtml(group.label)}</div>`;
+    return heading + autocompleteHtml({ kind: "results", label: group.label, contentHtml: group.repositories.map((repo) => {
+      const title = [repo.fullName, repo.description, repo.private ? "Private repository" : undefined].filter(Boolean).join(" — ");
+      return contentRowHtml({
+        width: "fill",
+        kind: "compact",
+        label: { kind: "text", text: repo.fullName },
+        trailingHtml: repo.private ? "<span>Private</span>" : undefined,
+        element: {
+          tag: "button",
+          attributesHtml: `type="button" role="option" aria-selected="false" data-git-url="${escapeHtml(repo.cloneUrl)}" title="${escapeHtml(title)}"`,
+        },
+      });
+    }).join("") });
+  }).join("");
 }

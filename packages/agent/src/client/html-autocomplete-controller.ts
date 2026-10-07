@@ -13,6 +13,8 @@ type HtmlAutocompleteOptions = {
   keydown?(event: KeyboardEvent, input: HTMLInputElement | HTMLTextAreaElement, url: string, actions: HtmlAutocompleteActions): boolean;
   loadingHtml?: string;
   triggerKeysWhenClosed?: string[];
+  /** Search only on an explicit button action or Enter, never on typing/caret movement. */
+  explicitSearch?: boolean;
   fullscreenShortcut?(option: HTMLElement): boolean;
   /** Return true when an event inside the menu has been handled. */
   menuEvent?(event: Event, input: HTMLInputElement | HTMLTextAreaElement): boolean | void;
@@ -66,8 +68,14 @@ export function createHtmlAutocompleteController(Controller: StimulusControllerC
       document.removeEventListener("selectionchange", this.selectionchange);
     }
 
+    search(): void {
+      this.inputTarget.focus();
+      this.scheduleRefresh(true);
+    }
+
     input(): void {
-      this.scheduleRefresh();
+      if (autocomplete.explicitSearch) this.close();
+      else this.scheduleRefresh();
     }
 
     keydown(event: KeyboardEvent): void {
@@ -81,6 +89,11 @@ export function createHtmlAutocompleteController(Controller: StimulusControllerC
         close: () => this.close(),
         refresh: (force = false) => this.scheduleRefresh(force),
       })) return;
+      if (autocomplete.explicitSearch && event.key === "Enter" && !event.isComposing && this.options().length === 0 && autocomplete.request(this.inputTarget, true)) {
+        event.preventDefault();
+        this.search();
+        return;
+      }
       if (this.menuTarget.hidden) {
         if (autocomplete.triggerKeysWhenClosed?.includes(event.key)) requestAnimationFrame(() => this.scheduleRefresh());
         return;
@@ -188,6 +201,7 @@ export function createHtmlAutocompleteController(Controller: StimulusControllerC
     private readonly submitted = (): void => this.close();
 
     private readonly selectionchange = (): void => {
+      if (autocomplete.explicitSearch) return;
       if (this.menuTarget.hidden || document.activeElement !== this.inputTarget || agentTreeOwnsMenu(this.menuTarget)) return;
       this.scheduleRefresh();
     };

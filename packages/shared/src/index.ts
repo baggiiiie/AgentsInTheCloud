@@ -51,6 +51,11 @@ export function looksLikeWorkspaceTemplateSpec(value: string): boolean {
   return /^(https?:\/\/|git@|ssh:\/\/|\/|\.\/|\.\.\/|[A-Za-z]:\\|github\.com\/)/i.test(value.trim());
 }
 
+export function shouldSearchGitHubRepositories(query: string): boolean {
+  const trimmed = query.trim();
+  return trimmed.length >= 2 && !looksLikeWorkspaceTemplateSpec(trimmed);
+}
+
 type TurboStreamAction = "append" | "prepend" | "before" | "replace" | "update" | "remove";
 
 export function turboStream(action: TurboStreamAction, target: string, html = "", options: { targets?: boolean; method?: "morph" } = {}): string {

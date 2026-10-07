@@ -2,13 +2,16 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitHubRepositorySearchRateLimitError, searchGitHubRepositories, shouldSearchGitHubRepositories } from "../src/server/github-repo-search.ts";
+import { GitHubRepositorySearchRateLimitError, searchGitHubRepositories } from "../src/server/github-repo-search.ts";
+
+import { shouldSearchGitHubRepositories } from "@agents-in-the-cloud/shared";
 
 const originalFetch = globalThis.fetch;
 let previousDataDir: string | undefined;
 let previousToken: string | undefined;
 let dataDir: string;
 let queries: string[];
+let requests: URL[];
 
 beforeEach(async () => {
   previousDataDir = process.env.ATELIER_DATA_DIR;
@@ -17,6 +20,7 @@ beforeEach(async () => {
   process.env.ATELIER_DATA_DIR = dataDir;
   process.env.GH_TOKEN = crypto.randomUUID();
   queries = [];
+  requests = [];
 });
 
 afterEach(async () => {
@@ -29,13 +33,19 @@ afterEach(async () => {
 });
 
 function repository(fullName: string, privateRepo = false) {
-  return { full_name: fullName, description: null, private: privateRepo, clone_url: `https://github.com/${fullName}.git`, html_url: `https://github.com/${fullName}`, default_branch: "main" };
+  return { full_name: fullName, description: null, private: privateRepo, clone_url: `https://github.com/${fullName}.git` };
 }
 
-function stubSearch(search: (query: string) => ReturnType<typeof repository>[]) {
+function stubSearch(search: (query: string) => ReturnType<typeof repository>[], orgs: (page: number) => { login: string }[] = () => [{ login: "my-org" }]) {
   globalThis.fetch = Object.assign(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
     const url = new URL(String(input));
+    requests.push(url);
     expect(new Headers(init?.headers).get("Authorization")).toBe(process.env.GH_TOKEN ? `Bearer ${process.env.GH_TOKEN}` : null);
+    if (url.pathname === "/user") return Response.json({ login: "me" });
+    if (url.pathname === "/user/orgs") {
+      expect(url.searchParams.get("per_page")).toBe("100");
+      return Response.json(orgs(Number(url.searchParams.get("page"))));
+    }
     expect(url.searchParams.get("per_page")).toBe("25");
     expect(url.pathname).toBe("/search/repositories");
     const query = url.searchParams.get("q")!;
@@ -51,31 +61,65 @@ test("explicit GitHub URLs bypass search while repository names remain searchabl
   expect(shouldSearchGitHubRepositories("Hello-World")).toBe(true);
 });
 
-test("one search prioritizes private repositories among 25 matches and displays at most 12", async () => {
-  stubSearch(() => [
-    ...Array.from({ length: 11 }, (_, index) => repository(`public/widget-${index}`)),
-    repository("private/widget", true),
-    ...Array.from({ length: 13 }, (_, index) => repository(`public/other-${index}`)),
+test("owner-scoped search puts personal and org repos first, including public ones, and deduplicates", async () => {
+  stubSearch((q) => q.includes("user:") ? [repository("me/widget"), repository("my-org/widget", true)] : [
+    ...Array.from({ length: 24 }, (_, index) => repository(`random/widget-${index}`)),
+    repository("me/widget"),
   ]);
-  const results = await searchGitHubRepositories("widget");
-  expect(results).toHaveLength(12);
-  expect(results[0]!.fullName).toBe("private/widget");
-  expect(results.slice(1).map((repo) => repo.fullName)).toEqual(Array.from({ length: 11 }, (_, index) => `public/widget-${index}`));
-  expect(queries).toEqual(["widget in:name"]);
+  const { repositories } = await searchGitHubRepositories("widget");
+  expect(repositories).toHaveLength(26);
+  expect(repositories.slice(0, 2).map((repo) => [repo.fullName, repo.personal])).toEqual([["me/widget", true], ["my-org/widget", true]]);
+  expect(repositories.slice(2).every((repo) => !repo.personal)).toBe(true);
+  expect(queries).toEqual(["widget is:public", "widget user:me user:my-org"]);
   await searchGitHubRepositories(" WIDGET ");
-  expect(queries).toHaveLength(1);
+  expect(queries).toHaveLength(2);
 });
 
-test("search excludes repositories whose names do not match the query", async () => {
-  stubSearch(() => [repository("some/not-a-repo"), repository("other/unrelated"), repository("other/not_a_repo")]);
-  expect((await searchGitHubRepositories("not-a-repo")).map((repo) => repo.fullName)).toEqual(["some/not-a-repo", "other/not_a_repo"]);
+test("general search preserves GitHub relevance rather than filtering to name substrings", async () => {
+  stubSearch((q) => q.includes("user:") ? [] : [repository("other/relevant-description"), repository("other/widget")]);
+  const results = await searchGitHubRepositories("widget language:typescript");
+  expect(results.repositories.map((repo) => repo.fullName)).toEqual(["other/relevant-description", "other/widget"]);
+  expect(queries[0]).toBe("widget language:typescript is:public");
 });
 
-test("anonymous searches use one request", async () => {
+test("anonymous searches use one request and explain that account search is unavailable", async () => {
   delete process.env.GH_TOKEN;
   stubSearch(() => [repository("public/anonymous-widget")]);
-  expect(await searchGitHubRepositories("anonymous-widget")).toHaveLength(1);
-  expect(queries).toEqual(["anonymous-widget in:name"]);
+  const results = await searchGitHubRepositories("anonymous-widget");
+  expect(results.repositories).toHaveLength(1);
+  expect(results.personalSearchNotice).toContain("Connect GitHub");
+  expect(queries).toEqual(["anonymous-widget is:public"]);
+  expect(requests).toHaveLength(1);
+});
+
+test("organization discovery follows pagination and is cached for the credential", async () => {
+  stubSearch(() => [], (page) => page === 1 ? Array.from({ length: 100 }, (_, i) => ({ login: `org${i}` })) : [{ login: "last-org" }]);
+  await searchGitHubRepositories("first");
+  expect(queries[1]).toContain("user:last-org");
+  await searchGitHubRepositories("second");
+  expect(requests.filter((url) => url.pathname === "/user")).toHaveLength(1);
+  expect(requests.filter((url) => url.pathname === "/user/orgs")).toHaveLength(2);
+});
+
+test("different credentials do not share cached private results or owners", async () => {
+  stubSearch((q) => q.includes("user:") ? [repository("me/private", true)] : []);
+  await searchGitHubRepositories("private");
+  process.env.GH_TOKEN = crypto.randomUUID();
+  await searchGitHubRepositories("private");
+  expect(queries).toHaveLength(4);
+  expect(requests.filter((url) => url.pathname === "/user")).toHaveLength(2);
+});
+
+test("failed account discovery leaves public search usable with an explicit notice", async () => {
+  stubSearch(() => [repository("public/widget")]);
+  const searchFetch = globalThis.fetch;
+  globalThis.fetch = Object.assign(async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    if (new URL(String(input)).pathname === "/user") return new Response("Bad credentials", { status: 401 });
+    return searchFetch(input, init);
+  }, { preconnect: originalFetch.preconnect });
+  const results = await searchGitHubRepositories("widget");
+  expect(results.repositories.map((repo) => repo.fullName)).toEqual(["public/widget"]);
+  expect(results.personalSearchNotice).toContain("could not be searched");
 });
 
 test("rate limits remain explicit and preserve the retry delay", async () => {

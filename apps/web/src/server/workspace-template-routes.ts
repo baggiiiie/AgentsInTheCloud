@@ -17,10 +17,10 @@ import {
   updateWorkspaceTemplateEnvironmentVariable, updateWorkspaceTemplateSecret,
   type WorkspaceTemplateEnvironmentVariable, type WorkspaceTemplateSecretInput, type WorkspaceTemplateSecretSummary, type WorkspaceTemplateSshKeySummary, type WorkspaceTemplateSummary,
 } from "@agents-in-the-cloud/workspace-templates";
-import { turboStreamResponse } from "@agents-in-the-cloud/shared";
+import { shouldSearchGitHubRepositories, turboStreamResponse } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
-import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories, shouldSearchGitHubRepositories } from "./github-repo-search.ts";
+import { GitHubRepositorySearchRateLimitError, renderGitHubRepositorySearchMenu, renderGitHubRepositorySearchRateLimitMenu, searchGitHubRepositories } from "./github-repo-search.ts";
 import { jsonResponse, matchRoute, replace, response, textResponse, update, wantsStream } from "@agents-in-the-cloud/shared/http";
 
 const jsonStringSchema = Type.String();
@@ -45,7 +45,8 @@ export function createWorkspaceTemplateRoutes(deps: {
   function newWorkspaceTemplateEditorBody(): string {
     const cancelButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Cancel" }, attributesHtml: 'data-action="dialog#close"' });
     const addButton = buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Add template" }, attributesHtml: 'data-turbo-submits-with="Adding…"' });
-    return `<div class="workspace-template-editor-body"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input"><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div>`;
+    const searchButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Search GitHub" }, attributesHtml: 'data-action="workspace-template-github-search#search"' });
+    return `<div class="workspace-template-editor-body"><form class="workspace-template-editor-new-form" aria-label="Add template" method="post" action="/workspace-templates" data-turbo="true" data-action="turbo:submit-end->dialog#submitted"><div><p>Save a remote URL, local path, or search for a GitHub repository.</p><div data-controller="workspace-template-github-search" data-workspace-template-github-search-url-value="/workspace-templates/github-search"><div class="workspace-template-github-search-field"><input class="text-field" name="gitUrl" placeholder="github.com/org/repo, or /path/to/repo#branch" required autofocus data-workspace-template-github-search-target="input" data-action="keydown->workspace-template-github-search#keydown input->workspace-template-github-search#input">${searchButton}</div><div class="floating-surface autocomplete-popover workspace-template-github-results" data-workspace-template-github-search-target="menu" hidden></div></div></div><footer>${cancelButton}${addButton}</footer></form></div>`;
   }
 
   async function workspaceTemplateEditorHtml(options: WorkspaceTemplateEditorOptions): Promise<string> {
@@ -309,9 +310,9 @@ export function createWorkspaceTemplateRoutes(deps: {
 
   async function githubRepositorySearchEndpoint(url: URL): Promise<Response> {
     const query = url.searchParams.get("q") ?? "";
+    if (!shouldSearchGitHubRepositories(query)) return response("");
     try {
-      const repositories = shouldSearchGitHubRepositories(query) ? await searchGitHubRepositories(query) : [];
-      return response(renderGitHubRepositorySearchMenu(repositories, query));
+      return response(renderGitHubRepositorySearchMenu(await searchGitHubRepositories(query)));
     } catch (error) {
       if (error instanceof GitHubRepositorySearchRateLimitError) return response(renderGitHubRepositorySearchRateLimitMenu(error), { status: 429 });
       throw error;

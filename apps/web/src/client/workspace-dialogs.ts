@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 import { createHtmlAutocompleteController, PromptHistoryNavigator } from "@agents-in-the-cloud/agent/client";
 import { composerViewportHeight, focusComposerText, revealComposerCaret, sizeComposer } from "@agents-in-the-cloud/prompt/client";
 import { autocompleteHtml } from "@agents-in-the-cloud/design-system/autocomplete";
-import { changeLayout, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, looksLikeWorkspaceTemplateSpec, softwareKeyboardArranged } from "@agents-in-the-cloud/shared";
+import { changeLayout, composerSubmitKey, focusLikelyOpensSoftwareKeyboard, isWorkspacePaneVisible, shouldSearchGitHubRepositories, softwareKeyboardArranged } from "@agents-in-the-cloud/shared";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { submitFormWithFirstButton } from "./form-submission.ts";
@@ -189,14 +189,13 @@ class ScrollIntoViewController extends Controller<HTMLElement> {
 const WorkspaceTemplateGithubSearchController = createHtmlAutocompleteController(Controller, {
   optionSelector: "[role=\"option\"]",
   loadingHtml: autocompleteHtml({ kind: "message", role: "status", content: { kind: "html", html: '<span class="agent-completion-spinner" aria-hidden="true"></span>Searching GitHub…' } }),
+  explicitSearch: true,
   request(input) {
     const query = input.value.trim();
-    if (query.length < 2 || looksLikeWorkspaceTemplateSpec(query)) return undefined;
-    return { query, debounceMs: 700 };
+    return shouldSearchGitHubRepositories(query) ? { query } : undefined;
   },
   select(option, input) {
-    const gitUrl = option.dataset.gitUrl;
-    if (!gitUrl) return;
+    const gitUrl = option.dataset.gitUrl!;
     input.value = gitUrl;
     input.setSelectionRange(gitUrl.length, gitUrl.length);
   },
