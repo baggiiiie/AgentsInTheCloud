@@ -37,7 +37,7 @@ export async function renderLaunchAgentType(agentType: WorkspaceAgentType, agent
 }
 
 /** The host owns text and attachments; Agent type switches replace only the settings footer. */
-export async function launchComposerContent(options: { draftId: string; agentType: WorkspaceAgentType; agentTypes: readonly WorkspaceAgentType[]; context: AgentLaunchFooterContext; workspaceTemplateId?: string }): Promise<AgentLaunchPresentation> {
+export async function launchComposerContent(options: { draftId: string; agentType: WorkspaceAgentType; agentTypes: readonly WorkspaceAgentType[]; context: AgentLaunchFooterContext; workspaceTemplateId?: string; initialPrompt: string }): Promise<AgentLaunchPresentation> {
   const { draftId } = options;
   const rowId = domId("agent_draft_attach", draftId);
   return {
@@ -45,7 +45,7 @@ export async function launchComposerContent(options: { draftId: string; agentTyp
     formAttributesHtml: 'data-action="submit->dictation-composer#submit keydown->submit-shortcut#keydown submit->submit-shortcut#submit turbo:submit-end->launch-composer-dialog#submitted turbo:submit-end->submit-shortcut#submitted"',
     bodyHtml: renderComposerBody({
       draft: { id: draftId, rowId },
-      inputHtml: `<textarea class="composer-input" name="text" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste"></textarea>`,
+      inputHtml: `<textarea class="composer-input" name="text" placeholder="Describe what you want the agent to do… (optional)" aria-label="Initial agent prompt" data-action="paste->agent-attachments#paste">${escapeHtml(options.initialPrompt)}</textarea>`,
     }),
     footerHtml: await renderLaunchAgentType(options.agentType, options.agentTypes, options.context),
     discardUrl: `/agent-attachment-drafts/${encodeURIComponent(draftId)}/discard`,
