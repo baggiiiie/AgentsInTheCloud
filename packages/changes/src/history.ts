@@ -58,7 +58,7 @@ export function endpointName(model: Pick<HistoryModel, "references">, id: string
 
 export function diffEndpointsDescription(model: HistoryModel, selected: ResolvedDiffEndpoints): string {
   if (model.unpushed && selected.target === workingTree && selected.base === model.unpushed.base) return `Unpushed changes · ${model.unpushed.count} ${model.unpushed.count === 1 ? "commit" : "commits"}`;
-  if (selected.target === workingTree && selected.base === model.head) return "Uncommitted changes";
+  if (selected.target === workingTree && selected.base === (model.head ?? null)) return model.branch ? `Uncommitted changes · ${model.branch}` : "Uncommitted changes";
   if (selected.target === workingTree && selected.base === stagedChanges) return "Unstaged changes";
   if (selected.target === stagedChanges && selected.base === (model.head ?? null)) return "Staged changes";
   if (selected.implicitBase) {

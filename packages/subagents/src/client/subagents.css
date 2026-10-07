@@ -1,4 +1,3 @@
-.builtin-agent-shell > .agent-composer-pane { --agent-inline-gutter: 8px; }
 .builtin-agent-shell .agent-transcript-region { flex-direction: column; }
 .subagents-control { flex: none; padding: 8px var(--agent-inline-gutter); min-height: 0; min-width: 0; }
 .subagents-control:has(> details:not([open])) { padding-block-end: 0; }

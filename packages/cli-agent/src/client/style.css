@@ -13,8 +13,9 @@
   .cli-agent-body .cli-transcript-view { padding-bottom:172px; }
 }
 .cli-agent-body:not(.cli-transcript-mode) [data-cli-terminal-target="transcriptEnd"] { display:none; }
-.cli-agent-body:not(.cli-transcript-mode) [data-action="cli-terminal#showTerminal"] { display:none; }
-.cli-agent-body:is(.cli-transcript-mode, :not(.cli-transcript-available)) [data-action~="cli-terminal#showTranscript"] { display:none; }
+.cli-agent-body:not(.cli-transcript-mode) [data-cli-transcript-button="terminal"] { display:none; }
+.cli-agent-body:not(.cli-transcript-pending) [data-cli-transcript-button="pending"] { display:none; }
+.cli-agent-body:is(.cli-transcript-mode, .cli-transcript-pending) [data-cli-transcript-button="transcript"] { display:none; }
 .cli-agent-body .cli-agent-composer {
   --agent-inline-gutter: 12px;
   flex:none;

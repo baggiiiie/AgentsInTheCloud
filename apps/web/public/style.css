@@ -441,6 +441,7 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 /* Host-owned launch dialog and provider settings. The explicit composer variant
    overrides shared editor defaults regardless of stylesheet load order. */
 .composer.launch-composer .composer-surface { border: 0; border-radius: 0; box-shadow: none; padding-bottom: 0; }
+.composer.launch-composer .composer-input { min-height: calc(6 * var(--composer-control-size) + 5 * var(--composer-button-gap) + 2 * var(--composer-control-inset)); }
 /* Host launch settings can wrap without hiding provider-specific controls. */
 .composer.launch-composer .composer-footer { position:relative; height:auto; min-height:var(--composer-footer-height); overflow:visible; padding:8px 12px; }
 /* Only LaunchComposer adopts keyboard geometry; other dialogs keep their layout. */

@@ -22,6 +22,7 @@ export interface HistoryModel {
   references: (ChangesRef & { id: string })[];
   endpoints: DiffEndpoints;
   head?: string;
+  branch?: string;
   upstream?: string;
   unpushed?: UnpushedHistory;
 }

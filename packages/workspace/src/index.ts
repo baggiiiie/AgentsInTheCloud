@@ -9,6 +9,7 @@ import { runHostObservableCommand, stripTerminalControls, tailTerminalText } fro
 import { errorMessage, isWorkspaceAppPort, workspaceGatewayPort, type WorkspaceGateway, type WorkspaceHttpAppBackend, type WorkspaceServerProvisioningHook } from "@agents-in-the-cloud/shared";
 import { inspectWorkspaceImage, resolveWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import { prepareWorkspaceSystemd } from "./systemd.ts";
+import { createWorkspaceContainerLifecycle, workspaceConfigurationLabel } from "./container-lifecycle.ts";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import { applySeedConfigManifest } from "./seed-config.ts";
@@ -94,10 +95,11 @@ async function waitForWorkspaceStartup(id: string): Promise<string> {
   throw new AgentsInTheCloudCoreError("workspace_startup_timeout", `workspace did not finish startup: ${id}${output ? `\n${output}` : ""}${log ? `\n\nStartup log:\n${log}` : ""}`);
 }
 
-async function validateWorkspaceContainer(id: string): Promise<void> {
+async function validateWorkspaceContainer(id: string): Promise<Record<string, string>> {
   assertValidWorkspaceId(id);
   const labels = await inspectLabels(id);
   if (labels[workspaceTypeLabel] !== "workspace" || labels[namespaceLabel] !== namespace()) throw new AgentsInTheCloudCoreError("workspace_not_found", `workspace not found: ${id}`);
+  return labels;
 }
 
 export async function resolveWorkspace(id: string): Promise<string> {
@@ -425,7 +427,7 @@ export async function createWorkspace(options: { id: string; events: AgentsInThe
       await events.emit("workspace_source_prepare", { workspaceId: id, init, context, workHostPath: source.worktreePath, workContainerPath: workspaceRoot });
     }, "retry");
     const activePlan = await run.step("workspace.plan", "Prepare workspace container plan", async () => {
-      const labels = { [workspaceTypeLabel]: "workspace", [namespaceLabel]: namespace(), [workspaceIdLabel]: id } satisfies Record<string, string>;
+      const labels = { [workspaceTypeLabel]: "workspace", [namespaceLabel]: namespace(), [workspaceIdLabel]: id, [workspaceConfigurationLabel]: "1" } satisfies Record<string, string>;
       const activePlan = baseWorkspacePlan(labels);
       plan = activePlan;
       const gatewayTokenPath = agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "gateway-token");
@@ -454,20 +456,19 @@ export async function createWorkspace(options: { id: string; events: AgentsInThe
     }
     const defaultWorkspaceFile = await run.step("workspace.preload-resolve", "Save configured preload images", () => workspaceImagePreloader.snapshot(activePlan.preloadImages, agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id)));
     if (defaultWorkspaceFile) activePlan.containerFiles.push({ source: dirname(defaultWorkspaceFile), target: "/etc" });
-    await run.step("workspace.container", "Start workspace container", async () => {
+    await run.step("workspace.container", "Create workspace container", async () => {
       await prepareWorkspaceSystemd(activePlan, agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "systemd"), workspaceInitScript(activePlan));
       const image = activePlan.image;
       if (!image) throw new AgentsInTheCloudCoreError("workspace_image_missing", "workspace image was not resolved");
       const container = workspaceContainerName(id);
+      await workspaceContainerLifecycle(id, true).snapshot(activePlan.containerFiles);
       await requireDocker(["network", "create", "--driver", "bridge", "--opt", `com.docker.network.bridge.name=${workspaceBridgeName(id)}`, "--label", `${workspaceTypeLabel}=workspace-network`, "--label", `${workspaceIdLabel}=${id}`, workspaceNetworkName(id)]);
       await requireDocker(workspaceCreateDockerArgs(container, image, activePlan));
-      for (const file of activePlan.containerFiles) await requireDocker(["cp", file.source, `${container}:${file.target}`]);
-      await requireDocker(["start", container]);
     });
     await run.step("workspace.startup", "Initialize workspace", async () => {
-      const log = await waitForWorkspaceStartup(id);
+      const log = await ensureWorkspaceStarted(id);
       run.report({ output: log });
-    }, "retry-or-continue");
+    }, "retry");
     await run.step("workspace.readiness", "Prepare workspace", async () => {
       await checkWorkspaceReadiness(id, (detail) => run.report({ detail }), (progress) => run.report(progress));
     }, "retry-or-continue");
@@ -602,10 +603,21 @@ export async function setWorkspaceTitle(id: string, title: string): Promise<null
   return null;
 }
 
-async function updateWorkspaceContainerRunning(id: string, running: boolean): Promise<void> {
-  const name = workspaceContainerName(id);
-  await requireDocker(running ? ["start", name] : ["stop", "--time", "10", name]);
+function workspaceContainerLifecycle(id: string, checkpointRequired: boolean) {
+  return createWorkspaceContainerLifecycle({
+    directory: agentsInTheCloudDataPath(getAgentsInTheCloudRuntimeContext(), "workspaces", id, "configuration"),
+    container: workspaceContainerName(id), checkpointRequired,
+    waitForStartup: () => waitForWorkspaceStartup(id),
+  });
+}
+
+/** Complete interrupted configuration before starting; never rerun planning hooks. */
+export async function ensureWorkspaceStarted(id: string): Promise<string> {
+  const labels = await validateWorkspaceContainer(id);
+  const lifecycle = workspaceContainerLifecycle(id, labels[workspaceConfigurationLabel] === "1");
+  const log = await lifecycle.ensureStarted();
   workspaceGatewayCache.delete(workspaceGatewayCacheKey(id));
+  return log;
 }
 
 /** Give the gateway 15 seconds to boot before reporting a recoverable startup failure. */
@@ -615,10 +627,10 @@ async function checkWorkspaceGateway(id: string): Promise<void> {
   if (result.exitCode !== 0) throw new AgentsInTheCloudCoreError("workspace_gateway_unavailable", `Workspace gateway did not become ready within 15 seconds.${result.stderr.trim() ? `\n${result.stderr.trim()}` : ""}`);
 }
 
-export async function setWorkspaceContainerRunning(id: string, running: boolean): Promise<null> {
+export async function stopWorkspaceContainer(id: string): Promise<void> {
   await validateWorkspaceContainer(id);
-  await updateWorkspaceContainerRunning(id, running);
-  return null;
+  await requireDocker(["stop", "--time", "10", workspaceContainerName(id)]);
+  workspaceGatewayCache.delete(workspaceGatewayCacheKey(id));
 }
 
 export async function setWorkspaceParked(id: string, parked: boolean): Promise<null> {
@@ -626,9 +638,13 @@ export async function setWorkspaceParked(id: string, parked: boolean): Promise<n
   const context = getAgentsInTheCloudRuntimeContext();
   await mkdir(workspaceMetadataDir(context, id), { recursive: true });
   const path = workspaceMetadataPath(context, id, parkedPath);
-  if (parked) await writeFile(path, "");
-  await updateWorkspaceContainerRunning(id, !parked);
-  if (!parked) await rm(path, { force: true });
+  if (parked) {
+    await writeFile(path, "");
+    await stopWorkspaceContainer(id);
+  } else {
+    await ensureWorkspaceStarted(id);
+    await rm(path, { force: true });
+  }
   return null;
 }
 

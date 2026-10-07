@@ -62,14 +62,14 @@ const sel = {
   followLatest: '.floating-stack :is([data-agent-pane-target="transcriptEnd"], [data-cli-terminal-target="transcriptEnd"])',
   terminal: ".observable-terminal-host",
   viewTranscript: '.floating-stack [data-action~="cli-terminal#showTranscript"]',
-  showTerminal: '.floating-stack [data-action~="cli-terminal#showTerminal"]',
+  showTerminal: '.floating-stack [data-cli-transcript-button="terminal"]',
   cliTranscript: ".cli-agent-body.cli-transcript-mode .cli-transcript-view .agent-transcript-content",
 };
 
 const bottom = (box: Box): number => box ? box[1] + box[3] : Number.NaN;
 /** Floating buttons keep the workspace bar's outer inset: 4px on mobile, 10px on desktop. */
 let floatingInset = 4;
-const floatingLabel = { opener: "Open composer", followLatest: "Follow latest" };
+const floatingLabel = { opener: "Open composer", followLatest: "Follow latest", pendingTranscript: "Will autoswitch to transcript when agent is done" };
 
 async function scenario(name: string, description: string, body: (recorder: ScenarioRecorder) => Promise<void>): Promise<void> {
   if (args.only && !new RegExp(args.only).test(name)) return;
@@ -135,7 +135,7 @@ async function closeComposer(): Promise<void> {
 }
 
 /** Floating stack slots, bottom to top. */
-const floatingOrder = [[floatingLabel.opener], ["View transcript", "Back to terminal"], [floatingLabel.followLatest]];
+const floatingOrder = [[floatingLabel.opener], ["View transcript", "Back to terminal", floatingLabel.pendingTranscript], [floatingLabel.followLatest]];
 
 function floatingStackChecks(frame: Frame, composerOpen: boolean, surface: Box = frame.transcript): ReturnType<typeof check>[] {
   const opener = frame.floating[floatingLabel.opener] ?? null;
@@ -314,17 +314,21 @@ await scenario("mobile-D2-send", "D2: sending on mobile closes the composer in o
 
 await page.navigate(piUrl, sel.terminal);
 await Bun.sleep(2500);
-// The view switch only appears once Pi has finished a turn.
-if (!await page.visible(sel.viewTranscript)) {
+// Selecting transcript can now queue autoswitch before Pi has a completed turn.
+await page.tap(sel.viewTranscript);
+await Bun.sleep(500);
+if (!await page.visible(sel.cliTranscript)) {
   log("giving Pi a turn");
   await openComposer();
   await resetComposerText();
   await page.tap(sel.input);
   await page.insertText("Reply with just the word OK.");
   await page.tap(".cli-agent-body .composer-send button");
-  await page.waitFor(sel.viewTranscript, 120_000);
+  await page.waitFor(sel.cliTranscript, 120_000);
   await page.evaluate<boolean>("(document.activeElement.blur(), true)");
 }
+await page.tap(sel.showTerminal);
+await Bun.sleep(400);
 
 await scenario("mobile-D14-terminal-focus", "D14: focusing the Pi terminal collapses the open composer (keeping its draft) in one step; the terminal moves, never resizes.", async (recorder) => {
   await openComposer();
@@ -378,7 +382,7 @@ await scenario("mobile-D18-frozen-send", "D18: sending while the frozen transcri
     check("D17: terminal not focused after send", !after.focus.includes("gespenst__input"), `focus: ${after.focus || "body"}`),
     // Use the same recorded working frame as the layout checks above. A short
     // reply can finish before transition() returns and legitimately restore the switch.
-    check("D18: no view switch while the agent works", !after.floating["View transcript"] && !after.floating["Back to terminal"], JSON.stringify(after.floating)),
+    check("D18: pending autoswitch shown while the agent works", Boolean(after.floating[floatingLabel.pendingTranscript]), JSON.stringify(after.floating)),
   );
   await page.waitFor(sel.cliTranscript, 120_000);
   recorder.add(check("D18: transcript returns when the turn finishes", await page.visible(sel.showTerminal), "Back to terminal shown"));
