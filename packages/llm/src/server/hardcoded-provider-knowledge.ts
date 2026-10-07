@@ -58,6 +58,10 @@ export function getPopularModelRank(provider: string, id: string): number | unde
   return known && !known.has(id) ? hardcodedPopularModels.length : undefined;
 }
 
+export const popularProviderIds: readonly string[] = [...new Set(hardcodedPopularModels.map(({ provider }) => provider))]
+  .filter((provider) => getPopularProviderRank(provider) !== undefined)
+  .sort((a, b) => getPopularProviderRank(a)! - getPopularProviderRank(b)!);
+
 export function getPopularProviderRank(provider: string): number | undefined {
   // Prefer Codex sign-in; OpenAI keeps its model defaults in the other providers list.
   if (provider === "openai") return undefined;

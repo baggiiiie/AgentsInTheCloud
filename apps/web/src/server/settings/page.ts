@@ -5,9 +5,9 @@ import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { destructiveConfirmationHtml } from "@agents-in-the-cloud/design-system/destructive-confirmation";
 import { Icons } from "@agents-in-the-cloud/design-system/icons";
-import { createPiModelRuntime, modelsDialogId, setEnabledModels } from "@agents-in-the-cloud/llm/server";
+import { createPiModelRuntime, modelsDialogId, popularProviderIds, setEnabledModels } from "@agents-in-the-cloud/llm/server";
 import { invalidArguments } from "@agents-in-the-cloud/core";
-import { errorMessage, escapeHtml } from "@agents-in-the-cloud/shared";
+import { errorMessage, escapeHtml, providerBadgeHtml } from "@agents-in-the-cloud/shared";
 import { clearGitHubToken } from "@agents-in-the-cloud/proxy-egress";
 import { agentsInTheCloudUrl } from "@agents-in-the-cloud/proxy-ingress";
 import { clearCommitIdentity, getStoredCommitIdentity, setCommitIdentity } from "@agents-in-the-cloud/workspace-templates";
@@ -117,7 +117,11 @@ export async function renderSettingsFrame(request: Request, sectionId?: string):
   const take = (...ids: string[]) => ids.map(id => { const html = inline.get(id) ?? ""; inline.delete(id); return html; }).join("");
   const disclosure = (id: string, label: string) => disclosureHtml({
     element: { id: `settings-sec-${id}`, attributesHtml: id === "developer-tools" ? 'hidden data-app-settings-target="developer"' : undefined }, open: sectionId === id,
-    summary: { kind: "compact", width: "fit", label: { kind: "text", text: label } },
+    summary: {
+      kind: id === "models" ? "multiline" : "compact",
+      label: { kind: "text", text: label },
+      trailingHtml: id === "models" ? popularProviderIds.map(provider => providerBadgeHtml(provider, provider, "settings-provider-icon")).join("") : undefined,
+    },
     bodyHtml: `<turbo-frame class="app-settings-section-frame" id="${sectionFrameId(id)}" src="/settings/sections/${id}" loading="lazy"><span role="status">Loading…</span></turbo-frame>`,
   });
   const content = `<div class="app-settings-overview">
