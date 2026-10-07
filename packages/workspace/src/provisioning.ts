@@ -42,11 +42,14 @@ export interface WorkspaceProvisioning {
   resume(workspaceId: string, action: "retry" | "continue"): string;
   delete(workspaceId: string): void;
   cancel(workspaceId: string): Promise<void>;
+  /** Stop admitting runs and wait for executing work; paused recovery is already idle. */
+  drain(): Promise<void>;
 }
 
 interface ProvisioningState {
   controller: AbortController;
   settled: ReturnType<typeof Promise.withResolvers<void>>;
+  idle: ReturnType<typeof Promise.withResolvers<void>>;
   status: "running" | "done" | "failed" | "cancelled";
   steps: WorkspaceProvisionStep[];
   startedAt: number;
@@ -58,6 +61,8 @@ interface ProvisioningState {
 /** Owns execution order, progress, and recovery. Consumers render snapshots, not event patches. */
 export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloudEventBus; onChange?: (workspaceId: string) => void; stepTimeoutMs?: number } = {}): WorkspaceProvisioning {
   const runs = new Map<string, ProvisioningState>();
+  const executing = new Set<ProvisioningState>();
+  let stopping = false;
   function cancel(id: string): Promise<void> {
     const run = runs.get(id);
     if (!run) return Promise.resolve();
@@ -75,19 +80,29 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
   }
   return {
     cancel,
+    async drain() {
+      stopping = true;
+      await Promise.all([...executing].filter((run) => !run.pending).map(async (run) => {
+        if (run.status !== "cancelled") await run.idle.promise;
+        // Pausing already resolved idle; cancellation still has to unwind cleanup.
+        if (run.status === "cancelled") await run.settled.promise;
+      }));
+    },
     snapshot(id) {
       const run = runs.get(id);
       if (!run) return undefined;
-      const { pending, startedAt, controller: _controller, settled: _settled, ...state } = run;
+      const { pending, startedAt, controller: _controller, settled: _settled, idle: _idle, ...state } = run;
       return structuredClone({ ...state, totalMs: state.totalMs ?? Math.round(performance.now() - startedAt), status: pending ? "waiting" : state.status, waiting: pending && { stepId: pending.stepId, retryable: pending.retryable, continuable: pending.continuable } });
     },
     resume(id, action) {
+      if (stopping) throw new Error("Workspace preparation is shutting down");
       const run = runs.get(id);
       if (!run?.pending) throw new AgentsInTheCloudCoreError("workspace_not_ready", `workspace ${id} is not waiting for provisioning confirmation`);
       const pending = run.pending;
       if (action === "continue" && !pending.continuable) throw invalidArguments("This step must succeed before continuing");
       if (action === "retry" && !pending.retryable) throw invalidArguments("This step does not support retry");
       run.pending = undefined;
+      run.idle = Promise.withResolvers<void>();
       pending.resolve(action);
       options.onChange?.(id);
       return pending.stepId;
@@ -97,9 +112,11 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
       runs.delete(id);
     },
     async run<T>(workspaceId: string, work: (run: WorkspaceProvisionRun) => Promise<T>): Promise<T> {
+      if (stopping) throw new Error("Workspace preparation is shutting down");
       if (runs.get(workspaceId)?.status === "running") throw new Error(`workspace ${workspaceId} already has an active provisioning run`);
-      const state: ProvisioningState = { controller: new AbortController(), settled: Promise.withResolvers<void>(), status: "running", steps: [], startedAt: performance.now() };
+      const state: ProvisioningState = { controller: new AbortController(), settled: Promise.withResolvers<void>(), idle: Promise.withResolvers<void>(), status: "running", steps: [], startedAt: performance.now() };
       runs.set(workspaceId, state);
+      executing.add(state);
       let active: WorkspaceProvisionStep | undefined;
       const changed = () => options.onChange?.(workspaceId);
       const checkCancelled = () => state.controller.signal.throwIfAborted();
@@ -147,6 +164,7 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
                 }
                 const pending = Promise.withResolvers<"retry" | "continue">();
                 state.pending = { stepId: id, retryable: recovery !== "continue", continuable: recovery !== "retry", resolve: pending.resolve };
+                state.idle.resolve();
                 changed();
                 const action = await pending.promise;
                 checkCancelled();
@@ -163,8 +181,8 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
       const unsubscribe = options.events?.on("workspace_provision_progress", ({ workspaceId: id, ...progress }) => {
         if (id === workspaceId) run.report(progress);
       });
-      changed();
       try {
+        changed();
         const result = await work(run);
         checkCancelled();
         state.totalMs = Math.round(performance.now() - state.startedAt);
@@ -179,7 +197,7 @@ export function createWorkspaceProvisioning(options: { events?: AgentsInTheCloud
           changed();
         }
         throw error;
-      } finally { unsubscribe?.(); state.settled.resolve(); }
+      } finally { unsubscribe?.(); executing.delete(state); state.settled.resolve(); state.idle.resolve(); }
     },
   };
 }

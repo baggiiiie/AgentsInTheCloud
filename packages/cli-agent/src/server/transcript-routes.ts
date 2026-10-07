@@ -80,7 +80,14 @@ interface CliTranscriptControls { viewSwitch?: string; followLatest?: string }
 export function renderCliTranscriptControls(adapter: CliAgentAdapter): CliTranscriptControls {
   if (!adapter.loadTranscript) return {};
   return {
-    viewSwitch: `${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Transcript, label: "View transcript" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTranscript" title="View transcript (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Terminal, label: "Back to terminal" }, attributesHtml: 'data-popular-button data-action="cli-terminal#showTerminal" title="Back to terminal (⌘⌥P)" aria-keyshortcuts="Meta+Alt+P"' })}`,
+    viewSwitch: [
+      { iconHtml: Icons.Transcript, label: "View transcript", state: "transcript", action: "showTranscript" },
+      { iconHtml: Icons.Terminal, label: "Back to terminal", state: "terminal", action: "showTerminal" },
+      { iconHtml: Icons.TranscriptPending, label: "Will autoswitch to transcript when agent is done", state: "pending", action: "showTerminal" },
+    ].map(({ iconHtml, label, state, action }) => buttonHtml({
+      type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml, label },
+      attributesHtml: `data-popular-button data-cli-transcript-button="${state}" data-action="cli-terminal#${action}" aria-keyshortcuts="Meta+Alt+P"`,
+    })).join(""),
     followLatest: renderFollowLatestButton('data-cli-terminal-target="transcriptEnd" data-action="cli-terminal#scrollToTranscriptEnd"'),
   };
 }

@@ -4,7 +4,7 @@ import { recoverWorkspaces } from "../src/server/workspace-recovery.ts";
 import { createWorkspaceRegistry } from "../src/server/workspace-registry.ts";
 
 const healthy = {
-  async setRunning() {}, async checkReadiness() {}, async imageOutdated() { return false; },
+  async ensureStarted() {}, async stop() {}, async checkReadiness() {}, async imageOutdated() { return false; },
 };
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -56,7 +56,7 @@ test("container failure fails only that workspace; image failures remain indepen
   const log = spyOn(console, "error").mockImplementation(() => {});
   try {
     await recoverWorkspaces(registry, { ...healthy, provisioning,
-      async setRunning(id) { if (id === "broken") throw new Error("missing mount"); },
+      async ensureStarted(id) { if (id === "broken") throw new Error("missing mount"); },
       async imageOutdated() { throw new Error("invalid image configuration"); },
     });
     expect(registry.get("broken")).toMatchObject({ phase: { kind: "provisioningPhase", status: "failed", error: "missing mount" } });
@@ -88,7 +88,7 @@ test("retry repeats only preparation and clears the warning on success", async (
   try {
     const recovery = recoverWorkspaces(registry, {
       ...healthy, provisioning,
-      async setRunning(id) { if (id === "retry") starts++; },
+      async ensureStarted(id) { if (id === "retry") starts++; },
       async checkReadiness(id) { if (id === "retry" && ++checks < 3) throw new Error("image cache not prepared yet"); },
     });
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -136,7 +136,7 @@ test("failure to retain a parked container leaves a non-busy provisioning failur
   await registry.seed([{ id: "parked", title: null, parked: true }]);
   const log = spyOn(console, "error").mockImplementation(() => {});
   try {
-    await recoverWorkspaces(registry, { ...healthy, provisioning, async setRunning() { throw new Error("Cannot stop container"); } });
+    await recoverWorkspaces(registry, { ...healthy, provisioning, async stop() { throw new Error("Cannot stop container"); } });
     expect(registry.get("parked")).toMatchObject({ parked: false, requestingAttention: true, phase: { kind: "provisioningPhase", status: "failed", busy: false, error: "Cannot stop container" } });
   } finally { log.mockRestore(); }
 });
@@ -162,4 +162,27 @@ test("runtime restoration waits for readiness and completes before the workspace
   restored.resolve();
   await recovery;
   expect(registry.get("active")?.phase.kind).toBe("runningPhase");
+});
+
+test("startup recovery finishes container configuration before readiness and never starts parked workspaces", async () => {
+  const registry = createWorkspaceRegistry();
+  const provisioning = createWorkspaceProvisioning();
+  await registry.seed([{ id: "partial", title: null }, { id: "healthy", title: null }, { id: "parked", title: null, parked: true }]);
+  const configured = Promise.withResolvers<void>();
+  const calls: string[] = [];
+  const recovery = recoverWorkspaces(registry, { ...healthy, provisioning,
+    async ensureStarted(id) { calls.push(`start:${id}`); if (id === "partial") await configured.promise; },
+    async stop(id) { calls.push(`stop:${id}`); },
+    async checkReadiness(id) { calls.push(`ready:${id}`); },
+  });
+  await tick();
+  expect(registry.get("partial")?.phase.kind).toBe("provisioningPhase");
+  expect(registry.get("healthy")?.phase.kind).toBe("runningPhase");
+  expect(calls).toContain("stop:parked");
+  expect(calls).not.toContain("start:parked");
+  expect(calls).not.toContain("ready:partial");
+  configured.resolve();
+  await recovery;
+  expect(calls.indexOf("start:partial")).toBeLessThan(calls.indexOf("ready:partial"));
+  expect(registry.get("partial")?.phase.kind).toBe("runningPhase");
 });

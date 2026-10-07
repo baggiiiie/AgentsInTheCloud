@@ -34,7 +34,8 @@ export function prepareWorkspaceForUse(id: string, registry: WorkspaceRegistry, 
 }
 
 interface RecoveryOperations extends WorkspaceReadinessOperations {
-  setRunning(id: string, running: boolean): Promise<null | void>;
+  ensureStarted(id: string): Promise<string | void>;
+  stop(id: string): Promise<null | void>;
   imageOutdated(id: string): Promise<boolean>;
 }
 
@@ -51,7 +52,7 @@ export async function recoverWorkspaces(
     const restore = async () => {
       try {
         await operations.provisioning.run(id, async (run) => {
-          await run.step("workspace.container", parked ? "Keep workspace parked" : "Start workspace container", () => operations.setRunning(id, !parked));
+          await run.step("workspace.container", parked ? "Keep workspace parked" : "Start workspace container", () => parked ? operations.stop(id) : operations.ensureStarted(id));
           if (!current() || parked) return;
           await prepare(id, registry, operations, run);
         });

@@ -225,3 +225,93 @@ test("required source preparation can retry but cannot be skipped", async () => 
   expect(attempts).toBe(2);
   expect(provisioning.snapshot("source")?.status).toBe("done");
 });
+
+test("shutdown draining waits for executing preparation and rejects new runs", async () => {
+  const provisioning = createWorkspaceProvisioning();
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const preparation = provisioning.run("active", async (run) => {
+    await run.step("configure", "Configure", async () => { entered.resolve(); await release.promise; });
+    await run.step("ready", "Ready", () => {});
+  });
+  await entered.promise;
+  let drained = false;
+  const shutdown = provisioning.drain().then(() => { drained = true; });
+  await Bun.sleep(0);
+  expect(drained).toBe(false);
+  await expect(provisioning.run("new", async () => {})).rejects.toThrow("shutting down");
+  release.resolve();
+  await Promise.all([preparation, shutdown]);
+  expect(provisioning.snapshot("active")?.status).toBe("done");
+});
+
+test("shutdown draining does not wait for user confirmation or admit retries", async () => {
+  const provisioning = createWorkspaceProvisioning();
+  const preparation = provisioning.run("paused", async (run) => {
+    await run.step("ready", "Ready", () => { throw new Error("not ready"); }, "retry-or-continue");
+  });
+  await Bun.sleep(0);
+  expect(provisioning.snapshot("paused")?.status).toBe("waiting");
+  await provisioning.drain();
+  expect(() => provisioning.resume("paused", "retry")).toThrow("shutting down");
+  const cancelled = preparation.catch((error: Error) => error);
+  await provisioning.cancel("paused");
+  expect(await cancelled).toHaveProperty("message", expect.stringContaining("cancelled"));
+});
+
+test("shutdown draining completes when executing work becomes paused", async () => {
+  const provisioning = createWorkspaceProvisioning();
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const preparation = provisioning.run("active", async (run) => {
+    await run.step("ready", "Ready", async () => { entered.resolve(); await release.promise; throw new Error("not ready"); }, "retry");
+  });
+  await entered.promise;
+  const shutdown = provisioning.drain();
+  release.resolve();
+  await shutdown;
+  expect(provisioning.snapshot("active")?.status).toBe("waiting");
+  const cancelled = preparation.catch((error: Error) => error);
+  await provisioning.cancel("active");
+  expect(await cancelled).toHaveProperty("message", expect.stringContaining("cancelled"));
+});
+
+for (const phase of ["active", "paused"] as const) for (const action of ["cancel", "delete"] as const) {
+  test(`shutdown waits for asynchronous cleanup after ${action} of ${phase === "active" ? "an" : "a"} ${phase} run`, async () => {
+    const entered = Promise.withResolvers<void>();
+    const paused = Promise.withResolvers<void>();
+    const interrupted = Promise.withResolvers<void>();
+    const cleanupEntered = Promise.withResolvers<void>();
+    const cleanup = Promise.withResolvers<void>();
+    const provisioning = createWorkspaceProvisioning({ onChange(id) {
+      if (provisioning.snapshot(id)?.waiting) paused.resolve();
+    } });
+    const preparation = provisioning.run("preparing", async (run) => {
+      try {
+        await run.step("ready", "Ready", async () => {
+          if (phase === "paused") throw new Error("not ready");
+          run.signal.addEventListener("abort", () => interrupted.resolve(), { once: true });
+          entered.resolve();
+          await interrupted.promise;
+        }, "retry");
+      } finally {
+        cleanupEntered.resolve();
+        await cleanup.promise;
+      }
+    }).catch((error: Error) => error);
+    await (phase === "paused" ? paused.promise : entered.promise);
+    const cancellation = provisioning[action]("preparing");
+    if (action === "delete") expect(provisioning.snapshot("preparing")).toBeUndefined();
+    await cleanupEntered.promise;
+    let drained = false;
+    const shutdown = provisioning.drain().then(() => { drained = true; });
+    try {
+      await Bun.sleep(0);
+      expect(drained).toBe(false);
+    } finally {
+      cleanup.resolve();
+      await Promise.all([cancellation, shutdown]);
+    }
+    expect(await preparation).toHaveProperty("message", expect.stringContaining("cancelled"));
+  });
+}

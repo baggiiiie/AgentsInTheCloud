@@ -16,7 +16,7 @@ import {
 } from "@agents-in-the-cloud/proxy-ingress/server";
 import { agentsInTheCloudName, errorMessage, type WorkspaceAppBackend, type WorkspaceAppRef, type WorkspaceServerAppResolver, type WorkspaceServerProvisioningHook, type WorkspaceServerSocketHandler, type WorkspaceServerSocketSession } from "@agents-in-the-cloud/shared";
 import { response, textResponse } from "@agents-in-the-cloud/shared/http";
-import { checkWorkspaceReadiness, createWorkspace, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, setWorkspaceContainerRunning, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
+import { checkWorkspaceReadiness, createWorkspace, ensureWorkspaceStarted, deleteWorkspace, ensureHostInotifyLimit, isWorkspaceRunning, listWorkspaces, resolveWorkspace, stopWorkspaceContainer, setWorkspaceParked, workspaceImageOutdated, workspacePortBackend, workspaceSetupProvisioningHook } from "@agents-in-the-cloud/workspace";
 import { ensureDefaultWorkspaceImage } from "@agents-in-the-cloud/workspace-image";
 import type { ServerWebSocket } from "bun";
 import { join } from "node:path";
@@ -60,7 +60,8 @@ const registry = createWorkspaceRegistry({
 });
 let app: WebApp;
 const workspaceStartupOperations = {
-  setRunning: setWorkspaceContainerRunning,
+  ensureStarted: ensureWorkspaceStarted,
+  stop: stopWorkspaceContainer,
   checkReadiness: checkWorkspaceReadiness,
   runtimeReady: (workspaceId: string) => agentsInTheCloudEvents.emit("workspace_runtime_ready", { workspaceId }),
   imageOutdated: (id: string) => workspaceImageOutdated(id, undefined, agentsInTheCloudEvents),
@@ -372,12 +373,13 @@ function resumeWorkspace(id: string): void {
   }).catch((error) => console.error(`Workspace startup failed for ${id}`, error));
 }
 
-// Release durable writer leases without turning host shutdown into user Stop.
+// Drain preparation before releasing durable writer leases; shutdown is not user Stop.
 let hostStopping = false;
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => {
   if (hostStopping) return;
   hostStopping = true;
-  void agentsInTheCloudEvents.emit("agents_in_the_cloud_host_stopping", {}).then(() => process.exit(0), error => {
+  server.stop();
+  void app.provisioning.drain().then(() => agentsInTheCloudEvents.emit("agents_in_the_cloud_host_stopping", {})).then(() => process.exit(0), error => {
     console.error("AgentsInTheCloud shutdown failed", error);
     process.exit(1);
   });

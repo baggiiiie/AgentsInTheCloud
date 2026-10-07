@@ -210,9 +210,9 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         if (data !== event.detail.data) event.target!.dispatchEvent(new Event("terminal-text-input:reset"));
       }
       resumeInput(): void { this.viewer?.setHistoryCursorHidden(false); }
-      get canToggleMode(): boolean { return this.transcriptAvailable; }
+      get canToggleMode(): boolean { return this.hasTranscriptTarget; }
       toggleMode(): void {
-        if (this.element.classList.contains("cli-transcript-mode")) {
+        if (this.transcriptMode) {
           this.showTerminal();
           this.focus();
         } else {
@@ -235,7 +235,7 @@ export const agentsInTheCloudClientModule: WorkspaceClientModule = {
         this.transcriptSubscription = window.AgentsInTheCloudCable!.subscribe(CableTopics.module(this.transcriptChannelValue, this.workspaceIdValue, this.transcriptMode ? { agentId, transcript: "shown" } : { agentId }));
       }
       private syncTranscript(): void {
-        this.element.classList.toggle("cli-transcript-available", this.transcriptAvailable);
+        this.element.classList.toggle("cli-transcript-pending", this.transcriptMode && !this.transcriptAvailable);
         const showing = this.transcriptMode && this.transcriptAvailable;
         if (showing === this.element.classList.contains("cli-transcript-mode")) return;
         this.element.classList.toggle("cli-transcript-mode", showing);
