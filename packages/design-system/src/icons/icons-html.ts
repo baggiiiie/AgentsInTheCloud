@@ -6,7 +6,7 @@ function iconHtml(paths: string): string {
 export const agentsInTheCloudBrandIconHtml = '<img class="agents-in-the-cloud-brand-icon" src="/agents-in-the-cloud-brand.png" width="24" height="24" alt="" aria-hidden="true">';
 
 /** The social-card A robot identifies Builtin agents, distinct from app branding. */
-export const builtinAgentIconHtml = '<img class="builtin-agent-icon" src="/builtin-agent.png" width="24" height="24" alt="" aria-hidden="true">';
+export const builtinAgentIconHtml = '<img class="builtin-agent-icon" src="/builtin-agent.png" width="20" height="24" alt="" aria-hidden="true">';
 
 /** Canonical decorative icons. Accessible names belong on the control or content that contains them. */
 export const Icons = {
