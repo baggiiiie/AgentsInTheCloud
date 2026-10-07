@@ -2,7 +2,7 @@ import { renderMarkdownEmbed } from "./embeds.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import MarkdownIt from "markdown-it";
-import { agentsInTheCloudFileHref } from "./agents-in-the-cloud-markdown.ts";
+import { agentsInTheCloudFileHref, workspaceFileImageSrc } from "./agents-in-the-cloud-markdown.ts";
 import { escapeHtml, isWorkspaceAppPort, isWorkspaceLoopbackHost, workspacePortAppKey, workspaceProxyUrl } from "@agents-in-the-cloud/shared";
 import { renderMarkdownDiff } from "@agents-in-the-cloud/syntax/markdown-diff";
 import { highlightCodeHtml } from "@agents-in-the-cloud/syntax";
@@ -108,6 +108,12 @@ markdown.renderer.rules.image = (tokens, index, options, environment: MarkdownEn
     provisional: environment.provisional ?? false,
   });
   if (embed !== undefined) return embed;
+  const src = workspaceFileImageSrc(environment.workspaceId, source, environment.sourcePath);
+  if (src) {
+    tokens[index]!.attrSet("src", src);
+    tokens[index]!.attrJoin("class", "agent-media-img");
+    tokens[index]!.attrSet("referrerpolicy", "no-referrer");
+  }
   return defaultImage(tokens, index, options, environment, renderer);
 };
 

@@ -24,20 +24,15 @@ To link to an editable text file anywhere in the workspace container's filesyste
 - \`[src/example.ts:42](agents-in-the-cloud://file/work/src/example.ts?line=42&column=1)\`
 - \`[plan.md](agents-in-the-cloud://file/tmp/plan.md)\`
 
-Whenever you are assigned an implementation task, you should carefully think what your user needs in order to evaluate your work.
+After every user request that made you write or change code, you should carefully think what your user needs in order to evaluate your work.
 That can be showing proof through screenshots. It can be by spinning up a dev server and using present tool to point the
 Browser view to it. It can be to start a program in a tmux session and use present to point a Terminal view to it.
-It can be by recording a video. You will optimize for your users evaluation convenience.`;
+It can be by recording a video. You will optimize for your users evaluation convenience, without the user having to explicitely ask for it`;
 
 /** Only AgentsInTheCloud's own transcript renders embed and file URLs. */
 export const agentsInTheCloudSystemPrompt = `${sharedAgentsInTheCloudInstructions}
 
-The AgentsInTheCloud web application makes it easy for the user to inspect files you have created. If you want the user
-to see an image, svg, video, or any other file on your disk inline in the conversation, emit a Markdown image with an AgentsInTheCloud embed URL like this:
-
-- \`![](artifact-preview:/work/app/screenshot.png)\`
-
-Use Markdown for prose and tables, and fenced Mermaid for static node-and-edge diagrams.
+Use Markdown for prose and tables, images, svg, and fenced Mermaid for static node-and-edge diagrams.
 For visual or interactive explanations inline in your reply, read /opt/agents-in-the-cloud/docs/inline-content.md,
 then reference an HTML fragment with \`![](inline-content:/work/explanation.html)\`. AgentsInTheCloud supplies the theme and sizing.
 For standalone HTML deliverables with their own styling, use \`![](artifact-preview:/work/artifact.html)\` instead; these can use JavaScript and CSS files.

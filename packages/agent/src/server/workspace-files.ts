@@ -48,7 +48,14 @@ export async function workspaceFileEndpoint(workspaceId: string, path: string, r
   const range = parseRange(request.headers.get("range"), size);
   const command = range ? `tail -c +${range.start + 1} ${quoted} | head -c ${range.end - range.start + 1}` : `cat ${quoted}`;
   const proc = Bun.spawn(["docker", "exec", container, "sh", "-c", command], { stdout: "pipe", stderr: "ignore" });
-  const headers = new Headers({ "content-type": mimeByExtension[extensionOf(path)] ?? "application/octet-stream", "accept-ranges": "bytes" });
+  const contentType = mimeByExtension[extensionOf(path)] ?? "application/octet-stream";
+  const headers = new Headers({ "content-type": contentType, "accept-ranges": "bytes", "x-content-type-options": "nosniff" });
+  if (contentType.startsWith("image/")) {
+    // SVGs are inert in <img>, but can also be navigated to directly. Keep that
+    // document sandboxed, script-free, and unable to load network resources.
+    headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'");
+    headers.set("referrer-policy", "no-referrer");
+  }
   if (range) {
     headers.set("content-range", `bytes ${range.start}-${range.end}/${size}`);
     headers.set("content-length", String(range.end - range.start + 1));

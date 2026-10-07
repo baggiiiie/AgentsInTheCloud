@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { agentsInTheCloudFileHref } from "../src/agents-in-the-cloud-markdown.ts";
+import { agentsInTheCloudFileHref, workspaceFileImageSrc } from "../src/agents-in-the-cloud-markdown.ts";
 
 function target(href: string, sourcePath?: string): URL | undefined {
   const resolved = agentsInTheCloudFileHref("workspace", href, sourcePath);
@@ -25,5 +25,26 @@ test("decodes filenames and preserves explicit file positions", () => {
 test("does not treat external URLs, anchors, or invalid paths as local files", () => {
   for (const href of ["https://example.com/image.png", "javascript:alert(1)", "data:text/html,test", "file://remote/work/image.png", "//example.com/image.png", "#section", "?query=1", "/work/%ZZ.png", "/work/%00.png", "agents-in-the-cloud://file/work/%00.png"]) {
     expect(target(href)).toBeUndefined();
+  }
+});
+
+test("resolves workspace image files to proxy URLs independent of image format", () => {
+  for (const extension of ["png", "jpg", "gif", "webp", "svg", "avif", "bmp"]) {
+    for (const source of [`/work/image.${extension}`, `image.${extension}`, `file:///work/image.${extension}`, `agents-in-the-cloud://file/work/image.${extension}`]) {
+      expect(workspaceFileImageSrc("work 1", source)).toBe(`/workspaces/work%201/files/work/image.${extension}`);
+    }
+  }
+  expect(workspaceFileImageSrc("workspace", "../image.svg", "/work/docs/README.md")).toBe("/workspaces/workspace/files/work/image.svg");
+});
+
+test("image proxy paths encode filenames and preserve query strings and SVG fragments", () => {
+  for (const source of ["/work/a%20b%23c.svg?v=2#diagram", "file:///work/a%20b%23c.svg?v=2#diagram", "agents-in-the-cloud://file/work/a%20b%23c.svg?v=2#diagram"]) {
+    expect(workspaceFileImageSrc("workspace", source)).toBe("/workspaces/workspace/files/work/a%20b%23c.svg?v=2#diagram");
+  }
+});
+
+test("image file resolution leaves non-file URLs and invalid paths untouched", () => {
+  for (const source of ["https://example.com/image.svg", "http://localhost:4000/image.svg", "//example.com/image.png", "data:image/png;base64,aGVsbG8=", "javascript:alert(1)", "file://remote/work/image.svg", "#diagram", "?v=2", "/work/%ZZ.svg", "/work/%00.svg"]) {
+    expect(workspaceFileImageSrc("workspace", source)).toBeUndefined();
   }
 });
