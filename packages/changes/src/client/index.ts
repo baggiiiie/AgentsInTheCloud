@@ -18,8 +18,10 @@ type FileSummary = { path: string };
 function createChangesController(Controller: WorkspaceClientControllerConstructor) {
   return class ChangesController extends Controller {
     declare readonly element: HTMLElement;
-    static targets = ["viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
+    static targets = ["imageFile", "imageHost", "viewer", "model", "error", "errorMessage", "collapseToggle", "commentGutter", "commentEditor", "commentCard", "commentsModel", "listEditor", "orphanHost", "orphanDisclosure", "orphanContent"];
     static values = { workspaceId: String, snapshotId: String, collapsed: Boolean };
+    declare readonly imageFileTargets: HTMLDetailsElement[];
+    declare readonly imageHostTarget: HTMLElement;
     declare readonly viewerTarget: HTMLElement;
     declare readonly modelTarget: HTMLScriptElement;
     declare readonly errorTarget: HTMLElement;
@@ -71,7 +73,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     disconnect(): void {
       this.headerMedia.removeEventListener("change", this.resizeHeaders);
       this.abort?.abort();
-      if (this.viewer) this.viewerTarget.appendChild(this.orphanHostTarget);
+      if (this.viewer) { this.viewerTarget.appendChild(this.imageHostTarget); this.viewerTarget.appendChild(this.orphanHostTarget); }
       this.viewer?.cleanUp();
       this.viewer = undefined;
       this.loaded.clear();
@@ -88,10 +90,13 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       for (const radio of this.element.querySelectorAll<HTMLElement>("[data-layout]")) radio.setAttribute("aria-checked", String(radio.dataset.layout === this.layout));
       this.element.querySelector('[data-action="changes#toggleWrap"]')!.setAttribute("aria-checked", String(this.wrap));
       // SAFETY: renderChanges emits this private model with type-matched loading items.
-      const model = JSON.parse(this.modelTarget.textContent!) as { files: FileSummary[]; items: CodeViewItem<CommentAnnotation>[] };
-      this.files = model.files;
+      const model = JSON.parse(this.modelTarget.textContent!) as { items: CodeViewItem<CommentAnnotation>[]; files: (FileSummary & { image: boolean })[] };
+      this.files = model.files.filter(file => !file.image);
+      // SAFETY: The edit controller transfers only file disclosure booleans in this presentation model.
+      const disclosure = new Map(Object.entries(JSON.parse(shell.dataset.changesFileCollapse ?? "{}") as Record<string, boolean>));
+      for (const image of this.imageFileTargets) image.open = !(disclosure.get(image.dataset.changesImage!) ?? this.collapsed);
       for (const item of model.items) if (item.type === "file") this.loaded.add(item.id);
-      if (!this.files.length) { this.syncCollapseControl(); return; }
+      if (!model.files.length) { this.syncCollapseControl(); return; }
       const abort = this.abort = new AbortController();
       const [{ CodeView }] = await Promise.all([import("@pierre/diffs"), import("@agents-in-the-cloud/syntax/pierre")]);
       if (abort.signal.aborted) return;
@@ -109,6 +114,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
           return button;
         },
         renderAnnotation: (annotation) => this.renderComment(annotation.metadata),
+        renderCodeViewHeader: () => this.imageHostTarget,
         renderCodeViewFooter: () => this.orphanHostTarget,
         diffStyle: this.layout,
         overflow: this.wrap ? "wrap" : "scroll",
@@ -125,14 +131,11 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       };
       this.viewer = new CodeView<CommentAnnotation, undefined>(this.options);
       this.viewer.setup(this.viewerTarget);
-      // SAFETY: The edit controller stores only file disclosure booleans in this presentation model.
-      const disclosure = new Map(Object.entries(JSON.parse(shell.dataset.changesFileCollapse ?? "{}") as Record<string, boolean>));
       this.viewer.setItems(model.items.map((item) => ({ ...item, collapsed: disclosure.get(item.id) ?? this.collapsed })));
       const scroll = Number(shell.dataset.changesScroll ?? 0);
       delete shell.dataset.changesFileCollapse;
       delete shell.dataset.changesScroll;
       requestAnimationFrame(() => { this.viewerTarget.scrollTop = scroll; });
-      this.syncCollapseControl();
       for (const path of this.loaded) this.updateComments(path);
       this.syncCollapseControl();
     }
@@ -199,11 +202,14 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
       this.syncCollapseControl();
     }
 
+    imageToggled(): void { this.syncCollapseControl(); }
+
     private syncCollapseControl(): void {
       // Mixed states offer Collapse all; Expand all is only useful once everything is closed.
-      this.collapsed = (this.files.length > 0 || this.hasOrphanDisclosureTarget)
+      this.collapsed = (this.files.length > 0 || this.imageFileTargets.length > 0 || this.hasOrphanDisclosureTarget)
         && (!this.hasOrphanDisclosureTarget || !this.orphansOpen)
-        && this.files.every((file) => this.viewer!.getItem(file.path)!.collapsed === true);
+        && this.imageFileTargets.every(image => !image.open)
+        && this.files.every(file => this.viewer?.getItem(file.path)?.collapsed === true);
       if (!this.hasCollapseToggleTarget) return;
       this.collapseToggleTarget.disabled = false;
       this.collapseToggleTarget.dataset.collapsed = String(this.collapsed);
@@ -480,6 +486,7 @@ function createChangesController(Controller: WorkspaceClientControllerConstructo
     toggleCollapse(): void {
       this.syncCollapseControl();
       this.collapsed = !this.collapsed;
+      for (const image of this.imageFileTargets) image.open = !this.collapsed;
       for (const file of this.files) {
         const item = this.viewer?.getItem(file.path);
         if (item) this.viewer!.updateItem({ ...item, collapsed: this.collapsed, version: (item.version ?? 0) + 1 });

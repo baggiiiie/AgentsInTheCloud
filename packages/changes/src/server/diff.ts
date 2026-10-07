@@ -1,3 +1,4 @@
+import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
 import { isUtf8 } from "node:buffer";
 import { parseDiffFromFile, type FileContents, type FileDiffMetadata } from "@pierre/diffs";
 import { git, parseGitStatus, parseGitNumstat, type GitStatusEntry, type GitNumstat, type Repository } from "@agents-in-the-cloud/workspace/git";
@@ -5,6 +6,8 @@ import { maxChangesTextBytes, maxChangesTextLines } from "../editing.ts";
 
 type ChangesFileKind = "text" | "binary" | "large" | "mode";
 type ChangesFileChange = "added" | "modified" | "removed";
+
+interface ChangesImage { contents: Buffer; contentType: string }
 
 export interface ChangesFile {
   path: string;
@@ -16,6 +19,7 @@ export interface ChangesFile {
   diff?: FileDiffMetadata;
   detail?: string;
   newMode?: string;
+  images?: { before?: ChangesImage; after?: ChangesImage };
 }
 
 export type ChangesFileSummary = {
@@ -62,6 +66,11 @@ async function modes(root: Repository, entry: GitStatusEntry): Promise<{ oldMode
   return {};
 }
 
+function captureImage(path: string, contents: Buffer | undefined, mode?: string): ChangesImage | undefined {
+  const contentType = imageMimeByExtension[extensionOf(path)];
+  return contents !== undefined && contentType && mode !== "120000" ? { contents, contentType } : undefined;
+}
+
 function changesFileFromContents(
   entry: GitStatusEntry,
   oldBuffer: Buffer | undefined,
@@ -73,6 +82,9 @@ function changesFileFromContents(
   const base: Pick<ChangesFile, "path" | "previousPath" | "change" | "newMode"> = { path: entry.path, change, newMode: modes.newMode };
   if (entry.previousPath) base.previousPath = entry.previousPath;
   if (oldBuffer === undefined && newBuffer === undefined) return undefined;
+  const before = captureImage(oldPath, oldBuffer, modes.oldMode);
+  const after = captureImage(entry.path, newBuffer, modes.newMode);
+  if (before || after) return { ...base, kind: "binary", images: { before, after } };
   const oldText = decodeText(oldBuffer);
   const newText = decodeText(newBuffer);
   if ((oldBuffer && oldText === undefined) || (newBuffer && newText === undefined)) return { ...base, kind: "binary", detail: "Binary file changed" };

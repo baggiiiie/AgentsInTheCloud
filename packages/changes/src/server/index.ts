@@ -149,13 +149,21 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
     if (match) return request.method === "GET" ? await deletionReviewFileResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
     match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/deletion\/commit$/);
     if (match) return request.method === "GET" ? await deletionReviewCommitResponse(match[0]!, url) : textResponse("Method not allowed", { status: 405 });
-    match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/file$/);
+    match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/(file|image)$/);
     if (match) {
       if (request.method !== "GET") return textResponse("Method not allowed", { status: 405 });
       const { snapshot } = await current(match[0]!);
       if (url.searchParams.get("snapshot") !== snapshot.id) return textResponse("This comparison has changed. Reopen Changes to load the current snapshot.", { status: 409 });
       const file = snapshot.files.get(url.searchParams.get("path") ?? "");
-      return file ? response(renderChangesFile(file, snapshot.id, snapshot.endpoints.target === "working")) : textResponse("Changed file not found", { status: 404 });
+      if (!file) return textResponse("Changed file not found", { status: 404 });
+      if (match[1] === "file") return response(renderChangesFile(file, snapshot.id, snapshot.endpoints.target === "working"));
+      const side = url.searchParams.get("side");
+      if (side !== "before" && side !== "after") return textResponse("Invalid image side", { status: 400 });
+      const image = file.images?.[side];
+      return image ? new Response(new Uint8Array(image.contents), { headers: {
+        "Content-Type": image.contentType, "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+      } }) : textResponse("Image not found", { status: 404 });
     }
     match = matchRoute(url, /^\/workspaces\/([^/]+)\/changes\/history$/);
     if (match) {

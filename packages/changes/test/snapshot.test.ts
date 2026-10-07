@@ -66,3 +66,35 @@ test("handles clean and non-Git directories", async () => {
   roots.push(empty);
   expect((await captureChanges(localRepository(empty))).index.phase).toBe("not-git");
 });
+
+test("image comparisons capture immutable before/after bytes, including renamed, added, deleted and staged images", async () => {
+  const root = await repository();
+  const before = Buffer.from([137, 80, 78, 71, 0, 1]);
+  const after = Buffer.from([137, 80, 78, 71, 0, 2]);
+  await writeFile(join(root, "card.PNG"), before);
+  await writeFile(join(root, "removed.png"), before);
+  await writeFile(join(root, "rename.png"), Buffer.concat([before, Buffer.from("rename")]));
+  await git(root, "add", ".");
+  await git(root, "commit", "-m", "Images");
+  await git(root, "mv", "rename.png", "renamed.png");
+  await writeFile(join(root, "card.PNG"), after);
+  await writeFile(join(root, "added.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  await rm(join(root, "removed.png"));
+  await git(root, "add", ".");
+  const snapshot = await captureChanges(localRepository(root));
+  const image = snapshot.files.get("card.PNG")!;
+  expect(image.kind).toBe("binary");
+  expect(image.diff).toBeUndefined();
+  expect(image.images?.before).toEqual({ contents: before, contentType: "image/png" });
+  expect(image.images?.after).toEqual({ contents: after, contentType: "image/png" });
+  expect(snapshot.files.get("added.svg")!.images?.before).toBeUndefined();
+  expect(snapshot.files.get("added.svg")!.images?.after?.contentType).toBe("image/svg+xml");
+  expect(snapshot.files.get("removed.png")!.images?.before?.contents).toEqual(before);
+  expect(snapshot.files.get("removed.png")!.images?.after).toBeUndefined();
+  expect(snapshot.files.get("renamed.png")!.previousPath).toBe("rename.png");
+  expect(snapshot.files.get("renamed.png")!.images?.before?.contents).toEqual(Buffer.concat([before, Buffer.from("rename")]));
+  await writeFile(join(root, "card.PNG"), Buffer.from([0, 3]));
+  expect(image.images?.after?.contents).toEqual(after);
+  const staged = await captureChanges(localRepository(root), { target: "staged" }, snapshot.history);
+  expect(staged.files.get("card.PNG")!.images?.after?.contents).toEqual(after);
+});

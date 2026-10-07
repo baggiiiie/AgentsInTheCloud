@@ -1,3 +1,4 @@
+import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { canEditFile, type EditModel } from "../editing.ts";
 import { renderEditFeedback, renderFileEditActions } from "./editing-render.ts";
 import { workingTree } from "./snapshot.ts";
@@ -73,16 +74,45 @@ export function renderChangesFile(file: ChangesFile, snapshotId: string, editabl
   return `<script type="application/json" data-changes-file>${json(item)}</script>`;
 }
 
+function renderRename(file: Pick<ChangesFile, "previousPath">): string {
+  return file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : "";
+}
+
+const imageStatus = {
+  added: { label: "Added", color: "changes-additions" },
+  removed: { label: "Removed", color: "changes-deletions" },
+  modified: { label: "Modified", color: "changes-rename" },
+};
+
+function renderImageFile(workspaceId: string, snapshot: ChangesSnapshot, file: ChangesFile, collapsed: boolean): string {
+  const sides = (["before", "after"] as const).filter(side => !(file.change === "added" && side === "before") && !(file.change === "removed" && side === "after"));
+  const figures = sides.map(side => {
+    const image = file.images![side];
+    const label = side === "before" ? "Before" : "After";
+    const query = new URLSearchParams({ snapshot: snapshot.id, path: file.path, side });
+    const src = `/workspaces/${encodeURIComponent(workspaceId)}/changes/image?${query}`;
+    return `<figure><figcaption>${label}<span>${escapeHtml(side === "before" ? snapshot.baseLabel : snapshot.targetLabel)}</span></figcaption><div class="changes-image-canvas">${image ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(`${file.path} — ${label.toLowerCase()}`)}" loading="lazy" decoding="async">` : "<span>No image preview</span>"}</div></figure>`;
+  }).join("");
+  const status = imageStatus[file.change];
+  return `<div class="changes-image-file">${disclosureHtml({
+    open: !collapsed,
+    element: { attributesHtml: `data-changes-target="imageFile" data-changes-image="${escapeHtml(file.path)}" data-action="toggle->changes#imageToggled"` },
+    summary: { width: "fill", kind: "compact", label: { kind: "text", text: file.path }, trailingHtml: `${renderRename(file)}<span class="changes-file-stats"><span class="${status.color}">${status.label}</span></span>` },
+    bodyHtml: `<div class="changes-image-comparison">${figures}</div>`,
+  })}</div>`;
+}
+
 export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, collapsed: boolean): string {
   const comments = placeReviewComments(reviewComments.list(workspaceId), snapshot);
-  const files = snapshot.stats.map(file => ({ ...file, editable: snapshot.endpoints.target === workingTree && canEditFile(snapshot.files.get(file.path)!) }));
-  const items: CodeViewItem<undefined>[] = files.map((file) => {
+  const files = snapshot.stats.map(file => ({ ...file, image: !!snapshot.files.get(file.path)!.images, editable: snapshot.endpoints.target === workingTree && canEditFile(snapshot.files.get(file.path)!) }));
+  const items: CodeViewItem<undefined>[] = files.filter(file => !file.image).map((file) => {
     const captured = snapshot.files.get(file.path)!;
     if (!captured.diff) return fileItem(captured, snapshot.id, 0, file.editable);
     const loadingDiff = parseDiffFromFile({ name: file.previousPath ?? file.path, contents: "" }, { name: file.path, contents: "Loading diff…", lang: "text" });
     loadingDiff.cacheKey = `${snapshot.id}:loading:${file.path}`;
     return { id: file.path, type: "diff", fileDiff: loadingDiff, version: 0 };
   });
+  const images = files.filter(file => file.image).map(file => renderImageFile(workspaceId, snapshot, snapshot.files.get(file.path)!, collapsed)).join("");
   const additions = snapshot.stats.reduce((total, file) => total + file.additions, 0);
   const deletions = snapshot.stats.reduce((total, file) => total + file.deletions, 0);
   const iconButton = (label: string, action: string, icon: string, attributes = "") => buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: icon, label }, attributesHtml: `data-action="changes#${action}" ${attributes}` });
@@ -93,10 +123,10 @@ export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, colla
     contentHtml: `${layoutItem("unified", "Unified diff")}${layoutItem("split", "Side-by-side diff")}<hr class="popup-menu__separator">${contentRowHtml({ width: "fill", kind: "compact", label: { kind: "text", text: "Wrap long lines" }, trailingHtml: `<span class="changes-menu-check">${Icons.Check}</span>`, element: { tag: "button", attributesHtml: 'type="button" role="menuitemcheckbox" aria-checked="true" data-action="changes#toggleWrap"' } })}`,
   });
   const collapseIcons = `<span class="changes-collapse-icon">${Icons.CollapseAll}</span><span class="changes-expand-icon">${Icons.ExpandAll}</span>`;
-  const headers = files.map((file) => `<template data-changes-header="${escapeHtml(file.path)}"><div class="changes-file-header" data-changes-edit-target="fileHeader">${contentRowHtml({
+  const headers = files.filter(file => !file.image).map((file) => `<template data-changes-header="${escapeHtml(file.path)}"><div class="changes-file-header" data-changes-edit-target="fileHeader">${contentRowHtml({
     width: "fill",
     kind: "compact", label: { kind: "text", text: file.path }, leadingHtml: Icons.Disclosure,
-    trailingHtml: `${file.previousPath ? `<span class="changes-rename" title="Previously ${escapeHtml(file.previousPath)}">Renamed</span>` : ""}<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}</span>`,
+    trailingHtml: `${renderRename(file)}<span class="changes-file-stats">${file.binarySizes ? "<span>Binary</span>" : `<span class="changes-additions">+${file.additions}</span><span class="changes-deletions">−${file.deletions}</span>`}</span>`,
     element: { tag: "button", attributesHtml: `type="button" data-path="${escapeHtml(file.path)}" data-action="changes#toggleFile" aria-expanded="${!collapsed}"` },
   })}${file.editable ? buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Edit" }, attributesHtml: `data-action="changes-edit#begin" data-path="${escapeHtml(file.path)}" aria-label="Edit ${escapeHtml(file.path)}"${collapsed ? " hidden" : ""}` }) + renderFileEditActions() : ""}</div></template>`).join("");
   const commentTemplates = `<template data-changes-target="commentGutter">${buttonHtml({ type: "button", variant: "secondary", content: { kind: "icon-only", iconHtml: Icons.Plus, label: "Add a comment" }, attributesHtml: 'data-action="changes#addComment"' })}</template>
@@ -112,7 +142,7 @@ export function renderDiff(workspaceId: string, snapshot: ChangesSnapshot, colla
     <div data-controller="live-surface" data-live-surface-workspace-value="${escapeHtml(workspaceId)}" data-live-surface-kind-value="review-comments" data-live-surface-key-value="${snapshot.id}" data-live-surface-eager-value="true">${renderCommentsModel(snapshot.id, comments)}</div>
     ${renderCommentActions(workspaceId, snapshot.id, comments)}
     <div id="${changesBodyId(workspaceId, snapshot.id)}-error" class="changes-error" data-changes-target="error" role="alert" hidden><span data-changes-target="errorMessage"></span>${iconButton("Dismiss file error", "dismissError", Icons.Close)}</div>
-    <div class="changes-surface"><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Changes diff">${files.length ? "" : `<div class="changes-empty">${escapeHtml(empty)}</div>`}<div data-changes-target="orphanHost">${renderOrphanComments(snapshot.id, comments)}<div class="changes-orphan-editor" data-changes-target="listEditor" hidden></div></div></div></div>
+    <div class="changes-surface"><div class="changes-viewer agents-in-the-cloud-pierre-host" data-changes-target="viewer" aria-label="Changes diff">${files.length ? "" : `<div class="changes-empty">${escapeHtml(empty)}</div>`}<div data-changes-target="imageHost">${images}</div><div data-changes-target="orphanHost">${renderOrphanComments(snapshot.id, comments)}<div class="changes-orphan-editor" data-changes-target="listEditor" hidden></div></div></div></div>
     <script type="application/json" data-changes-target="model">${json({ files, items })}</script><script type="application/json" data-changes-diff-endpoints-target="comparisonModel">${json({ endpoints: snapshot.endpoints, label: snapshot.label, baseLabel: snapshot.baseLabel, targetLabel: snapshot.targetLabel })}</script>${headers}${commentTemplates}
   </section>`;
 }
