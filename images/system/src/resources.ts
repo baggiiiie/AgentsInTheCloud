@@ -144,6 +144,9 @@ export async function initializeResources() {
   const config = JSON.parse(await readFile("/etc/docker/daemon.json", "utf8"));
   config["cgroup-parent"] = result.workloadsCgroupParent;
   config["exec-opts"] = ["native.cgroupdriver=cgroupfs"];
+  // Each workspace needs one container address, not Docker's default /16.
+  // Keep this private-daemon policy separate from the host and workspace daemons.
+  config["default-address-pools"] = [{ base: "172.16.0.0/12", size: 24 }];
   await writeFile("/run/agents-in-the-cloud-system/daemon.json", JSON.stringify(config));
   return result;
 }

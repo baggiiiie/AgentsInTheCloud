@@ -68,6 +68,15 @@ try:
   docker('exec',endpoint,'ip','addr','add',address,'dev','eth0')
  docker('run','-d','--name',name,'--privileged','--cgroupns=host','--restart','unless-stopped','--network',uplink,'--ip','11.200.0.3','--ip6','2001:4860:ffff:dead::3','--tmpfs','/run','--mount',f'source={name},target=/data',image,'--app-image','agents-in-the-cloud-test:v2')
  until(lambda:inner('info',check=False).returncode==0)
+ # Default Docker pools used to exhaust after roughly 30 workspaces. Exercise
+ # automatic allocation beyond that limit, not explicit test-only subnets.
+ capacity_networks=[f'capacity-{number}' for number in range(64)]
+ for network in capacity_networks:inner('network','create',network)
+ allocated=json.loads(inner('network','inspect',*capacity_networks).stdout)
+ subnets=[network['IPAM']['Config'][0]['Subnet'] for network in allocated]
+ assert len(set(subnets))==64 and all(subnet.endswith('/24') for subnet in subnets),subnets
+ inner('network','rm',*capacity_networks)
+ print('PASS 64 automatically allocated /24 workspace networks',flush=True)
  # Reuse actual built image locally, no registry credentials needed.
  source=subprocess.Popen(['docker','save',image],stdout=subprocess.PIPE)
  docker('exec','-i',name,'docker','load',stdin=source.stdout);assert source.wait()==0
