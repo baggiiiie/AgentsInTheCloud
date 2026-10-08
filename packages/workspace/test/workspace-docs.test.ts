@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { syncWorkspaceDocs } from "../src/server/workspace-docs.ts";
 
+const buildCommit = "0123456789abcdef0123456789abcdef01234567";
+const sourceLine = `\n\nIf you cannot find the answer to your question here, you can find the source code of this version of AgentsInTheCloud here: [GitHub](https://github.com/lucasmeijer/agentsinthecloud) · [0123456](https://github.com/lucasmeijer/agentsinthecloud/commit/${buildCommit})\n`;
+
 let root: string;
 let destination: string;
 beforeEach(async () => {
@@ -24,23 +27,23 @@ test("deploys shared and package documentation with relative paths and read-only
   await source("docs/deploy-in-workspace/agents-in-the-cloud.md", "Shared guide");
   await source("packages/inline-content/deploy-in-workspace/inline-content.md", "Rich guide");
   await source("packages/example/deploy-in-workspace/examples/usage.md", "Nested guide");
-  await syncWorkspaceDocs(root, destination);
-  expect(await readFile(join(destination, "agents-in-the-cloud.md"), "utf8")).toBe("Shared guide");
-  expect(await readFile(join(destination, "inline-content.md"), "utf8")).toBe("Rich guide");
-  expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Nested guide");
+  await syncWorkspaceDocs(root, destination, buildCommit);
+  expect(await readFile(join(destination, "agents-in-the-cloud.md"), "utf8")).toBe("Shared guide" + sourceLine);
+  expect(await readFile(join(destination, "inline-content.md"), "utf8")).toBe("Rich guide" + sourceLine);
+  expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Nested guide" + sourceLine);
   expect((await stat(join(destination, "inline-content.md"))).mode & 0o777).toBe(0o444);
 });
 
 test("updates and removes docs without replacing mounted directories", async () => {
   await source("packages/example/deploy-in-workspace/examples/usage.md", "First");
   await source("packages/example/deploy-in-workspace/obsolete/old.md", "Old");
-  await syncWorkspaceDocs(root, destination);
+  await syncWorkspaceDocs(root, destination, buildCommit);
   const rootInode = (await stat(destination)).ino;
   const nestedInode = (await stat(join(destination, "examples"))).ino;
   await source("packages/example/deploy-in-workspace/examples/usage.md", "Revised");
   await rm(join(root, "packages/example/deploy-in-workspace/obsolete"), { recursive: true });
-  await syncWorkspaceDocs(root, destination);
-  expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Revised");
+  await syncWorkspaceDocs(root, destination, buildCommit);
+  expect(await readFile(join(destination, "examples/usage.md"), "utf8")).toBe("Revised" + sourceLine);
   expect((await stat(destination)).ino).toBe(rootInode);
   expect((await stat(join(destination, "examples"))).ino).toBe(nestedInode);
   expect(await Bun.file(join(destination, "obsolete/old.md")).exists()).toBe(false);
@@ -48,15 +51,25 @@ test("updates and removes docs without replacing mounted directories", async () 
 
 test("rejects duplicate destinations before modifying installed docs", async () => {
   await source("docs/deploy-in-workspace/guide.md", "Original");
-  await syncWorkspaceDocs(root, destination);
+  await syncWorkspaceDocs(root, destination, buildCommit);
   await source("docs/deploy-in-workspace/guide.md", "Changed");
   await source("packages/example/deploy-in-workspace/guide.md", "Conflicting");
-  await expect(syncWorkspaceDocs(root, destination)).rejects.toThrow("Conflicting workspace documentation path: guide.md");
-  expect(await readFile(join(destination, "guide.md"), "utf8")).toBe("Original");
+  await expect(syncWorkspaceDocs(root, destination, buildCommit)).rejects.toThrow("Conflicting workspace documentation path: guide.md");
+  expect(await readFile(join(destination, "guide.md"), "utf8")).toBe("Original" + sourceLine);
 });
 
 test("rejects file versus directory collisions", async () => {
   await source("docs/deploy-in-workspace/examples", "A file");
   await source("packages/example/deploy-in-workspace/examples/usage.md", "A directory");
-  await expect(syncWorkspaceDocs(root, destination)).rejects.toThrow("Conflicting workspace documentation path: examples");
+  await expect(syncWorkspaceDocs(root, destination, buildCommit)).rejects.toThrow("Conflicting workspace documentation path: examples");
+});
+
+test("labels local development builds and leaves non-Markdown assets unchanged", async () => {
+  await source("docs/deploy-in-workspace/guide.md", "# Guide\n");
+  await source("packages/example/deploy-in-workspace/example.txt", "Example");
+  await syncWorkspaceDocs(root, destination, "");
+  expect(await readFile(join(destination, "guide.md"), "utf8")).toBe(
+    "# Guide\n\n\nIf you cannot find the answer to your question here, you can find the source code of this version of AgentsInTheCloud here: [GitHub](https://github.com/lucasmeijer/agentsinthecloud) · local development build\n",
+  );
+  expect(await readFile(join(destination, "example.txt"), "utf8")).toBe("Example");
 });

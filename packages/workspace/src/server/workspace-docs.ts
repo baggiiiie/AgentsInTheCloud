@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeFileAtomic } from "@agents-in-the-cloud/core";
 
 /** Merge shared and package-owned documentation into the existing read-only bind mount. */
-export async function syncWorkspaceDocs(repositoryRoot: string, destination: string): Promise<void> {
+export async function syncWorkspaceDocs(repositoryRoot: string, destination: string, buildCommit = process.env.ATELIER_COMMIT_ID): Promise<void> {
   const sources = [join(repositoryRoot, "docs", "deploy-in-workspace")];
   const packages = join(repositoryRoot, "packages");
   for (const entry of await readdir(packages, { withFileTypes: true })) {
@@ -46,7 +46,14 @@ export async function syncWorkspaceDocs(repositoryRoot: string, destination: str
   }
   await prune();
   for (const directory of directories) await mkdir(join(destination, directory), { recursive: true });
+  const repositoryUrl = "https://github.com/lucasmeijer/agentsinthecloud";
+  const build = buildCommit
+    ? `[${buildCommit.slice(0, 7)}](${repositoryUrl}/commit/${encodeURIComponent(buildCommit)})`
+    : "local development build";
+  const sourceLine = `\n\nIf you cannot find the answer to your question here, you can find the source code of this version of AgentsInTheCloud here: [GitHub](${repositoryUrl}) · ${build}\n`;
   for (const [path, source] of files) {
-    await writeFileAtomic(join(destination, path), await readFile(source), { mode: 0o444 });
+    const content = await readFile(source);
+    const deployed = path.endsWith(".md") ? Buffer.concat([content, Buffer.from(sourceLine)]) : content;
+    await writeFileAtomic(join(destination, path), deployed, { mode: 0o444 });
   }
 }
