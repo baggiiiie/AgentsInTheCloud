@@ -67,8 +67,7 @@ export function projectDurableTranscript(view: ConversationView): TranscriptItem
       if (startsTurn) records.push({ kind: "runStart", turnEntryId: key, timestamp: message.timestamp, startedAt: message.timestamp });
     } else if (message.role === "assistant") {
       records.push({ kind: "assistant", id: key, timestamp: message.timestamp,
-        // A throttled partial's default stopReason is not a terminal outcome.
-        stopReason: partial ? "toolUse" : message.stopReason,
+        stopReason: message.stopReason, partial,
         errorMessage: partial ? undefined : message.errorMessage,
         parts: message.content.map(part => part.type === "toolCall"
           ? { type: "toolCall", callId: part.id, name: part.name, args: part.arguments }

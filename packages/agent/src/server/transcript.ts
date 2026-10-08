@@ -38,7 +38,7 @@ export type TranscriptRecord =
   | { kind: "timing"; timing: TurnTimingSummary; turnEntryId?: string; outcome?: "completed" | "stopped"; timestamp: number }
   | { kind: "taskStart"; id: string; timestamp: number }
   | { kind: "user"; id: string; text: string; images: SessionImageRef[]; timestamp: number; rewindable?: boolean }
-  | { kind: "assistant"; id: string; parts: AssistantPart[]; stopReason: StopReason; errorMessage?: string; timestamp: number }
+  | { kind: "assistant"; id: string; parts: AssistantPart[]; stopReason: StopReason; partial?: boolean; errorMessage?: string; timestamp: number }
   | { kind: "toolResult"; callId: string; text: string; images: SessionImageRef[]; isError: boolean; timestamp: number; details?: ToolViewDetails }
   | { kind: "note"; id?: string; text: string; tone: NoteTone; timestamp?: number };
 
@@ -222,6 +222,8 @@ export function buildTranscript(records: TranscriptRecord[], options: { openEnde
 
     if (record.kind === "assistant") {
       const final = isFinalAssistantMessage(record.parts, record.stopReason);
+      // Pi can announce a final answer while it is still streaming. Placement
+      // follows that signal; only a committed message may finish the turn.
       const finalIndexes = new Set(final ? finalAssistantTextIndexes(record.parts) : []);
       let first = true;
       record.parts.forEach((part, index) => {
@@ -242,13 +244,13 @@ export function buildTranscript(records: TranscriptRecord[], options: { openEnde
           first = false;
         }
       });
-      if (final) {
+      if (final && !record.partial) {
         if (working) working.hasFinalAnswer = true;
         if (!runScoped) {
           if (working) working.completedAt = Math.max(working.startedAt, record.timestamp);
           working = undefined;
         }
-      } else {
+      } else if (!record.partial) {
         const errorText = assistantErrorText(record);
         const nextBoundary = record.stopReason === "error"
           ? records.slice(recordIndex + 1).find((next) =>
