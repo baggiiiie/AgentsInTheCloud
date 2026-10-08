@@ -206,7 +206,7 @@ describe("Workspace deletion review", () => {
 });
 
 describe("Review comments in workspace deletion safety", () => {
-  test("warns about saved comments even in a clean repository, and copying keeps the confirmation valid", async () => {
+  test("only uncopied comment revisions block deletion in a clean repository", async () => {
     const { createReviewCommentStore } = await import("../src/server/comments.ts");
     const { captureChanges } = await import("../src/server/snapshot.ts");
     const root = await workspaceRepository();
@@ -220,15 +220,39 @@ describe("Review comments in workspace deletion safety", () => {
     expect(uncopied).toMatchObject({ status: "blocked", details: { repositories: [], comments: [{ revision: 1, copiedRevision: 0 }] } });
     comments.markCopied(workspaceId, [{ id: comment.id, revision: 1 }]);
     const copied = await review.changesDeletionReview.inspect(workspaceId);
-    expect(copied).toMatchObject({ status: "blocked", details: { comments: [{ copiedRevision: 1 }] } });
-    if (uncopied.status !== "blocked" || copied.status !== "blocked") throw new Error("Expected review comments to block deletion");
-    expect(copied.fingerprint).toBe(uncopied.fingerprint);
+    expect(copied).toEqual({ status: "clear" });
+    expect(comments.list(workspaceId)).toMatchObject([{ id: comment.id, revision: 1, copiedRevision: 1 }]);
+    if (uncopied.status !== "blocked") throw new Error("Expected uncopied comments to block deletion");
     comments.save(workspaceId, { id: comment.id, revision: 1, body: "Changed review" }, snapshot);
     const changed = await review.changesDeletionReview.inspect(workspaceId);
     if (changed.status !== "blocked") throw new Error("Expected edited comment to block deletion");
-    expect(changed.fingerprint).not.toBe(copied.fingerprint);
+    expect(changed.fingerprint).not.toBe(uncopied.fingerprint);
     expect(changed).toMatchObject({ details: { comments: [{ revision: 2, copiedRevision: 1 }] } });
     comments.remove(workspaceId, comment.id, 2);
     expect(await review.changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
   });
+});
+
+
+test("copied comments are excluded without hiding other deletion risks", async () => {
+  const { createReviewCommentStore } = await import("../src/server/comments.ts");
+  const { captureChanges } = await import("../src/server/snapshot.ts");
+  const root = await workspaceRepository();
+  const comments = createReviewCommentStore({ dataDir });
+  const review = createDeletionReview((id, path) => localRepository(join(dataDir, "workspaces", id, "work", path)), comments);
+  await writeFile(join(root, "tracked.txt"), "review this\n");
+  const snapshot = await captureChanges(localRepository(root));
+  const copiedComment = comments.save(workspaceId, { id: "copied", revision: 0, body: "Already copied", path: "tracked.txt", side: "additions", start: 1, end: 1 }, snapshot);
+  const uncopiedComment = comments.save(workspaceId, { id: "uncopied", revision: 0, body: "Still here", path: "tracked.txt", side: "additions", start: 1, end: 1 }, snapshot);
+  comments.markCopied(workspaceId, [copiedComment]);
+  expect(await review.changesDeletionReview.inspect(workspaceId)).toMatchObject({
+    status: "blocked", details: { comments: [{ id: uncopiedComment.id }], repositories: [{ uncommitted: [{ path: "tracked.txt" }] }] },
+  });
+  comments.markCopied(workspaceId, [uncopiedComment]);
+  const assessment = await review.changesDeletionReview.inspect(workspaceId);
+  expect(assessment).toMatchObject({ status: "blocked", details: { repositories: [{ uncommitted: [{ path: "tracked.txt" }] }] } });
+  if (assessment.status !== "blocked") throw new Error("Expected git changes to block deletion");
+  expect(assessment.details).not.toHaveProperty("comments");
+  await writeFile(join(root, "tracked.txt"), "initial\n");
+  expect(await review.changesDeletionReview.inspect(workspaceId)).toEqual({ status: "clear" });
 });

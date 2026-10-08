@@ -43,7 +43,7 @@ export function createDeletionReview(repositoryFor: (workspaceId: string, path: 
         fingerprintMaterial.push(`${file.path}:${(await git(root, ["hash-object", "--no-filters", "--", file.path])).toString("utf8").trim()}`);
       }
     }
-    const savedComments = comments?.list(workspaceId) ?? [];
+    const savedComments = (comments?.list(workspaceId) ?? []).filter(comment => comment.copiedRevision !== comment.revision);
     if (!repositories.length && !savedComments.length) {
       assessments.delete(workspaceId);
       return { status: "clear" };

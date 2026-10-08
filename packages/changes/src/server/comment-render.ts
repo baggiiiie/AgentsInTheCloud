@@ -44,7 +44,7 @@ export function renderOrphanComments(snapshotId: string, comments: readonly Comm
 
 export const deletionCommentsId = (workspaceId: string) => domId("deletion", workspaceId, "review_comments");
 export function renderDeletionComments(workspaceId: string, comments: readonly ReviewComment[]): string {
-  const uncopied = comments.filter(comment => comment.copiedRevision !== comment.revision).length;
-  const message = uncopied ? `${uncopied} review ${uncopied === 1 ? "comment hasn’t" : "comments haven’t"} been copied. Deleting this workspace will delete ${comments.length === 1 ? "it" : "all saved comments"}.` : `${comments.length} saved review ${comments.length === 1 ? "comment will" : "comments will"} be deleted. ${comments.length === 1 ? "It’s" : "They’ve"} been copied, but keep the text somewhere else before deleting.`;
+  comments = comments.filter(comment => comment.copiedRevision !== comment.revision);
+  const message = `${comments.length} review ${comments.length === 1 ? "comment hasn’t" : "comments haven’t"} been copied. Deleting this workspace will delete ${comments.length === 1 ? "it" : "them"}.`;
   return `<section id="${deletionCommentsId(workspaceId)}" class="changes-deletion-comments">${comments.length ? `<h2>Review comments</h2><p>${escapeHtml(message)}</p>${renderCopyComments(workspaceId, `deletion-${workspaceId}`, comments.map(comment => ({ ...comment, status: "other" })))}` : ""}</section>`;
 }
