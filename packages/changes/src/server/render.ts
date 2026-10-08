@@ -56,7 +56,7 @@ export function renderChanges(workspaceId: string, snapshot: ChangesSnapshot, pi
   </section>`;
 }
 
-export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot, collapsed = false): string {
+export function renderComparison(workspaceId: string, snapshot: ChangesSnapshot, collapsed = true): string {
   return `<div id="${comparisonId(workspaceId, snapshot.history.id)}" class="changes-diff-slot" data-changes-diff-endpoints-target="diff">${renderDiff(workspaceId, snapshot, collapsed)}</div>`;
 }
 
