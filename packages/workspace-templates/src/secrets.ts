@@ -95,7 +95,7 @@ export async function updateWorkspaceTemplateSecret(workspaceTemplateId: string,
 }
 
 export function workspaceTemplateSecretPlaceholder(name: string): string {
-  return `ATELIER_PROXY_READY_${name.replaceAll(/[^A-Za-z0-9_]/g, "_").toUpperCase()}`;
+  return `AGENTSINTHECLOUD_PROXY_READY_${name.replaceAll(/[^A-Za-z0-9_]/g, "_").toUpperCase()}`;
 }
 
 export const workspaceTemplateSecretPathPermissionSchema = Type.Boolean({

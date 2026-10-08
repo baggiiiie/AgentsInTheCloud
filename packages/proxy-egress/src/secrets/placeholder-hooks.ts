@@ -129,7 +129,7 @@ export function createHttpHooks(options: CreateHttpHooksOptions = {}): CreateHtt
 }
 
 export function makeDefaultSecretPlaceholder(): string {
-  return `ATELIER_SECRET_${crypto.randomBytes(24).toString("hex")}`;
+  return `AGENTSINTHECLOUD_SECRET_${crypto.randomBytes(24).toString("hex")}`;
 }
 
 function assertSecretPlaceholderIsSafe(name: string, placeholder: string, existingEntries: Iterable<SecretEntry>): void {

@@ -36,10 +36,10 @@ describe("workspace secrets", () => {
     setGitHubToken("real-secret");
     const context = await createWorkspaceSecretContext("test-workspace");
 
-    expect(context.env.GH_TOKEN).toBe("ATELIER_PROXY_READY_GH_TOKEN");
+    expect(context.env.GH_TOKEN).toBe("AGENTSINTHECLOUD_PROXY_READY_GH_TOKEN");
     expect(context.secrets).toContainEqual({
       name: "GH_TOKEN",
-      placeholder: "ATELIER_PROXY_READY_GH_TOKEN",
+      placeholder: "AGENTSINTHECLOUD_PROXY_READY_GH_TOKEN",
       hosts: ["github.com", "api.github.com"],
     });
   });
@@ -56,9 +56,9 @@ describe("workspace secrets", () => {
     expect(context.env).not.toHaveProperty("OPTIONAL_TOKEN");
     const result = await context.hooks.onRequest(new Request("https://api.example.com/v1/sk-test-placeholder", { headers: { authorization: "Bearer sk-test-placeholder" } }));
 
-    expect(context.env.API_TOKEN).toBe("ATELIER_PROXY_READY_API_TOKEN");
+    expect(context.env.API_TOKEN).toBe("AGENTSINTHECLOUD_PROXY_READY_API_TOKEN");
     expect(context.env.STRICT_TOKEN).toBe("sk-test-placeholder");
-    expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "ATELIER_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
+    expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "AGENTSINTHECLOUD_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
     expect(context.secrets).toContainEqual({ name: "STRICT_TOKEN", placeholder: "sk-test-placeholder", hosts: ["api.example.com"] });
     expect(result.headers.get("authorization")).toBe("Bearer strict-secret");
     expect(result.url).toBe("https://api.example.com/v1/sk-test-placeholder");
@@ -69,7 +69,7 @@ describe("workspace secrets", () => {
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "API_TOKEN", hostPattern, secretValue: "real-secret" });
     const context = await createWorkspaceSecretContext("test-workspace", workspaceTemplateInit(workspaceTemplate.id));
 
-    expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "ATELIER_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
+    expect(context.secrets).toContainEqual({ name: "API_TOKEN", placeholder: "AGENTSINTHECLOUD_PROXY_READY_API_TOKEN", hosts: ["api.example.com", "*.example.org"] });
     for (const host of ["api.example.com", "service.example.org"]) {
       const result = await context.hooks.onRequest(new Request(`https://${host}/`, { headers: { authorization: `Bearer ${context.env.API_TOKEN}` } }));
       expect(result.headers.get("authorization")).toBe("Bearer real-secret");
@@ -103,7 +103,7 @@ describe("workspace secrets", () => {
     const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "TOKEN", hostPattern: "api.example.com", secretValue: "first" });
     const load = () => getWorkspaceSecretContext("test-workspace", async () => init);
     const first = await load();
-    const outbound = () => new Request("https://api.example.com/", { headers: { authorization: "Bearer ATELIER_PROXY_READY_TOKEN" } });
+    const outbound = () => new Request("https://api.example.com/", { headers: { authorization: "Bearer AGENTSINTHECLOUD_PROXY_READY_TOKEN" } });
     expect((await first.hooks.onRequest(outbound())).headers.get("authorization")).toBe("Bearer first");
     // The old process's environment is unchanged; callers explicitly supply the placeholder.
     expect(initial.env.TOKEN).toBeUndefined();
@@ -127,14 +127,14 @@ describe("workspace secrets", () => {
       const githubAuth = await context.hooks.onRequest(new Request(`${scheme}://api.github.com/user`, { headers: { authorization: `Bearer ${context.env.GH_TOKEN}` } }));
       expect(githubAuth.headers.get("authorization")).toBe("Bearer github-credential");
     }
-    const botRequest = () => new Request("https://api.telegram.org/botATELIER_PROXY_READY_BOT_TOKEN/getMe");
+    const botRequest = () => new Request("https://api.telegram.org/botAGENTSINTHECLOUD_PROXY_READY_BOT_TOKEN/getMe");
     expect((await (await load()).hooks.onRequest(botRequest())).url).toBe("https://api.telegram.org/bot123:telegram-credential/getMe");
     await updateWorkspaceTemplateSecret(workspaceTemplate.id, bot.id, { ...values, allowInPath: false });
     expect((await (await load()).hooks.onRequest(botRequest())).url).toBe(botRequest().url);
     await updateWorkspaceTemplateSecret(workspaceTemplate.id, bot.id, { ...values, allowInPath: true });
     expect((await (await load()).hooks.onRequest(botRequest())).url).toContain("bot123:telegram-credential/");
     const custom = await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "CUSTOM", hostPattern: "api.example.com", secretValue: "custom-credential", allowInPath: true });
-    const customRequest = () => new Request("https://api.example.com/ATELIER_PROXY_READY_CUSTOM");
+    const customRequest = () => new Request("https://api.example.com/AGENTSINTHECLOUD_PROXY_READY_CUSTOM");
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe("https://api.example.com/custom-credential");
     await updateWorkspaceTemplateSecret(workspaceTemplate.id, custom.id, { envName: "CUSTOM", hostPattern: "api.example.com", allowInPath: false });
     expect((await (await load()).hooks.onRequest(customRequest())).url).toBe(customRequest().url);
@@ -154,10 +154,10 @@ describe("workspace secrets", () => {
   });
 
   test("passes an inherited placeholder onward for nested AgentsInTheCloud", async () => {
-    process.env.GH_TOKEN = "ATELIER_PROXY_READY_GH_TOKEN";
+    process.env.GH_TOKEN = "AGENTSINTHECLOUD_PROXY_READY_GH_TOKEN";
 
     const context = await createWorkspaceSecretContext("test-workspace");
-    const basic = Buffer.from("x-access-token:ATELIER_PROXY_READY_GH_TOKEN").toString("base64");
+    const basic = Buffer.from("x-access-token:AGENTSINTHECLOUD_PROXY_READY_GH_TOKEN").toString("base64");
     const result = await context.hooks.onRequest(new Request("https://github.com/repo.git", { headers: { authorization: `Basic ${basic}` } }));
 
     expect(result.headers.get("authorization")).toBe(`Basic ${basic}`);

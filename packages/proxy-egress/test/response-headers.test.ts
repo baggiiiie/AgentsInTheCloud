@@ -10,7 +10,7 @@ import { createHttpHooks } from "../src/secrets/placeholder-hooks.ts";
 test("HTTP redirect reflection is scrubbed at the wire boundary, after response transforms, with the body unchanged", async () => {
   const directory = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-header-test-"));
   const secret = "fake-github-credential";
-  const placeholder = "ATELIER_PROXY_READY_GH_TOKEN";
+  const placeholder = "AGENTSINTHECLOUD_PROXY_READY_GH_TOKEN";
   const hooks = createHttpHooks({
     allowedInternalHosts: ["localhost"],
     secrets: { GH_TOKEN: { allowInPath: true, value: secret, hosts: ["localhost"], placeholder } },
