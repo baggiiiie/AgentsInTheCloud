@@ -1,6 +1,4 @@
 import { posix } from "node:path";
-import { isImageFile } from "../image-file.ts";
-import { maxEditableFileBytes } from "./editable-file.ts";
 import { execWorkspaceCommand, execWorkspaceCommandBuffer, workspaceRoot } from "@agents-in-the-cloud/workspace";
 
 export interface FileEntry {
@@ -50,21 +48,9 @@ function parseFindOutput(stdout: Buffer, directory: string): RawFileEntry[] {
   return entries;
 }
 
-async function openablePaths(workspaceId: string, entries: Array<{ path: string; kind: FileEntry["kind"]; size: number }>): Promise<Set<string>> {
-  const paths = entries.filter((entry) => entry.kind === "file" && !isImageFile(entry.path) && entry.size <= maxEditableFileBytes).map((entry) => entry.path);
-  if (paths.length === 0) return new Set();
-  const script = `for path do
-  encoding=$(file -b --mime-encoding -- "$path")
-  if ! test -s "$path" || test "$encoding" = us-ascii || test "$encoding" = utf-8; then printf '%s\\0' "$path"; fi
-done`;
-  const result = await execWorkspaceCommandBuffer(workspaceId, ["sh", "-c", script, "sh", ...paths]);
-  if (result.exitCode !== 0) throw new Error(result.stderr.trim() || "Unable to inspect files");
-  return new Set(result.stdout.toString("utf8").split("\0").filter(Boolean));
-}
-
-function fileEntries(rawEntries: RawFileEntry[], openable: Set<string>): FileEntry[] {
+function fileEntries(rawEntries: RawFileEntry[]): FileEntry[] {
   return rawEntries
-    .map((entry) => ({ ...entry, openable: openable.has(entry.path) || (entry.kind === "file" && isImageFile(entry.path)) }))
+    .map((entry) => ({ ...entry, openable: entry.kind === "file" }))
     .sort((left, right) => Number(right.kind === "directory") - Number(left.kind === "directory") || left.name.localeCompare(right.name));
 }
 
@@ -96,7 +82,7 @@ export async function getDirectoryEntry(workspaceId: string, inputPath: string |
 export async function listFiles(workspaceId: string, inputPath: string | null, selectedPath?: string, expandedPaths: ReadonlySet<string> = new Set()): Promise<{ path: string; entries: FileEntry[] }> {
   const path = await resolveFilesDirectory(workspaceId, inputPath);
   const rawEntries = await Promise.all((await readDirectoryEntries(workspaceId, path)).map((entry) => compactDirectoryEntry(entry, (directory) => readDirectoryEntries(workspaceId, directory))));
-  const entries = fileEntries(rawEntries, await openablePaths(workspaceId, rawEntries));
+  const entries = fileEntries(rawEntries);
   if (!selectedPath && expandedPaths.size === 0) return { path, entries };
   return {
     path,
@@ -114,7 +100,7 @@ export async function searchFiles(workspaceId: string, query: string, expandedPa
   const listing = await execWorkspaceCommandBuffer(workspaceId, ["sh", "-c", script, "sh", workspaceRoot, `*${literalPattern}*`]);
   if (listing.exitCode !== 0) throw new FilesPathError(listing.stderr.trim() || "Unable to search files", 403);
   const rawEntries = parseFindOutput(listing.stdout, workspaceRoot);
-  const entries = fileEntries(rawEntries, await openablePaths(workspaceId, rawEntries));
+  const entries = fileEntries(rawEntries);
   return await Promise.all(entries.map(async (entry) => {
     if (entry.kind !== "directory" || !expandedPaths.has(entry.path)) return entry;
     return { ...entry, children: (await listFiles(workspaceId, entry.path, undefined, expandedPaths)).entries };

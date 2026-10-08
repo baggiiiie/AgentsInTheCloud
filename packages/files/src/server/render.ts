@@ -11,6 +11,7 @@ import { workspaceRoot } from "@agents-in-the-cloud/workspace";
 import { posix } from "node:path";
 import type { FileEntry } from "./files.ts";
 import { isImageFile } from "../image-file.ts";
+import type { FilePreviewKind } from "./file-preview.ts";
 import { defaultFilesViewId, filesDiskGeneration, filesNavigationRequest, type FilesView } from "./state.ts";
 
 function filesTreeFrameId(workspaceId: string, viewId: string): string {
@@ -57,7 +58,7 @@ function directoryToggleUrl(workspaceId: string, viewId: string, path: string, e
   return `/workspaces/${encodeURIComponent(workspaceId)}/files?${query}`;
 }
 
-function selectedFileActions(workspaceId: string, view: FilesView, image = false): string {
+function selectedFileActions(workspaceId: string, view: FilesView, readOnly = false): string {
   const path = view.path!;
   const name = posix.basename(path);
   const contentUrl = workspaceProxyUrl(workspaceId, "file", path);
@@ -68,7 +69,7 @@ function selectedFileActions(workspaceId: string, view: FilesView, image = false
     attributesHtml: 'data-file-editor-target="copyButton"',
   });
   const downloadButton = actionLinkHtml({
-    href: contentUrl,
+    href: `${contentUrl}?download=1`,
     variant: "secondary",
     content: {
       kind: "icon-only",
@@ -90,7 +91,7 @@ function selectedFileActions(workspaceId: string, view: FilesView, image = false
     orientation: "horizontal",
     semantics: "group",
     label: "Actions for selected file",
-    itemsHtml: `${image ? "" : copyButton}${downloadButton}${deleteForm}`,
+    itemsHtml: `${readOnly ? "" : copyButton}${downloadButton}${deleteForm}`,
   });
 }
 
@@ -218,16 +219,26 @@ function markdownDisplayToggle(): string {
   });
 }
 
-export function renderFilesEditorFrame(workspaceId: string, view: FilesView): string {
+export function renderFilesEditorFrame(workspaceId: string, view: FilesView, previewKind: FilePreviewKind = isImageFile(view.path ?? "") ? "image" : "text", previewError?: string): string {
   const frameId = filesEditorFrameId(workspaceId, view.id);
   if (!view.path) return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane files-editor-empty"><header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path">Choose a file</span>${filesNavigatorToggle("expand")}</header><p>Select a file to view or edit. Drop files into the Files navigator to upload, or create them in Terminal and choose Refresh.</p></section></turbo-frame>`;
-  if (isImageFile(view.path)) {
+  if (previewKind !== "text") {
     const name = posix.basename(view.path);
-    const imageUrl = workspaceProxyUrl(workspaceId, "file", view.path);
+    const mediaUrl = escapeHtml(workspaceProxyUrl(workspaceId, "file", view.path));
+    const fullscreen = previewKind === "image" || previewKind === "video";
+    const preview = previewError
+      ? `<p class="empty-state">${escapeHtml(previewError)}</p>`
+      : previewKind === "image"
+      ? `<img src="${mediaUrl}" alt="${escapeHtml(name)}" decoding="async" loading="lazy">`
+      : previewKind === "video"
+        ? `<video src="${mediaUrl}" controls playsinline preload="metadata">Your browser can’t play this video. Download it to open it elsewhere.</video>`
+        : previewKind === "audio"
+          ? `<audio src="${mediaUrl}" controls preload="metadata">Your browser can’t play this audio. Download it to open it elsewhere.</audio>`
+          : `<p class="empty-state">${previewKind === "large-text" ? "This text file is too large to edit here." : "No preview available for this file."} Download it to open it elsewhere.</p>`;
     const fullscreenButton = buttonHtml({ type: "button", variant: "secondary", content: { kind: "caption", caption: "Fullscreen" }, attributesHtml: 'data-action="agents-in-the-cloud-fullscreen#open"' });
     return `<turbo-frame id="${frameId}" class="files-editor-frame"><section class="file-editor-pane" data-controller="agents-in-the-cloud-fullscreen" data-agents-in-the-cloud-fullscreen-mode-value="media" data-agents-in-the-cloud-fullscreen-title-value="${escapeHtml(name)}">
-      <header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path" title="${escapeHtml(view.path)}">${escapeHtml(view.path)}</span><span class="file-editor-toolbar-actions">${fullscreenButton}${selectedFileActions(workspaceId, view, true)}${filesNavigatorToggle("expand")}</span></header>
-      <div class="file-image-preview"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" decoding="async" loading="lazy"></div>
+      <header class="file-editor-toolbar work-view-toolbar"><span class="file-editor-path" title="${escapeHtml(view.path)}">${escapeHtml(view.path)}</span><span class="file-editor-toolbar-actions">${fullscreen ? fullscreenButton : ""}${selectedFileActions(workspaceId, view, true)}${filesNavigatorToggle("expand")}</span></header>
+      <div class="file-media-preview">${preview}</div>
     </section></turbo-frame>`;
   }
   const contentUrl = `/workspaces/${encodeURIComponent(workspaceId)}/files-view/content?${new URLSearchParams({ path: view.path })}`;
@@ -252,9 +263,9 @@ export function filesWorkViewPresentation(view: FilesView): WorkspaceWorkViewPre
   };
 }
 
-export function renderFilesWorkViewBody(workspaceId: string, view: FilesView): string {
+export function renderFilesWorkViewBody(workspaceId: string, view: FilesView, previewKind?: FilePreviewKind, previewError?: string): string {
   return `<section class="work-view-pane files-work-view"><div class="files-workbench${view.path ? "" : " is-files-navigator-open"}" data-controller="files-view" data-files-view-selected-path-value="${escapeHtml(view.path ?? "")}" data-action="turbo:frame-load->files-view#updateSelection turbo:before-morph-attribute->files-view#preservePaneState">
-    <div class="files-editor-canvas">${renderFilesEditorFrame(workspaceId, view)}</div>
+    <div class="files-editor-canvas">${renderFilesEditorFrame(workspaceId, view, previewKind, previewError)}</div>
     <aside class="files-navigator" aria-label="Files navigator"><header class="files-navigator-header work-view-toolbar"><span class="files-navigator-path">${escapeHtml(workspaceRoot)}</span>${refreshButton()}${filesNavigatorToggle("collapse")}</header>${renderLazyFilesTreeFrame(workspaceId, view)}</aside>
   </div></section>`;
 }

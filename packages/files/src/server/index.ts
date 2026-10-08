@@ -9,6 +9,7 @@ import { Value } from "typebox/value";
 import { fileSaveRequestSchema, type FileSaveRequest } from "../protocol.ts";
 import { EditableFileError, readEditableFile, requestedEditableFilePath, writeEditableFile } from "./editable-file.ts";
 import { deleteFile, FilesPathError, getDirectoryEntry, listFiles, searchFiles, uploadFile } from "./files.ts";
+import { filePreviewKind } from "./file-preview.ts";
 import { filesWorkViewPresentation, renderFilesDirectoryFrame, renderFilesRefreshSignal, renderFilesTreeFrame, renderFilesTreeResultsFrame, renderFilesWorkViewBody } from "./render.ts";
 import { closeFilesView, createFilesView, defaultFilesViewId, deleteFilesViewState, filesDiskChanged, filesView, listFilesViews, setFilesViewFile } from "./state.ts";
 
@@ -52,6 +53,9 @@ async function renderMarkdownEndpoint(workspaceId: string, request: Request, url
 
 async function fileContentEndpoint(workspaceId: string, request: Request, url: URL): Promise<Response> {
   const path = url.searchParams.get("path");
+  const kind = await filePreviewKind(workspaceId, requestedEditableFilePath(path));
+  if (kind === "large-text") throw new EditableFileError("Files larger than 2 MB cannot be edited", 413);
+  if (kind !== "text") throw new EditableFileError("Only text files can be edited", 415);
   if (request.method === "GET") return jsonResponse(await readEditableFile(workspaceId, path));
   if (request.method !== "PUT") return textResponse("Method not allowed", { status: 405 });
   const body: unknown = await request.json();
@@ -92,7 +96,15 @@ const filesWorkspaceModule: WorkspaceModule = {
       return { type: value.type, id: value.id };
     },
     identity: (reference: FilesWorkViewReference) => reference.id,
-    render: ({ workspaceId, reference }: { workspaceId: string; reference: FilesWorkViewReference }) => renderFilesWorkViewBody(workspaceId, filesView(workspaceId, reference.id)),
+    render: async ({ workspaceId, reference }: { workspaceId: string; reference: FilesWorkViewReference }) => {
+      const view = filesView(workspaceId, reference.id);
+      try {
+        return renderFilesWorkViewBody(workspaceId, view, view.path ? await filePreviewKind(workspaceId, view.path) : undefined);
+      } catch (error) {
+        if (error instanceof EditableFileError) return renderFilesWorkViewBody(workspaceId, view, "binary", error.message);
+        throw error;
+      }
+    },
     close: ({ workspaceId, reference }: { workspaceId: string; reference: FilesWorkViewReference }) => closeFilesView(workspaceId, reference.id),
   }],
   commands: [

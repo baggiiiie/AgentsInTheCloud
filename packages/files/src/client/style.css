@@ -93,5 +93,7 @@
 
 .files-editor-empty { background-image: var(--editor-background-image); }
 
-.file-image-preview { display: grid; place-items: center; min-height: 0; overflow: auto; padding: 16px; }
-.file-image-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+.file-media-preview { display: grid; place-items: center; min-height: 0; overflow: auto; padding: 16px; }
+.file-media-preview :is(img, video) { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.file-media-preview audio { width: min(100%, 640px); }

@@ -1,3 +1,4 @@
+import { posix } from "node:path";
 import { shellQuote } from "@agents-in-the-cloud/core";
 import { workspaceContainerName } from "@agents-in-the-cloud/workspace";
 import { extensionOf, imageMimeByExtension } from "@agents-in-the-cloud/shared/file-metadata";
@@ -48,8 +49,12 @@ export async function workspaceFileEndpoint(workspaceId: string, path: string, r
   const range = parseRange(request.headers.get("range"), size);
   const command = range ? `tail -c +${range.start + 1} ${quoted} | head -c ${range.end - range.start + 1}` : `cat ${quoted}`;
   const proc = Bun.spawn(["docker", "exec", container, "sh", "-c", command], { stdout: "pipe", stderr: "ignore" });
-  const contentType = mimeByExtension[extensionOf(path)] ?? "application/octet-stream";
+  const contentType = mimeByExtension[extensionOf(path)] ?? Bun.file(path).type;
   const headers = new Headers({ "content-type": contentType, "accept-ranges": "bytes", "x-content-type-options": "nosniff" });
+  if (new URL(request.url).searchParams.get("download") === "1") {
+    const filename = encodeURIComponent(posix.basename(path)).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+    headers.set("content-disposition", `attachment; filename*=UTF-8''${filename}`);
+  }
   if (contentType.startsWith("image/")) {
     // SVGs are inert in <img>, but can also be navigated to directly. Keep that
     // document sandboxed, script-free, and unable to load network resources.
