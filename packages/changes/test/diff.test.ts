@@ -1,9 +1,9 @@
 import { localRepository } from "../../workspace/test/support/local-repository.ts";
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { collectChangesFile, collectChangesIndex, collectChangesStats, type ChangesFile } from "../src/server/diff.ts";
+import { collectChangesComparison, collectChangesFile, collectChangesIndex, collectChangesStats, type ChangesFile } from "../src/server/diff.ts";
 import { command, createChangesRepository } from "./support/repository.ts";
 
 const roots: string[] = [];
@@ -51,6 +51,19 @@ describe("Changes collection", () => {
     const files = await changesFiles(root);
     expect(files.map((file) => file.path)).toEqual(["changed.ts", "untracked.ts"]);
     expect(files[1]!.kind).toBe("text");
+  });
+
+  test("shows an untracked nested repository as one entry", async () => {
+    const root = await repository();
+    await mkdir(join(root, "nested"));
+    await command(join(root, "nested"), "git", "init", "-q");
+    await writeFile(join(root, "nested", "inner.ts"), "export const inner = true;\n");
+
+    const nested: ChangesFile = { path: "nested/", change: "added", kind: "mode", detail: "Nested Git repository" };
+    expect(await changesFiles(root)).toEqual([nested]);
+    const comparison = await collectChangesComparison(localRepository(root), "HEAD");
+    expect(comparison.stats).toEqual([{ path: "nested/", change: "added", untracked: true, additions: 0, deletions: 0 }]);
+    expect(comparison.files.get("nested/")).toMatchObject(nested);
   });
 
   test("counts untracked text lines with or without a trailing newline", async () => {

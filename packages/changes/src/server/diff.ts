@@ -100,7 +100,13 @@ function changesFileFromContents(
       : modes.oldMode !== modes.newMode ? "File mode changed" : "No textual changes" };
 }
 
+/** Git reports an untracked nested repository as its directory, with a trailing slash, instead of its files. */
+function isNestedRepository(entry: GitStatusEntry): boolean {
+  return entry.code === "??" && entry.path.endsWith("/");
+}
+
 async function changesFile(root: Repository, entry: GitStatusEntry): Promise<ChangesFile | undefined> {
+  if (isNestedRepository(entry)) return { path: entry.path, change: "added", kind: "mode", detail: "Nested Git repository" };
   const oldPath = entry.previousPath ?? entry.path;
   const [oldBuffer, newBuffer, fileModes] = await Promise.all([
     entry.code === "??" ? undefined : gitObject(root, oldPath),
@@ -258,6 +264,11 @@ export async function collectChangesComparison(root: Repository, base: string, e
     if (entry.code === "??") summary.untracked = true;
     if (entry.oldMode === "160000" || entry.newMode === "160000") {
       files.set(entry.path, { ...summary, kind: "mode", detail: "Submodule changed" });
+      stats[position] = { ...summary, additions: 0, deletions: 0 };
+      return;
+    }
+    if (isNestedRepository(entry)) {
+      files.set(entry.path, { ...summary, kind: "mode", detail: "Nested Git repository" });
       stats[position] = { ...summary, additions: 0, deletions: 0 };
       return;
     }

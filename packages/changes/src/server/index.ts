@@ -200,10 +200,12 @@ export const agentsInTheCloudServerModule: WorkspaceModule = {
       const root = workspaceRepository(workspaceId);
       if (match[1] === "compare") next = await captureChanges(root, endpoints, previous.history);
       else next = await refreshChanges(root, previous, endpoints);
-    } catch (error) {
-      if (!(error instanceof InvalidDiffEndpoints)) throw error;
+    } catch (thrown) {
+      const error = thrown instanceof Error ? thrown : new Error(String(thrown));
+      const invalid = error instanceof InvalidDiffEndpoints;
+      if (!invalid) console.error(`Could not ${match[1]} Changes for workspace ${workspaceId}`, error);
       if (ticket !== state.request) return new Response(null, { status: 204 });
-      return turboStreamResponse(replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id, error.message)), { status: 422 });
+      return turboStreamResponse(replace(errorId(workspaceId, previous.history.id), renderError(workspaceId, previous.history.id, invalid ? error.message : `Couldn’t generate this comparison: ${error.message}`)), { status: invalid ? 422 : 500 });
     }
     // Last request wins. A slow earlier capture must not publish or overwrite a newer selection.
     if (ticket !== state.request) return new Response(null, { status: 204 });

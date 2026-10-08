@@ -270,7 +270,9 @@ export function createDiffEndpointsController(Controller: WorkspaceClientControl
         const result = await fetch(`/workspaces/${encodeURIComponent(this.workspaceIdValue)}/changes/${operation}`, { method: "POST", body: data, signal: request.signal, headers: { Accept: "text/vnd.turbo-stream.html" } });
         const html = await result.text();
         if (request.signal.aborted) return;
-        if (!result.headers.get("Content-Type")?.includes("text/vnd.turbo-stream.html")) throw new Error(html || "The comparison could not be generated.");
+        const contentType = result.headers.get("Content-Type") ?? "";
+        // Only plain-text bodies are readable messages; an HTML error page would show up as markup.
+        if (!contentType.includes("text/vnd.turbo-stream.html")) throw new Error(contentType.startsWith("text/plain") && html ? html : `The server responded with ${result.status}.`);
         this.failed = !result.ok;
         window.Turbo!.renderStreamMessage(html);
         // Turbo inserts the stream synchronously; rendering its targets occurs in the next task.
