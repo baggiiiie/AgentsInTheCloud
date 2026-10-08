@@ -187,6 +187,7 @@ if ((await api("/access")).mode === "localhost") {
   const access = await api("/access");
   assert.equal(access.connectionState, "Stopped");
   assert.equal(access.authUrl, undefined);
+  assert.equal(access.origin, `http://agents-in-the-cloud.localhost:${access.localPort}`, "access URL must return to the installation computer after disconnecting Tailscale");
   assert.equal((await status()).healthy, true, "switching connection mode must not restart the app");
   console.log("PASS: local mode leaves Tailscale stopped; explicit selection starts it; computer-only mode stops it without restarting the app");
 }

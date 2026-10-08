@@ -188,6 +188,8 @@ async function serveStatic(pathname: string, request: Request): Promise<Response
 
 async function compressDynamicResponse(request: Request, response: Response): Promise<Response> {
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  // Event streams stay open; buffering them for compression prevents delivery.
+  if (contentType.startsWith("text/event-stream")) return response;
   const compressible = contentType.startsWith("text/") || contentType.includes("json") || contentType.includes("javascript") || contentType.includes("xml");
   if (request.method === "HEAD" || !response.body || !compressible || response.headers.has("content-encoding")) return response;
   const headers = new Headers(response.headers);

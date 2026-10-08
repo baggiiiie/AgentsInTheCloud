@@ -1,4 +1,4 @@
-import { renderConnectionModeSettings } from "./connection-mode.ts";
+import { connectionModeManaged, renderConnectionModeSettings } from "./connection-mode.ts";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { panelHtml } from "@agents-in-the-cloud/design-system/panel";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
@@ -126,7 +126,7 @@ export async function renderSettingsFrame(request: Request, sectionId?: string):
   });
   const content = `<div class="app-settings-overview">
     ${take("theme", "dictation", "commit-identity", "github", "update-channel", "update", "access")}
-    <section class="settings-sec settings-sec-url" id="settings-sec-url"><h2>AgentsInTheCloud URL</h2>${agentsInTheCloudUrlHtml(agentsInTheCloudUrl(request), "settings_agents_in_the_cloud_url_qr")}</section>
+    ${connectionModeManaged() ? "" : `<section class="settings-sec settings-sec-url" id="settings-sec-url"><h2>AgentsInTheCloud URL</h2>${agentsInTheCloudUrlHtml(agentsInTheCloudUrl(request), "settings_agents_in_the_cloud_url_qr")}</section>`}
     ${take(...inline.keys())}
     <div class="app-settings-disclosures">${disclosure("models", "Models")}${disclosure("host", "Host")}${disclosure("developer-tools", "Developer tools")}</div>
   </div>`;

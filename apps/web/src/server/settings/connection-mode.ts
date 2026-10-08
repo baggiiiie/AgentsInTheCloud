@@ -5,13 +5,14 @@ import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { actionLinkHtml } from "@agents-in-the-cloud/design-system/action-link";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
+import { agentsInTheCloudUrlHtml } from "../agents-in-the-cloud-url.ts";
 import { response } from "@agents-in-the-cloud/shared/http";
 
 // The System access API and marker retain their existing protocol spelling.
-const managed = () => existsSync("/run/agents-in-the-cloud-system/access-v1");
-const schema = Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), connectionState: Type.String(), authUrl: Type.Optional(Type.String()), error: Type.Optional(Type.String()) });
+export const connectionModeManaged = () => existsSync("/run/agents-in-the-cloud-system/access-v1");
+const schema = Type.Object({ mode: Type.Union([Type.Literal("localhost"), Type.Literal("tailscale")]), connectionState: Type.String(), authUrl: Type.Optional(Type.String()), origin: Type.Optional(Type.String()), error: Type.Optional(Type.String()) });
 export async function renderConnectionModeSettings(): Promise<string> {
-  if (!managed()) return "";
+  if (!connectionModeManaged()) return "";
   const status = await fetch("http://127.0.0.1:3001/access");
   if (!status.ok) throw new Error(`System access status: ${status.status}`);
   const access = Value.Parse(schema, await status.json());
@@ -39,11 +40,12 @@ export async function renderConnectionModeSettings(): Promise<string> {
       ${access.error ? `<p class="settings-error">${escapeHtml(access.error)}</p>` : ""}
       ${connectionAction}
     </section>
+    <section class="settings-sec settings-sec-url" id="settings-sec-url"><h2>AgentsInTheCloud URL</h2>${access.origin ? agentsInTheCloudUrlHtml(access.origin, "settings_agents_in_the_cloud_url_qr") : '<p>The URL will appear when the connection is ready.</p>'}</section>
   </turbo-frame>`;
 }
 export async function handleConnectionModeSettings(request: Request, url: URL): Promise<Response | undefined> {
   if (!url.pathname.startsWith("/settings/access")) return;
-  if (!managed()) return new Response("System access settings are unavailable", { status: 404 });
+  if (!connectionModeManaged()) return new Response("System access settings are unavailable", { status: 404 });
   if (url.pathname === "/settings/access/events" && request.method === "GET") {
     const upstream = await fetch("http://127.0.0.1:3001/events", { signal: request.signal });
     return new Response(upstream.body, { status: upstream.status, headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });

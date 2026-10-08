@@ -222,6 +222,11 @@ async function prepareImage(reference: string, options: { pullApp: boolean; pull
 }
 let routing: Promise<void> = Promise.resolve();
 let appliedRoute = "";
+function accessOrigin(): string | undefined {
+  if (!tailscaleSelected()) return persisted.localPort ? `http://agents-in-the-cloud.localhost:${persisted.localPort}` : undefined;
+  if (tailnetHost && appliedRoute === `${tailnetHost}:${routeTarget}`) return `https://${tailnetHost}`;
+  return undefined;
+}
 function configureRoutes(target: number): Promise<void> {
   routeTarget = target;
   // Serialize Serve mutations, always using the most recent desired destination.
@@ -397,7 +402,7 @@ const server = Bun.serve({
         if (body.mode) await setConnectionMode(body.mode);
         else { await persist(); accessChanged(); }
       }
-      return Response.json({ mode: persisted.accessMode, localPort: persisted.localPort, connectionState, authUrl, error: connectionFailure ?? networkError });
+      return Response.json({ mode: persisted.accessMode, localPort: persisted.localPort, connectionState, authUrl, origin: accessOrigin(), error: connectionFailure ?? networkError });
     }
     if (url.pathname === "/status") {
       // Check again at the handoff: startup health alone can become stale.
@@ -715,7 +720,7 @@ async function initialize() {
     let tailscaleProcess: ChildProcess | undefined;
     let login: AbortController | undefined;
     function notifyAccessChanges() {
-      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError, httpsAction]);
+      const nextAccess = JSON.stringify([persisted.accessMode, connectionState, authUrl, connectionFailure, networkError, httpsAction, accessOrigin()]);
       if (nextAccess !== lastAccess) { lastAccess = nextAccess; accessChanged(); }
     }
     while (!stopping) {
