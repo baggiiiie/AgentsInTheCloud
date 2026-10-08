@@ -25,7 +25,8 @@ export function renderNotificationControl(ctx: AgentRenderContext, busy: boolean
   const turn = currentNotificationTurn(ctx);
   const armed = turn?.armed ?? false;
   const label = armed ? "Cancel notification for this turn" : "Notify when this turn finishes";
-  return `<span id="${notificationControlId(ctx)}">${buttonHtml({
+  // Temporarily hide the bell until it has a better home in the UI.
+  return `<span id="${notificationControlId(ctx)}" hidden>${buttonHtml({
     type: "button", variant: armed ? "primary" : "secondary", disabled: !turn,
     content: { kind: "icon-only", iconHtml: Icons.Bell, label },
     attributesHtml: `aria-pressed="${armed}" data-action="click->agent-notifications#toggle" data-notification-url="${escapeHtml(agentPath(ctx, "/notification"))}" data-notification-turn="${turn?.id ?? ""}" data-notification-armed="${armed}"`,
