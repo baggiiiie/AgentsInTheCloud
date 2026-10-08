@@ -2,6 +2,7 @@ import { renderMarkdownEmbed } from "./embeds.ts";
 import { copyButtonHtml } from "@agents-in-the-cloud/design-system/copy-button";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import MarkdownIt from "markdown-it";
+import { installMath } from "./math.ts";
 import { agentsInTheCloudFileHref, workspaceFileImageSrc } from "./agents-in-the-cloud-markdown.ts";
 import { escapeHtml, isWorkspaceAppPort, isWorkspaceLoopbackHost, workspacePortAppKey, workspaceProxyUrl } from "@agents-in-the-cloud/shared";
 import { renderMarkdownDiff } from "@agents-in-the-cloud/syntax/markdown-diff";
@@ -22,6 +23,7 @@ const markdown = new MarkdownIt({
   linkify: true,
   typographer: false,
 });
+installMath(markdown);
 const defaultValidateLink = markdown.validateLink.bind(markdown);
 markdown.validateLink = (url) => /^file:\/\//i.test(url)
   ? agentsInTheCloudFileHref("", url) !== undefined

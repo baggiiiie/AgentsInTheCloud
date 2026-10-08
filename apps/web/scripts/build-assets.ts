@@ -42,8 +42,15 @@ function requiredAssetPath(logicalPath: string): string {
   return path;
 }
 
-function rewriteAssetReferences(content: string, assetManifest: AssetManifest): string {
-  let next = content;
+function rewriteAssetReferences(content: string, assetManifest: AssetManifest, logicalPath?: string): string {
+  // Vendor stylesheets (such as KaTeX) use relative font URLs. Resolve those
+  // against their logical stylesheet URL before looking up fingerprinted assets.
+  let next = logicalPath ? content.replace(/url\((['"]?)([^)'"\s]+)\1\)/g, (original, _quote, reference: string) => {
+    if (reference.startsWith("#")) return original;
+    const resolved = new URL(reference, `https://assets.invalid${logicalPath}`);
+    const path = resolved.origin === "https://assets.invalid" ? assetManifest[resolved.pathname] : undefined;
+    return path ? `url("${path}${resolved.search}${resolved.hash}")` : original;
+  }) : content;
   for (const [logicalPath, publicPath] of Object.entries(assetManifest).sort((a, b) => b[0].length - a[0].length)) {
     next = next
       .replaceAll(`url("${logicalPath}")`, `url("${publicPath}")`)
@@ -108,7 +115,7 @@ async function fingerprintCssAssets(cssFiles: StaticFileRecord[]): Promise<Map<s
   for (let pass = 0; pass < maxCssManifestPasses; pass += 1) {
     let changed = false;
     for (const [logicalPath, source] of cssSources) {
-      const content = rewriteAssetReferences(source, manifest);
+      const content = rewriteAssetReferences(source, manifest, logicalPath);
       rendered.set(logicalPath, content);
       const publicPath = fingerprintedPath(logicalPath, content);
       if (manifest[logicalPath] !== publicPath) {

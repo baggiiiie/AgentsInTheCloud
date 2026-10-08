@@ -32,7 +32,7 @@ It can be by recording a video. You will optimize for your users evaluation conv
 /** Only AgentsInTheCloud's own transcript renders embed and file URLs. */
 export const agentsInTheCloudSystemPrompt = `${sharedAgentsInTheCloudInstructions}
 
-Use Markdown for prose and tables, images, svg, and fenced Mermaid for static node-and-edge diagrams.
+Use Markdown for prose and tables, images, svg, latex/math ($..$ for inline and $$ on separate lines around display equations) , and fenced Mermaid for static node-and-edge diagrams.
 For visual or interactive explanations inline in your reply, read /opt/agents-in-the-cloud/docs/inline-content.md,
 then reference an HTML fragment with \`![](inline-content:/work/explanation.html)\`. AgentsInTheCloud supplies the theme and sizing.
 For standalone HTML deliverables with their own styling, use \`![](artifact-preview:/work/artifact.html)\` instead; these can use JavaScript and CSS files.

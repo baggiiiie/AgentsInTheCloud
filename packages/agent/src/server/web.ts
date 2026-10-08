@@ -1,4 +1,5 @@
 import { dockerHostAgentsInTheCloudDataPath, getAgentsInTheCloudRuntimeContext, type AgentsInTheCloudEventBus } from "@agents-in-the-cloud/core";
+import { markdownMathStaticFiles } from "@agents-in-the-cloud/markdown/assets";
 import type { WorkspaceModule } from "@agents-in-the-cloud/shared";
 import { observableTerminalStaticFiles } from "@agents-in-the-cloud/observable-terminal/server";
 import { workspacePortBackend, type WorkspaceDockerMount, type WorkspaceInitInstruction } from "@agents-in-the-cloud/workspace";
@@ -35,6 +36,7 @@ export const agentWorkspaceModule: WorkspaceModule = {
     "/agent.css": { url: new URL("../client/style.css", import.meta.url), contentType: "text/css; charset=utf-8" },
     "/agent-tree.css": { url: new URL("../client/tree.css", import.meta.url), contentType: "text/css; charset=utf-8" },
     ...observableTerminalStaticFiles,
+    ...markdownMathStaticFiles,
   },
   renderWorkspacePaneActions: renderUsagePaneAction,
   openApiPaths: usageOpenApiPaths,

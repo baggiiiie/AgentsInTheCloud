@@ -25,6 +25,7 @@ export interface StreamingMarkdownUpdate {
 export function streamingMarkdownStableBoundary(source: string): number {
   let boundary = 0;
   let fence: Fence | undefined;
+  let math: "$$" | "\\[" | undefined;
   const lines = source.match(/[^\r\n]*(?:\r\n|\r|\n|$)/g)?.filter(Boolean) ?? [];
   let offset = 0;
 
@@ -33,16 +34,43 @@ export function streamingMarkdownStableBoundary(source: string): number {
     const line = lineWithEnding.replace(/(?:\r\n|\r|\n)$/, "");
     const lineStart = offset;
     offset += lineWithEnding.length;
-    fence = nextFence(fence, line);
+    if (math) math = nextDisplayMath(math, line);
+    else {
+      const wasInFence = fence !== undefined;
+      fence = nextFence(fence, line);
+      if (!wasInFence && !fence) math = nextDisplayMath(undefined, line);
+    }
 
     // A trailing space may become an indented continuation, not a blank line.
     // Wait on a final CR as well: the next delta may complete a CRLF pair.
     if (!terminated || (lineWithEnding.endsWith("\r") && offset === source.length)) continue;
-    if (!/^[ \t]*$/.test(line) || fence) continue;
+    if (!/^[ \t]*$/.test(line) || fence || math) continue;
     const candidate = source.slice(boundary, lineStart);
     if (isIndependentCompletedBlock(candidate)) boundary = offset;
   }
   return boundary;
+}
+
+function nextDisplayMath(open: "$$" | "\\[" | undefined, line: string): "$$" | "\\[" | undefined {
+  if (open) return line.trimEnd().endsWith(open === "$$" ? "$$" : "\\]") ? undefined : open;
+  const match = line.match(/^ {0,3}(\$\$|\\\[)(.*)$/);
+  if (!match) return undefined;
+  const marker = match[1] === "$$" ? "$$" : "\\[";
+  return match[2]!.trimEnd().endsWith(marker === "$$" ? "$$" : "\\]") ? undefined : marker;
+}
+
+function hasOpenDisplayMath(source: string): boolean {
+  let math: "$$" | "\\[" | undefined;
+  let fence: Fence | undefined;
+  for (const line of source.replace(/\r\n?/g, "\n").split("\n")) {
+    if (math) math = nextDisplayMath(math, line);
+    else {
+      const wasInFence = fence !== undefined;
+      fence = nextFence(fence, line);
+      if (!wasInFence && !fence) math = nextDisplayMath(undefined, line);
+    }
+  }
+  return math !== undefined;
 }
 
 function nextFence(open: Fence | undefined, line: string): Fence | undefined {
@@ -68,13 +96,19 @@ function openFence(text: string): Fence | undefined {
 function isIndependentCompletedBlock(block: string): boolean {
   if (/^[ \t\r\n]*$/.test(block)) return false;
   let fence: Fence | undefined;
+  let math: "$$" | "\\[" | undefined;
   const outsideFenceLines: string[] = [];
   for (const line of block.replace(/\r\n?/g, "\n").split("\n")) {
+    if (math) { math = nextDisplayMath(math, line); continue; }
     const wasInFence = fence !== undefined;
     fence = nextFence(fence, line);
-    if (!wasInFence && !fence) outsideFenceLines.push(line);
+    if (!wasInFence && !fence) {
+      math = nextDisplayMath(undefined, line);
+      // Contents of math blocks have no Markdown reference/list semantics.
+      if (!/^ {0,3}(\$\$|\\\[)/.test(line)) outsideFenceLines.push(line);
+    }
   }
-  if (fence) return false;
+  if (fence || math) return false;
   // Reference links (including shortcut links) can depend on definitions anywhere
   // in the document. Keep the first bracket-bearing block and all subsequent
   // blocks together in the mutable tail, preserving one Markdown environment.
@@ -90,7 +124,12 @@ export function repairStreamingMarkdownTail(tail: string): string {
   // Markdown already closes fenced blocks at EOF, including inside containers.
   // A synthetic unindented closer can instead open a new root-level code block.
   // Leave open code untouched, including by the inline repairs below.
-  if (openFence(tail)) return tail;
+  if (openFence(tail) || hasOpenDisplayMath(tail)) return tail;
+
+  // Do not invent Markdown closers inside a partially emitted equation. Keeping
+  // math-bearing lines literal is safer than provisional emphasis/link repair.
+  const lastLine = tail.slice(tail.lastIndexOf("\n") + 1);
+  if (/(?:\$|\\[([])/.test(lastLine)) return tail;
 
   let repaired = tail;
   const dangling = repaired.match(/(!?)\[([^\]\n]*)\]\(([^)\s]*)$/);

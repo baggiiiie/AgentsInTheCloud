@@ -3,13 +3,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./assets": "./src/assets.ts"
   },
   "dependencies": {
+    "@agents-in-the-cloud/design-system": "workspace:*",
     "@agents-in-the-cloud/shared": "workspace:*",
     "@agents-in-the-cloud/syntax": "workspace:*",
-    "markdown-it": "14.3.0",
-    "@agents-in-the-cloud/design-system": "workspace:*"
+    "@mdit/plugin-tex": "1.0.0",
+    "katex": "0.19.0",
+    "markdown-it": "14.3.0"
   },
   "devDependencies": {
     "@types/markdown-it": "14.1.2"

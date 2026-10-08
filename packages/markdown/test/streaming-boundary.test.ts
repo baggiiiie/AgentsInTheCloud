@@ -50,6 +50,29 @@ describe("streaming Markdown source boundaries", () => {
     }
   });
 
+  test("keeps display math intact across blank lines and every streamed prefix", () => {
+    for (const [opening, closing] of [["$$", "$$"], ["\\[", "\\]"]]) {
+      for (const newline of ["\n", "\r\n", "\r"]) {
+        const intro = `Before.${newline}${newline}`;
+        const incomplete = `${opening}${newline}x = 1${newline}${newline}+ 2${newline}`;
+        expect(streamingMarkdownStableBoundary(intro + incomplete)).toBe(intro.length);
+        const completed = `${intro}${incomplete}${closing}${newline}${newline}After.`;
+        let previous = 0;
+        for (let length = 1; length <= completed.length; length++) {
+          const boundary = streamingMarkdownStableBoundary(completed.slice(0, length));
+          expect(boundary).toBeGreaterThanOrEqual(previous);
+          previous = boundary;
+        }
+        expect(previous).toBe(completed.indexOf("After."));
+      }
+    }
+  });
+
+  test("math-looking delimiters inside fences do not open math blocks", () => {
+    const source = "```latex\n$$\nx = 1\n\n```\n\n";
+    expect(streamingMarkdownStableBoundary(source + "After.")).toBe(source.length);
+  });
+
   test("boundaries never retreat across append-only line and reference prefixes", () => {
     for (const source of [
       "Alpha\n continuation\n\nTail.",
