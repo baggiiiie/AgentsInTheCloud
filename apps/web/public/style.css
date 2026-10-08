@@ -432,10 +432,8 @@ button.settings-link:disabled { opacity: .45; cursor: default; filter: none; }
 .composer:has([data-model-ready="false"]):not(:has([data-agent-busy="true"])) .composer-connect-action { display: inline-flex; }
 
 /* Host-owned agent creation and initial prompt composition. */
-.agent-empty-canvas { display:flex; align-items:center; justify-content:center; min-height:100%; padding:32px; }
-.agent-empty-choices { width:100%; max-width:360px; }
-.agent-empty-choices h2 { font-size:20px; color:var(--text-bright); margin:0 0 8px; }
-.agent-empty-choices > p { color:var(--text); margin:0 0 24px; }
+.agent-empty-canvas { display:flex; align-items:center; justify-content:center; min-height:100%; padding:16px; }
+.agent-empty-choices { width:100%; max-width:760px; container-type:inline-size; }
 .agent-empty-choices .action-list { display:grid; gap:12px; }
 #launch_composer_provider { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; min-width:0; }
 #launch_composer_provider > .popup-menu-anchor { flex:0 0 auto; }
@@ -558,6 +556,7 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
   column-gap: 8px;
   width: max-content;
   max-width: 100%;
+  border-bottom: 1px solid var(--line-strong);
 }
 .agent-type-picker-header {
   display: grid;
@@ -568,6 +567,12 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
   font-size: var(--text-code);
 }
 .agent-type-picker-header > :first-child { grid-column: 1 / 3; }
+.agent-type-choice {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--line-strong);
+}
 .agent-type-picker .content-row {
   display: grid;
   grid-template-columns: subgrid;
@@ -598,3 +603,12 @@ html.software-keyboard-visible .composer.launch-composer :is(.agent-attach-row, 
 }
 .agent-type-subscription { display: flex; align-items: center; justify-content: center; }
 .agent-type-subscription svg { width: 18px; height: 18px; }
+
+@container (max-width: 440px) {
+  .agent-empty-choices .agent-type-picker { width:100%; grid-template-columns:16px minmax(0, 1fr); }
+  .agent-empty-choices .agent-type-picker-header { display:none; }
+  .agent-empty-choices .content-row__metadata { grid-column:2; }
+  .agent-empty-choices .agent-type-fields { grid-template-columns:minmax(0, 1fr) auto; gap:8px; }
+  .agent-empty-choices .agent-type-what { grid-column:1 / -1; overflow-wrap:normal; }
+  .agent-empty-choices .agent-type-subscriptions { display:flex; }
+}

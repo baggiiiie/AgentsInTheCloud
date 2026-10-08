@@ -38,7 +38,7 @@ function renderModelSelection(formId: string, models: ComposerModelOption[], con
   const modelItems = models.map((model) => {
     return contentRowHtml({
       width: "fill",
-      ...(model.unavailableReason ? { kind: "multiline" as const, description: model.unavailableReason } : { kind: "compact" as const }),
+      kind: "compact",
       label: { kind: "text", text: model.name },
       leadingHtml: providerBrandIconHtml(model.provider),
       element: { tag: "button", attributesHtml: `type="submit" name="model" value="${escapeHtml(`${model.provider}::${model.id}`)}" form="${escapeHtml(formId)}" role="menuitemradio" aria-checked="${model.selected}"${model.available === false ? " disabled" : ""}` },

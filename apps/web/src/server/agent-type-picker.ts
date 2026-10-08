@@ -36,7 +36,7 @@ export function renderAgentTypePicker(agentTypes: readonly AgentTypeChoice[], op
       trailingHtml: `<span class="agent-type-fields"><span class="agent-type-what">${escapeHtml(description.what)}</span><span>${description.models}</span><span class="agent-type-subscriptions">${subscriptions}</span></span>`,
       element: { tag: "button", attributesHtml: options.attributes(agentType) },
     });
-    return row;
+    return `<div class="agent-type-choice">${row}</div>`;
   }).join("");
   return `<div class="agent-type-picker"><div class="agent-type-picker-header" aria-hidden="true"><span>Agent</span><span>What</span><span>Models</span><span>Subscriptions</span></div>${rows}</div>`;
 }
