@@ -44,6 +44,33 @@ afterEach(async () => {
 });
 
 describe("Durable workspace journal", () => {
+  test("forwards distinct provider session IDs for new Builtin agents and preserves them after reopen", async () => {
+    const path = await directory();
+    const options = provider();
+    const sessionIds: (string | undefined)[] = [];
+    const streamSimple = options.models.streamSimple.bind(options.models);
+    options.models.streamSimple = (model, request, settings) => {
+      sessionIds.push(settings?.sessionId);
+      return streamSimple(model, request, settings);
+    };
+    options.faux.setResponses(Array.from({ length: 3 }, () => fauxAssistantMessage("answer")));
+    const first = await open(path, options);
+    const one = await first.agent(record, agent);
+    await (await one.submit({ type: "input", content: "First request", requestId: "one" }, context)).wait(context);
+    const two = await first.agent({ ...record, agentId: "second-agent" }, agent);
+    await (await two.submit({ type: "input", content: "Independent request", requestId: "two" }, context)).wait(context);
+    await first.close();
+
+    const reopened = await open(path, options);
+    await (await (await reopened.agent(record)).submit({ type: "input", content: "After reopen", requestId: "three" }, context)).wait(context);
+    expect(sessionIds).toHaveLength(3);
+    for (const sessionId of sessionIds) {
+      expect(sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    expect(sessionIds[1]).not.toBe(sessionIds[0]);
+    expect(sessionIds[2]).toBe(sessionIds[0]);
+  });
+
   test("creates independent roots atomically and finds their stable identities after reopen", async () => {
     const path = await directory();
     const options = provider();

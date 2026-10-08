@@ -22,12 +22,14 @@ for (const api of ["openai-codex-responses", "anthropic-messages"] as const) {
   test(`Durable persisted attribution reaches ${api} serializer across reopen`, async () => {
     const directory = await mkdtemp(join(tmpdir(), "durable-delegation-spike-"));
     const captured: JsonObject[] = [];
+    const sessionIds: (string | undefined)[] = [];
     let networkCalls = 0;
     const model: Model<typeof api> = { id: api === "anthropic-messages" ? "claude-sonnet-4-20250514" : "gpt-5.4", name: "Spike", provider: "spike", api, baseUrl: "https://never-contact.invalid", reasoning: false, input: ["text"], contextWindow: 200000, maxTokens: 1024, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
     const base = createModels();
     const overrides: Pick<Models, "getModel" | "streamSimple"> = {
       getModel: () => model,
       streamSimple(_model, context, originalOptions) {
+        sessionIds.push(originalOptions?.sessionId);
         const options: SimpleStreamOptions = {
           ...originalOptions,
           apiKey: api === "openai-codex-responses" ? token : "inspection-only",
@@ -74,6 +76,19 @@ for (const api of ["openai-codex-responses", "anthropic-messages"] as const) {
       const reopened = (await harness.conversation(id, ctx))!;
       await (await reopened.submit({ type: "input", content: "Retry after reopen", requestId: "second" }, ctx)).wait(ctx);
       expect(captured).toHaveLength(3);
+      // Durable supplies a persisted provider UUID, and the production delegation
+      // adapter preserves it. A fork has its own affinity; reopen keeps the root's.
+      expect(sessionIds).toHaveLength(3);
+      for (const sessionId of sessionIds) {
+        expect(sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      }
+      expect(sessionIds[0]).not.toBe(sessionIds[1]);
+      expect(sessionIds[2]).toBe(sessionIds[1]);
+      if (api === "openai-codex-responses") {
+        for (const [index, payload] of captured.entries()) {
+          expect(payload.prompt_cache_key === sessionIds[index]).toBe(true);
+        }
+      }
       for (const payload of captured) {
         expect(JSON.stringify(payload)).not.toContain("agents-in-the-cloud-agent-message:");
         expect(JSON.stringify(payload)).not.toContain("agentsInTheCloudAgentMessage");
