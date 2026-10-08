@@ -1,4 +1,6 @@
 import { composerAttachmentAttributes, renderComposerBody } from "@agents-in-the-cloud/prompt/server";
+import type { WorkspaceTemplateSummary } from "@agents-in-the-cloud/workspace-templates";
+import { workspaceTemplateChoiceHtml, workspaceTemplateIconHtml } from "./workspace-template-presentation.ts";
 import { buttonHtml } from "@agents-in-the-cloud/design-system/button";
 import { renderAgentTypePicker } from "./agent-type-picker.ts";
 import { popupHtml } from "@agents-in-the-cloud/design-system/popup";
@@ -61,4 +63,29 @@ export function renderLaunchComposer(options: { action: string; formId: string; 
       <div class="composer-footer">${content.footerHtml}</div>
     </div>
   </div>`;
+}
+
+export function launchWorkspaceAction(workspaceTemplateId: string | undefined, autoSelect: boolean): string {
+  const path = workspaceTemplateId ? `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplateId)}` : "/agent-workspaces";
+  return `${path}${autoSelect ? "?autoSelect=true" : ""}`;
+}
+
+export function renderLaunchWorkspaceTemplate(workspaceTemplates: readonly WorkspaceTemplateSummary[], selected: WorkspaceTemplateSummary | undefined, autoSelect: boolean): string {
+  const frameId = "launch_composer_workspace_template";
+  const selectionFormId = `${frameId}_selection`;
+  const ordered = [...workspaceTemplates].sort((left, right) => (right.lastUsedAt ?? 0) - (left.lastUsedAt ?? 0) || left.name.localeCompare(right.name));
+  return `<turbo-frame id="${frameId}" data-action="turbo:frame-load->launch-composer-dialog#templateChanged">
+    <form id="${selectionFormId}" method="get" action="/launch-composer/workspace-template" data-turbo-frame="${frameId}" hidden>
+      <input type="hidden" name="autoSelect" value="${autoSelect}">
+    </form>
+    <input type="hidden" data-launch-template-action="${escapeHtml(launchWorkspaceAction(selected?.id, autoSelect))}" value="${escapeHtml(selected?.id ?? "")}">
+    ${popupHtml({
+      id: `${frameId}_menu`, label: "Workspace template", width: "content",
+      trigger: { variant: "secondary", content: { kind: "caption", caption: selected?.name ?? "Empty workspace", iconHtml: workspaceTemplateIconHtml(selected) } },
+      contentHtml: [...ordered, undefined].map(template => workspaceTemplateChoiceHtml(template ? { ...template, title: template.name } : undefined, {
+        emptyLabel: "Empty workspace",
+        primaryAttributesHtml: `type="submit" name="workspaceTemplate" value="${escapeHtml(template?.id ?? "")}" form="${selectionFormId}" role="menuitemradio" aria-checked="${template?.id === selected?.id}"`,
+        settingsAttributesHtml: 'data-action="click->dialog#close"',
+      })).join(""),
+    })}</turbo-frame>`;
 }

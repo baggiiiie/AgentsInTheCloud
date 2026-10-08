@@ -14,8 +14,8 @@ export interface DialogOptions {
   iconHtml: string;
   /** Plain-text title caption. Dialog owns its body-text typography; callers supply no heading styling. */
   titleCaption: string;
-  /** Trusted controls placed immediately before the header close button. */
-  headerActionsHtml?: string;
+  /** Optional sentence with an inline control. Text is escaped; controlHtml is trusted. titleCaption remains the accessible dialog name. */
+  titleParts?: { before: string; controlHtml: string; after: string };
   /** Trusted, already-escaped body contents. */
   bodyHtml: string;
   /** Padded by default. Use full-bleed when child regions own spacing or separators must reach both edges. */
@@ -38,9 +38,12 @@ export function dialogHtml(options: DialogOptions): string {
     variant: "secondary",
     content: { kind: "icon-only", iconHtml: Icons.Close, label: closeLabel },
   })}</form>`;
+  const title = options.titleParts
+    ? `<div class="panel__title dialog__title" role="heading" aria-level="2">${options.iconHtml}<span>${escapeHtml(options.titleParts.before)} ${options.titleParts.controlHtml}${escapeHtml(options.titleParts.after)}</span></div>`
+    : `<h2 class="panel__title dialog__title">${options.iconHtml}<span>${escapeHtml(options.titleCaption)}</span></h2>`;
   const panel = panelHtml({
     element: { tag: "div" },
-    headerHtml: `<h2 class="panel__title dialog__title">${options.iconHtml}<span>${escapeHtml(options.titleCaption)}</span></h2>${options.headerActionsHtml ? `<div class="dialog__header-actions">${options.headerActionsHtml}</div>` : ""}${cancelButton}`,
+    headerHtml: `${title}${cancelButton}`,
     bodyHtml: options.bodyHtml,
     bodyLayout: options.bodyLayout ?? "padded",
     bodyOverflow: "scroll",

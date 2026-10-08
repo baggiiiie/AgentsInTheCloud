@@ -101,6 +101,14 @@ class LaunchComposerDialogController extends Controller<HTMLDialogElement> {
     return this.element.querySelector<HTMLElement>(".launch-composer")!;
   }
 
+  templateChanged(event: Event): void {
+    // SAFETY: This action is bound to the template Turbo Frame’s load event.
+    const frame = event.target as HTMLElement;
+    const selection = frame.querySelector<HTMLInputElement>("[data-launch-template-action]")!;
+    this.composer.querySelector<HTMLFormElement>("form")!.action = selection.dataset.launchTemplateAction!;
+    this.composer.setAttribute("data-dictation-composer-workspace-template-id-value", selection.value);
+  }
+
   focusText(event: MouseEvent): void {
     focusComposerText(this.composer, event);
   }

@@ -1031,7 +1031,7 @@ export const entries: CatalogueEntry[] = [
     title: "Dialog",
     when: "A focused task temporarily blocking page interaction. Not for small menus or ordinary navigation.",
     contract:
-      "Native dialog plus Panel. Open with showModal() in Stimulus or data-dialog-auto-show on server insertion. Escape and close dismiss; focus returns to opener. Provide titleCaption; the header and title always use regular body-text typography, owned by Dialog rather than callers. Full-bleed is for regions owning layout, not a size variant.",
+      "Native dialog plus Panel. Open with showModal() in Stimulus or data-dialog-auto-show on server insertion. Escape and close dismiss; focus returns to opener. Provide titleCaption for the accessible name; titleParts can compose escaped before/after text around a trusted inline control. The header and title always use regular body-text typography, owned by Dialog rather than callers. Full-bleed is for regions owning layout, not a size variant.",
     imports: { dialog: "dialogHtml", button: "buttonHtml", icons: "Icons" },
     examples: [
       {
@@ -1047,6 +1047,11 @@ export const entries: CatalogueEntry[] = [
             element: { id: "catalogue-dialog" },
             iconHtml: Icons.Plus,
             titleCaption: "A focused task",
+            titleParts: {
+              before: "Edit record in",
+              controlHtml: '<select class="popup-select" aria-label="Record environment"><option>Development</option><option>Staging</option></select>',
+              after: ", then save.",
+            },
             bodyHtml:
               '<label>Record name<input class="text-field" autofocus placeholder="Enter a name"></label><p>Resize, tab through controls, and press Escape.</p><span><select class="popup-select" aria-label="Dialog environment"><option>Development</option><option>Staging</option></select></span>' +
               "<p>Long content inside the modal.</p>".repeat(15),

@@ -11,7 +11,7 @@ import { buttonConfirmationHtml } from "@agents-in-the-cloud/design-system/butto
 import { escapeHtml } from "@agents-in-the-cloud/shared";
 import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts, listWorkspaceTemplateSshKeys, workspaceTemplateSecretAllowsPath, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSecretSummary } from "@agents-in-the-cloud/workspace-templates";
 
-import { workspaceTemplateSwatchColor } from "./workspace-presentation.ts";
+import { workspaceTemplateSwatchColor } from "./workspace-template-presentation.ts";
 
 export const templateSettingsHostId = "template_settings_host";
 export const templateSettingsFrameId = "template_settings_detail";

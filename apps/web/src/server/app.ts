@@ -54,7 +54,7 @@ import { getAgentType, defaultAgentType, orderedAgentTypes, registeredAgentTypes
 import { openWorkspaceFile } from "./file-navigation.ts";
 import { httpErrorStatus, problemJsonResponse } from "./http-responses.ts";
 import { jsonResponse, matchRoute, replace, response, textResponse, update, wantsStream } from "@agents-in-the-cloud/shared/http";
-import { launchComposerContent, renderLaunchComposer, renderLaunchAgentType } from "./launch-composer.ts";
+import { launchComposerContent, renderLaunchComposer, renderLaunchAgentType, renderLaunchWorkspaceTemplate, launchWorkspaceAction } from "./launch-composer.ts";
 import { createLiveResource } from "./live-resource.ts";
 import { handleOnboardingRequest, renderOnboardingDialog } from "./onboarding/routes.ts";
 import { agentsInTheCloudOpenApi } from "./openapi.ts";
@@ -291,38 +291,28 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     return { frameId: launchComposerSettingsFrameId, formId: launchComposerFormId, url: "/launch-composer/settings", query };
   }
 
-  async function renderLaunchComposerFrame(options: { titleCaption: string; action: string; workspaceTemplateId?: string }): Promise<string> {
+  async function renderLaunchComposerFrame(workspaceTemplate?: WorkspaceTemplateSummary, autoSelect = false): Promise<string> {
     const draftId = crypto.randomUUID();
     const agentTypes = await orderedAgentTypes();
     const initialPrompt = registry.list().length === 0
       ? "Hi, I think I'm about to make my first workspace in AgentsInTheCloud. Yay!\n\nIs it true that you have access to your own documentation and I can just ask you if I have a question about it?"
       : "";
-    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: options.workspaceTemplateId, initialPrompt });
+    const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: workspaceTemplate?.id, initialPrompt });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
         attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut composer-focus" data-action="mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:software-keyboard@document->launch-composer-dialog#layout resize@window->launch-composer-dialog#layout" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
       },
       iconHtml: Icons.Workspace,
-      titleCaption: options.titleCaption,
+      titleCaption: "Create workspace from a template, and then…",
+      titleParts: {
+        before: "Create workspace from",
+        controlHtml: renderLaunchWorkspaceTemplate((await listWorkspaceTemplates()).workspaceTemplates, workspaceTemplate, autoSelect),
+        after: ", and then…",
+      },
       closeLabel: "Close launch composer",
       bodyLayout: "full-bleed",
-      bodyHtml: renderLaunchComposer({ action: options.action, formId: launchComposerFormId, content }),
+      bodyHtml: renderLaunchComposer({ action: launchWorkspaceAction(workspaceTemplate?.id, autoSelect), formId: launchComposerFormId, content }),
     })}</turbo-frame>`;
-  }
-
-  async function renderEmptyLaunchComposerFrame(autoSelect = false): Promise<string> {
-    return await renderLaunchComposerFrame({
-      titleCaption: "Create empty workspace, and then…",
-      action: `/agent-workspaces${autoSelect ? "?autoSelect=true" : ""}`,
-    });
-  }
-
-  async function renderWorkspaceTemplateLaunchComposerFrame(workspaceTemplate: WorkspaceTemplateSummary, autoSelect = false): Promise<string> {
-    return await renderLaunchComposerFrame({
-      titleCaption: `Create workspace from ${workspaceTemplate.name}, and then…`,
-      action: `/workspace-template-agent-workspaces/${encodeURIComponent(workspaceTemplate.id)}${autoSelect ? "?autoSelect=true" : ""}`,
-      workspaceTemplateId: workspaceTemplate.id,
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -586,7 +576,7 @@ export function createWebApp(deps: WebAppDeps): WebApp {
       : surface?.kind === "models" ? await renderModelsDialog({ focus: surface.focus })
       : "";
     const launchComposer = surface?.kind === "new-workspace"
-      ? surface.workspaceTemplate ? await renderWorkspaceTemplateLaunchComposerFrame(surface.workspaceTemplate) : await renderEmptyLaunchComposerFrame()
+      ? await renderLaunchComposerFrame(surface.workspaceTemplate)
       : `<turbo-frame id="${launchComposerFrameId}"></turbo-frame>`;
     return `<div class="app fixed-shell-app" data-controller="agents-in-the-cloud-shortcuts workspace-navigation">
     ${renderWorkspacePane(pane, renderGlobalSidebarContributions(), workspaceModules.map((module) => module.renderWorkspacePaneActions?.() ?? "").join(""), launchComposerCommand.binding)}
@@ -1182,9 +1172,11 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     if (url.pathname === "/launch-composer" && request.method === "GET") {
       const workspaceTemplateReference = url.searchParams.get("workspaceTemplate");
       const autoSelect = url.searchParams.get("autoSelect") === "true";
-      return response(workspaceTemplateReference
-        ? await renderWorkspaceTemplateLaunchComposerFrame(await workspaceTemplateRoutes.byReference(workspaceTemplateReference), autoSelect)
-        : await renderEmptyLaunchComposerFrame(autoSelect));
+      return response(await renderLaunchComposerFrame(workspaceTemplateReference ? await workspaceTemplateRoutes.byReference(workspaceTemplateReference) : undefined, autoSelect));
+    }
+    if (url.pathname === "/launch-composer/workspace-template" && request.method === "GET") {
+      const reference = url.searchParams.get("workspaceTemplate");
+      return response(renderLaunchWorkspaceTemplate((await listWorkspaceTemplates()).workspaceTemplates, reference ? await workspaceTemplateRoutes.byReference(reference) : undefined, url.searchParams.get("autoSelect") === "true"));
     }
     if (url.pathname === "/launch-composer/agent-type" && request.method === "GET") return response(await renderLaunchAgentType(getAgentType(url.searchParams.get("agentTypeId") ?? "builtin"), await orderedAgentTypes(), launchComposerFooterContext()));
     if (url.pathname === "/launch-composer/settings" && request.method === "GET") return response(await getAgentType(url.searchParams.get("agentTypeId") ?? "builtin").launch.renderFooter(launchComposerFooterContext(url.searchParams)));

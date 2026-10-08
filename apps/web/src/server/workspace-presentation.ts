@@ -1,3 +1,4 @@
+import { workspaceTemplateChoiceHtml, workspaceTemplateIconHtml } from "./workspace-template-presentation.ts";
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
 import { contentRowHtml } from "@agents-in-the-cloud/design-system/content-row";
 import { addBadgeHtml } from "@agents-in-the-cloud/design-system/add-badge";
@@ -97,19 +98,6 @@ function renderWorkspaceRowStatus(workspace: WorkspacePaneEntry): string {
     : "";
 }
 
-/** Deterministic swatch color: one of 360 hues at three lightness steps, from an FNV-1a hash of the template id. */
-export function workspaceTemplateSwatchColor(workspaceTemplateId: string): string {
-  let hash = 0x811c9dc5;
-  for (const char of workspaceTemplateId) hash = Math.imul(hash ^ char.charCodeAt(0), 0x01000193) >>> 0;
-  return `oklch(${[0.62, 0.7, 0.78][Math.floor(hash / 360) % 3]} 0.15 ${hash % 360})`;
-}
-
-function workspaceTemplateIconHtml(workspaceTemplate?: Pick<WorkspacePaneWorkspaceTemplate, "id" | "swatchColor">): string {
-  return workspaceTemplate
-    ? `<span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(workspaceTemplate.swatchColor ?? workspaceTemplateSwatchColor(workspaceTemplate.id))}" aria-hidden="true"></span>`
-    : '<span class="workspace-template-icon is-empty" aria-hidden="true"></span>';
-}
-
 function renderWorkspaceRow(workspace: WorkspacePaneEntry, index: number): string {
   const { parked, workspaceTemplate } = workspace;
   const id = workspaceRowDomId(workspace.id);
@@ -164,20 +152,9 @@ function renderNewWorkspaceRow(presentation: WorkspacePanePresentation): string 
 }
 
 function renderWorkspaceTemplateOption(workspaceTemplate?: WorkspacePaneWorkspaceTemplate): string {
-  const title = workspaceTemplate?.title ?? "Nothing";
-  const settings = workspaceTemplate ? actionLinkHtml({
-    href: `/workspace-templates/${encodeURIComponent(workspaceTemplate.id)}/settings`,
-    variant: "secondary",
-    content: { kind: "icon-only", iconHtml: Icons.More, label: `${title} settings` },
-    attributesHtml: workspaceTemplateDialogTarget,
-  }) : undefined;
-  return contentRowHtml({
-    width: "fill",
-    kind: "compact",
-    leadingHtml: workspaceTemplateIconHtml(workspaceTemplate),
-    label: { kind: "text", text: title },
-    primary: { tag: "button", attributesHtml: `type="submit" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose keydown->workspace-pane#optionKeydown"` },
-    engagedActionsHtml: settings,
+  return workspaceTemplateChoiceHtml(workspaceTemplate, {
+    emptyLabel: "Nothing",
+    primaryAttributesHtml: `type="submit" role="radio" aria-checked="false" tabindex="-1" data-workspace-pane-target="option" data-workspace-template-id="${escapeHtml(workspaceTemplate?.id ?? "")}" data-action="workspace-pane#choose keydown->workspace-pane#optionKeydown"`,
   });
 }
 
