@@ -289,7 +289,6 @@ const filesClientModule: WorkspaceClientModule = {
       label: "Filter files",
       description: "Open the Files navigator and focus its filter.",
       scope: "work-view",
-      binding: "Meta+Alt+KeyP",
       run: async () => {
         const workbench = [...document.querySelectorAll<HTMLElement>(".files-workbench")]
           .find((candidate) => isWorkspacePaneVisible(candidate));
