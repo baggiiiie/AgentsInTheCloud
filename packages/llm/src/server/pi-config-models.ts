@@ -250,17 +250,19 @@ export async function loginPiOAuthProvider(providerId: string, interaction: Auth
   await refreshConnectedProviderCatalogue(runtime, providerId, interaction.signal);
 }
 
-async function validateModelProviderApiKey(provider: string, key: string): Promise<void> {
+/** Probe stored catalogue models or a not-yet-saved custom model using an in-memory credential. */
+export async function validateModelProviderApiKey(provider: string, key: string, customModel?: Model<Api>): Promise<void> {
   const trimmed = key.trim();
   if (!trimmed) throw new Error("API key is required");
   const credentials = new InMemoryCredentialStore();
   await credentials.modify(provider, async () => ({ type: "api_key", key: trimmed }));
-  const runtime = identifyAsAgentsInTheCloud(await ModelRuntime.create({ credentials, modelsPath: piModelsJsonPath(), allowModelNetwork: false }));
+  const runtime = identifyAsAgentsInTheCloud(await ModelRuntime.create({ credentials, modelsPath: customModel ? null : piModelsJsonPath(), allowModelNetwork: false }));
+  if (customModel) runtime.registerProvider(provider, { api: customModel.api, baseUrl: customModel.baseUrl, models: [customModel] });
   const models = runtime.getModels(provider);
   const model = models[Math.floor(Math.random() * models.length)];
   if (!model) throw new Error(`No models found for provider "${provider}"`);
-  const response = await runtime.completeSimple(model, { messages: [{ role: "user", content: "Reply with exactly: ok", timestamp: Date.now() }] }, { maxTokens: 1, headers: claudeCodeHeaders(model) });
-  if (response.stopReason === "error") throw new Error(response.errorMessage ?? "Provider rejected the API key");
+  const response = await runtime.completeSimple(model, { messages: [{ role: "user", content: "Reply with exactly: ok", timestamp: Date.now() }] }, { maxTokens: 1, headers: claudeCodeHeaders(model), signal: customModel ? AbortSignal.timeout(15_000) : undefined });
+  if (response.stopReason === "error" || response.stopReason === "aborted") throw new Error(response.errorMessage ?? "Provider rejected the API key");
 }
 
 export async function connectModelProviderApiKey(provider: string, key: string, options: { validate?: boolean } = {}): Promise<void> {

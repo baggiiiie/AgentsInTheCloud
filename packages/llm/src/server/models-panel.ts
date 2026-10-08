@@ -1,4 +1,5 @@
 import { disclosureHtml } from "@agents-in-the-cloud/design-system/disclosure";
+import { connectCustomOpenAIEndpoint, customOpenAIProtocols, customOpenAIDefaults, CustomEndpointInputError, type CustomOpenAIProtocol, type CustomOpenAIEndpointInput } from "./custom-openai-endpoint.ts";
 import { availableProviderModels } from "./known-model-provider-incorrectness.ts";
 import { anthropicSubscriptionNotice } from "./subscription.ts";
 import { listAccounts, providerLabel, sortByPopularity, type Account } from "./accounts.ts";
@@ -125,8 +126,12 @@ function renderAccountCard(account: Account, host: ModelsHost, open: boolean): s
   return `<div class="model-account">${disclosureHtml({ summary, open: open || account.connection === "needs_attention", bodyHtml: `<div class="form-section">${notice}${usage}<div class="model-account__actions">${reconnect}${disconnect}</div></div>` })}</div>`;
 }
 
-function renderProviderChoice(provider: ProviderChoice, host: ModelsHost, width: "fit" | "fill" = "fit"): string {
-  return `<form class="model-provider-choice" method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true">${contentRowHtml({
+function renderProviderChoice(provider: Pick<ProviderChoice, "provider" | "label">, host: ModelsHost, width: "fit" | "fill" = "fit", customApi?: CustomOpenAIProtocol): string {
+  const attributes = customApi
+    ? `method="get" action="/models/custom-endpoints/new" data-turbo-frame="${ids.connect(host)}"`
+    : `method="post" action="/models/providers/${encodeURIComponent(provider.provider)}/connect?${hostQuery(host)}" data-turbo="true"`;
+  const fields = customApi ? `<input type="hidden" name="host" value="${host}"><input type="hidden" name="api" value="${customApi}">` : "";
+  return `<form class="model-provider-choice" ${attributes}>${fields}${contentRowHtml({
     kind: "multiline",
     width,
     element: { tag: "button", attributesHtml: 'type="submit"' },
@@ -138,7 +143,10 @@ function renderProviderChoice(provider: ProviderChoice, host: ModelsHost, width:
 function renderOtherProviders(providers: ProviderChoice[], host: ModelsHost, query = ""): string {
   const normalized = query.trim().toLowerCase();
   const matching = providers.filter((provider) => `${provider.label} ${provider.provider}`.toLowerCase().includes(normalized));
-  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other model providers">${matching.map((provider) => renderProviderChoice(provider, host, "fill")).join("") || '<div class="managed-list__empty" role="status">No matching model providers.</div>'}</div></turbo-frame>`;
+  const customProtocols = customOpenAIProtocols.filter(protocol => `${protocol.name} ${protocol.id}`.toLowerCase().includes(normalized));
+  const customChoices = customProtocols.map(protocol => renderProviderChoice({ provider: "openai", label: protocol.name }, host, "fill", protocol.id)).join("");
+  const choices = matching.map((provider) => renderProviderChoice(provider, host, "fill")).join("") + customChoices;
+  return `<turbo-frame id="${ids.otherProviders(host)}"><div class="model-providers" tabindex="0" role="region" aria-label="Other model providers">${choices || '<div class="managed-list__empty" role="status">No matching model providers.</div>'}</div></turbo-frame>`;
 }
 
 function connectFrame(host: ModelsHost, body: string): string {
@@ -356,6 +364,32 @@ function renderApiKeyConnectionStep(provider: ProviderChoice, host: ModelsHost, 
         <input id="${inputId}" class="text-field" type="password" aria-label="API key" data-1p-ignore name="secret" placeholder="${escapeHtml(getProviderApiKeyExample(provider.provider) ?? "API key")}" autocomplete="off" required autofocus>
       </form>`,
     actionsHtml: backToChoices(host) + buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Connect" }, attributesHtml: `form="${formId}"` }),
+  });
+}
+
+function renderCustomEndpointStep(host: ModelsHost, protocol: typeof customOpenAIProtocols[number], values: Partial<Omit<CustomOpenAIEndpointInput, "api" | "apiKey">> = {}, error = ""): string {
+  const formId = domId("custom_endpoint_form", host);
+  const field = (name: string, label: string, value: string, attributes = "") => `<div><label for="${formId}_${name}">${label}</label><input class="text-field" id="${formId}_${name}" name="${name}" value="${escapeHtml(value)}" ${attributes}></div>`;
+  const advanced = disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Advanced settings" } }, bodyHtml: `<div class="form-stack">
+    <p>Model listings don't include reliable limits. These apply to every model added here; adjust them to match your server.</p>
+    ${field("contextWindow", "Context window (tokens)", String(values.contextWindow ?? customOpenAIDefaults.contextWindow), 'type="number" min="1" step="1" required')}
+    ${field("maxTokens", "Maximum output tokens", String(values.maxTokens ?? customOpenAIDefaults.maxTokens), 'type="number" min="1" step="1" required')}
+  </div>` });
+  return renderConnectionStep({ provider: "openai", label: protocol.name }, host, {
+    bodyHtml: `${error ? `<p class="settings-error" role="alert">${escapeHtml(error)}</p>` : ""}
+      <form id="${formId}" class="form-stack" method="post" action="/models/custom-endpoints?${hostQuery(host)}" data-turbo="true">
+        <input type="hidden" name="api" value="${protocol.id}">
+        ${field("name", "Name", values.name ?? "", 'required placeholder="DevBox Ollama" autofocus')}
+        ${field("baseUrl", "Base URL", values.baseUrl ?? "", 'type="url" required placeholder="https://models.example.com/v1"')}
+        <div><label for="${formId}_key">API key (optional)</label><input class="text-field" id="${formId}_key" type="password" name="secret" autocomplete="off" data-1p-ignore><p>Leave blank for servers without authentication.</p></div>
+        <p>Fetch models, then enable the ones you want. Or connect by model ID.</p>
+        ${field("modelId", "Model ID (for manual connection)", values.modelId ?? "", 'placeholder="local-coder"')}
+        ${advanced}
+        <p>Private endpoints must be reachable from the app. Workspace network restrictions still apply.</p>
+      </form>`,
+    actionsHtml: backToChoices(host)
+      + buttonHtml({ type: "submit", variant: "secondary", content: { kind: "caption", caption: "Connect model ID" }, attributesHtml: `form="${formId}" name="action" value="manual" data-turbo-submits-with="Connecting…"` })
+      + buttonHtml({ type: "submit", variant: "primary", content: { kind: "caption", caption: "Fetch models and connect" }, attributesHtml: `form="${formId}" name="action" value="discover" data-turbo-submits-with="Fetching models…"` }),
   });
 }
 
@@ -598,6 +632,30 @@ export async function handleModelsRequest(request: Request, url: URL, renderPick
   if (url.pathname === "/models/connect/providers" && request.method === "GET") {
     const runtime = await createPiModelRuntime();
     return response(renderOtherProviders(unconnectedProviders(runtime, await listAccounts(runtime)).other, host, url.searchParams.get("q") ?? ""));
+  }
+  if (url.pathname === "/models/custom-endpoints/new" && request.method === "GET") {
+    const protocol = customOpenAIProtocols.find(protocol => protocol.id === url.searchParams.get("api"));
+    if (!protocol) return response("Unknown endpoint protocol", { status: 400 });
+    return response(renderCustomEndpointStep(host, protocol));
+  }
+  if (url.pathname === "/models/custom-endpoints" && request.method === "POST") {
+    const form = await request.formData();
+    const protocol = customOpenAIProtocols.find(protocol => protocol.id === form.get("api"));
+    if (!protocol) return response("Unknown endpoint protocol", { status: 400 });
+    const action = form.get("action");
+    if (action !== "discover" && action !== "manual") return response("Unknown endpoint action", { status: 400 });
+    const values = {
+      name: String(form.get("name") ?? ""), baseUrl: String(form.get("baseUrl") ?? ""),
+      modelId: String(form.get("modelId") ?? ""),
+      contextWindow: Number(form.get("contextWindow")), maxTokens: Number(form.get("maxTokens")),
+    };
+    try { await connectCustomOpenAIEndpoint({ ...values, api: protocol.id, apiKey: String(form.get("secret") ?? "") }, action === "discover"); }
+    catch (error) {
+      // Do not reflect keys or upstream diagnostics into HTML, even if the server echoes them.
+      const message = error instanceof CustomEndpointInputError ? error.message : "Couldn't connect the endpoint. Check its settings and try again.";
+      return stream(replace(ids.connect(host), renderCustomEndpointStep(host, protocol, values, message)));
+    }
+    return panelResponse(host, renderPickerUpdates, { focus: "models", connectHtml: connectFrame(host, `<p role="status">${escapeHtml(values.name.trim())} connected. Choose models to enable below.</p>${backToChoices(host)}`) });
   }
   if (url.pathname === "/models/catalogue" && request.method === "GET") {
     const runtime = await createPiModelRuntime();
