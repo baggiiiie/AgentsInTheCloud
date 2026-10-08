@@ -101,26 +101,26 @@ describe("Workspace templates", () => {
     expect((await revealWorkspaceTemplateSecrets(workspaceTemplate.id, file, keyFile))[0]).not.toHaveProperty("placeholder");
   });
 
-  test("secret requirements can be saved, annotated, made optional, and filled later", async () => {
+  test("secrets can be saved, annotated, and filled later", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-secret-requirements-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "key");
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/requirements.git", file)).workspaceTemplate;
     const values = { envName: "API_TOKEN", hostPattern: "api.example.com" };
     const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { ...values, annotation: " Integration tests " }, file, keyFile);
-    expect(secret).toMatchObject({ annotation: "Integration tests", optional: false, configured: false });
+    expect(secret).toMatchObject({ annotation: "Integration tests", configured: false });
     expect(await revealWorkspaceTemplateSecrets(workspaceTemplate.id, file, keyFile)).toEqual([]);
-    expect(await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, optional: true, annotation: "Upload reports" }, file, keyFile))
-      .toMatchObject({ optional: true, configured: false, annotation: "Upload reports" });
+    expect(await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "Upload reports" }, file, keyFile))
+      .toMatchObject({ configured: false, annotation: "Upload reports" });
     expect(await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "real-value" }, file, keyFile))
-      .toMatchObject({ optional: true, configured: true, annotation: "Upload reports" });
-    await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "", optional: false, secretValue: "" }, file, keyFile);
-    expect(await listWorkspaceTemplateSecrets(workspaceTemplate.id, file)).toMatchObject([{ annotation: "", optional: false, configured: true }]);
+      .toMatchObject({ configured: true, annotation: "Upload reports" });
+    await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "", secretValue: "" }, file, keyFile);
+    expect(await listWorkspaceTemplateSecrets(workspaceTemplate.id, file)).toMatchObject([{ annotation: "", configured: true }]);
     expect(await revealWorkspaceTemplateSecrets(workspaceTemplate.id, file, keyFile)).toMatchObject([{ secretValue: "real-value" }]);
     expect(await readFile(file, "utf8")).not.toContain("real-value");
   });
 
-  test("older persisted secrets remain configured and default to required with no annotation", async () => {
+  test("older persisted secrets remain configured with no annotation", async () => {
     const dir = await mkdtemp(join(tmpdir(), "agents-in-the-cloud-old-secrets-"));
     const file = join(dir, "projects.json");
     const keyFile = join(dir, "key");
@@ -128,9 +128,11 @@ describe("Workspace templates", () => {
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "TOKEN", hostPattern: "example.com", secretValue: "value" }, file, keyFile);
     const store = JSON.parse(await readFile(file, "utf8"));
     delete store.projects[0].secrets[0].annotation;
-    delete store.projects[0].secrets[0].optional;
+    store.projects[0].secrets[0].optional = true;
     await writeFile(file, JSON.stringify(store));
-    expect(await listWorkspaceTemplateSecrets(workspaceTemplate.id, file)).toMatchObject([{ annotation: "", optional: false, configured: true }]);
+    const [secret] = await listWorkspaceTemplateSecrets(workspaceTemplate.id, file);
+    expect(secret).toMatchObject({ annotation: "", configured: true });
+    expect(secret).not.toHaveProperty("optional");
   });
 
   test("Workspace template SSH private keys are encrypted at rest", async () => {

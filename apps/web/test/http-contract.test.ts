@@ -44,7 +44,6 @@ const workspaceTemplateSecretSummarySchema = Type.Object({
   allowInPath: Type.Boolean(),
   placeholder: Type.Optional(Type.String()),
   annotation: Type.String(),
-  optional: Type.Boolean(),
   configured: Type.Boolean(),
   createdAt: Type.String(),
   updatedAt: Type.String(),
@@ -243,7 +242,7 @@ describe("HTTP contracts", () => {
     expect(Value.Parse(deletedWorkspaceTemplateEnvironmentVariableResponseSchema, await deletedEnvironmentResponse.json()).deleted).toBe(true);
   });
 
-  test("Secret JSON supports missing values and editable requirement metadata", async () => {
+  test("Secret JSON supports missing values and editable annotations", async () => {
     const { app, registry } = createTestApp();
     await registry.seed([]);
     const workspaceTemplate = (await addWorkspaceTemplate("https://github.com/org/requirements.git")).workspaceTemplate;
@@ -252,11 +251,10 @@ describe("HTTP contracts", () => {
     const response = await app.fetch(postJson(path, values));
     expect(response.status).toBe(200);
     const { secret } = Value.Parse(workspaceTemplateSecretResponseSchema, await response.json());
-    expect(secret).toMatchObject({ annotation: "Integration tests", optional: false, configured: false });
-    const updated = await app.fetch(postJson(`${path}/${secret.id}`, { ...values, optional: true, annotation: "Report uploads" }));
-    expect(Value.Parse(workspaceTemplateSecretResponseSchema, await updated.json()).secret).toMatchObject({ annotation: "Report uploads", optional: true, configured: false });
-    const invalid = await app.fetch(postJson(`${path}/${secret.id}`, { ...values, optional: "false" }));
-    expect(invalid.status).toBe(400);
+    expect(secret).toMatchObject({ annotation: "Integration tests", configured: false });
+    const updated = await app.fetch(postJson(`${path}/${secret.id}`, { ...values, annotation: "Report uploads" }));
+    expect(Value.Parse(workspaceTemplateSecretResponseSchema, await updated.json()).secret).toMatchObject({ annotation: "Report uploads", configured: false });
+    expect(secret).not.toHaveProperty("optional");
     expect(await revealWorkspaceTemplateSecrets(workspaceTemplate.id)).toEqual([]);
   });
 

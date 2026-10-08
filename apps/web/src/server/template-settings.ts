@@ -9,7 +9,7 @@ import { toggleHtml } from "@agents-in-the-cloud/design-system/toggle";
 import { warningBannerHtml } from "@agents-in-the-cloud/design-system/warning-banner";
 import { buttonConfirmationHtml } from "@agents-in-the-cloud/design-system/button-confirmation";
 import { escapeHtml } from "@agents-in-the-cloud/shared";
-import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts, listWorkspaceTemplateSshKeys, secretNeedsValue, workspaceTemplateSecretAllowsPath, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSecretSummary } from "@agents-in-the-cloud/workspace-templates";
+import { formatWorkspaceTemplateSpec, getWorkspaceTemplateConfiguration, getWorkspaceTemplateSshKnownHosts, listWorkspaceTemplateSshKeys, workspaceTemplateSecretAllowsPath, type WorkspaceTemplateConfiguration, type WorkspaceTemplateSecretSummary } from "@agents-in-the-cloud/workspace-templates";
 
 import { workspaceTemplateSwatchColor } from "./workspace-presentation.ts";
 
@@ -75,9 +75,8 @@ function secretEditor(t: WorkspaceTemplateConfiguration, secret?: WorkspaceTempl
   const hostAttributes = isNew ? 'data-workspace-template-secret-path-target="host" data-action="input->workspace-template-secret-path#useDefault"' : "";
   const content = `${field("Environment variable", "envName", secret?.envName ?? "", 'required autocomplete="off"')}
     ${field("Allowed host", "hostPattern", secret?.hostPattern ?? "", `required autocomplete="off" placeholder="api.example.com" ${hostAttributes}`)}
-    ${field(secret?.configured ? "Replace secret value" : "Secret value", "secretValue", "", `type="password" autocomplete="new-password" data-1p-ignore${isNew ? ' required' : ''}`)}
-    ${paragraph(secret?.configured ? "Leave the value blank to keep the stored secret. Stored values are never shown." : isNew ? "Required secrets need a value. Optional secrets can be added without one. Agents only see a placeholder." : "Agents only see a placeholder. Add the real value here when it’s available.")}
-    ${selection("Requirement", "optional", String(secret?.optional ?? false), [{ value: "false", label: "Required" }, { value: "true", label: "Optional" }])}
+    ${field(secret?.configured ? "Replace secret value" : "Secret value", "secretValue", "", `type="password" autocomplete="new-password" data-1p-ignore`)}
+    ${paragraph(secret?.configured ? "Leave the value blank to keep the stored secret. Stored values are never shown." : "Agents only see a placeholder. Add the real value here when it’s available.")}
     ${disclosureHtml({ summary: { kind: "compact", label: { kind: "text", text: "Advanced" } }, bodyHtml: `<div class="form-stack">
       ${field("Placeholder", "placeholder", secret?.placeholder ?? "", 'autocomplete="off"')}
       ${paragraph("Leave blank to use an automatically generated placeholder.")}
@@ -86,7 +85,7 @@ function secretEditor(t: WorkspaceTemplateConfiguration, secret?: WorkspaceTempl
       ${toggleHtml({ variant: "button", label: "Allow substitution in URL paths", name: "allowInPath", value: permission, options: [{ value: "false", label: "Disallow" }, { value: "true", label: "Allow" }], element: { dataAction: `${isNew ? "click->workspace-template-secret-path#choose change->workspace-template-secret-path#choose " : ""}change->template-settings#toggleChanged`, data: isNew ? { "workspace-template-secret-path-target": "toggle" } : undefined } })}</div>
       ${paragraph("Allow only if the service needs this secret in its URL path, rather than headers or the request body.")}
     </div>` })}`;
-  return `${secret ? paragraph(secret.configured ? "Secret stored" : secretNeedsValue(secret) ? "Required secret — needs a value" : "Optional secret — no value stored") : ""}${form(t.id, `/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`, content, { section: "secrets", saved, editor: secret?.id ?? "new", caption: isNew ? "Add secret" : "Save changes", attributesHtml: isNew ? 'data-controller="workspace-template-secret-path" data-template-settings-new-secret' : "" })}${secret ? removeForm(t.id, `/secrets/${encodeURIComponent(secret.id)}/delete`, "secrets", "Delete secret", `Delete ${secret.envName} and its stored value. Requests using it will no longer receive this secret.`) : ""}`;
+  return `${secret ? paragraph(secret.configured ? "Secret stored" : "No value stored") : ""}${form(t.id, `/secrets${secret ? `/${encodeURIComponent(secret.id)}` : ""}`, content, { section: "secrets", saved, editor: secret?.id ?? "new", caption: isNew ? "Add secret" : "Save changes", attributesHtml: isNew ? 'data-controller="workspace-template-secret-path"' : "" })}${secret ? removeForm(t.id, `/secrets/${encodeURIComponent(secret.id)}/delete`, "secrets", "Delete secret", `Delete ${secret.envName} and its stored value. Requests using it will no longer receive this secret.`) : ""}`;
 }
 
 export function templateSettingsErrorHtml(message: string): string {
@@ -98,7 +97,7 @@ export function templateSettingsErrorHtml(message: string): string {
 
 export async function renderTemplateSettingsFrame(id: string, location: TemplateSettingsLocation, references: TemplateSettingsReference[], saved = false, submittedPath?: string): Promise<string> {
   const [t, keys, knownHosts] = await Promise.all([getWorkspaceTemplateConfiguration(id), listWorkspaceTemplateSshKeys(id), getWorkspaceTemplateSshKnownHosts(id)]);
-  const section = sectionFor(location.section) ?? (t.secrets.some(secretNeedsValue) ? "secrets" : "index");
+  const section = sectionFor(location.section) ?? "index";
   const editor = location.editor ?? (location.section === "privileged" ? "docker" : location.section === "preload-images" ? "images" : location.section === "dockerfile" ? "dockerfile" : undefined);
   if (editor && !["secrets", "ssh", "environment", "container"].includes(section)) throw invalidArguments("This settings section has no record editor");
   if (section === "container" && editor && !["docker", "images", "dockerfile"].includes(editor)) throw invalidArguments("Settings record not found");
@@ -106,7 +105,7 @@ export async function renderTemplateSettingsFrame(id: string, location: Template
   const savedFor = (value: TemplateSettingsSection, record?: string) => saved && section === value && editor === record;
   const opened = (value: TemplateSettingsSection, record?: string) => section === value && (record === undefined || editor === record);
   const general = form(id, "", `<div class="template-settings-inline-fields">${field("Display name", "name", t.name, 'required autocomplete="off" data-1p-ignore="true"')}${field("Repository", "gitUrl", formatWorkspaceTemplateSpec(t), "required")}</div><label class="template-settings-color"><span>Swatch color</span><input type="hidden" name="swatchColor" value="${escapeHtml(t.swatchColor ?? "")}"><span class="template-settings-color-control"><span class="workspace-template-icon" style="--workspace-template-swatch: ${escapeHtml(t.swatchColor ?? workspaceTemplateSwatchColor(t.id))}" aria-hidden="true"></span><input type="color" name="swatchColorPicker" aria-label="Swatch color" data-template-settings-target="colorPicker" data-default-color="${workspaceTemplateSwatchColor(t.id)}" data-action="input->template-settings#colorChanged change->template-settings#colorChanged"></span></label>`, { section: "general", saved: savedFor("general"), autosave: true });
-  const secrets = inlineDisclosure("secrets", undefined, "Secrets your agent may use but not see", `${paragraph("Agents use placeholders. Real values are substituted in requests to allowed hosts. Changes also apply to existing workspaces.")}<div class="template-settings-inline-records">${t.secrets.toSorted((a, b) => Number(secretNeedsValue(b)) - Number(secretNeedsValue(a))).map(secret => inlineDisclosure("secrets", secret.id, secret.envName, secretEditor(t, secret, savedFor("secrets", secret.id)), opened("secrets", secret.id))).join("")}${inlineDisclosure("secrets", "new", "Add secret", secretEditor(t), opened("secrets", "new"))}</div>`, opened("secrets"));
+  const secrets = inlineDisclosure("secrets", undefined, "Secrets your agent may use but not see", `${paragraph("Agents use placeholders. Real values are substituted in requests to allowed hosts. Changes also apply to existing workspaces.")}<div class="template-settings-inline-records">${t.secrets.map(secret => inlineDisclosure("secrets", secret.id, secret.envName, secretEditor(t, secret, savedFor("secrets", secret.id)), opened("secrets", secret.id))).join("")}${inlineDisclosure("secrets", "new", "Add secret", secretEditor(t), opened("secrets", "new"))}</div>`, opened("secrets"));
   const environmentEditor = (variable?: WorkspaceTemplateConfiguration["environment"][number]) => {
     const record = variable?.id ?? "new";
     return `${form(id, `/environment${variable ? `/${encodeURIComponent(variable.id)}` : ""}`, `<div class="template-settings-inline-fields">${field("Name", "name", variable?.name ?? "", 'required autocomplete="off"')}${field("Value", "value", variable?.value ?? "", 'autocomplete="off"')}</div>`, { section: "environment", editor: record, saved: savedFor("environment", record), caption: variable ? "Save changes" : "Add variable" })}${variable ? removeForm(id, `/environment/${encodeURIComponent(variable.id)}/delete`, "environment", "Remove variable", `Remove ${variable.name} from new workspaces. Existing containers stay unchanged.`) : ""}`;

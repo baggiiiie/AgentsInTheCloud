@@ -38,13 +38,13 @@ test("renaming a project is not a setup change", async () => {
   expect(await warningsFor(workspace)).toEqual([]);
 });
 
-test("missing mandatory secrets and changed settings are separate, while annotations are live metadata", async () => {
+test("secrets without values produce no warnings, while annotations are live metadata", async () => {
   const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/example.git");
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
   const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, values);
   const workspace = entry(workspaceInitFromTemplate((await listWorkspaceTemplates()).workspaceTemplates[0]!));
-  expect((await warningsFor(workspace)).map((warning) => warning.kind)).toEqual(["missing-secrets"]);
-  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "Tests", optional: true });
+  expect((await warningsFor(workspace)).map((warning) => warning.kind)).toEqual([]);
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, annotation: "Tests" });
   expect(await warningsFor(workspace)).toEqual([]);
   await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "never expose this" });
   const warnings = await warningsFor(workspace);
@@ -67,11 +67,11 @@ test("only configured secrets contribute to setup drift", async () => {
   const { workspaceTemplate } = await addWorkspaceTemplate("https://github.com/org/declarations.git");
   const workspace = entry(workspaceInitFromTemplate(workspaceTemplate));
   const values = { envName: "TOKEN", hostPattern: "api.example.com" };
-  const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { ...values, optional: true });
+  const secret = await createWorkspaceTemplateSecret(workspaceTemplate.id, { ...values });
   expect(await warningsFor(workspace)).toEqual([]);
   expect((await getWorkspaceTemplateConfiguration(workspaceTemplate.id)).configurationFingerprint).toBe(workspaceTemplate.configurationFingerprint);
-  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, optional: false, placeholder: "TOKEN_PLACEHOLDER", annotation: "Tests" });
-  expect((await warningsFor(workspace)).map(({ kind }) => kind)).toEqual(["missing-secrets"]);
+  await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, placeholder: "TOKEN_PLACEHOLDER", annotation: "Tests" });
+  expect((await warningsFor(workspace)).map(({ kind }) => kind)).toEqual([]);
   await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "configured-value" });
   expect((await warningsFor(workspace)).map(({ kind }) => kind)).toEqual(["project-settings-changed"]);
   const snapshot = await getWorkspaceTemplateConfiguration(workspaceTemplate.id);
@@ -92,6 +92,6 @@ test("one project snapshot supplies consistent warnings to every workspace in a 
   const before = workspaceWarnings(first, snapshot);
   await updateWorkspaceTemplateSecret(workspaceTemplate.id, secret.id, { ...values, secretValue: "real-value" });
   expect(workspaceWarnings(second, snapshot)).toEqual(before);
-  expect(before.map(({ kind }) => kind)).toEqual(["missing-secrets"]);
+  expect(before.map(({ kind }) => kind)).toEqual([]);
   expect((await warningsFor(second)).map(({ kind }) => kind)).toEqual(["project-settings-changed"]);
 });

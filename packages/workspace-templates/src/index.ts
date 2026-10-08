@@ -43,7 +43,6 @@ export {
   listWorkspaceTemplateSecrets,
   revealWorkspaceTemplateSecrets,
   updateWorkspaceTemplateSecret,
-  secretNeedsValue,
   workspaceTemplateSecretPlaceholder,
   workspaceTemplateSecretPathPermissionSchema,
   type WorkspaceTemplateSecretInput,

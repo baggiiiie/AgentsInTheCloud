@@ -11,7 +11,7 @@ export type WorkspaceTemplateSummary = Omit<WorkspaceTemplateRecord, "secrets" |
   lastUsedAt?: number;
 };
 export type StoredWorkspaceTemplateSecret = Static<typeof storedWorkspaceTemplateSecretSchema>;
-export type WorkspaceTemplateSecretSummary = Omit<StoredWorkspaceTemplateSecret, "projectId" | "encryptedSecret" | "optional" | "annotation"> & { workspaceTemplateId: string; annotation: string; optional: boolean; configured: boolean };
+export type WorkspaceTemplateSecretSummary = Omit<StoredWorkspaceTemplateSecret, "projectId" | "encryptedSecret" | "annotation"> & { workspaceTemplateId: string; annotation: string; configured: boolean };
 export type StoredWorkspaceTemplateSshKey = Static<typeof storedWorkspaceTemplateSshKeySchema>;
 export type WorkspaceTemplateSshKeySummary = Omit<StoredWorkspaceTemplateSshKey, "projectId" | "encryptedPrivateKey"> & { workspaceTemplateId: string };
 export type StoredWorkspaceTemplateEnvironmentVariable = Static<typeof workspaceTemplateEnvironmentVariableSchema>;
@@ -48,7 +48,6 @@ const storedWorkspaceTemplateSecretSchema = Type.Object({
   updatedAt: Type.String(),
   encryptedSecret: Type.Optional(Type.String()),
   annotation: Type.Optional(Type.String()),
-  optional: Type.Optional(Type.Boolean()),
 });
 
 const workspaceTemplateEnvironmentVariableSchema = Type.Object({
@@ -148,6 +147,10 @@ export async function readWorkspaceTemplateStore(file: string): Promise<Workspac
   try {
     const stored = Value.Parse(workspaceTemplateStoreSchema, JSON.parse(await readFile(file, "utf8")));
     const store: WorkspaceTemplateStore = { workspaceTemplates: stored.projects };
+    // Ignore the retired requirement flag in older saved secrets.
+    for (const workspaceTemplate of store.workspaceTemplates) for (const secret of workspaceTemplate.secrets ?? []) {
+      Reflect.deleteProperty(secret, "optional");
+    }
     // Older records may contain derived SSH metadata; keep only the encrypted key and its label.
     for (const workspaceTemplate of store.workspaceTemplates) for (const key of workspaceTemplate.sshKeys ?? []) {
       Reflect.deleteProperty(key, "publicKey");
@@ -229,7 +232,7 @@ export type WorkspaceTemplateConfiguration = WorkspaceTemplateSummary & {
 
 export function workspaceTemplateSecretSummary(secret: StoredWorkspaceTemplateSecret): WorkspaceTemplateSecretSummary {
   const { encryptedSecret, projectId: workspaceTemplateId, ...metadata } = secret;
-  return { ...metadata, workspaceTemplateId, annotation: secret.annotation ?? "", optional: secret.optional ?? false, configured: !!encryptedSecret };
+  return { ...metadata, workspaceTemplateId, annotation: secret.annotation ?? "", configured: !!encryptedSecret };
 }
 
 export function workspaceTemplateSecretSummaries(workspaceTemplate: WorkspaceTemplateRecord): WorkspaceTemplateSecretSummary[] {

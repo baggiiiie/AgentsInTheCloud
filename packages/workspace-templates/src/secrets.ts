@@ -15,12 +15,7 @@ export interface WorkspaceTemplateSecretInput {
   placeholder?: string;
   allowInPath?: boolean;
   annotation?: string;
-  optional?: boolean;
   secretValue?: string;
-}
-
-export function secretNeedsValue(secret: WorkspaceTemplateSecretSummary): boolean {
-  return !secret.optional && !secret.configured;
 }
 
 function normalizeEnvName(value: string): string {
@@ -65,7 +60,7 @@ export async function createWorkspaceTemplateSecret(workspaceTemplateId: string,
     assertEnvNameAvailable(workspaceTemplate, envName);
     const now = new Date().toISOString();
     const id = randomUUID();
-    const stored: StoredWorkspaceTemplateSecret = { id, projectId: workspaceTemplateId, envName, hostPattern, placeholder, allowInPath: workspaceTemplateSecretAllowsPath(values), annotation: values.annotation?.trim() ?? "", optional: values.optional ?? false, encryptedSecret: secretValue ? await encryptWorkspaceTemplateValue(workspaceTemplateId, id, secretValue, keyFile) : undefined, createdAt: now, updatedAt: now };
+    const stored: StoredWorkspaceTemplateSecret = { id, projectId: workspaceTemplateId, envName, hostPattern, placeholder, allowInPath: workspaceTemplateSecretAllowsPath(values), annotation: values.annotation?.trim() ?? "", encryptedSecret: secretValue ? await encryptWorkspaceTemplateValue(workspaceTemplateId, id, secretValue, keyFile) : undefined, createdAt: now, updatedAt: now };
     workspaceTemplate.secrets.push(stored);
     return workspaceTemplateSecretSummary(stored);
   });
@@ -87,7 +82,6 @@ export async function updateWorkspaceTemplateSecret(workspaceTemplateId: string,
     }
     if (values.allowInPath !== undefined) secret.allowInPath = values.allowInPath;
     if (values.annotation !== undefined) secret.annotation = values.annotation.trim();
-    if (values.optional !== undefined) secret.optional = values.optional;
     if (values.secretValue) secret.encryptedSecret = await encryptWorkspaceTemplateValue(workspaceTemplateId, secretId, values.secretValue, keyFile);
     secret.updatedAt = new Date().toISOString();
     return workspaceTemplateSecretSummary(secret);

@@ -229,28 +229,23 @@ export function createWorkspaceTemplateRoutes(deps: {
         placeholder: String(formData.get("placeholder") ?? ""),
         secretValue: String(formData.get("secretValue") ?? "") || undefined,
         annotation: String(formData.get("annotation") ?? ""),
-        optional: formData.get("optional") === "true",
       };
     }
     const body = await readJsonObject(request);
     const allowInPath = body.allowInPath;
     if (allowInPath !== undefined && !Value.Check(workspaceTemplateSecretPathPermissionSchema, allowInPath)) throw invalidArguments("allowInPath must be a boolean");
-    const optional = body.optional;
-    if (optional !== undefined && !Value.Check(jsonBooleanSchema, optional)) throw invalidArguments("optional must be a boolean");
     return {
       envName: requiredJsonString(body, "envName"),
       hostPattern: requiredJsonString(body, "hostPattern"),
       placeholder: optionalJsonString(body, "placeholder"),
       secretValue: optionalJsonString(body, "secretValue"),
       annotation: optionalJsonString(body, "annotation"),
-      optional,
       allowInPath,
     };
   }
 
   async function createWorkspaceTemplateSecretEndpoint(workspaceTemplateId: string, request: Request): Promise<Response> {
     const values = await workspaceTemplateSecretValues(request);
-    if (!requestAcceptsJson(request) && !values.optional && !values.secretValue) throw invalidArguments("Enter a value for this required secret, or make it optional.");
     const secret = await createWorkspaceTemplateSecret(workspaceTemplateId, values);
     return workspaceTemplateSettingsResponse(request, { secret });
   }

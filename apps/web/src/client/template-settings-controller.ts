@@ -145,7 +145,6 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
     // SAFETY: These actions are bound only to inputs/toggles inside server-rendered forms.
     const form = (event.target as HTMLElement).closest("form")!;
     form.querySelector<HTMLInputElement>(`input[type="hidden"][name="${CSS.escape(event.detail.name)}"]`)!.value = event.detail.value;
-    if (event.detail.name === "optional" && form.hasAttribute("data-template-settings-new-secret")) form.querySelector<HTMLInputElement>('input[name="secretValue"]')!.required = event.detail.value === "false";
     this.updateSave(form);
     this.queueAutosave(form);
   }
@@ -168,7 +167,6 @@ export class TemplateSettingsController extends Controller<HTMLElement> {
       const name = toggle.querySelector<HTMLButtonElement>("button[name]")!.name;
       setToggleValue(toggle, form.querySelector<HTMLInputElement>(`input[type="hidden"][name="${CSS.escape(name)}"]`)!.value);
     }
-    if (form.hasAttribute("data-template-settings-new-secret")) form.querySelector<HTMLInputElement>('input[name="secretValue"]')!.required = form.querySelector<HTMLInputElement>('input[name="optional"]')!.value === "false";
     this.updateSave(form);
     form.closest("details")?.querySelector("summary")?.focus();
   }

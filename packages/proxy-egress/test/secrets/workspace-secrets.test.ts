@@ -50,10 +50,10 @@ describe("workspace secrets", () => {
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "STRICT_TOKEN", hostPattern: "api.example.com", placeholder: "sk-test-placeholder", secretValue: "strict-secret" });
 
     await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "MISSING_TOKEN", hostPattern: "api.example.com", annotation: "Integration tests" });
-    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "OPTIONAL_TOKEN", hostPattern: "api.example.com", optional: true });
+    await createWorkspaceTemplateSecret(workspaceTemplate.id, { envName: "UNCONFIGURED_TOKEN", hostPattern: "api.example.com" });
     const context = await createWorkspaceSecretContext("test-workspace", workspaceTemplateInit(workspaceTemplate.id));
     expect(context.env).not.toHaveProperty("MISSING_TOKEN");
-    expect(context.env).not.toHaveProperty("OPTIONAL_TOKEN");
+    expect(context.env).not.toHaveProperty("UNCONFIGURED_TOKEN");
     const result = await context.hooks.onRequest(new Request("https://api.example.com/v1/sk-test-placeholder", { headers: { authorization: "Bearer sk-test-placeholder" } }));
 
     expect(context.env.API_TOKEN).toBe("AGENTSINTHECLOUD_PROXY_READY_API_TOKEN");

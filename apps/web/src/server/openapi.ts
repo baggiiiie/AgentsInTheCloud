@@ -29,7 +29,7 @@ const agentId = { name: "agentId", in: "path", required: true, schema: { type: "
 const jsonBody = (schema: TSchema) => ({ required: true, content: { "application/json": { schema } } });
 const emptyObjectSchema = { type: "object", additionalProperties: false };
 const workspaceIssuesSchema = { type: "array", items: { type: "object", required: ["kind", "message"], properties: { kind: { type: "string", enum: ["readiness", "image"] }, message: { type: "string" } }, additionalProperties: false } };
-const workspaceTemplateSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, optional: { type: "boolean", default: false }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
+const workspaceTemplateSecretInputSchema = { type: "object", required: ["envName", "hostPattern"], properties: { envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string", description: "What this secret is needed for" }, secretValue: { type: "string", writeOnly: true } }, additionalProperties: false };
 const sshKnownHostsSchema = { type: "object", required: ["knownHosts"], properties: { knownHosts: { type: "string", description: "Operator-verified known_hosts entries; empty clears additional trust. GitHub is trusted by default." } } };
 const workspaceTemplateSummaryProperties = { swatchColor: { type: "string", pattern: "^#[0-9a-fA-F]{6}$", description: "Custom swatch color; absent when using the automatic template color" }, seedConfigEnabled: { type: "boolean", description: "Host-authorized Atelier-in-Atelier seeding; defaults to false" }, createdAt: { type: "number", description: "Unix timestamp in milliseconds when the template was added; absent for templates added before this was recorded" }, lastUsedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent use: adding the template or creating a workspace from it" }, lastWorkspaceCreatedAt: { type: "number", description: "Unix timestamp in milliseconds of the most recent workspace creation from this template; absent if none has been recorded" }, configurationFingerprint: { type: "string", description: "Opaque fingerprint of workspace setup settings" }, id: { type: "string" }, name: { type: "string" }, gitUrl: { type: "string" }, branch: { type: ["string", "null"] }, sessionShareKey: { type: "string" }, privileged: { type: "boolean", default: false, description: "Host-authorized privileged mode for future workspaces; enables Docker at the cost of host isolation" }, dockerfile: { type: "string" }, preloadImages: { type: "array", items: { type: "string" }, description: "Images prepared before newly created workspaces become ready. Does not change existing workspaces." } };
 const agentSummarySchema = {
@@ -96,7 +96,7 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
       "/workspace-templates/{workspaceTemplateId}/settings": {
         get: {
           summary: "Present workspace template settings",
-          description: "A non-modal settings index with focused section and record editors. Use section=index for the overview; without a section, missing required secrets take precedence. Use its URL with the presentation tool.",
+          description: "A non-modal settings index with focused section and record editors. Use section=index for the overview; without a section, the overview opens. Use its URL with the presentation tool.",
           parameters: [workspaceTemplateId, workspaceTemplateSettingsSection, { name: "editor", in: "query", required: false, description: "Record ID or new for Secrets, SSH access and Environment; docker, images or dockerfile for Container.", schema: { type: "string" } }],
           responses: htmlSurfaceResponses("AgentsInTheCloud with workspace template settings open"),
         },
@@ -167,8 +167,8 @@ export function agentsInTheCloudOpenApi(commands: WorkspaceModuleCommandHandler[
         EnvironmentVariableEnvelope: { type: "object", required: ["environmentVariable"], properties: { environmentVariable: { $ref: "#/components/schemas/EnvironmentVariable" } } },
         SecretSummary: {
           type: "object",
-          required: ["id", "workspaceTemplateId", "envName", "hostPattern", "createdAt", "updatedAt", "annotation", "optional", "configured"],
-          properties: { id: { type: "string" }, workspaceTemplateId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, optional: { type: "boolean" }, configured: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
+          required: ["id", "workspaceTemplateId", "envName", "hostPattern", "createdAt", "updatedAt", "annotation", "configured"],
+          properties: { id: { type: "string" }, workspaceTemplateId: { type: "string" }, envName: { type: "string" }, hostPattern: { type: "string" }, allowInPath: workspaceTemplateSecretPathPermissionSchema, placeholder: { type: "string" }, annotation: { type: "string" }, configured: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } },
           additionalProperties: false,
         },
         CreateSecret: workspaceTemplateSecretInputSchema,

@@ -81,7 +81,7 @@ A fringe Workspace template permission for copying Model provider credentials an
 The Workspace template page for managing Secrets shared with its Workspaces. Changes also apply to existing Workspaces, unlike Environment Variables, which only apply to new containers.
 
 **Secret**:
-A Workspace template credential entry that gives Agents a placeholder and permits substitution of its real value into requests to allowed hosts. Real values stay outside Agent sandboxes. A Secret can be required or optional, and its value may still need to be supplied.
+A Workspace template credential entry that gives Agents a placeholder and permits substitution of its real value into requests to allowed hosts. Real values stay outside Agent sandboxes. A Secret can be saved without a value and filled in later.
 _Avoid_: Project secret, environment variable (when the protected credential entry is meant)
 
 **Environment Variables**:
