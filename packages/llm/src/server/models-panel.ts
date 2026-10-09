@@ -518,7 +518,7 @@ function oauthDeviceCodeBody(flow: PendingOAuthFlow, complete = false): string {
     label: `Copy ${flow.userCode ?? ""} into clipboard`,
     caption: `Copy ${flow.userCode ?? ""}`,
     copyText: flow.userCode ?? "",
-    attributesHtml: 'data-action="oauth-flow#showDeviceAuth"',
+    action: "oauth-flow#showDeviceAuth",
   });
   const confirmationName = flow.provider === "openai-codex" ? "OpenAI-Codex" : flow.label;
   const status = complete

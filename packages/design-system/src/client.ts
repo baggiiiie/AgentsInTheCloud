@@ -27,7 +27,6 @@ const automaticBehaviors = [
   ["body", "content-rows"],
   ["body", "warning-banners"],
   [".activity-button, .progress-button", "perimeter-button"],
-  [".copy-button", "copy-button", "click->copy-button#copy"],
   [".destructive-confirmation", "destructive-confirmation"],
   [".dialog", "dialog"],
   [".help-tip", "help-tip"],
