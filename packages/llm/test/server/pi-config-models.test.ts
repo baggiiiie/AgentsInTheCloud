@@ -79,9 +79,11 @@ describe("custom Pi model configuration", () => {
       let authUrl: string | undefined;
       await expect(loginPiOAuthProvider("openai", {
         signal: abort.signal,
-        notify: (event) => { if (event.type === "auth_url") { authUrl = event.url; abort.abort(); } },
-        prompt: (prompt) => new Promise((_resolve, reject) => prompt.signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true })),
-      })).rejects.toThrow();
+        notify: (event) => { if (event.type === "auth_url") authUrl = event.url; },
+        // Reject the prompt so the provider reaches its cleanup before we start
+        // another login. Aborting in notify races the prompt's abort listener.
+        prompt: async () => { throw new Error("cancelled by test"); },
+      })).rejects.toThrow("cancelled by test");
       return new URL(authUrl!).searchParams.get("ext_agent_host_id");
     }
     const first = await agentHostId();
