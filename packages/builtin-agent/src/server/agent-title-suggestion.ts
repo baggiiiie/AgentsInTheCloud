@@ -109,7 +109,7 @@ function suggestAgentTitle(agent: { workspaceId: string; agentId?: string }, use
       }
       const response = await runtime.completeSimple(model, {
         messages: [{ role: "user", content: promptFor(promptText), timestamp: Date.now() }],
-      }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model) });
+      }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model), sessionId: crypto.randomUUID() });
       if (response.stopReason === "error") {
         logAgentTitleSuggestionError(agent, titleModelRef, response.errorMessage ?? "model returned an error", {
           stopReason: response.stopReason,

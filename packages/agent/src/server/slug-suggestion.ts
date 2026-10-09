@@ -41,7 +41,7 @@ export async function suggestAgentSlug(userPrompt: string, selectedModel?: Model
   if (!model || !(await runtime.checkAuth(model.provider))) return undefined;
   const response = await runtime.completeSimple(model, {
     messages: [{ role: "user", content: promptFor(userPrompt), timestamp: Date.now() }],
-  }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model) });
+  }, { ...agentTitleRequestOptions, headers: claudeCodeHeaders(model), sessionId: crypto.randomUUID() });
   if (response.stopReason === "error") return undefined;
   return normalizeSlug(textFromResponse(response));
 }
