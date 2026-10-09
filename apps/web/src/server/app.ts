@@ -300,7 +300,9 @@ export function createWebApp(deps: WebAppDeps): WebApp {
     const content = await launchComposerContent({ context: launchComposerFooterContext(), draftId, agentType: agentTypes[0]!, agentTypes, workspaceTemplateId: workspaceTemplate?.id, initialPrompt });
     return `<turbo-frame id="${launchComposerFrameId}">${dialogHtml({
       element: {
-        attributesHtml: `data-controller="dialog launch-composer-dialog submit-shortcut composer-focus" data-action="mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:software-keyboard@document->launch-composer-dialog#layout resize@window->launch-composer-dialog#layout" data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
+        controllers: "launch-composer-dialog submit-shortcut composer-focus",
+        actions: "mousedown->composer-focus#preserveInputFocus agents-in-the-cloud:software-keyboard@document->launch-composer-dialog#layout resize@window->launch-composer-dialog#layout",
+        attributesHtml: `data-launch-composer-dialog-discard-url-value="${escapeHtml(content.discardUrl)}"`,
       },
       iconHtml: Icons.Workspace,
       titleCaption: "Create workspace from a template, and then…",
